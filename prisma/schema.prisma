@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// Пользователь
+// ─────────────────────────────────────────────
+model User {
+  id           BigInt   @id                    // Telegram user ID
+  username     String?
+  firstName    String?
+  lastName     String?
+  language     String   @default("en")
+  tokenBalance Decimal  @default(5.50)         @db.Decimal(12, 4)
+  isNew        Boolean  @default(true)
+  isBlocked    Boolean  @default(false)
+  referredById BigInt?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  referredBy   User?              @relation("Referrals", fields: [referredById], references: [id])
+  referrals    User[]             @relation("Referrals")
+  dialogs      Dialog[]
+  transactions TokenTransaction[]
+  userState    UserState?
+
+  @@map("users")
+}
+
+// Состояние FSM бота для пользователя
+model UserState {
+  userId    BigInt  @id
+  state     String  @default("IDLE")          // IDLE | MAIN_MENU | GPT_SECTION | GPT_ACTIVE | ...
+  section   String? // gpt | design | audio | video
+  modelId   String? // текущая выбранная модель
+  dialogId  String? // текущий активный диалог
+
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_states")
+}
+
+// ─────────────────────────────────────────────
+// Диалоги
+// ─────────────────────────────────────────────
+model Dialog {
+  id       String  @id @default(cuid())
+  userId   BigInt
+  section  String  // gpt | design | audio | video
+  modelId  String  // gpt-4o | claude-sonnet | midjourney | kling | etc.
+  title    String?
+  isActive Boolean @default(true)
+
+  // ── Стратегия хранения контекста ────────────────────────────────────────
+  // "provider_chain"  — OpenAI Responses API: цепочка через previous_response_id
+  // "provider_thread" — OpenAI Assistants: сервер хранит всю историю в Thread
+  // "db_history"      — Anthropic, Gemini и др.: история из БД, последние N сообщений
+  contextStrategy        String  @default("db_history")
+  providerThreadId       String? // OpenAI Assistants: thread_id
+  providerLastResponseId String? // OpenAI Responses API: последний response_id
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId])
+  @@index([userId, section])
+  @@map("dialogs")
+}
+
+model Message {
+  id                String  @id @default(cuid())
+  dialogId          String
+  role              String  // user | assistant
+  content           String
+  mediaUrl          String?
+  mediaType         String? // image | video | audio
+  tokensUsed        Decimal @default(0) @db.Decimal(10, 4)
+  providerMessageId String? // OpenAI Assistants: message_id (для управления историей)
+
+  createdAt DateTime @default(now())
+
+  dialog Dialog @relation(fields: [dialogId], references: [id], onDelete: Cascade)
+
+  @@index([dialogId, createdAt])
+  @@map("messages")
+}
+
+// ─────────────────────────────────────────────
+// Токены
+// ─────────────────────────────────────────────
+model TokenTransaction {
+  id     String  @id @default(cuid())
+  userId BigInt
+  amount Decimal @db.Decimal(12, 4)           // положительное = пополнение, отрицательное = списание
+  type   String  // credit | debit
+  reason String  // welcome_bonus | ai_usage | purchase | referral_bonus | admin
+
+  // Метаданные для разных типов
+  modelId  String? // при ai_usage
+  dialogId String? // при ai_usage
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("token_transactions")
+}
+
+// ─────────────────────────────────────────────
+// Задачи генерации (async queue)
+// ─────────────────────────────────────────────
+model GenerationJob {
+  id       String @id @default(cuid())
+  userId   BigInt
+  dialogId String
+  section  String // image | video | audio
+  modelId  String
+  status   String @default("pending") // pending | processing | done | failed
+
+  prompt    String
+  inputData Json?  // доп. параметры (размер, стиль и т.д.)
+  outputUrl String?
+  error     String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@map("generation_jobs")
+}

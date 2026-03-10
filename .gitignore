@@ -1,3 +1,4 @@
+.claude/
 # Logs
 logs
 *.log
@@ -121,6 +122,16 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Turborepo
+.turbo/
+
+# Docker volumes
+postgres_data/
+redis_data/
+
+# Prisma
+prisma/generated/
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test

@@ -1,0 +1,30 @@
+FROM node:20-alpine AS base
+RUN npm install -g pnpm
+WORKDIR /app
+
+FROM base AS deps
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/bot/package.json ./packages/bot/
+COPY packages/shared/package.json ./packages/shared/
+RUN pnpm install --frozen-lockfile
+
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/bot/node_modules ./packages/bot/node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY . .
+RUN pnpm --filter @metabox/shared build
+RUN pnpm --filter @metabox/bot build
+
+FROM node:20-alpine AS runner
+RUN npm install -g pnpm
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder /app/packages/bot/dist ./packages/bot/dist
+COPY --from=builder /app/packages/bot/package.json ./packages/bot/
+COPY --from=builder /app/node_modules ./node_modules
+
+CMD ["node", "packages/bot/dist/index.js"]
