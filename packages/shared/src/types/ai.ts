@@ -6,13 +6,13 @@ export interface AIModel {
   name: string;
   section: Section;
   provider: string;
-  costPerRequest: number;      // в токенах (базовая стоимость)
+  costPerRequest: number; // в токенах (базовая стоимость)
   supportsImages: boolean;
   supportsVoice: boolean;
-  supportsWeb: boolean;        // выход в интернет
-  isAsync: boolean;            // требует очереди (для image/video/audio)
+  supportsWeb: boolean; // выход в интернет
+  isAsync: boolean; // требует очереди (для image/video/audio)
   contextStrategy: ContextStrategy;
-  contextMaxMessages: number;  // актуально для db_history: сколько сообщений отправлять
+  contextMaxMessages: number; // актуально для db_history: сколько сообщений отправлять
 }
 
 /** Входные данные для LLM-чата (с учётом стратегии контекста) */
@@ -34,9 +34,9 @@ export interface ChatOutput {
   text: string;
   tokensUsed: number;
   // Возвращаем для обновления Dialog
-  newResponseId?: string;   // provider_chain: сохранить как providerLastResponseId
-  newThreadId?: string;     // provider_thread: при первом вызове (создание Thread)
-  newMessageId?: string;    // provider_thread: id сообщения ассистента
+  newResponseId?: string; // provider_chain: сохранить как providerLastResponseId
+  newThreadId?: string; // provider_thread: при первом вызове (создание Thread)
+  newMessageId?: string; // provider_thread: id сообщения ассистента
 }
 
 /** Входные данные для async-генерации (image/video/audio) */

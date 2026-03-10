@@ -3,7 +3,7 @@ export default {
     welcome:
       "🔶 Welcome to Metabox! By continuing, you agree to the Terms of Service ([link]). Please choose your language:",
     tokensGranted:
-      "⚡ 5.50 tokens have been credited for you to explore the bot. To learn more about your account and plans, click the \"Profile\" button below in the main menu.",
+      '⚡ 5.50 tokens have been credited for you to explore the bot. To learn more about your account and plans, click the "Profile" button below in the main menu.',
     videoIntro:
       "📌 A brief overview of the main bot tools.\nMetabox provides access to more than 70 AI tools.\n📎 Detailed video on how to use the bot and description of all features",
     mainMenuTitle: "🏠 Main Menu\nChoose a section 👇",
@@ -32,9 +32,9 @@ export default {
     newDialog: "💬 New Dialog",
     prompts: "📋 Prompts",
     gptEditorActivated:
-      "🔆 GPT Editor activated! Now you can use the OpenAI editor to draw or modify your image.\nSend an image with a request in one message or just ask 👇\nIf you decide to change the model, go to the \"⚙ Management\" menu.",
+      '🔆 GPT Editor activated! Now you can use the OpenAI editor to draw or modify your image.\nSend an image with a request in one message or just ask 👇\nIf you decide to change the model, go to the "⚙ Management" menu.',
     newDialogCreated:
-      "💬 New dialog created. View all dialogs in the \"⚙ Management\" menu, \"Dialogs\" tab.",
+      '💬 New dialog created. View all dialogs in the "⚙ Management" menu, "Dialogs" tab.',
     backToMain: "🏠 Main Menu",
   },
   design: {

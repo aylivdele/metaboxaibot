@@ -74,17 +74,17 @@ metabox-bot/
 
 ### Ключевые технологии
 
-| Слой | Технология | Обоснование |
-|---|---|---|
-| Bot framework | Grammy.js | Современный, TS-native, middleware/scenes из коробки |
-| API framework | Fastify | Быстрый, schema validation, хорошая экосистема |
-| ORM | Prisma | Type-safe, миграции, хорошо с PostgreSQL |
-| Queue | BullMQ + Redis | Надёжные очереди для async AI генерации |
-| Mini App | React + Vite + TailwindCSS | Быстрая сборка, @telegram-apps/sdk |
-| Monorepo | Turborepo + pnpm | Кэширование билдов, параллельные задачи |
-| AI Gateway | Единый адаптер-паттерн | Легко добавлять новые провайдеры |
-| Storage | AWS S3 / Cloudflare R2 | Изображения, аудио, видео |
-| Monitoring | Pino (logs) + Prometheus | Структурированные логи, метрики |
+| Слой          | Технология                 | Обоснование                                          |
+| ------------- | -------------------------- | ---------------------------------------------------- |
+| Bot framework | Grammy.js                  | Современный, TS-native, middleware/scenes из коробки |
+| API framework | Fastify                    | Быстрый, schema validation, хорошая экосистема       |
+| ORM           | Prisma                     | Type-safe, миграции, хорошо с PostgreSQL             |
+| Queue         | BullMQ + Redis             | Надёжные очереди для async AI генерации              |
+| Mini App      | React + Vite + TailwindCSS | Быстрая сборка, @telegram-apps/sdk                   |
+| Monorepo      | Turborepo + pnpm           | Кэширование билдов, параллельные задачи              |
+| AI Gateway    | Единый адаптер-паттерн     | Легко добавлять новые провайдеры                     |
+| Storage       | AWS S3 / Cloudflare R2     | Изображения, аудио, видео                            |
+| Monitoring    | Pino (logs) + Prometheus   | Структурированные логи, метрики                      |
 
 ---
 
@@ -147,13 +147,13 @@ model TokenTransaction {
 
 ### Стратегии хранения контекста по провайдерам
 
-| Провайдер | Стратегия | Как работает |
-|---|---|---|
-| **OpenAI GPT-4o, o-series** | `provider_chain` | Responses API: каждый ответ имеет `response_id`. Передаём `previous_response_id` — провайдер сам ведёт историю. В БД пишем только для отображения в UI. |
-| **OpenAI Assistants** | `provider_thread` | Создаём `Thread` при старте диалога, сохраняем `thread_id`. Добавляем сообщения через API, запускаем `Run`. Полная история на стороне OpenAI. |
-| **Anthropic Claude** | `db_history` | Серверного контекста нет. Берём последние N сообщений из БД, отправляем массивом `messages[]` в каждом запросе. |
-| **Google Gemini** | `db_history` | Серверного контекста для диалогов нет (есть `cachedContent` только для системных промптов). Отправляем `contents[]` из БД. |
-| **Qwen и другие** | `db_history` | Аналогично Anthropic — история из БД. |
+| Провайдер                   | Стратегия         | Как работает                                                                                                                                            |
+| --------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **OpenAI GPT-4o, o-series** | `provider_chain`  | Responses API: каждый ответ имеет `response_id`. Передаём `previous_response_id` — провайдер сам ведёт историю. В БД пишем только для отображения в UI. |
+| **OpenAI Assistants**       | `provider_thread` | Создаём `Thread` при старте диалога, сохраняем `thread_id`. Добавляем сообщения через API, запускаем `Run`. Полная история на стороне OpenAI.           |
+| **Anthropic Claude**        | `db_history`      | Серверного контекста нет. Берём последние N сообщений из БД, отправляем массивом `messages[]` в каждом запросе.                                         |
+| **Google Gemini**           | `db_history`      | Серверного контекста для диалогов нет (есть `cachedContent` только для системных промптов). Отправляем `contents[]` из БД.                              |
+| **Qwen и другие**           | `db_history`      | Аналогично Anthropic — история из БД.                                                                                                                   |
 
 **Ограничение истории (`db_history`):** отправляем последние **50 сообщений** (настраивается per-model через `contextMaxMessages` в конфиге модели). Это покрывает ~90% реальных диалогов и не раздувает контекстное окно.
 
@@ -197,6 +197,7 @@ class LLMAdapterFactory {
 ```
 
 **Поток обработки сообщения в диалоге:**
+
 ```
 Пользователь → бот → api/services/chat.service.ts
   1. Загрузить Dialog (+ contextStrategy, providerThreadId, providerLastResponseId)
@@ -225,18 +226,18 @@ IDLE ──/start──► LANGUAGE_SELECT ──выбор──► MAIN_MENU
 
 **Состояния:**
 
-| State | Описание |
-|---|---|
-| `IDLE` | Нет выбранного инструмента |
-| `MAIN_MENU` | Главное меню |
-| `GPT_SECTION` | Раздел GPTs/Claude/Gemini |
-| `GPT_ACTIVE` | Модель активирована, ведётся диалог |
-| `DESIGN_SECTION` | Раздел Дизайн с ИИ |
-| `DESIGN_ACTIVE` | Модель дизайна активирована |
-| `AUDIO_SECTION` | Раздел Аудио с ИИ |
-| `AUDIO_ACTIVE` | Аудио модель активирована |
-| `VIDEO_SECTION` | Раздел Видео будущего |
-| `VIDEO_ACTIVE` | Видео модель активирована |
+| State            | Описание                            |
+| ---------------- | ----------------------------------- |
+| `IDLE`           | Нет выбранного инструмента          |
+| `MAIN_MENU`      | Главное меню                        |
+| `GPT_SECTION`    | Раздел GPTs/Claude/Gemini           |
+| `GPT_ACTIVE`     | Модель активирована, ведётся диалог |
+| `DESIGN_SECTION` | Раздел Дизайн с ИИ                  |
+| `DESIGN_ACTIVE`  | Модель дизайна активирована         |
+| `AUDIO_SECTION`  | Раздел Аудио с ИИ                   |
+| `AUDIO_ACTIVE`   | Аудио модель активирована           |
+| `VIDEO_SECTION`  | Раздел Видео будущего               |
+| `VIDEO_ACTIVE`   | Видео модель активирована           |
 
 ---
 
@@ -265,6 +266,7 @@ IDLE ──/start──► LANGUAGE_SELECT ──выбор──► MAIN_MENU
 ### Этап 3 — Раздел GPTs/Claude/Gemini (1–2 недели)
 
 **Мультичаты и контекст:**
+
 - [ ] Grammy Scene: `GPT_SECTION` → `GPT_ACTIVE`
 - [ ] Reply Keyboard раздела
 - [ ] Создание нового диалога (запись в БД + инициализация контекста у провайдера)
@@ -272,22 +274,26 @@ IDLE ──/start──► LANGUAGE_SELECT ──выбор──► MAIN_MENU
 - [ ] Переименование и удаление диалогов (через Mini App)
 
 **OpenAI (стратегия `provider_chain` — Responses API):**
+
 - [ ] Адаптер GPT-4o: `previous_response_id` для цепочки ответов без передачи истории
 - [ ] Сохранение `response_id` в `Dialog.providerLastResponseId` после каждого ответа
 - [ ] Streaming ответа: `edit_message` по мере поступления токенов
 
 **OpenAI Assistants (стратегия `provider_thread`):**
+
 - [ ] При создании диалога — создаём `Thread` → сохраняем `thread_id` в `Dialog.providerThreadId`
 - [ ] Добавление сообщений через `thread.messages.create` + запуск `Run`
 - [ ] Polling/streaming статуса Run → отправка результата пользователю
 
 **Anthropic Claude / Gemini / Qwen (стратегия `db_history`):**
+
 - [ ] Адаптер Claude: загрузка последних N сообщений из БД → передача в `messages[]`
 - [ ] Адаптер Gemini: аналогично через `contents[]`
 - [ ] Адаптер Qwen: аналогично
 - [ ] Настройка `contextMaxMessages` per-model (по умолчанию 50)
 
 **Общее:**
+
 - [ ] `chat.service.ts` — единый сервис, выбирает стратегию по `Dialog.contextStrategy`
 - [ ] Сохранение всех сообщений в БД (для UI и fallback)
 - [ ] Списание токенов за каждый запрос
