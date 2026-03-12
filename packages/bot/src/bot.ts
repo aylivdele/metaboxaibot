@@ -11,6 +11,11 @@ import {
   handleDesignMessage,
   handleNewDesignDialog,
 } from "./scenes/design.js";
+import {
+  handleVideoModelSelect,
+  handleVideoMessage,
+  handleNewVideoDialog,
+} from "./scenes/video.js";
 import { userStateService } from "@metabox/api/services";
 import { getT } from "@metabox/shared";
 import { logger } from "./logger.js";
@@ -36,6 +41,9 @@ export function createBot(token: string): Bot<BotContext> {
   // ── Design model selection callback ──────────────────────────────────────
   bot.callbackQuery(/^design_model_/, handleDesignModelSelect);
 
+  // ── Video model selection callback ───────────────────────────────────────
+  bot.callbackQuery(/^video_model_/, handleVideoModelSelect);
+
   // ── Reply keyboard — menu navigation ─────────────────────────────────────
   // Translation keys are resolved at runtime after i18n middleware runs.
   bot.on("message:text", async (ctx, next) => {
@@ -57,6 +65,8 @@ export function createBot(token: string): Bot<BotContext> {
       [t.gpt.activateEditor]: () => handleActivateGptEditor(ctx),
       // Design section buttons
       [t.design.newDialog]: () => handleNewDesignDialog(ctx),
+      // Video section buttons
+      [t.video.newDialog]: () => handleNewVideoDialog(ctx),
     };
 
     const handler = menuMap[text];
@@ -72,6 +82,7 @@ export function createBot(token: string): Bot<BotContext> {
     const state = await userStateService.get(ctx.user.id);
     if (state?.state === "GPT_ACTIVE") return handleGptMessage(ctx);
     if (state?.state === "DESIGN_ACTIVE") return handleDesignMessage(ctx);
+    if (state?.state === "VIDEO_ACTIVE") return handleVideoMessage(ctx);
 
     return next();
   });

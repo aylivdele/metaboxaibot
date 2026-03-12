@@ -51,6 +51,7 @@ export interface Translations {
     sectionTitle: string;
     avatars: string;
     lipSync: string;
+    newDialog: string;
     backToMain: string;
   };
   errors: {

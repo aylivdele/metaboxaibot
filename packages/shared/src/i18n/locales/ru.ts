@@ -55,6 +55,7 @@ export default {
     sectionTitle: "🎬 Видео будущего\nВыберите раздел для работы с видео 👇",
     avatars: "👾 Аватары",
     lipSync: "🔄 Синхронизатор губ",
+    newDialog: "🎬 Новое видео",
     backToMain: "🏠 В главное меню",
   },
   errors: {

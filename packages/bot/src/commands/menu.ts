@@ -52,6 +52,7 @@ export async function handleVideo(ctx: BotContext): Promise<void> {
   await ctx.reply(ctx.t.video.sectionTitle, {
     reply_markup: {
       keyboard: [
+        [{ text: ctx.t.video.newDialog }],
         [{ text: ctx.t.video.avatars }, { text: ctx.t.video.lipSync }],
         [{ text: ctx.t.common.backToMain }],
       ],

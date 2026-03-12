@@ -55,6 +55,7 @@ export default {
     sectionTitle: "🎬 Video of the Future\nChoose a section to work with video 👇",
     avatars: "👾 Avatars",
     lipSync: "🔄 Lip Sync",
+    newDialog: "🎬 New Video",
     backToMain: "🏠 Back to Main Menu",
   },
   errors: {

@@ -21,8 +21,8 @@
       "default": "./dist/services/index.js"
     },
     "./queues": {
-      "types": "./src/queues/image.queue.ts",
-      "default": "./dist/queues/image.queue.js"
+      "types": "./src/queues/index.ts",
+      "default": "./dist/queues/index.js"
     },
     "./db": {
       "types": "./src/db.ts",
@@ -31,6 +31,10 @@
     "./ai/image": {
       "types": "./src/ai/image/factory.ts",
       "default": "./dist/ai/image/factory.js"
+    },
+    "./ai/video": {
+      "types": "./src/ai/video/factory.ts",
+      "default": "./dist/ai/video/factory.js"
     },
     "./storage": {
       "types": "./src/storage/s3.client.ts",
