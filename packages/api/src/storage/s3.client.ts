@@ -42,3 +42,29 @@ export async function uploadFromUrl(
   const endpoint = process.env.S3_ENDPOINT ?? `https://s3.${process.env.S3_REGION}.amazonaws.com`;
   return `${endpoint}/${BUCKET}/${key}`;
 }
+
+/**
+ * Uploads a raw Buffer to S3.
+ * Returns the public S3 URL.
+ */
+export async function uploadBuffer(
+  buffer: Buffer,
+  folder: "images" | "audio" | "video",
+  ext: string,
+  contentType: string,
+): Promise<string> {
+  const key = `${folder}/${randomUUID()}.${ext}`;
+
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+      ACL: "public-read",
+    }),
+  );
+
+  const endpoint = process.env.S3_ENDPOINT ?? `https://s3.${process.env.S3_REGION}.amazonaws.com`;
+  return `${endpoint}/${BUCKET}/${key}`;
+}

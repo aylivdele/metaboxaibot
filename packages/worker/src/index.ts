@@ -1,9 +1,10 @@
 import "dotenv/config";
 import { Worker } from "bullmq";
 import { Redis } from "ioredis";
-import type { ImageJobData, VideoJobData } from "@metabox/api/queues";
+import type { ImageJobData, VideoJobData, AudioJobData } from "@metabox/api/queues";
 import { processImageJob } from "./processors/image.processor.js";
 import { processVideoJob } from "./processors/video.processor.js";
+import { processAudioJob } from "./processors/audio.processor.js";
 import { logger } from "./logger.js";
 
 const connection = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
@@ -36,9 +37,22 @@ videoWorker.on("failed", (job, err) => {
   logger.error({ jobId: job?.id, err }, "Video job failed");
 });
 
-logger.info("Worker started — listening on image and video queues");
+const audioWorker = new Worker<AudioJobData>("audio", processAudioJob, {
+  connection,
+  concurrency: 5,
+});
+
+audioWorker.on("completed", (job) => {
+  logger.info({ jobId: job.id }, "Audio job completed");
+});
+
+audioWorker.on("failed", (job, err) => {
+  logger.error({ jobId: job?.id, err }, "Audio job failed");
+});
+
+logger.info("Worker started — listening on image, video and audio queues");
 
 process.on("SIGTERM", async () => {
-  await Promise.all([imageWorker.close(), videoWorker.close()]);
+  await Promise.all([imageWorker.close(), videoWorker.close(), audioWorker.close()]);
   process.exit(0);
 });

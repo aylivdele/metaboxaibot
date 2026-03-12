@@ -7,3 +7,5 @@ export type { SubmitImageParams, SubmitImageResult } from "./generation.service.
 export { userStateService } from "./user-state.service.js";
 export { videoGenerationService } from "./video-generation.service.js";
 export type { SubmitVideoParams, SubmitVideoResult } from "./video-generation.service.js";
+export { audioGenerationService } from "./audio-generation.service.js";
+export type { SubmitAudioParams, SubmitAudioResult } from "./audio-generation.service.js";

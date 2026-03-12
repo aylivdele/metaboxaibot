@@ -36,6 +36,10 @@
       "types": "./src/ai/video/factory.ts",
       "default": "./dist/ai/video/factory.js"
     },
+    "./ai/audio": {
+      "types": "./src/ai/audio/factory.ts",
+      "default": "./dist/ai/audio/factory.js"
+    },
     "./storage": {
       "types": "./src/storage/s3.client.ts",
       "default": "./dist/storage/s3.client.js"

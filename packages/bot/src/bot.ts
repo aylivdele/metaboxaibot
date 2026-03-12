@@ -16,6 +16,7 @@ import {
   handleVideoMessage,
   handleNewVideoDialog,
 } from "./scenes/video.js";
+import { handleAudioSubSection, handleAudioMessage } from "./scenes/audio.js";
 import { userStateService } from "@metabox/api/services";
 import { getT } from "@metabox/shared";
 import { logger } from "./logger.js";
@@ -67,6 +68,11 @@ export function createBot(token: string): Bot<BotContext> {
       [t.design.newDialog]: () => handleNewDesignDialog(ctx),
       // Video section buttons
       [t.video.newDialog]: () => handleNewVideoDialog(ctx),
+      // Audio section buttons
+      [t.audio.tts]: () => handleAudioSubSection(ctx, "tts-openai"),
+      [t.audio.voiceClone]: () => handleAudioSubSection(ctx, "voice-clone"),
+      [t.audio.music]: () => handleAudioSubSection(ctx, "suno"),
+      [t.audio.sounds]: () => handleAudioSubSection(ctx, "sounds-el"),
     };
 
     const handler = menuMap[text];
@@ -83,6 +89,7 @@ export function createBot(token: string): Bot<BotContext> {
     if (state?.state === "GPT_ACTIVE") return handleGptMessage(ctx);
     if (state?.state === "DESIGN_ACTIVE") return handleDesignMessage(ctx);
     if (state?.state === "VIDEO_ACTIVE") return handleVideoMessage(ctx);
+    if (state?.state === "AUDIO_ACTIVE") return handleAudioMessage(ctx);
 
     return next();
   });

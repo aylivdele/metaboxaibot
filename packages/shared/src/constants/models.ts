@@ -359,6 +359,19 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
   },
+  "sounds-el": {
+    id: "sounds-el",
+    name: "Звуковые эффекты (ElevenLabs)",
+    section: "audio",
+    provider: "elevenlabs",
+    costPerRequest: 0.2,
+    supportsImages: false,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+  },
 };
 
 // Модели по секции
