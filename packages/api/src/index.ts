@@ -1,4 +1,16 @@
-// Точка входа API — будет реализовано в Этапе 3+
 import "dotenv/config";
+import Fastify from "fastify";
+import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import { logger } from "./logger.js";
 
-console.log("Metabox API starting... (stub)");
+const server = Fastify({ logger: false });
+
+await server.register(cors);
+await server.register(helmet);
+
+server.get("/health", async () => ({ status: "ok" }));
+
+const port = Number(process.env.API_PORT ?? 3001);
+await server.listen({ port, host: "0.0.0.0" });
+logger.info({ port }, "API server started");
