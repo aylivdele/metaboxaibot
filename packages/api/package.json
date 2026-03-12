@@ -19,22 +19,43 @@
     "./services": {
       "types": "./src/services/index.ts",
       "default": "./dist/services/index.js"
+    },
+    "./queues": {
+      "types": "./src/queues/image.queue.ts",
+      "default": "./dist/queues/image.queue.js"
+    },
+    "./db": {
+      "types": "./src/db.ts",
+      "default": "./dist/db.js"
+    },
+    "./ai/image": {
+      "types": "./src/ai/image/factory.ts",
+      "default": "./dist/ai/image/factory.js"
+    },
+    "./storage": {
+      "types": "./src/storage/s3.client.ts",
+      "default": "./dist/storage/s3.client.js"
     }
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@aws-sdk/client-s3": "^3.800.0",
+    "@fal-ai/client": "^1.5.0",
     "@fastify/cors": "^10.0.2",
     "@fastify/helmet": "^13.0.1",
     "@google/generative-ai": "^0.24.0",
     "@metabox/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
+    "bullmq": "^5.56.0",
     "dotenv": "^16.5.0",
     "fastify": "^5.3.2",
+    "ioredis": "^5.6.1",
     "openai": "^4.90.0",
     "pg": "^8.20.0",
     "pino": "^9.7.0",
-    "pino-pretty": "^13.0.0"
+    "pino-pretty": "^13.0.0",
+    "replicate": "^1.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.29",
