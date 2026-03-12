@@ -1,0 +1,190 @@
+import { useEffect, useState, useCallback } from "react";
+import { api } from "../api/client.js";
+import type { Dialog, Model, UserState } from "../types.js";
+
+type Tab = "dialogs" | "model";
+
+const SECTIONS = ["gpt", "design", "audio", "video"] as const;
+const SECTION_LABELS: Record<string, string> = {
+  gpt: "💡 GPT",
+  design: "🎨 Design",
+  audio: "🎧 Audio",
+  video: "🎬 Video",
+};
+
+export function ManagementPage() {
+  const [tab, setTab] = useState<Tab>("dialogs");
+  const [dialogs, setDialogs] = useState<Dialog[]>([]);
+  const [models, setModels] = useState<Model[]>([]);
+  const [state, setState] = useState<UserState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [activeSection, setActiveSection] = useState<string>("gpt");
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const [ds, ms, st] = await Promise.all([
+      api.dialogs.list(),
+      api.models.list(),
+      api.state.get(),
+    ]);
+    setDialogs(ds);
+    setModels(ms);
+    setState(st);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadData().catch(console.error);
+  }, [loadData]);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this dialog?")) return;
+    await api.dialogs.delete(id);
+    setDialogs((ds) => ds.filter((d) => d.id !== id));
+  };
+
+  const handleActivate = async (dialog: Dialog) => {
+    await api.dialogs.activate(dialog.id);
+    setState((s) => (s ? { ...s, dialogId: dialog.id, modelId: dialog.modelId } : s));
+  };
+
+  const handleRename = async (id: string) => {
+    if (!renameValue.trim()) return;
+    await api.dialogs.rename(id, renameValue.trim());
+    setDialogs((ds) => ds.map((d) => (d.id === id ? { ...d, title: renameValue.trim() } : d)));
+    setRenamingId(null);
+    setRenameValue("");
+  };
+
+  const handleSetModel = async (modelId: string) => {
+    await api.state.patch({ modelId });
+    setState((s) => (s ? { ...s, modelId } : s));
+  };
+
+  if (loading) return <div className="page-loading">Loading…</div>;
+
+  const filteredDialogs = dialogs.filter((d) => d.section === activeSection);
+  const sectionModels = models.filter((m) => m.section === activeSection);
+
+  return (
+    <div className="page">
+      <div className="tab-bar">
+        <button
+          className={`tab-btn${tab === "dialogs" ? " tab-btn--active" : ""}`}
+          onClick={() => setTab("dialogs")}
+        >
+          💬 Dialogs
+        </button>
+        <button
+          className={`tab-btn${tab === "model" ? " tab-btn--active" : ""}`}
+          onClick={() => setTab("model")}
+        >
+          🤖 Model
+        </button>
+      </div>
+
+      <div className="section-chips">
+        {SECTIONS.map((s) => (
+          <button
+            key={s}
+            className={`chip${activeSection === s ? " chip--active" : ""}`}
+            onClick={() => setActiveSection(s)}
+          >
+            {SECTION_LABELS[s]}
+          </button>
+        ))}
+      </div>
+
+      {tab === "dialogs" && (
+        <div className="dialog-list">
+          {filteredDialogs.length === 0 ? (
+            <div className="empty-state">No dialogs in this section</div>
+          ) : (
+            filteredDialogs.map((d) => (
+              <div
+                key={d.id}
+                className={`dialog-item${state?.dialogId === d.id ? " dialog-item--active" : ""}`}
+              >
+                {renamingId === d.id ? (
+                  <div className="dialog-item__rename">
+                    <input
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void handleRename(d.id);
+                        if (e.key === "Escape") setRenamingId(null);
+                      }}
+                      autoFocus
+                    />
+                    <button onClick={() => void handleRename(d.id)}>✓</button>
+                    <button onClick={() => setRenamingId(null)}>✕</button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="dialog-item__info">
+                      <div className="dialog-item__title">{d.title ?? d.modelId}</div>
+                      <div className="dialog-item__meta">
+                        {d.modelId} · {new Date(d.updatedAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="dialog-item__actions">
+                      {state?.dialogId !== d.id && (
+                        <button
+                          className="action-btn action-btn--primary"
+                          onClick={() => void handleActivate(d)}
+                          title="Set active"
+                        >
+                          ▶
+                        </button>
+                      )}
+                      <button
+                        className="action-btn"
+                        onClick={() => {
+                          setRenamingId(d.id);
+                          setRenameValue(d.title ?? "");
+                        }}
+                        title="Rename"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        className="action-btn action-btn--danger"
+                        onClick={() => void handleDelete(d.id)}
+                        title="Delete"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {tab === "model" && (
+        <div className="model-list">
+          {sectionModels.map((m) => (
+            <div
+              key={m.id}
+              className={`model-item${state?.modelId === m.id ? " model-item--active" : ""}`}
+              onClick={() => void handleSetModel(m.id)}
+            >
+              <div className="model-item__name">{m.name}</div>
+              <div className="model-item__meta">
+                {m.costPerRequest} tkn · {m.provider}
+                {m.supportsImages && " · 🖼"}
+                {m.supportsVoice && " · 🎙"}
+                {m.isAsync && " · ⏳"}
+              </div>
+              {state?.modelId === m.id && <span className="model-item__badge">✓ Active</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

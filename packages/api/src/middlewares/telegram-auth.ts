@@ -1,0 +1,65 @@
+import { createHmac } from "node:crypto";
+import type { FastifyRequest, FastifyReply } from "fastify";
+import { db } from "../db.js";
+
+/**
+ * Verifies a Telegram Mini App initData string.
+ * Returns the parsed user_id if valid, throws otherwise.
+ */
+export function verifyTelegramInitData(initDataRaw: string): bigint {
+  const botToken = process.env.BOT_TOKEN;
+  if (!botToken) throw new Error("BOT_TOKEN not set");
+
+  const params = new URLSearchParams(initDataRaw);
+  const hash = params.get("hash");
+  if (!hash) throw new Error("Missing hash in initData");
+
+  params.delete("hash");
+
+  // Build data_check_string: sorted key=value pairs joined by \n
+  const dataCheckString = [...params.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("\n");
+
+  // HMAC-SHA256("WebAppData", botToken) → secret key
+  const secretKey = createHmac("sha256", "WebAppData").update(botToken).digest();
+  // HMAC-SHA256(dataCheckString, secretKey)
+  const computedHash = createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+
+  if (computedHash !== hash) throw new Error("Invalid initData hash");
+
+  const userRaw = params.get("user");
+  if (!userRaw) throw new Error("No user in initData");
+  const user = JSON.parse(userRaw) as { id: number };
+  return BigInt(user.id);
+}
+
+/**
+ * Fastify preHandler that verifies Telegram initData from the
+ * "Authorization: tma {initDataRaw}" header and sets request.userId.
+ */
+export async function telegramAuthHook(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const authHeader = request.headers.authorization;
+  if (!authHeader?.startsWith("tma ")) {
+    return reply.code(401).send({ error: "Missing Telegram auth" });
+  }
+  const initDataRaw = authHeader.slice(4);
+  try {
+    const userId = verifyTelegramInitData(initDataRaw);
+    // Attach to request so route handlers can use it
+    (request as FastifyRequest & { userId: bigint }).userId = userId;
+  } catch (err) {
+    return reply.code(401).send({ error: "Invalid Telegram auth", detail: String(err) });
+  }
+
+  // Ensure user exists (the bot may not have /start-ed yet in some edge cases)
+  const user = await db.user.findUnique({
+    where: { id: (request as FastifyRequest & { userId: bigint }).userId },
+  });
+  if (!user) return reply.code(404).send({ error: "User not found" });
+  if (user.isBlocked) return reply.code(403).send({ error: "User is blocked" });
+}
