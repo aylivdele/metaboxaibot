@@ -19,6 +19,7 @@ import {
 import { handleAudioSubSection, handleAudioMessage } from "./scenes/audio.js";
 import { userStateService } from "@metabox/api/services";
 import { getT } from "@metabox/shared";
+import { rateLimitMiddleware } from "./middlewares/rate-limit.middleware.js";
 import { logger } from "./logger.js";
 
 export function createBot(token: string): Bot<BotContext> {
@@ -27,6 +28,7 @@ export function createBot(token: string): Bot<BotContext> {
   // ── Global middlewares ───────────────────────────────────────────────────
   bot.use(authMiddleware);
   bot.use(i18nMiddleware);
+  bot.use(rateLimitMiddleware);
 
   // ── Commands ─────────────────────────────────────────────────────────────
   bot.command("start", handleStart);

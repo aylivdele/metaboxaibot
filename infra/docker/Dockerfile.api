@@ -6,6 +6,7 @@ FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/api/package.json ./packages/api/
 COPY packages/shared/package.json ./packages/shared/
+COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
@@ -14,6 +15,7 @@ COPY --from=deps /app/packages/api/node_modules ./packages/api/node_modules
 COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY . .
 RUN pnpm --filter @metabox/shared build
+RUN pnpm exec prisma generate
 RUN pnpm --filter @metabox/api build
 
 FROM node:20-alpine AS runner

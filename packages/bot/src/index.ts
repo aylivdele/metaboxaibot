@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { initSentry } from "./sentry.js";
+initSentry(); // must be before any other imports that could throw
 import { createBot } from "./bot.js";
 import { preloadLocales, SUPPORTED_LANGUAGES } from "@metabox/shared";
 import { logger } from "./logger.js";
