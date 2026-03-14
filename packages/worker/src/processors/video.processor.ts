@@ -4,11 +4,12 @@ import type { VideoJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createVideoAdapter } from "@metabox/api/ai/video";
 import { logger } from "../logger.js";
+import { config } from "@metabox/shared";
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_POLLS = 144; // 12 minutes max
 
-const telegram = new Api(process.env.BOT_TOKEN!);
+const telegram = new Api(config.bot.token);
 
 export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
   const { dbJobId, userId: userIdStr, modelId, prompt, imageUrl, telegramChatId } = job.data;

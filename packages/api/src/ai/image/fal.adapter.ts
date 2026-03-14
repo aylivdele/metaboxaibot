@@ -1,5 +1,6 @@
 import { fal } from "@fal-ai/client";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const MODEL_ENDPOINTS: Record<string, string> = {
   flux: "fal-ai/flux/dev",
@@ -16,7 +17,7 @@ export class FalAdapter implements ImageAdapter {
 
   constructor(
     readonly modelId: string,
-    apiKey = process.env.FAL_API_KEY,
+    apiKey = config.ai.fal,
   ) {
     fal.config({ credentials: apiKey });
   }

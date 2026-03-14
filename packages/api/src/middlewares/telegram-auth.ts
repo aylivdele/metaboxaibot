@@ -1,15 +1,13 @@
 import { createHmac } from "node:crypto";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { db } from "../db.js";
+import { config } from "@metabox/shared";
 
 /**
  * Verifies a Telegram Mini App initData string.
  * Returns the parsed user_id if valid, throws otherwise.
  */
 export function verifyTelegramInitData(initDataRaw: string): bigint {
-  const botToken = process.env.BOT_TOKEN;
-  if (!botToken) throw new Error("BOT_TOKEN not set");
-
   const params = new URLSearchParams(initDataRaw);
   const hash = params.get("hash");
   if (!hash) throw new Error("Missing hash in initData");
@@ -23,7 +21,7 @@ export function verifyTelegramInitData(initDataRaw: string): bigint {
     .join("\n");
 
   // HMAC-SHA256("WebAppData", botToken) → secret key
-  const secretKey = createHmac("sha256", "WebAppData").update(botToken).digest();
+  const secretKey = createHmac("sha256", "WebAppData").update(config.bot.token).digest();
   // HMAC-SHA256(dataCheckString, secretKey)
   const computedHash = createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
 

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { AudioAdapter, AudioInput, AudioResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const DEFAULT_VOICE: OpenAI.Audio.Speech.SpeechCreateParams["voice"] = "alloy";
 
@@ -12,7 +13,7 @@ export class OpenAiTtsAdapter implements AudioAdapter {
 
   private client: OpenAI;
 
-  constructor(apiKey = process.env.OPENAI_API_KEY) {
+  constructor(apiKey = config.ai.openai) {
     this.client = new OpenAI({ apiKey });
   }
 

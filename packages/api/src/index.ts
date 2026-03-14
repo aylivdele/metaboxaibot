@@ -16,6 +16,7 @@ import { dialogsRoutes } from "./routes/dialogs.js";
 import { stateRoutes } from "./routes/state.js";
 import { modelsRoutes } from "./routes/models.js";
 import { adminRoutes } from "./routes/admin.js";
+import { config } from "@metabox/shared";
 
 const server = Fastify({ logger: false });
 
@@ -69,6 +70,6 @@ await server.register(stateRoutes);
 await server.register(modelsRoutes);
 await server.register(adminRoutes);
 
-const port = Number(process.env.API_PORT ?? 3001);
+const port = config.api.port;
 await server.listen({ port, host: "0.0.0.0" });
 logger.info({ port }, "API server started");

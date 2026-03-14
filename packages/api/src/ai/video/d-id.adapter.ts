@@ -1,4 +1,5 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const DID_API = "https://api.d-id.com";
 
@@ -21,8 +22,8 @@ export class DIDAdapter implements VideoAdapter {
   private readonly defaultPresenterUrl: string;
 
   constructor(
-    apiKey = process.env.DID_API_KEY ?? "",
-    defaultPresenterUrl = process.env.DID_PRESENTER_URL ??
+    apiKey = config.ai.did ?? "",
+    defaultPresenterUrl = config.ai.didPresenterUrl ??
       "https://d-id-public-bucket.s3.amazonaws.com/alice.jpg",
   ) {
     this.apiKey = apiKey;

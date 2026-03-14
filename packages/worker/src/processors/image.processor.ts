@@ -4,11 +4,12 @@ import type { ImageJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createImageAdapter } from "@metabox/api/ai/image";
 import { logger } from "../logger.js";
+import { config } from "@metabox/shared";
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLLS = 120; // 6 minutes max
 
-const telegram = new Api(process.env.BOT_TOKEN!);
+const telegram = new Api(config.bot.token);
 
 export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
   const { dbJobId, userId: userIdStr, modelId, prompt, negativePrompt, telegramChatId } = job.data;

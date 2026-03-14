@@ -1,4 +1,5 @@
 import type { AudioAdapter, AudioInput, AudioResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const ELEVENLABS_API = "https://api.elevenlabs.io/v1";
 
@@ -15,7 +16,7 @@ export class ElevenLabsAdapter implements AudioAdapter {
 
   constructor(
     readonly modelId: "voice-clone" | "sounds-el",
-    private readonly apiKey = process.env.ELEVENLABS_API_KEY ?? "",
+    private readonly apiKey = config.ai.elevenlabs ?? "",
   ) {}
 
   private headers() {

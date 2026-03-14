@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, type Content } from "@google/generative-ai";
 import type { LLMAdapter, LLMInput, LLMOutput, MessageRecord } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const MODEL_MAP: Record<string, string> = {
   "gemini-2-flash": "gemini-2.0-flash",
@@ -20,7 +21,7 @@ export class GeminiAdapter implements LLMAdapter {
   constructor(
     private readonly modelId: string,
     contextMaxMessages = 50,
-    apiKey = process.env.GOOGLE_AI_API_KEY,
+    apiKey = config.ai.google,
   ) {
     this.genai = new GoogleGenerativeAI(apiKey!);
     this.apiModel = MODEL_MAP[modelId] ?? modelId;

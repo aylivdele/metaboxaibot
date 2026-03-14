@@ -1,4 +1,5 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const RUNWAY_API = "https://api.dev.runwayml.com/v1";
 
@@ -17,7 +18,7 @@ export class RunwayAdapter implements VideoAdapter {
 
   private readonly apiKey: string;
 
-  constructor(apiKey = process.env.RUNWAY_API_KEY ?? "") {
+  constructor(apiKey = config.ai.runway ?? "") {
     this.apiKey = apiKey;
   }
 

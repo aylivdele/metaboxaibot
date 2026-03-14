@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 /**
  * DALL-E 3 adapter — synchronous, returns URL immediately.
@@ -10,7 +11,7 @@ export class DalleAdapter implements ImageAdapter {
 
   private client: OpenAI;
 
-  constructor(apiKey = process.env.OPENAI_API_KEY) {
+  constructor(apiKey = config.ai.openai) {
     this.client = new OpenAI({ apiKey });
   }
 

@@ -1,5 +1,6 @@
 import Replicate from "replicate";
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 /**
  * Replicate-backed video adapter.
@@ -15,7 +16,7 @@ export class ReplicateVideoAdapter implements VideoAdapter {
 
   constructor(
     readonly modelId: string,
-    apiToken = process.env.REPLICATE_API_TOKEN,
+    apiToken = config.ai.replicate,
   ) {
     this.client = new Replicate({ auth: apiToken });
   }

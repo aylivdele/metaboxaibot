@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { Redis } from "ioredis";
+import { config } from "@metabox/shared";
 
 export interface ImageJobData {
   /** GenerationJob.id in DB */
@@ -18,7 +19,7 @@ let _connection: Redis | undefined;
 
 function getConnection(): Redis {
   if (!_connection) {
-    _connection = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+    _connection = new Redis(config.redis.url, {
       maxRetriesPerRequest: null,
     });
   }

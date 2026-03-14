@@ -1,4 +1,5 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const LUMA_API = "https://api.lumalabs.ai/dream-machine/v1";
 
@@ -17,7 +18,7 @@ export class LumaAdapter implements VideoAdapter {
 
   private readonly apiKey: string;
 
-  constructor(apiKey = process.env.LUMA_API_KEY ?? "") {
+  constructor(apiKey = config.ai.luma ?? "") {
     this.apiKey = apiKey;
   }
 

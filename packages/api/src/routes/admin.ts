@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
+import { config } from "@metabox/shared";
 
 /**
  * Admin routes — protected by ADMIN_SECRET header.
@@ -7,7 +8,7 @@ import { db } from "../db.js";
  */
 export async function adminRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.addHook("preHandler", async (request, reply) => {
-    const secret = process.env.ADMIN_SECRET;
+    const secret = config.api.adminSecret;
     if (!secret) {
       await reply.status(503).send({ error: "Admin access not configured" });
       return;

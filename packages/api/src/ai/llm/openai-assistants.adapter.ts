@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { LLMAdapter, LLMInput, LLMOutput } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const POLL_INTERVAL_MS = 1000;
 
@@ -17,8 +18,8 @@ export class OpenAIAssistantsAdapter implements LLMAdapter {
 
   constructor(
     private readonly model: string,
-    apiKey = process.env.OPENAI_API_KEY,
-    assistantId = process.env.OPENAI_ASSISTANT_ID ?? "",
+    apiKey = config.ai.openai,
+    assistantId = config.ai.openaiAssistantId ?? "",
   ) {
     this.client = new OpenAI({ apiKey });
     this.assistantId = assistantId;

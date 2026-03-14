@@ -1,5 +1,6 @@
 import { fal } from "@fal-ai/client";
 import type { AudioAdapter, AudioInput, AudioResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const SUNO_ENDPOINT = "fal-ai/suno-v4";
 
@@ -10,7 +11,7 @@ export class SunoAdapter implements AudioAdapter {
   readonly modelId = "suno";
   readonly isAsync = true;
 
-  constructor(apiKey = process.env.FAL_API_KEY) {
+  constructor(apiKey = config.ai.fal) {
     fal.config({ credentials: apiKey });
   }
 

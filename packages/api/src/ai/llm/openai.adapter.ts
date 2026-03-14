@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { LLMAdapter, LLMInput, LLMOutput } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 /**
  * OpenAI Responses API adapter (provider_chain strategy).
@@ -13,7 +14,7 @@ export class OpenAIAdapter implements LLMAdapter {
 
   constructor(
     private readonly model: string,
-    apiKey = process.env.OPENAI_API_KEY,
+    apiKey = config.ai.openai,
   ) {
     this.client = new OpenAI({ apiKey });
   }

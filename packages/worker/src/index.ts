@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { config } from "@metabox/shared";
 import { Worker } from "bullmq";
 import { Redis } from "ioredis";
 import type { ImageJobData, VideoJobData, AudioJobData } from "@metabox/api/queues";
@@ -7,7 +8,7 @@ import { processVideoJob } from "./processors/video.processor.js";
 import { processAudioJob } from "./processors/audio.processor.js";
 import { logger } from "./logger.js";
 
-const connection = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+const connection = new Redis(config.redis.url, {
   maxRetriesPerRequest: null,
 });
 

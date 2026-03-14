@@ -1,5 +1,6 @@
 import { fal } from "@fal-ai/client";
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 /**
  * FAL.ai video adapter — used for Kling, MiniMax, Pika, Hailuo.
@@ -14,7 +15,7 @@ const FAL_ENDPOINTS: Record<string, string> = {
 export class FalVideoAdapter implements VideoAdapter {
   constructor(
     readonly modelId: string,
-    apiKey = process.env.FAL_API_KEY,
+    apiKey = config.ai.fal,
   ) {
     fal.config({ credentials: apiKey });
   }

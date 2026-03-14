@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { LLMAdapter, LLMInput, LLMOutput, MessageRecord } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 /**
  * Alibaba Qwen adapter (db_history strategy).
@@ -14,7 +15,7 @@ export class QwenAdapter implements LLMAdapter {
   constructor(
     private readonly model: string,
     contextMaxMessages = 40,
-    apiKey = process.env.QWEN_API_KEY,
+    apiKey = config.ai.qwen,
   ) {
     this.client = new OpenAI({
       apiKey,

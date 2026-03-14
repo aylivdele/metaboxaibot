@@ -1,5 +1,6 @@
 import Replicate from "replicate";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const MODEL_VERSIONS: Record<string, string> = {
   "stable-diffusion": "stability-ai/sdxl:39ed52f2319f9b0e",
@@ -19,7 +20,7 @@ export class ReplicateAdapter implements ImageAdapter {
 
   constructor(
     readonly modelId: string,
-    apiKey = process.env.REPLICATE_API_KEY,
+    apiKey = config.ai.replicate,
   ) {
     this.client = new Replicate({ auth: apiKey });
   }

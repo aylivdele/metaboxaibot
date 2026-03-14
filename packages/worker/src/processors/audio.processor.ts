@@ -4,11 +4,12 @@ import type { AudioJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createAudioAdapter } from "@metabox/api/ai/audio";
 import { logger } from "../logger.js";
+import { config } from "@metabox/shared";
 
 const POLL_INTERVAL_MS = 4000;
 const MAX_POLLS = 90; // 6 minutes max
 
-const telegram = new Api(process.env.BOT_TOKEN!);
+const telegram = new Api(config.bot.token);
 
 async function sendAudio(
   chatId: number,

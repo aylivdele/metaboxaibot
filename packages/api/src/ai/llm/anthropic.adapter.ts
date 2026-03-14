@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { LLMAdapter, LLMInput, LLMOutput, MessageRecord } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const MODEL_MAP: Record<string, string> = {
   "claude-sonnet": "claude-sonnet-4-5-20251001",
@@ -20,7 +21,7 @@ export class AnthropicAdapter implements LLMAdapter {
   constructor(
     private readonly modelId: string,
     contextMaxMessages = 50,
-    apiKey = process.env.ANTHROPIC_API_KEY,
+    apiKey = config.ai.anthropic,
   ) {
     this.client = new Anthropic({ apiKey });
     this.apiModel = MODEL_MAP[modelId] ?? modelId;

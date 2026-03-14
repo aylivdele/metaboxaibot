@@ -1,4 +1,5 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
 
 const HEYGEN_API = "https://api.heygen.com/v2";
 
@@ -22,8 +23,8 @@ export class HeyGenAdapter implements VideoAdapter {
   private readonly avatarId: string;
 
   constructor(
-    apiKey = process.env.HEYGEN_API_KEY ?? "",
-    avatarId = process.env.HEYGEN_AVATAR_ID ?? "Angela-inblackskirt-20220820",
+    apiKey = config.ai.heygen ?? "",
+    avatarId = config.ai.heygenAvatarId ?? "Angela-inblackskirt-20220820",
   ) {
     this.apiKey = apiKey;
     this.avatarId = avatarId;
