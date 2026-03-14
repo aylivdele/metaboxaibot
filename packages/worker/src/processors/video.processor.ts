@@ -3,7 +3,6 @@ import { Api } from "grammy";
 import type { VideoJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createVideoAdapter } from "@metabox/api/ai/video";
-import { uploadFromUrl } from "@metabox/api/storage";
 import { logger } from "../logger.js";
 
 const POLL_INTERVAL_MS = 5000;
@@ -24,10 +23,8 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
   const adapter = createVideoAdapter(modelId);
 
   try {
-    // Submit to provider
     const providerJobId = await adapter.submit({ prompt, imageUrl });
 
-    // Poll until done
     let videoResult = null;
     for (let i = 0; i < MAX_POLLS; i++) {
       await sleep(POLL_INTERVAL_MS);
@@ -39,21 +36,16 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       throw new Error(`Timed out waiting for ${modelId} job ${providerJobId}`);
     }
 
-    // Upload to S3
-    const s3Url = await uploadFromUrl(videoResult.url, "video");
-
-    // Update DB
     await db.generationJob.update({
       where: { id: dbJobId },
-      data: { status: "done", outputUrl: s3Url, completedAt: new Date() },
+      data: { status: "done", outputUrl: videoResult.url, completedAt: new Date() },
     });
 
-    // Notify user via Telegram
-    await telegram.sendVideo(telegramChatId, s3Url, {
+    await telegram.sendVideo(telegramChatId, videoResult.url, {
       caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
     });
 
-    logger.info({ dbJobId, s3Url }, "Video job completed");
+    logger.info({ dbJobId }, "Video job completed");
   } catch (err) {
     logger.error({ dbJobId, err }, "Video job failed");
 
@@ -66,7 +58,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       .sendMessage(telegramChatId, `❌ Video generation failed: ${String(err).slice(0, 200)}`)
       .catch(() => void 0);
 
-    throw err; // let BullMQ handle retries
+    throw err;
   }
 
   void userIdStr;

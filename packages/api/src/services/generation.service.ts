@@ -1,6 +1,5 @@
 import { db } from "../db.js";
 import { createImageAdapter } from "../ai/image/factory.js";
-import { uploadFromUrl } from "../storage/s3.client.js";
 import { getImageQueue } from "../queues/image.queue.js";
 import { AI_MODELS } from "@metabox/shared";
 
@@ -27,11 +26,10 @@ export const generationService = {
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
 
-    // Create DB job record
     const job = await db.generationJob.create({
       data: {
         userId,
-        dialogId: "", // will be set by caller if needed
+        dialogId: "",
         section: "image",
         modelId,
         prompt,
@@ -46,14 +44,13 @@ export const generationService = {
       // ── Sync generation (DALL-E 3) ──────────────────────────────────────
       try {
         const result = await adapter.generate({ prompt, negativePrompt, imageUrl: sourceImageUrl });
-        const s3Url = await uploadFromUrl(result.url, "images");
 
         await db.generationJob.update({
           where: { id: job.id },
-          data: { status: "done", outputUrl: s3Url, completedAt: new Date() },
+          data: { status: "done", outputUrl: result.url, completedAt: new Date() },
         });
 
-        return { dbJobId: job.id, imageUrl: s3Url, isPending: false };
+        return { dbJobId: job.id, imageUrl: result.url, isPending: false };
       } catch (err) {
         await db.generationJob.update({
           where: { id: job.id },

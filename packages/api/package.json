@@ -39,15 +39,10 @@
     "./ai/audio": {
       "types": "./src/ai/audio/factory.ts",
       "default": "./dist/ai/audio/factory.js"
-    },
-    "./storage": {
-      "types": "./src/storage/s3.client.ts",
-      "default": "./dist/storage/s3.client.js"
     }
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "@aws-sdk/client-s3": "^3.800.0",
     "@fal-ai/client": "^1.5.0",
     "@fastify/cors": "^10.0.2",
     "@fastify/helmet": "^13.0.1",

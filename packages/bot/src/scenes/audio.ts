@@ -1,3 +1,4 @@
+import { InputFile } from "grammy";
 import type { BotContext } from "../types/context.js";
 import { audioGenerationService, userStateService } from "@metabox/api/services";
 import { logger } from "../logger.js";
@@ -50,9 +51,11 @@ export async function handleAudioMessage(ctx: BotContext): Promise<void> {
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
 
-    if (!result.isPending && result.audioUrl) {
-      // Sync result — send audio immediately
-      await ctx.replyWithAudio(result.audioUrl, { caption: `🎧 ${prompt.slice(0, 200)}` });
+    if (!result.isPending) {
+      const audio = result.audioBuffer
+        ? new InputFile(result.audioBuffer, `audio.${result.audioExt ?? "mp3"}`)
+        : result.audioUrl!;
+      await ctx.replyWithAudio(audio, { caption: `🎧 ${prompt.slice(0, 200)}` });
     } else {
       // Async (Suno music) — worker will notify when done
       await ctx.reply(

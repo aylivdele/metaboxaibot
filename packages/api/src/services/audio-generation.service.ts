@@ -1,6 +1,5 @@
 import { db } from "../db.js";
 import { createAudioAdapter } from "../ai/audio/factory.js";
-import { uploadBuffer, uploadFromUrl } from "../storage/s3.client.js";
 import { getAudioQueue } from "../queues/audio.queue.js";
 import { AI_MODELS } from "@metabox/shared";
 
@@ -15,8 +14,10 @@ export interface SubmitAudioParams {
 
 export interface SubmitAudioResult {
   dbJobId: string;
-  /** Populated immediately for sync models (TTS). */
+  /** Populated for sync models (TTS). Use InputFile(audioBuffer) or audioUrl. */
+  audioBuffer?: Buffer;
   audioUrl?: string;
+  audioExt?: string;
   isPending: boolean;
 }
 
@@ -27,7 +28,6 @@ export const audioGenerationService = {
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
 
-    // Create DB job record
     const job = await db.generationJob.create({
       data: {
         userId,
@@ -46,21 +46,18 @@ export const audioGenerationService = {
       try {
         const result = await adapter.generate({ prompt, voiceId, sourceAudioUrl });
 
-        let s3Url: string;
-        if (result.buffer) {
-          s3Url = await uploadBuffer(result.buffer, "audio", result.ext, result.contentType);
-        } else if (result.url) {
-          s3Url = await uploadFromUrl(result.url, "audio", result.ext);
-        } else {
-          throw new Error("Audio adapter returned neither buffer nor URL");
-        }
-
         await db.generationJob.update({
           where: { id: job.id },
-          data: { status: "done", outputUrl: s3Url, completedAt: new Date() },
+          data: { status: "done", outputUrl: result.url ?? null, completedAt: new Date() },
         });
 
-        return { dbJobId: job.id, audioUrl: s3Url, isPending: false };
+        return {
+          dbJobId: job.id,
+          audioBuffer: result.buffer,
+          audioUrl: result.url,
+          audioExt: result.ext,
+          isPending: false,
+        };
       } catch (err) {
         await db.generationJob.update({
           where: { id: job.id },
