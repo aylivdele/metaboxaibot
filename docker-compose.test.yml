@@ -35,6 +35,10 @@ services:
     container_name: metabox_bot
     restart: always
     env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,6 +52,10 @@ services:
     container_name: metabox_api
     restart: always
     env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     ports:
       - "127.0.0.1:3001:3001"
     depends_on:
@@ -63,6 +71,10 @@ services:
     container_name: metabox_worker
     restart: always
     env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     depends_on:
       postgres:
         condition: service_healthy

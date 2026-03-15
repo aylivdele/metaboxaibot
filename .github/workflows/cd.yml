@@ -1,8 +1,10 @@
 name: CD
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
     branches: [main]
+    types: [completed]
 
 # Only one deployment at a time; a newer push cancels the queued one
 concurrency:
@@ -17,6 +19,7 @@ jobs:
   build-images:
     name: Build ${{ matrix.service }}
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       packages: write
@@ -35,6 +38,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -54,7 +59,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/metabox-${{ matrix.service }}:latest
-            ghcr.io/${{ github.repository_owner }}/metabox-${{ matrix.service }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/metabox-${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}
           # GitHub Actions layer cache — next build reuses unchanged layers
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,scope=${{ matrix.service }},mode=max
@@ -63,10 +68,13 @@ jobs:
   build-webapp:
     name: Build & deploy webapp
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -112,7 +120,7 @@ jobs:
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_ACTOR: ${{ github.actor }}
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
@@ -136,5 +144,12 @@ jobs:
 
             echo "Pruning old images..."
             docker image prune -f
+
+            echo "Reloading nginx..."
+            # nginx.server.conf is symlinked to /etc/nginx/sites-available/metabox
+            # (set up once: ln -sf /opt/metabox/infra/nginx/nginx.server.conf /etc/nginx/sites-available/metabox)
+            # git pull above already updated the source file — just test and reload
+            sudo nginx -t
+            sudo systemctl reload nginx
 
             echo "Deploy complete — $IMAGE_TAG"
