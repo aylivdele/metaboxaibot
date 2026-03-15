@@ -36,8 +36,9 @@ export async function handleAudioMessage(ctx: BotContext): Promise<void> {
   if (!chatId) return;
 
   const state = await userStateService.get(ctx.user.id);
-  
-  const activeDialog = !!state?.audioDialogId && await dialogService.findById(state.audioDialogId)
+
+  const activeDialog =
+    !!state?.audioDialogId && (await dialogService.findById(state.audioDialogId));
   const modelId = activeDialog ? activeDialog.modelId : "tts-openai";
   const prompt = ctx.message.text;
 

@@ -38,7 +38,8 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
   if (!chatId) return;
 
   const state = await userStateService.get(ctx.user.id);
-  const activeDialog = !!state?.designDialogId && await dialogService.findById(state.designDialogId)
+  const activeDialog =
+    !!state?.designDialogId && (await dialogService.findById(state.designDialogId));
   const modelId = activeDialog ? activeDialog.modelId : "dall-e-3";
   const prompt = ctx.message.text;
 

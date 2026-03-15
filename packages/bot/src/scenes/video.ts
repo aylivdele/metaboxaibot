@@ -40,7 +40,8 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
   if (!chatId) return;
 
   const state = await userStateService.get(ctx.user.id);
-  const activeDialog = !!state?.videoDialogId && await dialogService.findById(state.videoDialogId)
+  const activeDialog =
+    !!state?.videoDialogId && (await dialogService.findById(state.videoDialogId));
   const modelId = activeDialog ? activeDialog.modelId : "kling";
   const prompt = ctx.message.text;
 

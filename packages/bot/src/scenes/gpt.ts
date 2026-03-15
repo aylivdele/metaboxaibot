@@ -16,7 +16,7 @@ export async function handleNewGptDialog(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
 
   const state = await userStateService.get(ctx.user.id);
-  const activeDialog = !!state?.gptDialogId && await dialogService.findById(state.gptDialogId)
+  const activeDialog = !!state?.gptDialogId && (await dialogService.findById(state.gptDialogId));
   const modelId = activeDialog ? activeDialog.modelId : DEFAULT_GPT_MODEL;
 
   const dialog = await dialogService.create({
