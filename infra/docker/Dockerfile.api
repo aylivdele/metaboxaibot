@@ -29,5 +29,9 @@ COPY --from=builder /app/packages/api/dist ./packages/api/dist
 COPY --from=builder /app/packages/api/package.json ./packages/api/
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/package.json ./package.json
+COPY infra/docker/entrypoint.api.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
-CMD ["node", "packages/api/dist/index.js"]
+ENTRYPOINT ["./entrypoint.sh"]

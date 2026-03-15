@@ -29,7 +29,9 @@ services:
       retries: 5
 
   bot:
-    image: ${GHCR_IMAGE_PREFIX}/metabox-bot:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.bot
     container_name: metabox_bot
     restart: always
     env_file: .env
@@ -40,7 +42,9 @@ services:
         condition: service_healthy
 
   api:
-    image: ${GHCR_IMAGE_PREFIX}/metabox-api:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
     container_name: metabox_api
     restart: always
     env_file: .env
@@ -53,7 +57,9 @@ services:
         condition: service_healthy
 
   worker:
-    image: ${GHCR_IMAGE_PREFIX}/metabox-worker:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
     container_name: metabox_worker
     restart: always
     env_file: .env
@@ -63,33 +69,6 @@ services:
       redis:
         condition: service_healthy
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: metabox_prometheus
-    restart: always
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=15d"
-    volumes:
-      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: metabox_grafana
-    restart: always
-    ports:
-      - "127.0.0.1:3000:3000"
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    volumes:
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus
-
 volumes:
   postgres_data:
   redis_data:
-  prometheus_data:
-  grafana_data:
