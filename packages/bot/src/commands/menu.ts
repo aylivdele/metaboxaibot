@@ -1,6 +1,16 @@
 import type { BotContext } from "../types/context.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
-import { userStateService } from "@metabox/api/services";
+import { userStateService, dialogService } from "@metabox/api/services";
+import type { Section } from "@metabox/shared";
+
+/** Returns the active dialog name for a section, or undefined. */
+async function activeDialogLabel(userId: bigint, section: string): Promise<string | undefined> {
+  const dialogId = await userStateService.getDialogForSection(userId, section as Section);
+  if (!dialogId) return undefined;
+  const dialog = await dialogService.findById(dialogId);
+  if (!dialog) return undefined;
+  return dialog.title ?? dialog.modelId;
+}
 
 export async function handleMenu(ctx: BotContext): Promise<void> {
   await ctx.reply(ctx.t.start.mainMenuTitle, {
@@ -9,8 +19,13 @@ export async function handleMenu(ctx: BotContext): Promise<void> {
 }
 
 export async function handleGpt(ctx: BotContext): Promise<void> {
-  if (ctx.user) await userStateService.setState(ctx.user.id, "GPT_SECTION", "gpt");
-  await ctx.reply(ctx.t.gpt.sectionTitle, {
+  if (!ctx.user) return;
+  const dialogLabel = await activeDialogLabel(ctx.user.id, "gpt");
+  await userStateService.setState(ctx.user.id, "GPT_SECTION", "gpt");
+  const text = dialogLabel
+    ? `${ctx.t.gpt.sectionTitle}\n\n💬 ${dialogLabel}`
+    : ctx.t.gpt.sectionTitle;
+  await ctx.reply(text, {
     reply_markup: {
       keyboard: [
         [{ text: ctx.t.gpt.newDialog }, { text: ctx.t.gpt.activateEditor }],
@@ -24,8 +39,13 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
 }
 
 export async function handleDesign(ctx: BotContext): Promise<void> {
-  if (ctx.user) await userStateService.setState(ctx.user.id, "DESIGN_SECTION", "design");
-  await ctx.reply(ctx.t.design.sectionTitle, {
+  if (!ctx.user) return;
+  const dialogLabel = await activeDialogLabel(ctx.user.id, "design");
+  await userStateService.setState(ctx.user.id, "DESIGN_SECTION", "design");
+  const text = dialogLabel
+    ? `${ctx.t.design.sectionTitle}\n\n💬 ${dialogLabel}`
+    : ctx.t.design.sectionTitle;
+  await ctx.reply(text, {
     reply_markup: {
       keyboard: [
         [{ text: ctx.t.design.newDialog }, { text: ctx.t.design.management }],

@@ -25,7 +25,7 @@ export async function handleNewGptDialog(ctx: BotContext): Promise<void> {
   });
 
   await userStateService.setState(ctx.user.id, "GPT_ACTIVE", "gpt");
-  await userStateService.setDialog(ctx.user.id, dialog.id);
+  await userStateService.setDialogForSection(ctx.user.id, "gpt", dialog.id);
 
   await ctx.reply(ctx.t.gpt.newDialogCreated);
 }
@@ -36,7 +36,7 @@ export async function handleGptMessage(ctx: BotContext): Promise<void> {
   if (!ctx.user || !ctx.message?.text) return;
 
   const state = await userStateService.get(ctx.user.id);
-  if (!state?.dialogId) {
+  if (!state?.gptDialogId) {
     // No active dialog — prompt user to create one
     await ctx.reply(ctx.t.gpt.newDialogCreated);
     return;
@@ -53,7 +53,7 @@ export async function handleGptMessage(ctx: BotContext): Promise<void> {
 
   try {
     const stream = chatService.sendMessageStream({
-      dialogId: state.dialogId,
+      dialogId: state.gptDialogId,
       userId: ctx.user.id,
       content: userText,
     });

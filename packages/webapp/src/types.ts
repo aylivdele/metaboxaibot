@@ -42,7 +42,10 @@ export interface UserState {
   state: string;
   section: string | null;
   modelId: string | null;
-  dialogId: string | null;
+  gptDialogId: string | null;
+  designDialogId: string | null;
+  audioDialogId: string | null;
+  videoDialogId: string | null;
 }
 
 export type Page = "profile" | "management" | "tariffs" | "referral";

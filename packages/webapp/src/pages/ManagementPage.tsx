@@ -2,8 +2,6 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "../api/client.js";
 import type { Dialog, Model, UserState } from "../types.js";
 
-type Tab = "dialogs" | "model";
-
 const SECTION_LABELS: Record<string, string> = {
   gpt: "💡 GPT",
   design: "🎨 Design",
@@ -18,13 +16,14 @@ interface ManagementPageProps {
 }
 
 export function ManagementPage({ initialSection }: ManagementPageProps) {
-  const [tab, setTab] = useState<Tab>("dialogs");
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [state, setState] = useState<UserState | null>(null);
   const [loading, setLoading] = useState(true);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const [creating, setCreating] = useState(false);
   const validInitial = VALID_SECTIONS.includes(initialSection as (typeof VALID_SECTIONS)[number])
     ? initialSection!
     : "gpt";
@@ -47,15 +46,30 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
     loadData().catch(console.error);
   }, [loadData]);
 
+  function sectionDialogKey(section: string): keyof UserState {
+    const map: Record<string, keyof UserState> = {
+      gpt: "gptDialogId",
+      design: "designDialogId",
+      audio: "audioDialogId",
+      video: "videoDialogId",
+    };
+    return map[section] ?? "gptDialogId";
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this dialog?")) return;
     await api.dialogs.delete(id);
     setDialogs((ds) => ds.filter((d) => d.id !== id));
+    const key = sectionDialogKey(activeSection);
+    if (state?.[key] === id) {
+      setState((s) => (s ? { ...s, [key]: null } : s));
+    }
   };
 
   const handleActivate = async (dialog: Dialog) => {
     await api.dialogs.activate(dialog.id);
-    setState((s) => (s ? { ...s, dialogId: dialog.id, modelId: dialog.modelId } : s));
+    const key = sectionDialogKey(activeSection);
+    setState((s) => (s ? { ...s, [key]: dialog.id, modelId: dialog.modelId } : s));
   };
 
   const handleRename = async (id: string) => {
@@ -66,9 +80,18 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
     setRenameValue("");
   };
 
-  const handleSetModel = async (modelId: string) => {
-    await api.state.patch({ modelId });
-    setState((s) => (s ? { ...s, modelId } : s));
+  const handleCreateDialog = async (modelId: string) => {
+    setCreating(true);
+    try {
+      const dialog = await api.dialogs.create(activeSection, modelId);
+      await api.dialogs.activate(dialog.id);
+      const key = sectionDialogKey(activeSection);
+      setState((s) => (s ? { ...s, [key]: dialog.id, modelId } : s));
+      setDialogs((ds) => [dialog, ...ds]);
+      setIsCreating(false);
+    } finally {
+      setCreating(false);
+    }
   };
 
   if (loading) return <div className="page-loading">Loading…</div>;
@@ -78,42 +101,62 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
 
   return (
     <div className="page">
-      <div className="tab-bar">
-        <button
-          className={`tab-btn${tab === "dialogs" ? " tab-btn--active" : ""}`}
-          onClick={() => setTab("dialogs")}
-        >
-          💬 Dialogs
-        </button>
-        <button
-          className={`tab-btn${tab === "model" ? " tab-btn--active" : ""}`}
-          onClick={() => setTab("model")}
-        >
-          🤖 Model
-        </button>
-      </div>
-
       <div className="section-chips">
         {VALID_SECTIONS.map((s) => (
           <button
             key={s}
             className={`chip${activeSection === s ? " chip--active" : ""}`}
-            onClick={() => setActiveSection(s)}
+            onClick={() => {
+              setActiveSection(s);
+              setIsCreating(false);
+            }}
           >
             {SECTION_LABELS[s]}
           </button>
         ))}
       </div>
 
-      {tab === "dialogs" && (
+      {isCreating ? (
+        <div className="model-picker">
+          <div className="model-picker__header">
+            <span>Choose a model</span>
+            <button className="action-btn" onClick={() => setIsCreating(false)}>
+              ✕
+            </button>
+          </div>
+          {sectionModels.length === 0 ? (
+            <div className="empty-state">No models available</div>
+          ) : (
+            sectionModels.map((m) => (
+              <div
+                key={m.id}
+                className={`model-item${creating ? " model-item--disabled" : ""}`}
+                onClick={() => !creating && void handleCreateDialog(m.id)}
+              >
+                <div className="model-item__name">{m.name}</div>
+                <div className="model-item__meta">
+                  {m.costPerRequest} tkn · {m.provider}
+                  {m.supportsImages && " · 🖼"}
+                  {m.supportsVoice && " · 🎙"}
+                  {m.isAsync && " · ⏳"}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
         <div className="dialog-list">
+          <button className="new-dialog-btn" onClick={() => setIsCreating(true)}>
+            ➕ New dialog
+          </button>
+
           {filteredDialogs.length === 0 ? (
             <div className="empty-state">No dialogs in this section</div>
           ) : (
             filteredDialogs.map((d) => (
               <div
                 key={d.id}
-                className={`dialog-item${state?.dialogId === d.id ? " dialog-item--active" : ""}`}
+                className={`dialog-item${state?.[sectionDialogKey(activeSection)] === d.id ? " dialog-item--active" : ""}`}
               >
                 {renamingId === d.id ? (
                   <div className="dialog-item__rename">
@@ -138,7 +181,7 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
                       </div>
                     </div>
                     <div className="dialog-item__actions">
-                      {state?.dialogId !== d.id && (
+                      {state?.[sectionDialogKey(activeSection)] !== d.id && (
                         <button
                           className="action-btn action-btn--primary"
                           onClick={() => void handleActivate(d)}
@@ -170,27 +213,6 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
               </div>
             ))
           )}
-        </div>
-      )}
-
-      {tab === "model" && (
-        <div className="model-list">
-          {sectionModels.map((m) => (
-            <div
-              key={m.id}
-              className={`model-item${state?.modelId === m.id ? " model-item--active" : ""}`}
-              onClick={() => void handleSetModel(m.id)}
-            >
-              <div className="model-item__name">{m.name}</div>
-              <div className="model-item__meta">
-                {m.costPerRequest} tkn · {m.provider}
-                {m.supportsImages && " · 🖼"}
-                {m.supportsVoice && " · 🎙"}
-                {m.isAsync && " · ⏳"}
-              </div>
-              {state?.modelId === m.id && <span className="model-item__badge">✓ Active</span>}
-            </div>
-          ))}
         </div>
       )}
     </div>

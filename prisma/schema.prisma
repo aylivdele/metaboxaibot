@@ -38,7 +38,12 @@ model UserState {
   state     String  @default("IDLE")          // IDLE | MAIN_MENU | GPT_SECTION | GPT_ACTIVE | ...
   section   String? // gpt | design | audio | video
   modelId   String? // текущая выбранная модель
-  dialogId  String? // текущий активный диалог
+
+  // Активный диалог для каждого раздела (хранится независимо)
+  gptDialogId    String?
+  designDialogId String?
+  audioDialogId  String?
+  videoDialogId  String?
 
   updatedAt DateTime @updatedAt
 

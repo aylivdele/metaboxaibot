@@ -95,7 +95,7 @@ export const dialogsRoutes: FastifyPluginAsync = async (fastify) => {
     if (!dialog) return reply.code(404).send({ error: "Dialog not found" });
     if (dialog.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
 
-    await userStateService.setDialog(userId, id);
+    await userStateService.setDialogForSection(userId, dialog.section as Section, id);
     return { success: true };
   });
 };

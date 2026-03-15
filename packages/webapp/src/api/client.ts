@@ -64,7 +64,7 @@ export const api = {
 
   state: {
     get: () => request<UserState>("/state"),
-    patch: (body: { modelId?: string; dialogId?: string | null }) =>
+    patch: (body: { modelId?: string; section?: string; dialogId?: string | null }) =>
       request<{ success: boolean }>("/state", {
         method: "PATCH",
         body: JSON.stringify(body),
