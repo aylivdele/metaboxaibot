@@ -59,6 +59,7 @@ export default {
     backToMain: "🏠 Back to Main Menu",
   },
   errors: {
+    unexpected: "Unexpected error. Please, try again later.",
     noTool:
       "⚠️ No tool selected for working with the bot.\nPlease use the navigation to activate the desired function (see photo) ↕️\n*If the ☰ menu button (highlighted in red in the photo) has disappeared, type /start to restart the bot* 🔄",
     insufficientTokens:

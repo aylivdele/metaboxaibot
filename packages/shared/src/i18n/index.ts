@@ -56,6 +56,7 @@ export interface Translations {
   };
   errors: {
     noTool: string;
+    unexpected: string;
     insufficientTokens: string;
     userBlocked: string;
   };
