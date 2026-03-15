@@ -25,10 +25,11 @@ RUN npm install -g pnpm
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY --from=builder /app/packages/shared/dist        ./packages/shared/dist
+COPY --from=builder /app/packages/shared/dist         ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/
-COPY --from=builder /app/packages/bot/dist           ./packages/bot/dist
-COPY --from=builder /app/packages/bot/package.json   ./packages/bot/
-COPY --from=builder /app/node_modules                ./node_modules
+COPY --from=builder /app/packages/bot/dist            ./packages/bot/dist
+COPY --from=builder /app/packages/bot/package.json    ./packages/bot/
+COPY --from=builder /app/packages/bot/node_modules    ./packages/bot/node_modules
+COPY --from=builder /app/node_modules                 ./node_modules
 
 CMD ["node", "packages/bot/dist/index.js"]
