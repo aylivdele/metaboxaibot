@@ -2,6 +2,8 @@ import type { BotContext } from "../types/context.js";
 import { chatService, dialogService, userStateService } from "@metabox/api/services";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { logger } from "../logger.js";
+import { config } from "@metabox/shared";
+import { InlineKeyboard } from "grammy";
 
 /** Default model for new GPT dialogs (user can change via Management). */
 const DEFAULT_GPT_MODEL = "gpt-4o";
@@ -94,11 +96,17 @@ export async function handleActivateGptEditor(ctx: BotContext): Promise<void> {
   await ctx.reply(ctx.t.gpt.gptEditorActivated);
 }
 
-// ── Management (stub — full implementation pending) ───────────────────────────
+// ── Management — opens Mini App ───────────────────────────────────────────────
 
 export async function handleGptManagement(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
-  await ctx.reply(ctx.t.gpt.management + " — coming soon.");
+  const webappUrl = config.bot.webappUrl;
+  if (!webappUrl) {
+    await ctx.reply(ctx.t.errors.unexpected);
+    return;
+  }
+  const kb = new InlineKeyboard().webApp(ctx.t.gpt.management, `${webappUrl}#management/gpt`);
+  await ctx.reply(ctx.t.gpt.management, { reply_markup: kb });
 }
 
 // ── Prompts (stub — full implementation pending) ──────────────────────────────

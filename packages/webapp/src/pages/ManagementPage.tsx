@@ -4,7 +4,6 @@ import type { Dialog, Model, UserState } from "../types.js";
 
 type Tab = "dialogs" | "model";
 
-const SECTIONS = ["gpt", "design", "audio", "video"] as const;
 const SECTION_LABELS: Record<string, string> = {
   gpt: "💡 GPT",
   design: "🎨 Design",
@@ -12,7 +11,13 @@ const SECTION_LABELS: Record<string, string> = {
   video: "🎬 Video",
 };
 
-export function ManagementPage() {
+const VALID_SECTIONS = ["gpt", "design", "audio", "video"] as const;
+
+interface ManagementPageProps {
+  initialSection?: string;
+}
+
+export function ManagementPage({ initialSection }: ManagementPageProps) {
   const [tab, setTab] = useState<Tab>("dialogs");
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const [models, setModels] = useState<Model[]>([]);
@@ -20,7 +25,10 @@ export function ManagementPage() {
   const [loading, setLoading] = useState(true);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [activeSection, setActiveSection] = useState<string>("gpt");
+  const validInitial = VALID_SECTIONS.includes(initialSection as (typeof VALID_SECTIONS)[number])
+    ? initialSection!
+    : "gpt";
+  const [activeSection, setActiveSection] = useState<string>(validInitial);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -86,7 +94,7 @@ export function ManagementPage() {
       </div>
 
       <div className="section-chips">
-        {SECTIONS.map((s) => (
+        {VALID_SECTIONS.map((s) => (
           <button
             key={s}
             className={`chip${activeSection === s ? " chip--active" : ""}`}

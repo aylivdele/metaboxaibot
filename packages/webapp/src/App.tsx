@@ -7,8 +7,17 @@ import { TariffsPage } from "./pages/TariffsPage.js";
 import { ReferralPage } from "./pages/ReferralPage.js";
 import type { Page } from "./types.js";
 
+/** Parse initial page and section from URL hash, e.g. #management/gpt */
+function parseHash(): { page: Page; section?: string } {
+  const [pagePart, sectionPart] = window.location.hash.slice(1).split("/");
+  const validPages: Page[] = ["profile", "management", "tariffs", "referral"];
+  const page = validPages.includes(pagePart as Page) ? (pagePart as Page) : "profile";
+  return { page, section: sectionPart };
+}
+
 export function App() {
-  const [page, setPage] = useState<Page>("profile");
+  const initial = parseHash();
+  const [page, setPage] = useState<Page>(initial.page);
   const { ready, error } = useTelegramInit();
 
   if (error) {
@@ -37,7 +46,7 @@ export function App() {
 
       <main className="app-main">
         {page === "profile" && <ProfilePage />}
-        {page === "management" && <ManagementPage />}
+        {page === "management" && <ManagementPage initialSection={initial.section} />}
         {page === "tariffs" && <TariffsPage />}
         {page === "referral" && <ReferralPage />}
       </main>

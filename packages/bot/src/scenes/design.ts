@@ -1,6 +1,6 @@
 import type { BotContext } from "../types/context.js";
 import { generationService, userStateService } from "@metabox/api/services";
-import { MODELS_BY_SECTION } from "@metabox/shared";
+import { MODELS_BY_SECTION, config } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 
@@ -73,11 +73,17 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
   }
 }
 
-// ── Management (stub — full implementation pending) ───────────────────────────
+// ── Management — opens Mini App ───────────────────────────────────────────────
 
 export async function handleDesignManagement(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
-  await ctx.reply(ctx.t.design.management + " — coming soon.");
+  const webappUrl = config.bot.webappUrl;
+  if (!webappUrl) {
+    await ctx.reply(ctx.t.errors.unexpected);
+    return;
+  }
+  const kb = new InlineKeyboard().webApp(ctx.t.design.management, `${webappUrl}#management/design`);
+  await ctx.reply(ctx.t.design.management, { reply_markup: kb });
 }
 
 // ── New design dialog ─────────────────────────────────────────────────────────
