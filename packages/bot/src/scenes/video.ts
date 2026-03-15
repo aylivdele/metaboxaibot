@@ -69,6 +69,20 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
   }
 }
 
+// ── Avatars (stub — full implementation pending) ──────────────────────────────
+
+export async function handleVideoAvatars(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.reply(ctx.t.video.avatars + " — coming soon.");
+}
+
+// ── Lip Sync (stub — full implementation pending) ─────────────────────────────
+
+export async function handleVideoLipSync(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.reply(ctx.t.video.lipSync + " — coming soon.");
+}
+
 // ── New video dialog ──────────────────────────────────────────────────────────
 
 export async function handleNewVideoDialog(ctx: BotContext): Promise<void> {

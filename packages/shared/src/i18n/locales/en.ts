@@ -40,7 +40,7 @@ export default {
   design: {
     sectionTitle: "🎨 AI Design\nChoose a section to work with images 👇",
     management: "⚙ Management",
-    newDialog: "💬 New Dialog",
+    newDialog: "🎨 New Image",
     backToMain: "🏠 Back to Main Menu",
   },
   audio: {

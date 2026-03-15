@@ -1,5 +1,6 @@
 import type { BotContext } from "../types/context.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
+import { userStateService } from "@metabox/api/services";
 
 export async function handleMenu(ctx: BotContext): Promise<void> {
   await ctx.reply(ctx.t.start.mainMenuTitle, {
@@ -8,6 +9,7 @@ export async function handleMenu(ctx: BotContext): Promise<void> {
 }
 
 export async function handleGpt(ctx: BotContext): Promise<void> {
+  if (ctx.user) await userStateService.setState(ctx.user.id, "GPT_SECTION", "gpt");
   await ctx.reply(ctx.t.gpt.sectionTitle, {
     reply_markup: {
       keyboard: [
@@ -22,6 +24,7 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
 }
 
 export async function handleDesign(ctx: BotContext): Promise<void> {
+  if (ctx.user) await userStateService.setState(ctx.user.id, "DESIGN_SECTION", "design");
   await ctx.reply(ctx.t.design.sectionTitle, {
     reply_markup: {
       keyboard: [

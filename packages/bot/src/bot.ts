@@ -5,16 +5,25 @@ import { i18nMiddleware } from "./middlewares/i18n.middleware.js";
 import { handleStart, handleLanguageSelect } from "./commands/start.js";
 import { handleMenu, handleGpt, handleDesign, handleAudio, handleVideo } from "./commands/menu.js";
 import { handleNoTool } from "./handlers/no-tool.handler.js";
-import { handleNewGptDialog, handleGptMessage, handleActivateGptEditor } from "./scenes/gpt.js";
+import {
+  handleNewGptDialog,
+  handleGptMessage,
+  handleActivateGptEditor,
+  handleGptManagement,
+  handleGptPrompts,
+} from "./scenes/gpt.js";
 import {
   handleDesignModelSelect,
   handleDesignMessage,
   handleNewDesignDialog,
+  handleDesignManagement,
 } from "./scenes/design.js";
 import {
   handleVideoModelSelect,
   handleVideoMessage,
   handleNewVideoDialog,
+  handleVideoAvatars,
+  handleVideoLipSync,
 } from "./scenes/video.js";
 import { handleAudioSubSection, handleAudioMessage } from "./scenes/audio.js";
 import { userStateService } from "@metabox/api/services";
@@ -53,6 +62,15 @@ export function createBot(token: string): Bot<BotContext> {
     const t = ctx.t;
     const text = ctx.message.text;
 
+    // Management text is identical across GPT and Design sections — route by section.
+    if (text === t.gpt.management) {
+      if (!ctx.user) return next();
+      const state = await userStateService.get(ctx.user.id);
+      if (state?.section === "gpt") return handleGptManagement(ctx);
+      if (state?.section === "design") return handleDesignManagement(ctx);
+      return next();
+    }
+
     const menuMap: Record<string, () => Promise<void>> = {
       [t.menu.gpt]: () => handleGpt(ctx),
       [t.menu.design]: () => handleDesign(ctx),
@@ -66,10 +84,13 @@ export function createBot(token: string): Bot<BotContext> {
       // GPT section buttons
       [t.gpt.newDialog]: () => handleNewGptDialog(ctx),
       [t.gpt.activateEditor]: () => handleActivateGptEditor(ctx),
+      [t.gpt.prompts]: () => handleGptPrompts(ctx),
       // Design section buttons
       [t.design.newDialog]: () => handleNewDesignDialog(ctx),
       // Video section buttons
       [t.video.newDialog]: () => handleNewVideoDialog(ctx),
+      [t.video.avatars]: () => handleVideoAvatars(ctx),
+      [t.video.lipSync]: () => handleVideoLipSync(ctx),
       // Audio section buttons
       [t.audio.tts]: () => handleAudioSubSection(ctx, "tts-openai"),
       [t.audio.voiceClone]: () => handleAudioSubSection(ctx, "voice-clone"),

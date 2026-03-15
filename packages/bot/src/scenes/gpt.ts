@@ -94,6 +94,20 @@ export async function handleActivateGptEditor(ctx: BotContext): Promise<void> {
   await ctx.reply(ctx.t.gpt.gptEditorActivated);
 }
 
+// ── Management (stub — full implementation pending) ───────────────────────────
+
+export async function handleGptManagement(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.reply(ctx.t.gpt.management + " — coming soon.");
+}
+
+// ── Prompts (stub — full implementation pending) ──────────────────────────────
+
+export async function handleGptPrompts(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.reply(ctx.t.gpt.prompts + " — coming soon.");
+}
+
 // ── Back to main from GPT section ─────────────────────────────────────────────
 
 export async function handleGptBackToMain(ctx: BotContext): Promise<void> {

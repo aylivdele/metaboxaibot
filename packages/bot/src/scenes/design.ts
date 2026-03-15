@@ -73,6 +73,13 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
   }
 }
 
+// ── Management (stub — full implementation pending) ───────────────────────────
+
+export async function handleDesignManagement(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.reply(ctx.t.design.management + " — coming soon.");
+}
+
 // ── New design dialog ─────────────────────────────────────────────────────────
 
 export async function handleNewDesignDialog(ctx: BotContext): Promise<void> {
