@@ -18,6 +18,7 @@ COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_module
 COPY . .
 RUN pnpm --filter @metabox/shared build
 RUN pnpm exec prisma generate
+RUN pnpm --filter @metabox/api build
 RUN pnpm --filter @metabox/bot build
 
 FROM node:20-alpine AS runner
