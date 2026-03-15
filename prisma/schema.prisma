@@ -61,7 +61,7 @@ model Dialog {
   section  String  // gpt | design | audio | video
   modelId  String  // gpt-4o | claude-sonnet | midjourney | kling | etc.
   title    String?
-  isActive Boolean @default(true)
+  isDeleted Boolean @default(false)
 
   // ── Стратегия хранения контекста ────────────────────────────────────────
   // "provider_chain"  — OpenAI Responses API: цепочка через previous_response_id

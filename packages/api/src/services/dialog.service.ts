@@ -32,13 +32,13 @@ export const dialogService = {
 
   async listByUser(userId: bigint, section?: Section): Promise<Dialog[]> {
     return db.dialog.findMany({
-      where: { userId, ...(section ? { section } : {}), isActive: true },
+      where: { userId, ...(section ? { section } : {}), isDeleted: false },
       orderBy: { updatedAt: "desc" },
     });
   },
 
   async softDelete(dialogId: string): Promise<void> {
-    await db.dialog.update({ where: { id: dialogId }, data: { isActive: false } });
+    await db.dialog.update({ where: { id: dialogId }, data: { isDeleted: true } });
   },
 
   async rename(dialogId: string, title: string): Promise<Dialog> {
