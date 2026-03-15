@@ -154,10 +154,11 @@ jobs:
             echo "Pruning old images..."
             docker image prune -f
 
-            echo "Reloading nginx..."
-            # nginx.server.conf is symlinked to /etc/nginx/sites-available/metabox
+            echo "Updating repo (nginx config)..."
+            # nginx.server.conf is symlinked from /etc/nginx/sites-available/metabox
             # (set up once: ln -sf /opt/metaboxaibot/infra/nginx/nginx.server.conf /etc/nginx/sites-available/metabox)
-            # git pull above already updated the source file — just test and reload
+            # GHCR_TOKEN is GITHUB_TOKEN — auto-generated per job, read access to repo
+            git -c "url.https://x-access-token:${GHCR_TOKEN}@github.com/.insteadOf=https://github.com/" pull origin main
             sudo nginx -t
             sudo systemctl reload nginx
 
