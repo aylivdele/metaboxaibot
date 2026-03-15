@@ -23,7 +23,7 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
   const dialogLabel = await activeDialogLabel(ctx.user.id, "gpt");
   await userStateService.setState(ctx.user.id, "GPT_SECTION", "gpt");
   const text = dialogLabel
-    ? `${ctx.t.gpt.sectionTitle}\n\n💬 ${dialogLabel}`
+    ? `${ctx.t.gpt.sectionTitle}\n\n💬 Активный диалог: ${dialogLabel}`
     : ctx.t.gpt.sectionTitle;
   await ctx.reply(text, {
     reply_markup: {

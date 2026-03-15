@@ -1,5 +1,5 @@
 import type { BotContext } from "../types/context.js";
-import { generationService, userStateService } from "@metabox/api/services";
+import { dialogService, generationService, userStateService } from "@metabox/api/services";
 import { MODELS_BY_SECTION, config } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -38,7 +38,8 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
   if (!chatId) return;
 
   const state = await userStateService.get(ctx.user.id);
-  const modelId = state?.modelId ?? "dall-e-3";
+  const activeDialog = !!state?.designDialogId && await dialogService.findById(state.designDialogId)
+  const modelId = activeDialog ? activeDialog.modelId : "dall-e-3";
   const prompt = ctx.message.text;
 
   const pendingMsg = await ctx.reply("🎨 Generating your image...");

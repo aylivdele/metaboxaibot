@@ -1,6 +1,6 @@
 import { InputFile } from "grammy";
 import type { BotContext } from "../types/context.js";
-import { audioGenerationService, userStateService } from "@metabox/api/services";
+import { audioGenerationService, dialogService, userStateService } from "@metabox/api/services";
 import { logger } from "../logger.js";
 
 // ── Sub-section entry points ──────────────────────────────────────────────────
@@ -36,7 +36,9 @@ export async function handleAudioMessage(ctx: BotContext): Promise<void> {
   if (!chatId) return;
 
   const state = await userStateService.get(ctx.user.id);
-  const modelId = state?.modelId ?? "tts-openai";
+  
+  const activeDialog = !!state?.audioDialogId && await dialogService.findById(state.audioDialogId)
+  const modelId = activeDialog ? activeDialog.modelId : "tts-openai";
   const prompt = ctx.message.text;
 
   const pendingMsg = await ctx.reply("🎧 Processing your audio request...");

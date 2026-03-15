@@ -1,5 +1,5 @@
 import type { BotContext } from "../types/context.js";
-import { videoGenerationService, userStateService } from "@metabox/api/services";
+import { videoGenerationService, userStateService, dialogService } from "@metabox/api/services";
 import { MODELS_BY_SECTION } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -40,7 +40,8 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
   if (!chatId) return;
 
   const state = await userStateService.get(ctx.user.id);
-  const modelId = state?.modelId ?? "kling";
+  const activeDialog = !!state?.videoDialogId && await dialogService.findById(state.videoDialogId)
+  const modelId = activeDialog ? activeDialog.modelId : "kling";
   const prompt = ctx.message.text;
 
   const pendingMsg = await ctx.reply("🎬 Queuing your video generation...");
@@ -67,20 +68,6 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
       await ctx.reply("❌ Failed to queue video generation. Please try again.");
     }
   }
-}
-
-// ── Avatars (stub — full implementation pending) ──────────────────────────────
-
-export async function handleVideoAvatars(ctx: BotContext): Promise<void> {
-  if (!ctx.user) return;
-  await ctx.reply(ctx.t.video.avatars + " — coming soon.");
-}
-
-// ── Lip Sync (stub — full implementation pending) ─────────────────────────────
-
-export async function handleVideoLipSync(ctx: BotContext): Promise<void> {
-  if (!ctx.user) return;
-  await ctx.reply(ctx.t.video.lipSync + " — coming soon.");
 }
 
 // ── New video dialog ──────────────────────────────────────────────────────────
