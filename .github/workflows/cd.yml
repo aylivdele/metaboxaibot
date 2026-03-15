@@ -94,19 +94,16 @@ jobs:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_BOT_USERNAME: ${{ secrets.VITE_BOT_USERNAME }}
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
-
       - name: Upload webapp dist to VPS
-        run: |
-          rsync -az --delete \
-            -e "ssh -i ~/.ssh/deploy_key" \
-            packages/webapp/dist/ \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/metabox/
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "packages/webapp/dist/*"
+          target: /var/www/metabox
+          strip_components: 3
+          rm: true
 
   # ── Pull new images and restart services on VPS ─────────────────────────────
   deploy:
@@ -128,7 +125,7 @@ jobs:
           envs: GHCR_TOKEN,GH_ACTOR,IMAGE_TAG
           script: |
             set -e
-            cd /opt/metabox
+            cd /opt/metaboxaibot
 
             echo "Logging in to ghcr.io..."
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
@@ -147,7 +144,7 @@ jobs:
 
             echo "Reloading nginx..."
             # nginx.server.conf is symlinked to /etc/nginx/sites-available/metabox
-            # (set up once: ln -sf /opt/metabox/infra/nginx/nginx.server.conf /etc/nginx/sites-available/metabox)
+            # (set up once: ln -sf /opt/metaboxaibot/infra/nginx/nginx.server.conf /etc/nginx/sites-available/metabox)
             # git pull above already updated the source file — just test and reload
             sudo nginx -t
             sudo systemctl reload nginx
