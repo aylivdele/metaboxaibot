@@ -52,13 +52,27 @@ export const chatService = {
     // Save user message
     await dialogService.saveMessage(dialogId, "user", content);
 
-    // Stream response
+    // Stream response — iterate manually to capture the generator return value
     const chunks: string[] = [];
     const gen = adapter.chatStream(input);
 
-    for await (const chunk of gen) {
-      chunks.push(chunk);
-      yield chunk;
+    while (true) {
+      const next = await gen.next();
+      if (next.done) {
+        const result = next.value;
+        if (result?.newResponseId) {
+          await dialogService.updateProviderContext(dialogId, {
+            providerLastResponseId: result.newResponseId,
+          });
+        } else if (result?.newThreadId) {
+          await dialogService.updateProviderContext(dialogId, {
+            providerThreadId: result.newThreadId,
+          });
+        }
+        break;
+      }
+      chunks.push(next.value);
+      yield next.value;
     }
 
     const responseText = chunks.join("");
@@ -66,10 +80,6 @@ export const chatService = {
 
     // Save assistant message
     await dialogService.saveMessage(dialogId, "assistant", responseText, { tokensUsed });
-
-    // Update provider context pointers
-    // (newResponseId / newThreadId are not easily accessible here without refactoring
-    //  the generator return — handled separately for provider_chain via a non-stream call)
 
     // Deduct tokens
     await db.$transaction([

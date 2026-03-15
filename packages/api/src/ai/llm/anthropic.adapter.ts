@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { LLMAdapter, LLMInput, LLMOutput, MessageRecord } from "./base.adapter.js";
+import type { LLMAdapter, LLMInput, LLMOutput, MessageRecord, StreamResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
 const MODEL_MAP: Record<string, string> = {
@@ -36,7 +36,7 @@ export class AnthropicAdapter implements LLMAdapter {
     return { text: chunks.join(""), tokensUsed: 0 };
   }
 
-  async *chatStream(input: LLMInput): AsyncGenerator<string> {
+  async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
     const messages = this.buildMessages(input);
     const stream = this.client.messages.stream({
       model: this.apiModel,
@@ -57,9 +57,8 @@ export class AnthropicAdapter implements LLMAdapter {
         outputTokens = event.usage.output_tokens;
       }
     }
-    // tokensUsed not easily returned from generator — tracked in chat()
-    void inputTokens;
-    void outputTokens;
+
+    return { tokensUsed: inputTokens + outputTokens };
   }
 
   private buildMessages(input: LLMInput): Anthropic.MessageParam[] {

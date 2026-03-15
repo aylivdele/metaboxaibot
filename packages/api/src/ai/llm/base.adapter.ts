@@ -27,9 +27,15 @@ export interface LLMOutput {
   newThreadId?: string;
 }
 
+export interface StreamResult {
+  newResponseId?: string;
+  newThreadId?: string;
+  tokensUsed?: number;
+}
+
 export interface LLMAdapter {
   readonly contextStrategy: ContextStrategy;
   readonly contextMaxMessages: number;
   chat(input: LLMInput): Promise<LLMOutput>;
-  chatStream(input: LLMInput): AsyncGenerator<string>;
+  chatStream(input: LLMInput): AsyncGenerator<string, StreamResult | void, unknown>;
 }

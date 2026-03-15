@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { LLMAdapter, LLMInput, LLMOutput } from "./base.adapter.js";
+import type { LLMAdapter, LLMInput, LLMOutput, StreamResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
 /**
@@ -33,7 +33,7 @@ export class OpenAIAdapter implements LLMAdapter {
     };
   }
 
-  async *chatStream(input: LLMInput): AsyncGenerator<string> {
+  async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
     const stream = await this.client.responses.create({
       model: this.model,
       input: this.buildInput(input),
@@ -41,11 +41,20 @@ export class OpenAIAdapter implements LLMAdapter {
       stream: true,
     });
 
+    let newResponseId: string | undefined;
+    let tokensUsed = 0;
+
     for await (const event of stream) {
       if (event.type === "response.output_text.delta") {
         yield event.delta;
+      } else if (event.type === "response.completed") {
+        newResponseId = event.response.id;
+        const usage = event.response.usage;
+        if (usage) tokensUsed = usage.input_tokens + usage.output_tokens;
       }
     }
+
+    return { newResponseId, tokensUsed };
   }
 
   private buildInput(input: LLMInput): string | OpenAI.Responses.ResponseInput {

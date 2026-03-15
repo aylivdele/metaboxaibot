@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { LLMAdapter, LLMInput, LLMOutput } from "./base.adapter.js";
+import type { LLMAdapter, LLMInput, LLMOutput, StreamResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
 const POLL_INTERVAL_MS = 1000;
@@ -33,14 +33,13 @@ export class OpenAIAssistantsAdapter implements LLMAdapter {
     return { text: chunks.join(""), tokensUsed: 0 };
   }
 
-  async *chatStream(input: LLMInput): AsyncGenerator<string> {
+  async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
     // Create thread on first message, reuse on subsequent
     let threadId = input.threadId;
-    let isNewThread = false;
+    const isNewThread = !threadId;
     if (!threadId) {
       const thread = await this.client.beta.threads.create();
       threadId = thread.id;
-      isNewThread = true;
     }
 
     // Add user message to thread
@@ -60,9 +59,6 @@ export class OpenAIAssistantsAdapter implements LLMAdapter {
       model: this.model,
     });
 
-    let newThreadId: string | undefined = isNewThread ? threadId : undefined;
-    void newThreadId; // returned via LLMOutput — propagated by chatService
-
     for await (const event of stream) {
       if (
         event.event === "thread.message.delta" &&
@@ -72,6 +68,8 @@ export class OpenAIAssistantsAdapter implements LLMAdapter {
         if (text) yield text;
       }
     }
+
+    return { newThreadId: isNewThread ? threadId : undefined };
   }
 
   /** Poll-based fallback (used if streaming isn't needed). */
