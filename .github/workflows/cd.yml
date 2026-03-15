@@ -94,6 +94,14 @@ jobs:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_BOT_USERNAME: ${{ secrets.VITE_BOT_USERNAME }}
 
+      - name: Clear webapp dir on VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: rm -rf /var/www/metabox/*
+
       - name: Upload webapp dist to VPS
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -103,7 +111,6 @@ jobs:
           source: "packages/webapp/dist/*"
           target: /var/www/metabox
           strip_components: 3
-          rm: true
 
   # ── Pull new images and restart services on VPS ─────────────────────────────
   deploy:
