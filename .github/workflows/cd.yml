@@ -125,11 +125,12 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_ACTOR: ${{ github.actor }}
           IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          GHCR_IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: GHCR_TOKEN,GH_ACTOR,IMAGE_TAG
+          envs: GHCR_TOKEN,GH_ACTOR,IMAGE_TAG,GHCR_IMAGE_PREFIX
           script: |
             set -e
             cd /opt/metaboxaibot
@@ -137,8 +138,11 @@ jobs:
             echo "Logging in to ghcr.io..."
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
 
-            echo "Updating IMAGE_TAG in .env to $IMAGE_TAG..."
-            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env || echo "IMAGE_TAG=$IMAGE_TAG" >> .env
+            echo "Updating IMAGE_TAG and GHCR_IMAGE_PREFIX in .env..."
+            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env \
+              || echo "IMAGE_TAG=$IMAGE_TAG" >> .env
+            sed -i "s|^GHCR_IMAGE_PREFIX=.*|GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX|" .env \
+              || echo "GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX" >> .env
 
             echo "Pulling new images..."
             docker compose -f docker-compose.prod.yml pull bot api worker
