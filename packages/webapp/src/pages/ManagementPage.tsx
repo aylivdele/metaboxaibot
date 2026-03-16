@@ -174,8 +174,15 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
                       }}
                       autoFocus
                     />
-                    <button className="action-btn action-btn--primary" onClick={() => void handleRename(d.id)}>✓</button>
-                    <button className="action-btn" onClick={() => setRenamingId(null)}>✕</button>
+                    <button
+                      className="action-btn action-btn--primary"
+                      onClick={() => void handleRename(d.id)}
+                    >
+                      ✓
+                    </button>
+                    <button className="action-btn" onClick={() => setRenamingId(null)}>
+                      ✕
+                    </button>
                   </div>
                 ) : (
                   <>

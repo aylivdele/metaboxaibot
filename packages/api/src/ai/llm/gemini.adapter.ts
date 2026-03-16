@@ -1,5 +1,11 @@
 import { GoogleGenerativeAI, type Content } from "@google/generative-ai";
-import type { LLMAdapter, LLMInput, LLMOutput, MessageRecord, StreamResult } from "./base.adapter.js";
+import type {
+  LLMAdapter,
+  LLMInput,
+  LLMOutput,
+  MessageRecord,
+  StreamResult,
+} from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
 const MODEL_MAP: Record<string, string> = {

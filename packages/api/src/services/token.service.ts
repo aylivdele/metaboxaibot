@@ -52,11 +52,7 @@ export async function checkBalance(userId: bigint): Promise<void> {
  *
  * For LLM models: costUsdPerRequest is 0, cost is driven by per-token pricing.
  */
-export function calculateCost(
-  model: AIModel,
-  inputTokens = 0,
-  outputTokens = 0,
-): number {
+export function calculateCost(model: AIModel, inputTokens = 0, outputTokens = 0): number {
   const providerUsdCost =
     model.costUsdPerRequest +
     (inputTokens * model.inputCostUsdPerMToken) / 1_000_000 +
