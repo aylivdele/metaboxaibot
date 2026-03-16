@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import type { Page } from "../types.js";
 
 interface Props {
@@ -5,7 +6,7 @@ interface Props {
   onChange: (page: Page) => void;
 }
 
-const TABS: Array<{ id: Page; label: string; icon: (active: boolean) => JSX.Element }> = [
+const TABS: Array<{ id: Page; label: string; icon: (active: boolean) => ReactElement }> = [
   {
     id: "profile",
     label: "Profile",
