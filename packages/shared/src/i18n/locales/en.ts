@@ -95,4 +95,8 @@ export default {
     newDialog: "💬 New Dialog",
     comingSoon: " — coming soon.",
   },
+  payments: {
+    success: "✅ Payment successful! Tokens have been credited to your balance.",
+    error: "⚠️ Payment received but tokens could not be credited. Please contact support.",
+  },
 } as const;

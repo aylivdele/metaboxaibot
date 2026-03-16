@@ -84,6 +84,10 @@ export interface Translations {
     newDialog: string;
     comingSoon: string;
   };
+  payments: {
+    success: string;
+    error: string;
+  };
 }
 
 const cache = new Map<Language, Translations>();

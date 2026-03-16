@@ -75,4 +75,12 @@ export const api = {
     list: (section?: string) =>
       request<Model[]>(section ? `/models?section=${section}` : "/models"),
   },
+
+  payments: {
+    createInvoice: (planId: string) =>
+      request<{ invoiceUrl: string }>("/payments/invoice", {
+        method: "POST",
+        body: JSON.stringify({ planId }),
+      }),
+  },
 };

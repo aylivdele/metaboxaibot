@@ -22,6 +22,8 @@ export type {
 export { SUPPORTED_LANGUAGES, LANGUAGE_LABELS, RTL_LANGUAGES } from "./constants/languages.js";
 export { AI_MODELS, MODELS_BY_SECTION } from "./constants/models.js";
 export { BOT_STATES, SECTION_BY_STATE, WELCOME_BONUS_TOKENS } from "./constants/states.js";
+export { PLANS } from "./constants/plans.js";
+export type { Plan } from "./constants/plans.js";
 
 // Config
 export { config } from "./config.js";

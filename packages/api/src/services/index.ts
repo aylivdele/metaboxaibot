@@ -9,3 +9,4 @@ export { videoGenerationService } from "./video-generation.service.js";
 export type { SubmitVideoParams, SubmitVideoResult } from "./video-generation.service.js";
 export { audioGenerationService } from "./audio-generation.service.js";
 export type { SubmitAudioParams, SubmitAudioResult } from "./audio-generation.service.js";
+export { paymentService } from "./payment.service.js";

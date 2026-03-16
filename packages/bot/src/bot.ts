@@ -26,6 +26,7 @@ import {
   handleVideoLipSync,
 } from "./scenes/video.js";
 import { handleAudioSubSection, handleAudioMessage } from "./scenes/audio.js";
+import { handlePreCheckoutQuery, handleSuccessfulPayment } from "./scenes/payment.js";
 import { userStateService } from "@metabox/api/services";
 import { getT } from "@metabox/shared";
 import { rateLimitMiddleware } from "./middlewares/rate-limit.middleware.js";
@@ -116,6 +117,10 @@ export function createBot(token: string): Bot<BotContext> {
 
     return next();
   });
+
+  // ── Telegram Stars payments ───────────────────────────────────────────────
+  bot.on("pre_checkout_query", handlePreCheckoutQuery);
+  bot.on("message:successful_payment", handleSuccessfulPayment);
 
   // ── Fallback: no tool selected ────────────────────────────────────────────
   bot.on("message", handleNoTool);

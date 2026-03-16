@@ -16,6 +16,7 @@ import { dialogsRoutes } from "./routes/dialogs.js";
 import { stateRoutes } from "./routes/state.js";
 import { modelsRoutes } from "./routes/models.js";
 import { adminRoutes } from "./routes/admin.js";
+import { paymentsRoutes } from "./routes/payments.js";
 import { config } from "@metabox/shared";
 
 const server = Fastify({ logger: false });
@@ -69,6 +70,7 @@ await server.register(dialogsRoutes);
 await server.register(stateRoutes);
 await server.register(modelsRoutes);
 await server.register(adminRoutes);
+await server.register(paymentsRoutes);
 
 const port = config.api.port;
 await server.listen({ port, host: "0.0.0.0" });
