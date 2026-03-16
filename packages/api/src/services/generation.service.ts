@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import { createImageAdapter } from "../ai/image/factory.js";
 import { getImageQueue } from "../queues/image.queue.js";
 import { AI_MODELS } from "@metabox/shared";
+import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
 
 export interface SubmitImageParams {
   userId: bigint;
@@ -26,6 +27,8 @@ export const generationService = {
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
 
+    await checkBalance(userId);
+
     const job = await db.generationJob.create({
       data: {
         userId,
@@ -49,6 +52,8 @@ export const generationService = {
           where: { id: job.id },
           data: { status: "done", outputUrl: result.url, completedAt: new Date() },
         });
+
+        await deductTokens(userId, calculateCost(model), modelId);
 
         return { dbJobId: job.id, imageUrl: result.url, isPending: false };
       } catch (err) {

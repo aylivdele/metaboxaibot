@@ -15,7 +15,7 @@ export const modelsRoutes: FastifyPluginAsync = async (fastify) => {
       name: m.name,
       section: m.section,
       provider: m.provider,
-      costPerRequest: m.costPerRequest,
+      costUsdPerRequest: m.costUsdPerRequest,
       supportsImages: m.supportsImages,
       supportsVoice: m.supportsVoice,
       isAsync: m.isAsync,

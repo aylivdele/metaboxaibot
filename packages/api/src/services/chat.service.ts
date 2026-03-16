@@ -1,7 +1,9 @@
 import { db } from "../db.js";
 import { createLLMAdapter } from "../ai/llm/factory.js";
 import { dialogService } from "./dialog.service.js";
+import { calculateCost } from "./token.service.js";
 import type { LLMInput } from "../ai/llm/base.adapter.js";
+import { AI_MODELS } from "@metabox/shared";
 
 export interface SendMessageParams {
   dialogId: string;
@@ -56,6 +58,9 @@ export const chatService = {
     const chunks: string[] = [];
     const gen = adapter.chatStream(input);
 
+    let inputTokensUsed: number | undefined;
+    let outputTokensUsed: number | undefined;
+
     while (true) {
       const next = await gen.next();
       if (next.done) {
@@ -69,6 +74,8 @@ export const chatService = {
             providerThreadId: result.newThreadId,
           });
         }
+        inputTokensUsed = result?.inputTokensUsed;
+        outputTokensUsed = result?.outputTokensUsed;
         break;
       }
       chunks.push(next.value);
@@ -76,7 +83,11 @@ export const chatService = {
     }
 
     const responseText = chunks.join("");
-    const tokensUsed = estimateTokens(content, responseText);
+    const model = AI_MODELS[dialog.modelId];
+    const tokensUsed =
+      model && inputTokensUsed !== undefined && outputTokensUsed !== undefined
+        ? calculateCost(model, inputTokensUsed, outputTokensUsed)
+        : estimateTokens(content, responseText);
 
     // Save assistant message
     await dialogService.saveMessage(dialogId, "assistant", responseText, { tokensUsed });

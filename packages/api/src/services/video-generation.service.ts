@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import { getVideoQueue } from "../queues/video.queue.js";
 import { AI_MODELS } from "@metabox/shared";
+import { checkBalance } from "./token.service.js";
 
 export interface SubmitVideoParams {
   userId: bigint;
@@ -21,6 +22,8 @@ export const videoGenerationService = {
 
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
+
+    await checkBalance(userId);
 
     // Create DB job record
     const job = await db.generationJob.create({

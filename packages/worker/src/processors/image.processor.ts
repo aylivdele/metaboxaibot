@@ -3,8 +3,9 @@ import { Api } from "grammy";
 import type { ImageJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createImageAdapter } from "@metabox/api/ai/image";
+import { deductTokens, calculateCost } from "@metabox/api/services";
 import { logger } from "../logger.js";
-import { config } from "@metabox/shared";
+import { config, AI_MODELS } from "@metabox/shared";
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLLS = 120; // 6 minutes max
@@ -47,6 +48,11 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       data: { status: "done", outputUrl: imageResult.url, completedAt: new Date() },
     });
 
+    const model = AI_MODELS[modelId];
+    if (model) {
+      await deductTokens(BigInt(userIdStr), calculateCost(model), modelId);
+    }
+
     await telegram.sendPhoto(telegramChatId, imageResult.url, {
       caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
     });
@@ -66,8 +72,6 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
     throw err;
   }
-
-  void userIdStr;
 }
 
 function sleep(ms: number) {

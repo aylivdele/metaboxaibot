@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { LLMAdapter, LLMInput, LLMOutput, MessageRecord } from "./base.adapter.js";
+import type { LLMAdapter, LLMInput, LLMOutput, MessageRecord, StreamResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
 /**
@@ -32,7 +32,7 @@ export class QwenAdapter implements LLMAdapter {
     return { text: chunks.join(""), tokensUsed: 0 };
   }
 
-  async *chatStream(input: LLMInput): AsyncGenerator<string> {
+  async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       ...(input.history ?? []).map((m: MessageRecord) => ({
         role: m.role as "user" | "assistant",
@@ -45,11 +45,21 @@ export class QwenAdapter implements LLMAdapter {
       model: this.model,
       messages,
       stream: true,
+      stream_options: { include_usage: true },
     });
+
+    let inputTokensUsed = 0;
+    let outputTokensUsed = 0;
 
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) yield delta;
+      if (chunk.usage) {
+        inputTokensUsed = chunk.usage.prompt_tokens;
+        outputTokensUsed = chunk.usage.completion_tokens;
+      }
     }
+
+    return { inputTokensUsed, outputTokensUsed };
   }
 }

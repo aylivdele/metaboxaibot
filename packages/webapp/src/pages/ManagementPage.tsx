@@ -135,7 +135,7 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
               >
                 <div className="model-item__name">{m.name}</div>
                 <div className="model-item__meta">
-                  {m.costPerRequest} tkn · {m.provider}
+                  ${m.costUsdPerRequest.toFixed(3)} · {m.provider}
                   {m.supportsImages && " · 🖼"}
                   {m.supportsVoice && " · 🎙"}
                   {m.isAsync && " · ⏳"}

@@ -42,7 +42,8 @@ export class OpenAIAdapter implements LLMAdapter {
     });
 
     let newResponseId: string | undefined;
-    let tokensUsed = 0;
+    let inputTokensUsed = 0;
+    let outputTokensUsed = 0;
 
     for await (const event of stream) {
       if (event.type === "response.output_text.delta") {
@@ -50,11 +51,14 @@ export class OpenAIAdapter implements LLMAdapter {
       } else if (event.type === "response.completed") {
         newResponseId = event.response.id;
         const usage = event.response.usage;
-        if (usage) tokensUsed = usage.input_tokens + usage.output_tokens;
+        if (usage) {
+          inputTokensUsed = usage.input_tokens;
+          outputTokensUsed = usage.output_tokens;
+        }
       }
     }
 
-    return { newResponseId, tokensUsed };
+    return { newResponseId, inputTokensUsed, outputTokensUsed };
   }
 
   private buildInput(input: LLMInput): string | OpenAI.Responses.ResponseInput {

@@ -59,6 +59,9 @@ export class OpenAIAssistantsAdapter implements LLMAdapter {
       model: this.model,
     });
 
+    let inputTokensUsed = 0;
+    let outputTokensUsed = 0;
+
     for await (const event of stream) {
       if (
         event.event === "thread.message.delta" &&
@@ -66,10 +69,13 @@ export class OpenAIAssistantsAdapter implements LLMAdapter {
       ) {
         const text = event.data.delta.content[0].text?.value ?? "";
         if (text) yield text;
+      } else if (event.event === "thread.run.completed" && event.data.usage) {
+        inputTokensUsed = event.data.usage.prompt_tokens;
+        outputTokensUsed = event.data.usage.completion_tokens;
       }
     }
 
-    return { newThreadId: isNewThread ? threadId : undefined };
+    return { newThreadId: isNewThread ? threadId : undefined, inputTokensUsed, outputTokensUsed };
   }
 
   /** Poll-based fallback (used if streaming isn't needed). */

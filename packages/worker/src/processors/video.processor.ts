@@ -3,8 +3,9 @@ import { Api } from "grammy";
 import type { VideoJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createVideoAdapter } from "@metabox/api/ai/video";
+import { deductTokens, calculateCost } from "@metabox/api/services";
 import { logger } from "../logger.js";
-import { config } from "@metabox/shared";
+import { config, AI_MODELS } from "@metabox/shared";
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_POLLS = 144; // 12 minutes max
@@ -42,6 +43,11 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       data: { status: "done", outputUrl: videoResult.url, completedAt: new Date() },
     });
 
+    const model = AI_MODELS[modelId];
+    if (model) {
+      await deductTokens(BigInt(userIdStr), calculateCost(model), modelId);
+    }
+
     await telegram.sendVideo(telegramChatId, videoResult.url, {
       caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
     });
@@ -61,8 +67,6 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     throw err;
   }
-
-  void userIdStr;
 }
 
 function sleep(ms: number) {

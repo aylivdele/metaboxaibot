@@ -30,7 +30,10 @@ export interface LLMOutput {
 export interface StreamResult {
   newResponseId?: string;
   newThreadId?: string;
-  tokensUsed?: number;
+  /** Raw provider input token count (API tokens, not internal credits). */
+  inputTokensUsed?: number;
+  /** Raw provider output token count (API tokens, not internal credits). */
+  outputTokensUsed?: number;
 }
 
 export interface LLMAdapter {

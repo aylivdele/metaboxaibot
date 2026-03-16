@@ -6,7 +6,20 @@ export interface AIModel {
   name: string;
   section: Section;
   provider: string;
-  costPerRequest: number; // в токенах (базовая стоимость)
+  /**
+   * Provider cost in USD per request (break-even cost).
+   * For LLM models this is 0 — cost is driven entirely by per-token pricing below.
+   * For media generation (image/audio/video) this is the mid-range provider price.
+   */
+  costUsdPerRequest: number;
+  /**
+   * USD per 1 million INPUT tokens (LLM models only, 0 for media).
+   */
+  inputCostUsdPerMToken: number;
+  /**
+   * USD per 1 million OUTPUT tokens (LLM models only, 0 for media).
+   */
+  outputCostUsdPerMToken: number;
   supportsImages: boolean;
   supportsVoice: boolean;
   supportsWeb: boolean; // выход в интернет

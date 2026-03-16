@@ -3,8 +3,9 @@ import { Api, InputFile } from "grammy";
 import type { AudioJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createAudioAdapter } from "@metabox/api/ai/audio";
+import { deductTokens, calculateCost } from "@metabox/api/services";
 import { logger } from "../logger.js";
-import { config } from "@metabox/shared";
+import { config, AI_MODELS } from "@metabox/shared";
 
 const POLL_INTERVAL_MS = 4000;
 const MAX_POLLS = 90; // 6 minutes max
@@ -74,6 +75,11 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
       data: { status: "done", outputUrl: audioResult.url ?? null, completedAt: new Date() },
     });
 
+    const model = AI_MODELS[modelId];
+    if (model) {
+      await deductTokens(BigInt(userIdStr), calculateCost(model), modelId);
+    }
+
     await sendAudio(telegramChatId, audioResult, `✅ ${modelId}: ${prompt.slice(0, 200)}`);
 
     logger.info({ dbJobId }, "Audio job completed");
@@ -91,8 +97,6 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
 
     throw err;
   }
-
-  void userIdStr;
 }
 
 function sleep(ms: number) {

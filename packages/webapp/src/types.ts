@@ -32,7 +32,7 @@ export interface Model {
   name: string;
   section: string;
   provider: string;
-  costPerRequest: number;
+  costUsdPerRequest: number;
   supportsImages: boolean;
   supportsVoice: boolean;
   isAsync: boolean;

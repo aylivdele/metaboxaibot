@@ -64,7 +64,7 @@ export class AnthropicAdapter implements LLMAdapter {
       }
     }
 
-    return { tokensUsed: inputTokens + outputTokens };
+    return { inputTokensUsed: inputTokens, outputTokensUsed: outputTokens };
   }
 
   private buildMessages(input: LLMInput): Anthropic.MessageParam[] {

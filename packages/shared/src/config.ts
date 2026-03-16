@@ -32,6 +32,14 @@ function optInt(name: string, fallback: number): number {
   return n;
 }
 
+function optFloat(name: string, fallback: number): number {
+  const v = process.env[name];
+  if (!v) return fallback;
+  const n = parseFloat(v);
+  if (isNaN(n)) throw new Error(`[config] ${name} must be a number, got: "${v}"`);
+  return n;
+}
+
 export const config = {
   /** Runtime environment */
   env: optDefault("NODE_ENV", "development") as "development" | "production" | "test",
@@ -62,6 +70,17 @@ export const config = {
   },
   sentry: {
     dsn: opt("SENTRY_DSN"),
+  },
+
+  /**
+   * Billing parameters.
+   * usdPerToken: how many USD one internal token is worth (Pro plan: $0.043).
+   * targetMargin: multiplier over provider break-even (2.0 = 2× cost = ~100% gross margin).
+   * Override via BILLING_USD_PER_TOKEN / BILLING_TARGET_MARGIN env vars.
+   */
+  billing: {
+    usdPerToken: optFloat("BILLING_USD_PER_TOKEN", 0.043),
+    targetMargin: optFloat("BILLING_TARGET_MARGIN", 2.0),
   },
 
   /** AI providers (all optional — only needed for models you enable) */

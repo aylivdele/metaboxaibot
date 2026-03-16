@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, type Content } from "@google/generative-ai";
-import type { LLMAdapter, LLMInput, LLMOutput, MessageRecord } from "./base.adapter.js";
+import type { LLMAdapter, LLMInput, LLMOutput, MessageRecord, StreamResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
 const MODEL_MAP: Record<string, string> = {
@@ -36,7 +36,7 @@ export class GeminiAdapter implements LLMAdapter {
     return { text: chunks.join(""), tokensUsed: 0 };
   }
 
-  async *chatStream(input: LLMInput): AsyncGenerator<string> {
+  async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
     const model = this.genai.getGenerativeModel({
       model: this.apiModel,
       ...(input.systemPrompt ? { systemInstruction: input.systemPrompt } : {}),
@@ -66,6 +66,13 @@ export class GeminiAdapter implements LLMAdapter {
       const text = chunk.text();
       if (text) yield text;
     }
+
+    const aggregated = await result.response;
+    const usage = aggregated.usageMetadata;
+    return {
+      inputTokensUsed: usage?.promptTokenCount ?? 0,
+      outputTokensUsed: usage?.candidatesTokenCount ?? 0,
+    };
   }
 }
 
