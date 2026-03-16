@@ -101,6 +101,11 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
 
   return (
     <div className="page">
+      <div className="page-header">
+        <h2>Dialogs</h2>
+        <p className="page-subtitle">Manage your AI conversations</p>
+      </div>
+
       <div className="section-chips">
         {VALID_SECTIONS.map((s) => (
           <button
@@ -147,7 +152,7 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
       ) : (
         <div className="dialog-list">
           <button className="new-dialog-btn" onClick={() => setIsCreating(true)}>
-            ➕ New dialog
+            ＋ New dialog
           </button>
 
           {filteredDialogs.length === 0 ? (
@@ -169,8 +174,8 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
                       }}
                       autoFocus
                     />
-                    <button onClick={() => void handleRename(d.id)}>✓</button>
-                    <button onClick={() => setRenamingId(null)}>✕</button>
+                    <button className="action-btn action-btn--primary" onClick={() => void handleRename(d.id)}>✓</button>
+                    <button className="action-btn" onClick={() => setRenamingId(null)}>✕</button>
                   </div>
                 ) : (
                   <>

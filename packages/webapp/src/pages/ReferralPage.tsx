@@ -45,7 +45,7 @@ export function ReferralPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h2>🎁 Referral Program</h2>
+        <h2>Referral Program</h2>
         <p className="page-subtitle">
           Invite friends and earn tokens for every new user who joins via your link.
         </p>
@@ -67,10 +67,10 @@ export function ReferralPage() {
         <div className="referral-card__link">{referralLink ?? "Loading…"}</div>
         <div className="referral-card__actions">
           <button className="btn btn--secondary" onClick={handleCopy} disabled={!referralLink}>
-            {copied ? "✓ Copied!" : "📋 Copy"}
+            {copied ? "✓ Copied!" : "Copy link"}
           </button>
           <button className="btn btn--primary" onClick={handleShare} disabled={!referralLink}>
-            📤 Share
+            Share
           </button>
         </div>
       </div>
@@ -78,7 +78,7 @@ export function ReferralPage() {
       <div className="referral-how">
         <div className="section-title">How it works</div>
         <ol className="referral-steps">
-          <li>Share your link with friends</li>
+          <li>Share your unique link with friends</li>
           <li>Friend opens the bot via your link</li>
           <li>You both receive bonus tokens</li>
         </ol>
