@@ -38,6 +38,10 @@ export interface Translations {
     management: string;
     newDialog: string;
     backToMain: string;
+    modelActivated: string;
+    generating: string;
+    asyncPending: string;
+    generationFailed: string;
   };
   audio: {
     sectionTitle: string;
@@ -46,6 +50,14 @@ export interface Translations {
     music: string;
     sounds: string;
     backToMain: string;
+    ttsActivated: string;
+    voiceCloneActivated: string;
+    musicActivated: string;
+    soundsActivated: string;
+    activated: string;
+    processing: string;
+    asyncPending: string;
+    generationFailed: string;
   };
   video: {
     sectionTitle: string;
@@ -53,6 +65,10 @@ export interface Translations {
     lipSync: string;
     newDialog: string;
     backToMain: string;
+    modelActivated: string;
+    queuing: string;
+    asyncPending: string;
+    generationFailed: string;
   };
   errors: {
     noTool: string;
@@ -66,6 +82,7 @@ export interface Translations {
     knowledgeBase: string;
     management: string;
     newDialog: string;
+    comingSoon: string;
   };
 }
 

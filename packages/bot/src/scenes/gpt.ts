@@ -1,6 +1,5 @@
 import type { BotContext } from "../types/context.js";
 import { chatService, dialogService, userStateService } from "@metabox/api/services";
-import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { logger } from "../logger.js";
 import { config } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
@@ -114,15 +113,5 @@ export async function handleGptManagement(ctx: BotContext): Promise<void> {
 
 export async function handleGptPrompts(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
-  await ctx.reply(ctx.t.gpt.prompts + " — coming soon.");
-}
-
-// ── Back to main from GPT section ─────────────────────────────────────────────
-
-export async function handleGptBackToMain(ctx: BotContext): Promise<void> {
-  if (!ctx.user) return;
-  await userStateService.setState(ctx.user.id, "MAIN_MENU");
-  await ctx.reply(ctx.t.start.mainMenuTitle, {
-    reply_markup: buildMainMenuKeyboard(ctx.t),
-  });
+  await ctx.reply(ctx.t.gpt.prompts + ctx.t.common.comingSoon);
 }

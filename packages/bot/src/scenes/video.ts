@@ -27,9 +27,7 @@ export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
   await userStateService.setState(ctx.user.id, "VIDEO_ACTIVE", "video");
   await userStateService.setModel(ctx.user.id, modelId);
 
-  await ctx.reply(
-    `🎬 ${modelId} activated.\nSend me a text prompt (and optionally attach an image) to generate a video.`,
-  );
+  await ctx.reply(ctx.t.video.modelActivated);
 }
 
 // ── Incoming prompt in VIDEO_ACTIVE state ─────────────────────────────────────
@@ -45,7 +43,7 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
   const modelId = activeDialog ? activeDialog.modelId : "kling";
   const prompt = ctx.message.text;
 
-  const pendingMsg = await ctx.reply("🎬 Queuing your video generation...");
+  const pendingMsg = await ctx.reply(ctx.t.video.queuing);
 
   try {
     await videoGenerationService.submitVideo({
@@ -57,16 +55,14 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
 
-    await ctx.reply(
-      "⏳ Your video is being generated. This may take several minutes — you will receive it when it's ready.",
-    );
+    await ctx.reply(ctx.t.video.asyncPending);
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
       await ctx.reply(ctx.t.errors.insufficientTokens);
     } else {
       logger.error(err, "Video message error");
-      await ctx.reply("❌ Failed to queue video generation. Please try again.");
+      await ctx.reply(ctx.t.video.generationFailed);
     }
   }
 }
@@ -85,12 +81,12 @@ export async function handleNewVideoDialog(ctx: BotContext): Promise<void> {
 
 export async function handleVideoAvatars(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
-  await ctx.reply(ctx.t.video.avatars + " — coming soon.");
+  await ctx.reply(ctx.t.video.avatars + ctx.t.common.comingSoon);
 }
 
 // ── Lip Sync (stub — full implementation pending) ─────────────────────────────
 
 export async function handleVideoLipSync(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
-  await ctx.reply(ctx.t.video.lipSync + " — coming soon.");
+  await ctx.reply(ctx.t.video.lipSync + ctx.t.common.comingSoon);
 }

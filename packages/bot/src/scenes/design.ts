@@ -27,7 +27,7 @@ export async function handleDesignModelSelect(ctx: BotContext): Promise<void> {
   await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE", "design");
   await userStateService.setModel(ctx.user.id, modelId);
 
-  await ctx.reply(`🎨 ${modelId} activated.\nSend me a prompt to generate an image.`);
+  await ctx.reply(ctx.t.design.modelActivated);
 }
 
 // ── Incoming prompt in DESIGN_ACTIVE state ────────────────────────────────────
@@ -43,7 +43,7 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
   const modelId = activeDialog ? activeDialog.modelId : "dall-e-3";
   const prompt = ctx.message.text;
 
-  const pendingMsg = await ctx.reply("🎨 Generating your image...");
+  const pendingMsg = await ctx.reply(ctx.t.design.generating);
 
   try {
     const result = await generationService.submitImage({
@@ -60,9 +60,7 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
       await ctx.replyWithPhoto(result.imageUrl, { caption: `🎨 ${prompt.slice(0, 200)}` });
     } else {
       // Async — worker will notify when done
-      await ctx.reply(
-        "⏳ Your image is being generated. You will receive it as soon as it's ready.",
-      );
+      await ctx.reply(ctx.t.design.asyncPending);
     }
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
@@ -70,7 +68,7 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
       await ctx.reply(ctx.t.errors.insufficientTokens);
     } else {
       logger.error(err, "Design message error");
-      await ctx.reply("❌ Generation failed. Please try again.");
+      await ctx.reply(ctx.t.design.generationFailed);
     }
   }
 }

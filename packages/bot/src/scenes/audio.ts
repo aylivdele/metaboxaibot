@@ -16,16 +16,13 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
   await userStateService.setModel(ctx.user.id, modelId);
 
   const instructions: Record<string, string> = {
-    "tts-openai": "🗣 Text-to-Speech activated.\nSend me any text and I will convert it to speech.",
-    "voice-clone":
-      "🎙 Voice synthesis activated.\nSend me a text and it will be spoken in a natural AI voice.",
-    suno: "🎵 Music generation activated.\nDescribe the music you want (genre, mood, style) and I will create it.",
-    "sounds-el":
-      '🔊 Sound effects activated.\nDescribe the sound you want (e.g. "rain on a window", "thunder") and I will generate it.',
+    "tts-openai": ctx.t.audio.ttsActivated,
+    "voice-clone": ctx.t.audio.voiceCloneActivated,
+    suno: ctx.t.audio.musicActivated,
+    "sounds-el": ctx.t.audio.soundsActivated,
   };
 
-  const msg = instructions[modelId] ?? `🎧 ${modelId} activated.\nSend me your request.`;
-  await ctx.reply(msg);
+  await ctx.reply(instructions[modelId] ?? ctx.t.audio.activated);
 }
 
 // ── Incoming prompt in AUDIO_ACTIVE state ─────────────────────────────────────
@@ -42,7 +39,7 @@ export async function handleAudioMessage(ctx: BotContext): Promise<void> {
   const modelId = activeDialog ? activeDialog.modelId : "tts-openai";
   const prompt = ctx.message.text;
 
-  const pendingMsg = await ctx.reply("🎧 Processing your audio request...");
+  const pendingMsg = await ctx.reply(ctx.t.audio.processing);
 
   try {
     const result = await audioGenerationService.submitAudio({
@@ -61,9 +58,7 @@ export async function handleAudioMessage(ctx: BotContext): Promise<void> {
       await ctx.replyWithAudio(audio, { caption: `🎧 ${prompt.slice(0, 200)}` });
     } else {
       // Async (Suno music) — worker will notify when done
-      await ctx.reply(
-        "⏳ Your audio is being generated. You will receive it as soon as it's ready.",
-      );
+      await ctx.reply(ctx.t.audio.asyncPending);
     }
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
@@ -71,7 +66,7 @@ export async function handleAudioMessage(ctx: BotContext): Promise<void> {
       await ctx.reply(ctx.t.errors.insufficientTokens);
     } else {
       logger.error(err, "Audio message error");
-      await ctx.reply("❌ Audio generation failed. Please try again.");
+      await ctx.reply(ctx.t.audio.generationFailed);
     }
   }
 }

@@ -42,6 +42,10 @@ export default {
     management: "⚙ Management",
     newDialog: "🎨 New Image",
     backToMain: "🏠 Back to Main Menu",
+    modelActivated: "🎨 Model activated.\nSend me a prompt to generate an image.",
+    generating: "🎨 Generating your image...",
+    asyncPending: "⏳ Your image is being generated. You will receive it as soon as it's ready.",
+    generationFailed: "❌ Generation failed. Please try again.",
   },
   audio: {
     sectionTitle: "🎧 AI Audio\nChoose a section to work with audio 👇",
@@ -50,6 +54,17 @@ export default {
     music: "🎵 Music Generation",
     sounds: "🔊 Sound Effects",
     backToMain: "🏠 Back to Main Menu",
+    ttsActivated: "🗣 Text-to-Speech activated.\nSend me any text and I will convert it to speech.",
+    voiceCloneActivated:
+      "🎙 Voice synthesis activated.\nSend me a text and it will be spoken in a natural AI voice.",
+    musicActivated:
+      "🎵 Music generation activated.\nDescribe the music you want (genre, mood, style) and I will create it.",
+    soundsActivated:
+      '🔊 Sound effects activated.\nDescribe the sound you want (e.g. "rain on a window", "thunder") and I will generate it.',
+    activated: "🎧 Audio activated.\nSend me your request.",
+    processing: "🎧 Processing your audio request...",
+    asyncPending: "⏳ Your audio is being generated. You will receive it as soon as it's ready.",
+    generationFailed: "❌ Audio generation failed. Please try again.",
   },
   video: {
     sectionTitle: "🎬 Video of the Future\nChoose a section to work with video 👇",
@@ -57,6 +72,12 @@ export default {
     lipSync: "🔄 Lip Sync",
     newDialog: "🎬 New Video",
     backToMain: "🏠 Back to Main Menu",
+    modelActivated:
+      "🎬 Model activated.\nSend me a text prompt (and optionally attach an image) to generate a video.",
+    queuing: "🎬 Queuing your video generation...",
+    asyncPending:
+      "⏳ Your video is being generated. This may take several minutes — you will receive it when it's ready.",
+    generationFailed: "❌ Failed to queue video generation. Please try again.",
   },
   errors: {
     unexpected: "Unexpected error. Please, try again later.",
@@ -72,5 +93,6 @@ export default {
     knowledgeBase: "📖 Knowledge Base",
     management: "⚙ Management",
     newDialog: "💬 New Dialog",
+    comingSoon: " — coming soon.",
   },
 } as const;
