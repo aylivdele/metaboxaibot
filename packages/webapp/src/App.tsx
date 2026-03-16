@@ -32,7 +32,18 @@ export function App() {
   if (!ready) {
     return (
       <div className="splash">
-        <div className="splash__icon">⚡</div>
+        <div className="splash__icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <defs>
+              <linearGradient id="splash-grad" x1="0" y1="0" x2="48" y2="48">
+                <stop offset="0%" stopColor="#C4956A" />
+                <stop offset="100%" stopColor="#A07A5F" />
+              </linearGradient>
+            </defs>
+            <rect x="4" y="4" width="40" height="40" rx="12" fill="url(#splash-grad)" />
+            <path d="M16 24l6 6 10-12" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          </svg>
+        </div>
         <div className="splash__text">Loading Metabox…</div>
       </div>
     );
@@ -41,7 +52,7 @@ export function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <span className="app-header__logo">⚡ Metabox</span>
+        <span className="app-header__logo">✦ Metabox</span>
       </header>
 
       <main className="app-main">

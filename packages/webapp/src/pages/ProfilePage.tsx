@@ -39,7 +39,7 @@ export function ProfilePage() {
 
       <div className="balance-card">
         <div className="balance-card__label">Token Balance</div>
-        <div className="balance-card__amount">⚡ {Number(profile.tokenBalance).toFixed(2)}</div>
+        <div className="balance-card__amount">✦ {Number(profile.tokenBalance).toFixed(2)}</div>
         <div className="balance-card__sub">Referrals: {profile.referralCount}</div>
       </div>
 

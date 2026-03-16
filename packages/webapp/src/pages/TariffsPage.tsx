@@ -75,7 +75,7 @@ export function TariffsPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h2>💳 Token Packages</h2>
+        <h2>Token Packages</h2>
         {balance !== null && (
           <p className="page-subtitle">Current balance: ⚡ {Number(balance).toFixed(2)} tokens</p>
         )}
@@ -95,10 +95,10 @@ export function TariffsPage() {
       <div className="plans-grid">
         {PLANS.map((plan) => (
           <div key={plan.id} className={`plan-card${plan.popular ? " plan-card--popular" : ""}`}>
-            {plan.popular && <div className="plan-card__badge">⭐ Popular</div>}
+            {plan.popular && <div className="plan-card__badge">Popular</div>}
             <div className="plan-card__label">{plan.label}</div>
-            <div className="plan-card__tokens">⚡ {plan.tokens} tokens</div>
-            <div className="plan-card__price">{plan.stars} ⭐ Stars</div>
+            <div className="plan-card__tokens">✦ {plan.tokens}</div>
+            <div className="plan-card__price">{plan.stars} ⭐</div>
             <button
               className="plan-card__btn"
               onClick={() => handleBuy(plan)}
