@@ -20,7 +20,7 @@ export default {
     design: "🎨 Дизайн с ИИ",
     audio: "🎧 Аудио с ИИ",
     video: "🎬 Видео будущего",
-    storage: "🖼 Хранилище изображений",
+    storage: "📁 Хранилище медиа",
     help: "❓ Помощь",
     knowledgeBase: "📖 База знаний",
   },
