@@ -45,7 +45,8 @@ const translations = {
     "tariffs.title": "Token Packages",
     "tariffs.currentBalance": "Current balance",
     "tariffs.tokens": "tokens",
-    "tariffs.description": "Tokens are used for all AI requests. 1 token ≈ 1 image or 50 GPT messages.",
+    "tariffs.description":
+      "Tokens are used for all AI requests. 1 token ≈ 1 image or 50 GPT messages.",
     "tariffs.popular": "Popular",
     "tariffs.buy": "Buy",
     "tariffs.buying": "…",
@@ -58,7 +59,8 @@ const translations = {
 
     // Referral
     "referral.title": "Referral Program",
-    "referral.subtitle": "Invite friends and earn tokens for every new user who joins via your link.",
+    "referral.subtitle":
+      "Invite friends and earn tokens for every new user who joins via your link.",
     "referral.invited": "Friends invited",
     "referral.perReferral": "Tokens per referral",
     "referral.yourLink": "Your referral link",
@@ -143,7 +145,8 @@ const translations = {
     "tariffs.title": "Пакеты токенов",
     "tariffs.currentBalance": "Текущий баланс",
     "tariffs.tokens": "токенов",
-    "tariffs.description": "Токены используются для всех AI-запросов. 1 токен ≈ 1 изображение или 50 GPT-сообщений.",
+    "tariffs.description":
+      "Токены используются для всех AI-запросов. 1 токен ≈ 1 изображение или 50 GPT-сообщений.",
     "tariffs.popular": "Популярный",
     "tariffs.buy": "Купить",
     "tariffs.buying": "…",
