@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import "@fastify/multipart";
 import { db } from "../db.js";
 import { config } from "@metabox/shared";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
