@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api/client.js";
+import { useI18n } from "../i18n.js";
 import type { Dialog, Model, UserState } from "../types.js";
 
 const SECTION_LABELS: Record<string, string> = {
@@ -16,6 +17,7 @@ interface ManagementPageProps {
 }
 
 export function ManagementPage({ initialSection }: ManagementPageProps) {
+  const { t } = useI18n();
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [state, setState] = useState<UserState | null>(null);
@@ -94,7 +96,7 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
     }
   };
 
-  if (loading) return <div className="page-loading">Loading…</div>;
+  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 
   const filteredDialogs = dialogs.filter((d) => d.section === activeSection);
   const sectionModels = models.filter((m) => m.section === activeSection);
@@ -102,8 +104,8 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
   return (
     <div className="page">
       <div className="page-header">
-        <h2>Dialogs</h2>
-        <p className="page-subtitle">Manage your AI conversations</p>
+        <h2>{t("manage.title")}</h2>
+        <p className="page-subtitle">{t("manage.subtitle")}</p>
       </div>
 
       <div className="section-chips">
@@ -124,13 +126,13 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
       {isCreating ? (
         <div className="model-picker">
           <div className="model-picker__header">
-            <span>Choose a model</span>
+            <span>{t("manage.chooseModel")}</span>
             <button className="action-btn" onClick={() => setIsCreating(false)}>
               ✕
             </button>
           </div>
           {sectionModels.length === 0 ? (
-            <div className="empty-state">No models available</div>
+            <div className="empty-state">{t("manage.noModels")}</div>
           ) : (
             sectionModels.map((m) => (
               <div
@@ -152,11 +154,11 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
       ) : (
         <div className="dialog-list">
           <button className="new-dialog-btn" onClick={() => setIsCreating(true)}>
-            ＋ New dialog
+            {t("manage.newDialog")}
           </button>
 
           {filteredDialogs.length === 0 ? (
-            <div className="empty-state">No dialogs in this section</div>
+            <div className="empty-state">{t("manage.noDialogs")}</div>
           ) : (
             filteredDialogs.map((d) => (
               <div

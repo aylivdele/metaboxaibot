@@ -3,6 +3,7 @@ export interface UserProfile {
   username: string | null;
   firstName: string | null;
   language: string;
+  role: "USER" | "MODERATOR" | "ADMIN";
   tokenBalance: string;
   referralCount: number;
   createdAt: string;
@@ -48,4 +49,21 @@ export interface UserState {
   videoDialogId: string | null;
 }
 
-export type Page = "profile" | "management" | "tariffs" | "referral";
+export interface AdminUser {
+  id: string;
+  username: string | null;
+  firstName: string | null;
+  tokenBalance: string;
+  role: "USER" | "MODERATOR" | "ADMIN";
+  isBlocked: boolean;
+  createdAt: string;
+}
+
+export interface AdminUsersResponse {
+  users: AdminUser[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export type Page = "profile" | "management" | "tariffs" | "referral" | "admin";

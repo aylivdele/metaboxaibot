@@ -1,4 +1,4 @@
-import type { UserProfile, Dialog, UserState, Model } from "../types.js";
+import type { UserProfile, Dialog, UserState, Model, AdminUsersResponse } from "../types.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 
@@ -81,6 +81,31 @@ export const api = {
       request<{ invoiceUrl: string }>("/payments/invoice", {
         method: "POST",
         body: JSON.stringify({ planId }),
+      }),
+  },
+
+  admin: {
+    users: (params: { page?: number; limit?: number; search?: string }) => {
+      const qs = new URLSearchParams();
+      if (params.page) qs.set("page", String(params.page));
+      if (params.limit) qs.set("limit", String(params.limit));
+      if (params.search) qs.set("search", params.search);
+      return request<AdminUsersResponse>(`/admin/users?${qs.toString()}`);
+    },
+    grant: (userId: string, amount: number, reason?: string) =>
+      request<{ success: boolean; newBalance: string }>("/admin/grant", {
+        method: "POST",
+        body: JSON.stringify({ userId, amount, reason }),
+      }),
+    block: (userId: string, blocked: boolean) =>
+      request<{ success: boolean; isBlocked: boolean }>("/admin/block", {
+        method: "POST",
+        body: JSON.stringify({ userId, blocked }),
+      }),
+    setRole: (userId: string, role: string) =>
+      request<{ success: boolean }>("/admin/role", {
+        method: "POST",
+        body: JSON.stringify({ userId, role }),
       }),
   },
 };

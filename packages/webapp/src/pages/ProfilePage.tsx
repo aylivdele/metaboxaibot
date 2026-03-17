@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
+import { useI18n } from "../i18n.js";
+import { BannerSlider } from "../components/BannerSlider.js";
 import type { UserProfile } from "../types.js";
 
-const REASON_LABEL: Record<string, string> = {
-  welcome_bonus: "🎁 Welcome bonus",
-  ai_usage: "🤖 AI usage",
-  purchase: "💳 Token purchase",
-  referral_bonus: "🎁 Referral bonus",
-  admin: "🔧 Admin adjustment",
+const REASON_KEYS: Record<string, string> = {
+  welcome_bonus: "profile.reason.welcome_bonus",
+  ai_usage: "profile.reason.ai_usage",
+  purchase: "profile.reason.purchase",
+  referral_bonus: "profile.reason.referral_bonus",
+  admin: "profile.reason.admin",
 };
 
 export function ProfilePage() {
+  const { t } = useI18n();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +26,7 @@ export function ProfilePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="page-loading">Loading…</div>;
+  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
   if (error) return <div className="page-error">❌ {error}</div>;
   if (!profile) return null;
 
@@ -31,6 +34,8 @@ export function ProfilePage() {
 
   return (
     <div className="page">
+      <BannerSlider />
+
       <div className="profile-header">
         <div className="profile-avatar">{displayName[0].toUpperCase()}</div>
         <div className="profile-name">{displayName}</div>
@@ -38,20 +43,22 @@ export function ProfilePage() {
       </div>
 
       <div className="balance-card">
-        <div className="balance-card__label">Token Balance</div>
+        <div className="balance-card__label">{t("profile.balance")}</div>
         <div className="balance-card__amount">✦ {Number(profile.tokenBalance).toFixed(2)}</div>
-        <div className="balance-card__sub">Referrals: {profile.referralCount}</div>
+        <div className="balance-card__sub">{t("profile.referrals")}: {profile.referralCount}</div>
       </div>
 
-      <div className="section-title">Transaction History</div>
+      <div className="section-title">{t("profile.txHistory")}</div>
       {profile.transactions.length === 0 ? (
-        <div className="empty-state">No transactions yet</div>
+        <div className="empty-state">{t("profile.noTx")}</div>
       ) : (
         <ul className="tx-list">
           {profile.transactions.map((tx) => (
             <li key={tx.id} className="tx-item">
               <div className="tx-item__info">
-                <span className="tx-item__reason">{REASON_LABEL[tx.reason] ?? tx.reason}</span>
+                <span className="tx-item__reason">
+                  {REASON_KEYS[tx.reason] ? t(REASON_KEYS[tx.reason] as any) : tx.reason}
+                </span>
                 {tx.modelId && <span className="tx-item__model">{tx.modelId}</span>}
                 <span className="tx-item__date">{new Date(tx.createdAt).toLocaleDateString()}</span>
               </div>

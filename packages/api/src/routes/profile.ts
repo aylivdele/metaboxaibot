@@ -28,6 +28,7 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       username: user.username ?? null,
       firstName: user.firstName ?? null,
       language: user.language,
+      role: user.role,
       tokenBalance: user.tokenBalance.toString(),
       referralCount,
       createdAt: user.createdAt.toISOString(),

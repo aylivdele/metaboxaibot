@@ -6,6 +6,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
 // ─────────────────────────────────────────────
 // Пользователь
 // ─────────────────────────────────────────────
@@ -15,6 +21,7 @@ model User {
   firstName    String?
   lastName     String?
   language     String   @default("en")
+  role         Role     @default(USER)
   tokenBalance Decimal  @default(5.50)         @db.Decimal(12, 4)
   isNew        Boolean  @default(true)
   isBlocked    Boolean  @default(false)

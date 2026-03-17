@@ -1,15 +1,21 @@
-import type { ReactElement } from "react";
+import { useI18n } from "../i18n.js";
 import type { Page } from "../types.js";
 
 interface Props {
   current: Page;
   onChange: (page: Page) => void;
+  showAdmin: boolean;
 }
 
-const TABS: Array<{ id: Page; label: string; icon: (active: boolean) => ReactElement }> = [
+const TABS: Array<{
+  id: Page;
+  labelKey: string;
+  icon: (active: boolean) => JSX.Element;
+  adminOnly?: boolean;
+}> = [
   {
     id: "profile",
-    label: "Profile",
+    labelKey: "nav.profile",
     icon: (active) => (
       <svg viewBox="0 0 24 24" strokeWidth={active ? 2 : 1.8}>
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -19,7 +25,7 @@ const TABS: Array<{ id: Page; label: string; icon: (active: boolean) => ReactEle
   },
   {
     id: "management",
-    label: "Manage",
+    labelKey: "nav.manage",
     icon: (active) => (
       <svg viewBox="0 0 24 24" strokeWidth={active ? 2 : 1.8}>
         <rect x="3" y="3" width="7" height="7" rx="1.5" />
@@ -31,7 +37,7 @@ const TABS: Array<{ id: Page; label: string; icon: (active: boolean) => ReactEle
   },
   {
     id: "tariffs",
-    label: "Tariffs",
+    labelKey: "nav.tariffs",
     icon: (active) => (
       <svg viewBox="0 0 24 24" strokeWidth={active ? 2 : 1.8}>
         <path d="M12 2L2 7l10 5 10-5-10-5z" />
@@ -42,19 +48,32 @@ const TABS: Array<{ id: Page; label: string; icon: (active: boolean) => ReactEle
   },
   {
     id: "referral",
-    label: "Referral",
+    labelKey: "nav.referral",
     icon: (active) => (
       <svg viewBox="0 0 24 24" strokeWidth={active ? 2 : 1.8}>
         <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
       </svg>
     ),
   },
+  {
+    id: "admin",
+    labelKey: "nav.admin",
+    adminOnly: true,
+    icon: (active) => (
+      <svg viewBox="0 0 24 24" strokeWidth={active ? 2 : 1.8}>
+        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    ),
+  },
 ];
 
-export function BottomNav({ current, onChange }: Props) {
+export function BottomNav({ current, onChange, showAdmin }: Props) {
+  const { t } = useI18n();
+  const visibleTabs = TABS.filter((tab) => !tab.adminOnly || showAdmin);
+
   return (
     <nav className="bottom-nav">
-      {TABS.map((tab) => {
+      {visibleTabs.map((tab) => {
         const isActive = current === tab.id;
         return (
           <button
@@ -63,7 +82,7 @@ export function BottomNav({ current, onChange }: Props) {
             onClick={() => onChange(tab.id)}
           >
             <span className="bottom-nav__icon">{tab.icon(isActive)}</span>
-            <span className="bottom-nav__label">{tab.label}</span>
+            <span className="bottom-nav__label">{t(tab.labelKey as any)}</span>
           </button>
         );
       })}

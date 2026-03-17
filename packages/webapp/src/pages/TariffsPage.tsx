@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
+import { useI18n } from "../i18n.js";
 
 interface Plan {
   id: string;
@@ -26,6 +27,7 @@ function getTgWebApp(): TgWebApp | undefined {
 }
 
 export function TariffsPage() {
+  const { t } = useI18n();
   const [balance, setBalance] = useState<string | null>(null);
   const [buying, setBuying] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
@@ -47,13 +49,13 @@ export function TariffsPage() {
       const tg = getTgWebApp();
 
       if (!tg?.openInvoice) {
-        setNotice({ text: "Open this page inside Telegram to pay with Stars.", ok: false });
+        setNotice({ text: t("tariffs.openInTg"), ok: false });
         return;
       }
 
       tg.openInvoice(invoiceUrl, (status) => {
         if (status === "paid") {
-          setNotice({ text: `✅ ${plan.tokens} tokens credited to your balance!`, ok: true });
+          setNotice({ text: `✅ ${plan.tokens} ${t("tariffs.success")}`, ok: true });
           // Refresh balance
           api.profile
             .get()
@@ -62,11 +64,11 @@ export function TariffsPage() {
         } else if (status === "cancelled") {
           setNotice(null);
         } else {
-          setNotice({ text: "Payment failed. Please try again.", ok: false });
+          setNotice({ text: t("tariffs.failed"), ok: false });
         }
       });
     } catch {
-      setNotice({ text: "Could not create invoice. Please try again.", ok: false });
+      setNotice({ text: t("tariffs.invoiceError"), ok: false });
     } finally {
       setBuying(null);
     }
@@ -75,12 +77,12 @@ export function TariffsPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h2>Token Packages</h2>
+        <h2>{t("tariffs.title")}</h2>
         {balance !== null && (
-          <p className="page-subtitle">Current balance: ⚡ {Number(balance).toFixed(2)} tokens</p>
+          <p className="page-subtitle">{t("tariffs.currentBalance")}: ✦ {Number(balance).toFixed(2)} {t("tariffs.tokens")}</p>
         )}
         <p className="page-subtitle">
-          Tokens are used for all AI requests. 1 token ≈ 1 image or 50 GPT messages.
+          {t("tariffs.description")}
         </p>
       </div>
 
@@ -95,7 +97,7 @@ export function TariffsPage() {
       <div className="plans-grid">
         {PLANS.map((plan) => (
           <div key={plan.id} className={`plan-card${plan.popular ? " plan-card--popular" : ""}`}>
-            {plan.popular && <div className="plan-card__badge">Popular</div>}
+            {plan.popular && <div className="plan-card__badge">{t("tariffs.popular")}</div>}
             <div className="plan-card__label">{plan.label}</div>
             <div className="plan-card__tokens">✦ {plan.tokens}</div>
             <div className="plan-card__price">{plan.stars} ⭐</div>
@@ -104,16 +106,16 @@ export function TariffsPage() {
               onClick={() => handleBuy(plan)}
               disabled={buying !== null}
             >
-              {buying === plan.id ? "…" : "Buy"}
+              {buying === plan.id ? t("tariffs.buying") : t("tariffs.buy")}
             </button>
           </div>
         ))}
       </div>
 
       <div className="tariff-note">
-        Payments are processed securely via Telegram Stars.
+        {t("tariffs.note")}
         <br />
-        Tokens are credited instantly after payment.
+        {t("tariffs.note2")}
       </div>
     </div>
   );
