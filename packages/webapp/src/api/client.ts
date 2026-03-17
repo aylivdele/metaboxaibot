@@ -1,6 +1,13 @@
-import type { UserProfile, Dialog, UserState, Model, AdminUsersResponse } from "../types.js";
+import type {
+  UserProfile,
+  Dialog,
+  UserState,
+  Model,
+  AdminUsersResponse,
+  BannerSlide,
+} from "../types.js";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
+export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 
 let _initDataRaw: string | null = null;
 
@@ -21,6 +28,26 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+async function uploadRequest<T>(path: string, body: FormData): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (_initDataRaw) {
+    headers["Authorization"] = `tma ${_initDataRaw}`;
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers,
+    body,
   });
 
   if (!res.ok) {
@@ -84,6 +111,10 @@ export const api = {
       }),
   },
 
+  slides: {
+    list: () => request<{ slides: BannerSlide[] }>("/slides"),
+  },
+
   admin: {
     users: (params: { page?: number; limit?: number; search?: string }) => {
       const qs = new URLSearchParams();
@@ -107,5 +138,21 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ userId, role }),
       }),
+    slides: {
+      list: () => request<{ slides: BannerSlide[] }>("/admin/slides"),
+      create: (data: FormData) => uploadRequest<BannerSlide>("/admin/slides", data),
+      update: (id: string, data: Record<string, unknown>) =>
+        request<BannerSlide>(`/admin/slides/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      delete: (id: string) =>
+        request<{ success: boolean }>(`/admin/slides/${id}`, { method: "DELETE" }),
+      reorder: (slideIds: string[]) =>
+        request<{ success: boolean }>("/admin/slides/reorder", {
+          method: "POST",
+          body: JSON.stringify({ slideIds }),
+        }),
+    },
   },
 };

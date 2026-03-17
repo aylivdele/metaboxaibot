@@ -66,4 +66,13 @@ export interface AdminUsersResponse {
   limit: number;
 }
 
+export interface BannerSlide {
+  id: string;
+  imageUrl: string;
+  linkUrl: string | null;
+  displaySeconds: number;
+  sortOrder: number;
+  active: boolean;
+}
+
 export type Page = "profile" | "management" | "tariffs" | "referral" | "admin";
