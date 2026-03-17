@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { useI18n } from "../i18n.js";
 import type { Page } from "../types.js";
 
@@ -10,7 +11,7 @@ interface Props {
 const TABS: Array<{
   id: Page;
   labelKey: string;
-  icon: (active: boolean) => JSX.Element;
+  icon: (active: boolean) => ReactElement;
   adminOnly?: boolean;
 }> = [
   {
