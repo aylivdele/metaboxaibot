@@ -13,6 +13,7 @@ const translations = {
     "nav.tariffs": "Tariffs",
     "nav.referral": "Referral",
     "nav.admin": "Admin",
+    "nav.gallery": "Gallery",
 
     // Profile
     "profile.balance": "Token Balance",
@@ -94,6 +95,16 @@ const translations = {
     "admin.accessDenied": "Access denied",
     "admin.accessDeniedText": "You don't have admin privileges.",
 
+    // Gallery
+    "gallery.title": "My Files",
+    "gallery.subtitle": "All generated images, audio, and videos",
+    "gallery.section.image": "Images",
+    "gallery.section.audio": "Audio",
+    "gallery.section.video": "Videos",
+    "gallery.empty": "No files in this section yet",
+    "gallery.download": "Send to chat",
+    "gallery.sent": "✓ Sent!",
+
     // Language
     "lang.title": "Language",
 
@@ -111,6 +122,7 @@ const translations = {
     "nav.tariffs": "Тарифы",
     "nav.referral": "Рефералы",
     "nav.admin": "Админ",
+    "nav.gallery": "Галерея",
 
     // Profile
     "profile.balance": "Баланс токенов",
@@ -191,6 +203,16 @@ const translations = {
     "admin.nextPage": "Далее →",
     "admin.accessDenied": "Доступ запрещён",
     "admin.accessDeniedText": "У вас нет прав администратора.",
+
+    // Gallery
+    "gallery.title": "Мои файлы",
+    "gallery.subtitle": "Все сгенерированные изображения, аудио и видео",
+    "gallery.section.image": "Изображения",
+    "gallery.section.audio": "Аудио",
+    "gallery.section.video": "Видео",
+    "gallery.empty": "В этом разделе пока нет файлов",
+    "gallery.download": "Отправить в чат",
+    "gallery.sent": "✓ Отправлено!",
 
     // Language
     "lang.title": "Язык",

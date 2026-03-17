@@ -3,6 +3,7 @@ import { createAudioAdapter } from "../ai/audio/factory.js";
 import { getAudioQueue } from "../queues/audio.queue.js";
 import { AI_MODELS } from "@metabox/shared";
 import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
+import { buildS3Key, uploadBuffer, uploadFromUrl } from "./s3.service.js";
 
 export interface SubmitAudioParams {
   userId: bigint;
@@ -55,6 +56,21 @@ export const audioGenerationService = {
         });
 
         await deductTokens(userId, calculateCost(model), modelId);
+
+        // Upload to S3 in background
+        const audioKey = buildS3Key("audio", userId.toString(), job.id, result.ext ?? "mp3");
+        const uploadFn = result.buffer
+          ? uploadBuffer(audioKey, result.buffer, `audio/${result.ext ?? "mpeg"}`)
+          : result.url
+            ? uploadFromUrl(audioKey, result.url, `audio/${result.ext ?? "mpeg"}`)
+            : Promise.resolve(null);
+        uploadFn
+          .then((s3Key) => {
+            if (s3Key) {
+              return db.generationJob.update({ where: { id: job.id }, data: { s3Key } });
+            }
+          })
+          .catch(() => void 0);
 
         return {
           dbJobId: job.id,

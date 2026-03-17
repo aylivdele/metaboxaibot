@@ -6,13 +6,14 @@ import { ManagementPage } from "./pages/ManagementPage.js";
 import { TariffsPage } from "./pages/TariffsPage.js";
 import { ReferralPage } from "./pages/ReferralPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
+import { GalleryPage } from "./pages/GalleryPage.js";
 import { I18nProvider, useI18n } from "./i18n.js";
 import { api } from "./api/client.js";
 import type { Page, UserProfile } from "./types.js";
 
 function parseHash(): { page: Page; section?: string } {
   const [pagePart, sectionPart] = window.location.hash.slice(1).split("/");
-  const validPages: Page[] = ["profile", "management", "tariffs", "referral", "admin"];
+  const validPages: Page[] = ["profile", "management", "tariffs", "referral", "admin", "gallery"];
   const page = validPages.includes(pagePart as Page) ? (pagePart as Page) : "profile";
   return { page, section: sectionPart };
 }
@@ -96,6 +97,7 @@ function AppContent() {
         {page === "tariffs" && <TariffsPage />}
         {page === "referral" && <ReferralPage />}
         {page === "admin" && <AdminPage />}
+        {page === "gallery" && <GalleryPage />}
       </main>
 
       <BottomNav current={page} onChange={setPage} showAdmin={isAdmin} />

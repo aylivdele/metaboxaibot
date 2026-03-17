@@ -4,6 +4,7 @@ import type { ImageJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createImageAdapter } from "@metabox/api/ai/image";
 import { deductTokens, calculateCost } from "@metabox/api/services";
+import { buildS3Key, sectionMeta, uploadFromUrl } from "@metabox/api/services/s3";
 import { logger } from "../logger.js";
 import { config, AI_MODELS } from "@metabox/shared";
 
@@ -43,9 +44,16 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       throw new Error(`Timed out waiting for ${modelId} job ${providerJobId}`);
     }
 
+    const { ext, contentType } = sectionMeta("image");
+    const s3Key = await uploadFromUrl(
+      buildS3Key("image", userIdStr, dbJobId, ext),
+      imageResult.url,
+      contentType,
+    ).catch(() => null);
+
     await db.generationJob.update({
       where: { id: dbJobId },
-      data: { status: "done", outputUrl: imageResult.url, completedAt: new Date() },
+      data: { status: "done", outputUrl: imageResult.url, s3Key, completedAt: new Date() },
     });
 
     const model = AI_MODELS[modelId];

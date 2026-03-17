@@ -4,6 +4,7 @@ import type { AudioJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createAudioAdapter } from "@metabox/api/ai/audio";
 import { deductTokens, calculateCost } from "@metabox/api/services";
+import { buildS3Key, uploadBuffer, uploadFromUrl } from "@metabox/api/services/s3";
 import { logger } from "../logger.js";
 import { config, AI_MODELS } from "@metabox/shared";
 
@@ -70,9 +71,18 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
       audioResult = polled;
     }
 
+    const audioKey = buildS3Key("audio", userIdStr, dbJobId, audioResult.ext ?? "mp3");
+    const s3Key = await (
+      audioResult.buffer
+        ? uploadBuffer(audioKey, audioResult.buffer, `audio/${audioResult.ext ?? "mpeg"}`)
+        : audioResult.url
+          ? uploadFromUrl(audioKey, audioResult.url, `audio/${audioResult.ext ?? "mpeg"}`)
+          : Promise.resolve(null)
+    ).catch(() => null);
+
     await db.generationJob.update({
       where: { id: dbJobId },
-      data: { status: "done", outputUrl: audioResult.url ?? null, completedAt: new Date() },
+      data: { status: "done", outputUrl: audioResult.url ?? null, s3Key, completedAt: new Date() },
     });
 
     const model = AI_MODELS[modelId];

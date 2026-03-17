@@ -66,4 +66,21 @@ export interface AdminUsersResponse {
   limit: number;
 }
 
-export type Page = "profile" | "management" | "tariffs" | "referral" | "admin";
+export interface GalleryItem {
+  id: string;
+  section: string;
+  modelId: string;
+  prompt: string;
+  s3Key: string | null;
+  outputUrl: string | null;
+  completedAt: string | null;
+}
+
+export interface GalleryResponse {
+  items: GalleryItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export type Page = "profile" | "management" | "tariffs" | "referral" | "admin" | "gallery";

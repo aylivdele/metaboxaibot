@@ -4,6 +4,7 @@ import type { VideoJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createVideoAdapter } from "@metabox/api/ai/video";
 import { deductTokens, calculateCost } from "@metabox/api/services";
+import { buildS3Key, sectionMeta, uploadFromUrl } from "@metabox/api/services/s3";
 import { logger } from "../logger.js";
 import { config, AI_MODELS } from "@metabox/shared";
 
@@ -38,9 +39,16 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       throw new Error(`Timed out waiting for ${modelId} job ${providerJobId}`);
     }
 
+    const { ext, contentType } = sectionMeta("video");
+    const s3Key = await uploadFromUrl(
+      buildS3Key("video", userIdStr, dbJobId, ext),
+      videoResult.url,
+      contentType,
+    ).catch(() => null);
+
     await db.generationJob.update({
       where: { id: dbJobId },
-      data: { status: "done", outputUrl: videoResult.url, completedAt: new Date() },
+      data: { status: "done", outputUrl: videoResult.url, s3Key, completedAt: new Date() },
     });
 
     const model = AI_MODELS[modelId];

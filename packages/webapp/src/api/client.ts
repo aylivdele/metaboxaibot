@@ -1,4 +1,4 @@
-import type { UserProfile, Dialog, UserState, Model, AdminUsersResponse } from "../types.js";
+import type { UserProfile, Dialog, UserState, Model, AdminUsersResponse, GalleryResponse } from "../types.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 
@@ -82,6 +82,18 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ planId }),
       }),
+  },
+
+  gallery: {
+    list: (params: { section?: string; page?: number; limit?: number }) => {
+      const qs = new URLSearchParams();
+      if (params.section) qs.set("section", params.section);
+      if (params.page) qs.set("page", String(params.page));
+      if (params.limit) qs.set("limit", String(params.limit));
+      return request<GalleryResponse>(`/gallery?${qs.toString()}`);
+    },
+    download: (id: string) =>
+      request<{ success: boolean }>(`/gallery/${id}/download`, { method: "POST" }),
   },
 
   admin: {

@@ -83,6 +83,21 @@ export const config = {
     targetMargin: optFloat("BILLING_TARGET_MARGIN", 2.0),
   },
 
+  /**
+   * S3-compatible object storage (optional).
+   * If S3_BUCKET is not set, file uploads are skipped gracefully.
+   * Compatible with AWS S3, Cloudflare R2, MinIO, etc.
+   */
+  s3: {
+    bucket: opt("S3_BUCKET"),
+    region: optDefault("S3_REGION", "auto"),
+    endpoint: opt("S3_ENDPOINT"), // e.g. https://<account>.r2.cloudflarestorage.com
+    accessKeyId: opt("S3_ACCESS_KEY_ID"),
+    secretAccessKey: opt("S3_SECRET_ACCESS_KEY"),
+    /** Public base URL for direct downloads (e.g. https://cdn.example.com). */
+    publicUrl: opt("S3_PUBLIC_URL"),
+  },
+
   /** AI providers (all optional — only needed for models you enable) */
   ai: {
     openai: opt("OPENAI_API_KEY"),

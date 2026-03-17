@@ -3,6 +3,7 @@ import { createImageAdapter } from "../ai/image/factory.js";
 import { getImageQueue } from "../queues/image.queue.js";
 import { AI_MODELS } from "@metabox/shared";
 import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
+import { buildS3Key, sectionMeta, uploadFromUrl } from "./s3.service.js";
 
 export interface SubmitImageParams {
   userId: bigint;
@@ -54,6 +55,19 @@ export const generationService = {
         });
 
         await deductTokens(userId, calculateCost(model), modelId);
+
+        // Upload to S3 in background — do not block the response
+        if (result.url) {
+          const { ext, contentType } = sectionMeta("image");
+          const key = buildS3Key("image", userId.toString(), job.id, ext);
+          uploadFromUrl(key, result.url, contentType)
+            .then((s3Key) => {
+              if (s3Key) {
+                return db.generationJob.update({ where: { id: job.id }, data: { s3Key } });
+              }
+            })
+            .catch(() => void 0);
+        }
 
         return { dbJobId: job.id, imageUrl: result.url, isPending: false };
       } catch (err) {
