@@ -146,7 +146,11 @@ export function AdminPage() {
                 <span>
                   {t("admin.joined")}: {new Date(user.createdAt).toLocaleDateString()}
                 </span>
-                {user.isBlocked && <span style={{ color: "var(--danger)" }}>🚫 {t("admin.blocked")}</span>}
+                {user.isBlocked && (
+                  <span style={{ color: "var(--danger)" }}>
+                    🚫 {t("admin.blocked")}
+                  </span>
+                )}
               </div>
 
               <div className="admin-user-card__actions">
@@ -159,14 +163,16 @@ export function AdminPage() {
                     {t("admin.makeAdmin")}
                   </button>
                 )}
-                {profile.role === "ADMIN" && user.role !== "MODERATOR" && user.role !== "ADMIN" && (
-                  <button
-                    className="admin-btn admin-btn--accent"
-                    onClick={() => handleSetRole(user.id, "MODERATOR")}
-                  >
-                    {t("admin.makeModerator")}
-                  </button>
-                )}
+                {profile.role === "ADMIN" &&
+                  user.role !== "MODERATOR" &&
+                  user.role !== "ADMIN" && (
+                    <button
+                      className="admin-btn admin-btn--accent"
+                      onClick={() => handleSetRole(user.id, "MODERATOR")}
+                    >
+                      {t("admin.makeModerator")}
+                    </button>
+                  )}
                 {profile.role === "ADMIN" && user.role !== "USER" && (
                   <button
                     className="admin-btn admin-btn--accent"
@@ -208,7 +214,10 @@ export function AdminPage() {
                     </button>
                     <button
                       className="admin-btn"
-                      onClick={() => { setGrantingId(null); setGrantAmount(""); }}
+                      onClick={() => {
+                        setGrantingId(null);
+                        setGrantAmount("");
+                      }}
                     >
                       ✕
                     </button>
