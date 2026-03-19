@@ -98,6 +98,22 @@ export const config = {
     publicUrl: opt("S3_PUBLIC_URL"),
   },
 
+  /**
+   * Admin alerts (optional).
+   * ALERT_CHAT_ID — Telegram chat/channel ID to send low-balance notifications.
+   * ALERT_INTERVAL_HOURS — how often to check (default: 12).
+   * ALERT_FAL_THRESHOLD_USD — alert when FAL balance below this (default: 5).
+   * ALERT_ELEVENLABS_THRESHOLD_CHARS — alert when ElevenLabs chars remaining below this (default: 50000).
+   */
+  alerts: {
+    chatId: opt("ALERT_CHAT_ID"),
+    /** message_thread_id for supergroup topics (optional). */
+    threadId: optInt("ALERT_THREAD_ID", 0) || undefined,
+    intervalHours: optFloat("ALERT_INTERVAL_HOURS", 12),
+    falThresholdUsd: optFloat("ALERT_FAL_THRESHOLD_USD", 5),
+    elevenlabsThresholdChars: optInt("ALERT_ELEVENLABS_THRESHOLD_CHARS", 50_000),
+  },
+
   /** AI providers (all optional — only needed for models you enable) */
   ai: {
     openai: opt("OPENAI_API_KEY"),

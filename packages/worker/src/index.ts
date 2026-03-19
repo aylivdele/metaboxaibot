@@ -6,6 +6,7 @@ import type { ImageJobData, VideoJobData, AudioJobData } from "@metabox/api/queu
 import { processImageJob } from "./processors/image.processor.js";
 import { processVideoJob } from "./processors/video.processor.js";
 import { processAudioJob } from "./processors/audio.processor.js";
+import { checkProviderBalances } from "./monitors/balance.monitor.js";
 import { logger } from "./logger.js";
 
 const connection = new Redis(config.redis.url, {
@@ -53,7 +54,24 @@ audioWorker.on("failed", (job, err) => {
 
 logger.info("Worker started — listening on image, video and audio queues");
 
-process.on("SIGTERM", async () => {
-  await Promise.all([imageWorker.close(), videoWorker.close(), audioWorker.close()]);
-  process.exit(0);
-});
+// ── Balance monitor ───────────────────────────────────────────────────────────
+if (config.alerts.chatId) {
+  const intervalMs = config.alerts.intervalHours * 60 * 60 * 1000;
+  // Run once at startup, then on the configured interval
+  checkProviderBalances().catch((err) => logger.error({ err }, "Balance monitor error"));
+  const balanceTimer = setInterval(() => {
+    checkProviderBalances().catch((err) => logger.error({ err }, "Balance monitor error"));
+  }, intervalMs);
+  logger.info({ intervalHours: config.alerts.intervalHours }, "Balance monitor started");
+
+  process.on("SIGTERM", async () => {
+    clearInterval(balanceTimer);
+    await Promise.all([imageWorker.close(), videoWorker.close(), audioWorker.close()]);
+    process.exit(0);
+  });
+} else {
+  process.on("SIGTERM", async () => {
+    await Promise.all([imageWorker.close(), videoWorker.close(), audioWorker.close()]);
+    process.exit(0);
+  });
+}
