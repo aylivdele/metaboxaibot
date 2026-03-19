@@ -157,3 +157,21 @@ model GenerationJob {
   @@index([status])
   @@map("generation_jobs")
 }
+
+// ─────────────────────────────────────────────
+// Баннерные слайды
+// ─────────────────────────────────────────────
+model BannerSlide {
+  id             String  @id @default(cuid())
+  imageUrl       String
+  linkUrl        String?
+  displaySeconds Int     @default(4)
+  sortOrder      Int     @default(0)
+  active         Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sortOrder])
+  @@map("banner_slides")
+}

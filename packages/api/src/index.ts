@@ -8,6 +8,10 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import fastifyMultipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { logger } from "./logger.js";
 import { registry } from "./metrics.js";
 import { authRoutes } from "./routes/auth.js";
@@ -18,7 +22,10 @@ import { modelsRoutes } from "./routes/models.js";
 import { adminRoutes } from "./routes/admin.js";
 import { paymentsRoutes } from "./routes/payments.js";
 import { galleryRoutes } from "./routes/gallery.js";
+import { slidesRoutes } from "./routes/slides.js";
 import { config } from "@metabox/shared";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const server = Fastify({ logger: false });
 
@@ -57,6 +64,15 @@ await server.register(swaggerUi, {
   uiConfig: { docExpansion: "list" },
 });
 
+await server.register(fastifyMultipart, {
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+await server.register(fastifyStatic, {
+  root: join(__dirname, "..", "uploads"),
+  prefix: "/uploads/",
+  decorateReply: false,
+});
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 server.get("/health", { schema: { hide: true } }, async () => ({ status: "ok" }));
 
@@ -73,6 +89,7 @@ await server.register(modelsRoutes);
 await server.register(adminRoutes);
 await server.register(paymentsRoutes);
 await server.register(galleryRoutes);
+await server.register(slidesRoutes);
 
 const port = config.api.port;
 await server.listen({ port, host: "0.0.0.0" });

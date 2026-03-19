@@ -123,6 +123,10 @@ dist
 # TernJS port file
 .tern-port
 
+# Uploaded files
+packages/api/uploads/banners/*
+!packages/api/uploads/banners/.gitkeep
+
 # Turborepo
 .turbo/
 
