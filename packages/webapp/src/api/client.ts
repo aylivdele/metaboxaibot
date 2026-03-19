@@ -1,4 +1,11 @@
-import type { UserProfile, Dialog, UserState, Model, AdminUsersResponse, GalleryResponse } from "../types.js";
+import type {
+  UserProfile,
+  Dialog,
+  UserState,
+  Model,
+  AdminUsersResponse,
+  GalleryResponse,
+} from "../types.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 

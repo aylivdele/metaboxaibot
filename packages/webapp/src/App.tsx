@@ -74,7 +74,14 @@ function AppContent() {
               </linearGradient>
             </defs>
             <rect x="4" y="4" width="40" height="40" rx="12" fill="url(#sg)" />
-            <path d="M16 24l6 6 10-12" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <path
+              d="M16 24l6 6 10-12"
+              stroke="#fff"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
           </svg>
         </div>
         <div className="splash__text">{t("common.loading")}</div>

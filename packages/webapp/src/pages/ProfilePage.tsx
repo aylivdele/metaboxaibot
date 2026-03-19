@@ -45,7 +45,9 @@ export function ProfilePage() {
       <div className="balance-card">
         <div className="balance-card__label">{t("profile.balance")}</div>
         <div className="balance-card__amount">✦ {Number(profile.tokenBalance).toFixed(2)}</div>
-        <div className="balance-card__sub">{t("profile.referrals")}: {profile.referralCount}</div>
+        <div className="balance-card__sub">
+          {t("profile.referrals")}: {profile.referralCount}
+        </div>
       </div>
 
       <div className="section-title">{t("profile.txHistory")}</div>

@@ -27,14 +27,11 @@ async function sendFileToUser(
     caption,
   };
 
-  const res = await fetch(
-    `https://api.telegram.org/bot${config.bot.token}/${method}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
+  const res = await fetch(`https://api.telegram.org/bot${config.bot.token}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { description?: string };
@@ -96,7 +93,15 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
 
     const job = await db.generationJob.findUnique({
       where: { id },
-      select: { id: true, userId: true, section: true, modelId: true, prompt: true, s3Key: true, outputUrl: true },
+      select: {
+        id: true,
+        userId: true,
+        section: true,
+        modelId: true,
+        prompt: true,
+        s3Key: true,
+        outputUrl: true,
+      },
     });
 
     if (!job) return reply.code(404).send({ error: "Not found" });

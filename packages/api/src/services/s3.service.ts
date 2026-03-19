@@ -1,8 +1,4 @@
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-} from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { config } from "@metabox/shared";
 
@@ -23,12 +19,7 @@ function makeClient(): S3Client | null {
 }
 
 /** Builds the S3 key for a generated file. */
-export function buildS3Key(
-  section: string,
-  userId: string,
-  jobId: string,
-  ext: string,
-): string {
+export function buildS3Key(section: string, userId: string, jobId: string, ext: string): string {
   return `${section}/${userId}/${jobId}.${ext}`;
 }
 
@@ -99,11 +90,9 @@ export async function getFileUrl(key: string): Promise<string | null> {
   const client = makeClient();
   if (!client) return null;
 
-  return getSignedUrl(
-    client,
-    new GetObjectCommand({ Bucket: bucket, Key: key }),
-    { expiresIn: PRESIGN_TTL },
-  );
+  return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), {
+    expiresIn: PRESIGN_TTL,
+  });
 }
 
 export const s3Service = { buildS3Key, sectionMeta, uploadBuffer, uploadFromUrl, getFileUrl };

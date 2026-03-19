@@ -22,10 +22,7 @@ export function BannerSlider() {
 
   return (
     <div className="banner-slider">
-      <div
-        className="banner-slider__track"
-        style={{ transform: `translateX(-${current * 100}%)` }}
-      >
+      <div className="banner-slider__track" style={{ transform: `translateX(-${current * 100}%)` }}>
         {slides.map((slide, i) => (
           <div key={i} className="banner-slide">
             <div className="banner-slide__title">{slide.title}</div>

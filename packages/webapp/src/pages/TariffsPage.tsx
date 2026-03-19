@@ -79,11 +79,11 @@ export function TariffsPage() {
       <div className="page-header">
         <h2>{t("tariffs.title")}</h2>
         {balance !== null && (
-          <p className="page-subtitle">{t("tariffs.currentBalance")}: ✦ {Number(balance).toFixed(2)} {t("tariffs.tokens")}</p>
+          <p className="page-subtitle">
+            {t("tariffs.currentBalance")}: ✦ {Number(balance).toFixed(2)} {t("tariffs.tokens")}
+          </p>
         )}
-        <p className="page-subtitle">
-          {t("tariffs.description")}
-        </p>
+        <p className="page-subtitle">{t("tariffs.description")}</p>
       </div>
 
       {notice && (

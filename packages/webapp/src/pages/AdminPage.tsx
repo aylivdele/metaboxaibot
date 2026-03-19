@@ -18,10 +18,7 @@ export function AdminPage() {
   const limit = 20;
 
   useEffect(() => {
-    api.profile
-      .get()
-      .then(setProfile)
-      .catch(console.error);
+    api.profile.get().then(setProfile).catch(console.error);
   }, []);
 
   const loadUsers = useCallback(async () => {
@@ -50,9 +47,7 @@ export function AdminPage() {
 
   const handleBlock = async (userId: string, blocked: boolean) => {
     await api.admin.block(userId, blocked);
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, isBlocked: blocked } : u)),
-    );
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, isBlocked: blocked } : u)));
   };
 
   const handleGrant = async (userId: string) => {
@@ -69,9 +64,7 @@ export function AdminPage() {
   const handleSetRole = async (userId: string, role: string) => {
     await api.admin.setRole(userId, role);
     setUsers((prev) =>
-      prev.map((u) =>
-        u.id === userId ? { ...u, role: role as AdminUser["role"] } : u,
-      ),
+      prev.map((u) => (u.id === userId ? { ...u, role: role as AdminUser["role"] } : u)),
     );
   };
 
@@ -127,9 +120,7 @@ export function AdminPage() {
             >
               <div className="admin-user-card__header">
                 <div>
-                  <div className="admin-user-card__name">
-                    {user.firstName ?? "—"}
-                  </div>
+                  <div className="admin-user-card__name">{user.firstName ?? "—"}</div>
                   <div className="admin-user-card__username">
                     {user.username ? `@${user.username}` : `ID: ${user.id}`}
                   </div>
@@ -142,11 +133,15 @@ export function AdminPage() {
               </div>
 
               <div className="admin-user-card__meta">
-                <span>{t("admin.balance")}: ✦ {Number(user.tokenBalance).toFixed(2)}</span>
+                <span>
+                  {t("admin.balance")}: ✦ {Number(user.tokenBalance).toFixed(2)}
+                </span>
                 <span>
                   {t("admin.joined")}: {new Date(user.createdAt).toLocaleDateString()}
                 </span>
-                {user.isBlocked && <span style={{ color: "var(--danger)" }}>🚫 {t("admin.blocked")}</span>}
+                {user.isBlocked && (
+                  <span style={{ color: "var(--danger)" }}>🚫 {t("admin.blocked")}</span>
+                )}
               </div>
 
               <div className="admin-user-card__actions">
@@ -203,12 +198,13 @@ export function AdminPage() {
                       placeholder={t("admin.grantAmount")}
                       autoFocus
                     />
-                    <button onClick={() => handleGrant(user.id)}>
-                      {t("admin.grantSubmit")}
-                    </button>
+                    <button onClick={() => handleGrant(user.id)}>{t("admin.grantSubmit")}</button>
                     <button
                       className="admin-btn"
-                      onClick={() => { setGrantingId(null); setGrantAmount(""); }}
+                      onClick={() => {
+                        setGrantingId(null);
+                        setGrantAmount("");
+                      }}
                     >
                       ✕
                     </button>

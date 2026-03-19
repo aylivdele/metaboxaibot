@@ -12,7 +12,13 @@ const SECTION_ICON: Record<Section, string> = {
   video: "🎬",
 };
 
-function GalleryItemCard({ item, onDownload }: { item: GalleryItem; onDownload: (id: string) => Promise<void> }) {
+function GalleryItemCard({
+  item,
+  onDownload,
+}: {
+  item: GalleryItem;
+  onDownload: (id: string) => Promise<void>;
+}) {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -66,21 +72,18 @@ export function GalleryPage() {
 
   const LIMIT = 20;
 
-  const load = useCallback(
-    (sec: Section, pg: number) => {
-      setLoading(true);
-      setError(null);
-      api.gallery
-        .list({ section: sec, page: pg, limit: LIMIT })
-        .then((res) => {
-          setItems(res.items);
-          setTotal(res.total);
-        })
-        .catch((err: Error) => setError(err.message))
-        .finally(() => setLoading(false));
-    },
-    [],
-  );
+  const load = useCallback((sec: Section, pg: number) => {
+    setLoading(true);
+    setError(null);
+    api.gallery
+      .list({ section: sec, page: pg, limit: LIMIT })
+      .then((res) => {
+        setItems(res.items);
+        setTotal(res.total);
+      })
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     load(section, page);
