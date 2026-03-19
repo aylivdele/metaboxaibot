@@ -42,6 +42,11 @@ export function createBot(token: string): Bot<BotContext> {
   bot.use(i18nMiddleware);
   bot.use(rateLimitMiddleware);
 
+  // ── Private chats only — ignore all group/channel updates ────────────────
+  bot.use(async (ctx, next) => {
+    if (ctx.chat?.type === "private") return next();
+  });
+
   // ── Commands ─────────────────────────────────────────────────────────────
   bot.command("start", handleStart);
   bot.command("menu", handleMenu);
