@@ -55,4 +55,13 @@ export const userStateService = {
       update: { modelId },
     });
   },
+
+  /** Set (or clear) the design reference message for img2img. Null = clear. */
+  async setDesignRefMessage(userId: bigint, messageId: string | null): Promise<void> {
+    await db.userState.upsert({
+      where: { userId },
+      create: { userId, state: "IDLE", designRefMessageId: messageId },
+      update: { designRefMessageId: messageId },
+    });
+  },
 };

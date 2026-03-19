@@ -15,6 +15,8 @@ import {
 import {
   handleDesignModelSelect,
   handleDesignMessage,
+  handleDesignPhoto,
+  handleDesignRefSelect,
   handleNewDesignDialog,
   handleDesignManagement,
 } from "./scenes/design.js";
@@ -53,6 +55,9 @@ export function createBot(token: string): Bot<BotContext> {
 
   // ── Design model selection callback ──────────────────────────────────────
   bot.callbackQuery(/^design_model_/, handleDesignModelSelect);
+
+  // ── Design reference (img2img) callback ───────────────────────────────────
+  bot.callbackQuery(/^design_ref_/, handleDesignRefSelect);
 
   // ── Video model selection callback ───────────────────────────────────────
   bot.callbackQuery(/^video_model_/, handleVideoModelSelect);
@@ -111,7 +116,11 @@ export function createBot(token: string): Bot<BotContext> {
 
     const state = await userStateService.get(ctx.user.id);
     if (state?.state === "GPT_ACTIVE") return handleGptMessage(ctx);
-    if (state?.state === "DESIGN_ACTIVE") return handleDesignMessage(ctx);
+    if (state?.state === "DESIGN_ACTIVE") {
+      // Photo sent in design state → set as img2img reference
+      if (ctx.message?.photo) return handleDesignPhoto(ctx);
+      return handleDesignMessage(ctx);
+    }
     if (state?.state === "VIDEO_ACTIVE") return handleVideoMessage(ctx);
     if (state?.state === "AUDIO_ACTIVE") return handleAudioMessage(ctx);
 

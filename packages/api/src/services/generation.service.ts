@@ -4,6 +4,7 @@ import { getImageQueue } from "../queues/image.queue.js";
 import { AI_MODELS } from "@metabox/shared";
 import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
 import { buildS3Key, sectionMeta, uploadFromUrl } from "./s3.service.js";
+import { dialogService } from "./dialog.service.js";
 
 export interface SubmitImageParams {
   userId: bigint;
@@ -12,6 +13,8 @@ export interface SubmitImageParams {
   negativePrompt?: string;
   sourceImageUrl?: string;
   telegramChatId: number;
+  /** If set, user/assistant messages are saved to this dialog for img2img context. */
+  dialogId?: string;
 }
 
 export interface SubmitImageResult {
@@ -19,11 +22,14 @@ export interface SubmitImageResult {
   /** Populated immediately for sync models (dall-e). */
   imageUrl?: string;
   isPending: boolean;
+  /** Message.id of the saved assistant result (for "Refine" button). Only set for sync models when dialogId provided. */
+  assistantMessageId?: string;
 }
 
 export const generationService = {
   async submitImage(params: SubmitImageParams): Promise<SubmitImageResult> {
-    const { userId, modelId, prompt, negativePrompt, sourceImageUrl, telegramChatId } = params;
+    const { userId, modelId, prompt, negativePrompt, sourceImageUrl, telegramChatId, dialogId } =
+      params;
 
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
@@ -33,7 +39,7 @@ export const generationService = {
     const job = await db.generationJob.create({
       data: {
         userId,
-        dialogId: "",
+        dialogId: dialogId ?? "",
         section: "image",
         modelId,
         prompt,
@@ -56,6 +62,17 @@ export const generationService = {
 
         await deductTokens(userId, calculateCost(model), modelId);
 
+        // Save messages to dialog for img2img context
+        let assistantMessageId: string | undefined;
+        if (dialogId && result.url) {
+          await dialogService.saveMessage(dialogId, "user", prompt);
+          const assistantMsg = await dialogService.saveMessage(dialogId, "assistant", "", {
+            mediaUrl: result.url,
+            mediaType: "image",
+          });
+          assistantMessageId = assistantMsg.id;
+        }
+
         // Upload to S3 in background — do not block the response
         if (result.url) {
           const { ext, contentType } = sectionMeta("image");
@@ -69,7 +86,7 @@ export const generationService = {
             .catch(() => void 0);
         }
 
-        return { dbJobId: job.id, imageUrl: result.url, isPending: false };
+        return { dbJobId: job.id, imageUrl: result.url, isPending: false, assistantMessageId };
       } catch (err) {
         await db.generationJob.update({
           where: { id: job.id },
@@ -91,6 +108,7 @@ export const generationService = {
         negativePrompt,
         sourceImageUrl,
         telegramChatId,
+        dialogId,
       },
       { attempts: 3, backoff: { type: "exponential", delay: 5000 } },
     );

@@ -13,6 +13,8 @@ export interface ImageJobData {
   sourceImageUrl?: string;
   /** Telegram chat id to notify when done */
   telegramChatId: number;
+  /** Dialog.id for saving messages and enabling img2img context. */
+  dialogId?: string;
 }
 
 let _connection: Redis | undefined;

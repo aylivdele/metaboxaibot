@@ -14,7 +14,15 @@ const MAX_POLLS = 120; // 6 minutes max
 const telegram = new Api(config.bot.token);
 
 export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
-  const { dbJobId, userId: userIdStr, modelId, prompt, negativePrompt, telegramChatId } = job.data;
+  const {
+    dbJobId,
+    userId: userIdStr,
+    modelId,
+    prompt,
+    negativePrompt,
+    telegramChatId,
+    dialogId,
+  } = job.data;
 
   logger.info({ dbJobId, modelId }, "Processing image job");
 
@@ -61,8 +69,38 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       await deductTokens(BigInt(userIdStr), calculateCost(model), modelId);
     }
 
+    // Save messages to dialog and get assistantMessageId for Refine button
+    let assistantMessageId: string | undefined;
+    if (dialogId) {
+      await db.message.create({
+        data: { dialogId, role: "user", content: prompt, tokensUsed: 0 },
+      });
+      const assistantMsg = await db.message.create({
+        data: {
+          dialogId,
+          role: "assistant",
+          content: "",
+          mediaUrl: imageResult.url,
+          mediaType: "image",
+          tokensUsed: 0,
+        },
+      });
+      assistantMessageId = assistantMsg.id;
+    }
+
+    // Show Refine button only for img2img-capable models
+    const replyMarkup =
+      model?.supportsImages && assistantMessageId
+        ? {
+            inline_keyboard: [
+              [{ text: "🔄 Доработать", callback_data: `design_ref_${assistantMessageId}` }],
+            ],
+          }
+        : undefined;
+
     await telegram.sendPhoto(telegramChatId, imageResult.url, {
       caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
+      reply_markup: replyMarkup,
     });
 
     logger.info({ dbJobId }, "Image job completed");

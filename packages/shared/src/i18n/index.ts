@@ -42,6 +42,11 @@ export interface Translations {
     generating: string;
     asyncPending: string;
     generationFailed: string;
+    photoSaved: string;
+    photoAsReference: string;
+    withReference: string;
+    refSelected: string;
+    refine: string;
   };
   audio: {
     sectionTitle: string;

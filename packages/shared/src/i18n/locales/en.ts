@@ -46,6 +46,11 @@ export default {
     generating: "🎨 Generating your image...",
     asyncPending: "⏳ Your image is being generated. You will receive it as soon as it's ready.",
     generationFailed: "❌ Generation failed. Please try again.",
+    photoSaved: "📎 Photo set as reference. Send your prompt.",
+    photoAsReference: "[user photo reference]",
+    withReference: "(with reference)",
+    refSelected: "✅ Selected as reference",
+    refine: "🔄 Refine",
   },
   audio: {
     sectionTitle: "🎧 AI Audio\nChoose a section to work with audio 👇",

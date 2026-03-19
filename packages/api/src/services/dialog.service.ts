@@ -50,7 +50,12 @@ export const dialogService = {
     dialogId: string,
     role: "user" | "assistant",
     content: string,
-    extras?: { tokensUsed?: number; providerMessageId?: string },
+    extras?: {
+      tokensUsed?: number;
+      providerMessageId?: string;
+      mediaUrl?: string;
+      mediaType?: string;
+    },
   ): Promise<Message> {
     return db.message.create({
       data: {
@@ -59,7 +64,17 @@ export const dialogService = {
         content,
         tokensUsed: extras?.tokensUsed ?? 0,
         providerMessageId: extras?.providerMessageId,
+        mediaUrl: extras?.mediaUrl,
+        mediaType: extras?.mediaType,
       },
+    });
+  },
+
+  /** Fetch a single message by ID (used for img2img reference lookup). */
+  async getMessageById(id: string): Promise<Pick<Message, "id" | "mediaUrl" | "mediaType"> | null> {
+    return db.message.findUnique({
+      where: { id },
+      select: { id: true, mediaUrl: true, mediaType: true },
     });
   },
 
