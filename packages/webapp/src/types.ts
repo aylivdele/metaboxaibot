@@ -7,6 +7,8 @@ export interface UserProfile {
   tokenBalance: string;
   referralCount: number;
   createdAt: string;
+  email: string | null;
+  emailVerified: boolean;
   transactions: Transaction[];
 }
 
@@ -101,4 +103,4 @@ export interface GalleryResponse {
   limit: number;
 }
 
-export type Page = "profile" | "management" | "tariffs" | "referral" | "admin" | "gallery";
+export type Page = "profile" | "management" | "tariffs" | "referral" | "admin";

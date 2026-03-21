@@ -6,13 +6,12 @@ import { ManagementPage } from "./pages/ManagementPage.js";
 import { TariffsPage } from "./pages/TariffsPage.js";
 import { ReferralPage } from "./pages/ReferralPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
-import { GalleryPage } from "./pages/GalleryPage.js";
 import { I18nProvider, useI18n } from "./i18n.js";
 import { api } from "./api/client.js";
 import type { Page, UserProfile } from "./types.js";
 
 function parseHash(): { page: Page; section?: string } {
-  const validPages: Page[] = ["profile", "management", "tariffs", "referral", "admin", "gallery"];
+  const validPages: Page[] = ["profile", "management", "tariffs", "referral", "admin"];
   // Prefer query params (?page=...) — avoids conflict with Telegram's #tgWebAppData hash injection
   const params = new URLSearchParams(window.location.search);
   const qPage = params.get("page");
@@ -113,7 +112,6 @@ function AppContent() {
         {page === "tariffs" && <TariffsPage />}
         {page === "referral" && <ReferralPage />}
         {page === "admin" && <AdminPage />}
-        {page === "gallery" && <GalleryPage />}
       </main>
 
       <BottomNav current={page} onChange={setPage} showAdmin={isAdmin} />

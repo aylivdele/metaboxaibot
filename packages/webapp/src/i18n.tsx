@@ -10,10 +10,15 @@ const translations = {
     // Bottom Nav
     "nav.profile": "Profile",
     "nav.manage": "Manage",
+    "nav.learning": "Learning",
     "nav.tariffs": "Tariffs",
     "nav.referral": "Referral",
     "nav.admin": "Admin",
-    "nav.gallery": "Gallery",
+
+    // Profile tabs
+    "profile.tabOverview": "Overview",
+    "profile.tabGallery": "Gallery",
+    "profile.tabSettings": "Settings",
 
     // Profile
     "profile.balance": "Token Balance",
@@ -131,6 +136,22 @@ const translations = {
     "gallery.download": "Send to chat",
     "gallery.sent": "✓ Sent!",
 
+    // Settings
+    "settings.title": "Account Settings",
+    "settings.email": "Email",
+    "settings.password": "Password",
+    "settings.newPassword": "New password",
+    "settings.confirmPassword": "Confirm password",
+    "settings.confirmPasswordPlaceholder": "Repeat password",
+    "settings.save": "Save changes",
+    "settings.saved": "Settings saved successfully",
+    "settings.noChanges": "No changes to save",
+    "settings.passwordMismatch": "Passwords do not match",
+    "settings.passwordTooShort": "Password must be at least 6 characters",
+    "settings.verified": "Verified",
+    "settings.verify": "Verify email",
+    "settings.verificationSent": "Verification email sent! Check your inbox.",
+
     // Language
     "lang.title": "Language",
 
@@ -145,10 +166,15 @@ const translations = {
     // Bottom Nav
     "nav.profile": "Профиль",
     "nav.manage": "Диалоги",
+    "nav.learning": "Обучение",
     "nav.tariffs": "Тарифы",
     "nav.referral": "Рефералы",
     "nav.admin": "Админ",
-    "nav.gallery": "Галерея",
+
+    // Profile tabs
+    "profile.tabOverview": "Обзор",
+    "profile.tabGallery": "Галерея",
+    "profile.tabSettings": "Настройки",
 
     // Profile
     "profile.balance": "Баланс токенов",
@@ -264,6 +290,22 @@ const translations = {
     "gallery.empty": "В этом разделе пока нет файлов",
     "gallery.download": "Отправить в чат",
     "gallery.sent": "✓ Отправлено!",
+
+    // Settings
+    "settings.title": "Настройки аккаунта",
+    "settings.email": "Email",
+    "settings.password": "Пароль",
+    "settings.newPassword": "Новый пароль",
+    "settings.confirmPassword": "Подтвердите пароль",
+    "settings.confirmPasswordPlaceholder": "Повторите пароль",
+    "settings.save": "Сохранить изменения",
+    "settings.saved": "Настройки сохранены",
+    "settings.noChanges": "Нет изменений для сохранения",
+    "settings.passwordMismatch": "Пароли не совпадают",
+    "settings.passwordTooShort": "Пароль должен быть не менее 6 символов",
+    "settings.verified": "Подтверждён",
+    "settings.verify": "Подтвердить email",
+    "settings.verificationSent": "Письмо для подтверждения отправлено! Проверьте почту.",
 
     // Language
     "lang.title": "Язык",

@@ -71,6 +71,13 @@ export const api = {
 
   profile: {
     get: () => request<UserProfile>("/profile"),
+    updateSettings: (data: Record<string, string>) =>
+      request<{ email: string | null; emailVerified: boolean }>("/profile/settings", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    sendVerification: () =>
+      request<{ success: boolean }>("/profile/verify-email", { method: "POST" }),
   },
 
   dialogs: {

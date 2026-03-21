@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import { BannerSlider } from "../components/BannerSlider.js";
-import type { UserProfile } from "../types.js";
+import type { UserProfile, GalleryItem } from "../types.js";
+
+type ProfileTab = "overview" | "gallery" | "settings";
 
 const REASON_KEYS: Record<string, string> = {
   welcome_bonus: "profile.reason.welcome_bonus",
@@ -17,6 +19,7 @@ export function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
 
   useEffect(() => {
     api.profile
@@ -27,7 +30,7 @@ export function ProfilePage() {
   }, []);
 
   if (loading) return <div className="page-loading">{t("common.loading")}</div>;
-  if (error) return <div className="page-error">❌ {error}</div>;
+  if (error) return <div className="page-error">{error}</div>;
   if (!profile) return null;
 
   const displayName = profile.firstName ?? profile.username ?? `User ${profile.id.slice(-4)}`;
@@ -42,6 +45,41 @@ export function ProfilePage() {
         {profile.username && <div className="profile-username">@{profile.username}</div>}
       </div>
 
+      <div className="profile-tabs">
+        <button
+          className={`profile-tabs__btn${activeTab === "overview" ? " profile-tabs__btn--active" : ""}`}
+          onClick={() => setActiveTab("overview")}
+        >
+          {t("profile.tabOverview")}
+        </button>
+        <button
+          className={`profile-tabs__btn${activeTab === "gallery" ? " profile-tabs__btn--active" : ""}`}
+          onClick={() => setActiveTab("gallery")}
+        >
+          {t("profile.tabGallery")}
+        </button>
+        <button
+          className={`profile-tabs__btn${activeTab === "settings" ? " profile-tabs__btn--active" : ""}`}
+          onClick={() => setActiveTab("settings")}
+        >
+          {t("profile.tabSettings")}
+        </button>
+      </div>
+
+      {activeTab === "overview" && <OverviewTab profile={profile} />}
+      {activeTab === "gallery" && <GalleryTab />}
+      {activeTab === "settings" && <SettingsTab profile={profile} onUpdate={setProfile} />}
+    </div>
+  );
+}
+
+/* ── Overview Tab ──────────────────────────────────────────────────────────── */
+
+function OverviewTab({ profile }: { profile: UserProfile }) {
+  const { t } = useI18n();
+
+  return (
+    <>
       <div className="balance-card">
         <div className="balance-card__label">{t("profile.balance")}</div>
         <div className="balance-card__amount">✦ {Number(profile.tokenBalance).toFixed(2)}</div>
@@ -72,6 +110,322 @@ export function ProfilePage() {
           ))}
         </ul>
       )}
+    </>
+  );
+}
+
+/* ── Gallery Tab ───────────────────────────────────────────────────────────── */
+
+const SECTIONS = ["image", "audio", "video"] as const;
+type Section = (typeof SECTIONS)[number];
+
+function GalleryTab() {
+  const { t, locale } = useI18n();
+  const [section, setSection] = useState<Section>("image");
+  const [items, setItems] = useState<GalleryItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const LIMIT = 20;
+
+  const sectionLabels: Record<Section, string> = {
+    image: locale === "ru" ? "🎨 Изображения" : "🎨 Images",
+    audio: locale === "ru" ? "🎧 Аудио" : "🎧 Audio",
+    video: locale === "ru" ? "🎬 Видео" : "🎬 Video",
+  };
+
+  const load = useCallback((sec: Section, pg: number) => {
+    setLoading(true);
+    setError(null);
+    api.gallery
+      .list({ section: sec, page: pg, limit: LIMIT })
+      .then((res) => {
+        setItems(res.items);
+        setTotal(res.total);
+      })
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    load(section, page);
+  }, [section, page, load]);
+
+  const handleSectionChange = (sec: Section) => {
+    setSection(sec);
+    setPage(1);
+  };
+
+  const handleSend = useCallback(async (id: string) => {
+    await api.gallery.download(id);
+  }, []);
+
+  const totalPages = Math.ceil(total / LIMIT);
+
+  return (
+    <>
+      <div className="section-chips" style={{ marginTop: 8 }}>
+        {SECTIONS.map((sec) => (
+          <button
+            key={sec}
+            className={`chip${section === sec ? " chip--active" : ""}`}
+            onClick={() => handleSectionChange(sec)}
+          >
+            {sectionLabels[sec]}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div className="page-loading">{t("common.loading")}</div>}
+      {error && <div className="page-error">{error}</div>}
+
+      {!loading && !error && items.length === 0 && (
+        <div className="empty-state">{t("gallery.empty")}</div>
+      )}
+
+      {!loading && items.length > 0 && (
+        <div className={`gallery-grid${section === "image" ? " gallery-grid--2col" : ""}`}>
+          {items.map((item) => (
+            <GalleryCard key={item.id} item={item} onSend={handleSend} />
+          ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button
+            className="pagination__btn"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+          >
+            {t("admin.prevPage")}
+          </button>
+          <span className="pagination__info">
+            {page} / {totalPages}
+          </span>
+          <button
+            className="pagination__btn"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+          >
+            {t("admin.nextPage")}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+function GalleryCard({
+  item,
+  onSend,
+}: {
+  item: GalleryItem;
+  onSend: (id: string) => Promise<void>;
+}) {
+  const { t, locale } = useI18n();
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [imgError, setImgError] = useState(false);
+
+  const handleSend = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await onSend(item.id);
+      setSent(true);
+      setTimeout(() => setSent(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const previewUrl = item.outputUrl;
+  const isImage = item.section === "image";
+  const isVideo = item.section === "video";
+  const isAudio = item.section === "audio";
+
+  return (
+    <div className="gallery-card">
+      {isImage && previewUrl && !imgError && (
+        <div className="gallery-card__preview">
+          <img
+            src={previewUrl}
+            alt={item.prompt}
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+        </div>
+      )}
+      {isVideo && previewUrl && (
+        <div className="gallery-card__preview gallery-card__preview--video">
+          <video src={previewUrl} preload="metadata" controls={false} muted playsInline />
+          <div className="gallery-card__video-overlay">▶</div>
+        </div>
+      )}
+      {isAudio && <div className="gallery-card__audio-icon">🎵</div>}
+
+      <div className="gallery-card__body">
+        <div className="gallery-card__meta">
+          <span className="gallery-card__model">{item.modelId}</span>
+          {item.completedAt && (
+            <span className="gallery-card__date">
+              {new Date(item.completedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
+            </span>
+          )}
+        </div>
+        <p className="gallery-card__prompt">{item.prompt}</p>
+        {error && <p className="gallery-card__error">{error}</p>}
+        <button
+          className={`gallery-card__btn${sent ? " gallery-card__btn--sent" : ""}`}
+          onClick={handleSend}
+          disabled={loading || sent}
+        >
+          {loading ? "…" : sent ? t("gallery.sent") : t("gallery.download")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Settings Tab ──────────────────────────────────────────────────────────── */
+
+function SettingsTab({
+  profile,
+  onUpdate,
+}: {
+  profile: UserProfile;
+  onUpdate: (p: UserProfile) => void;
+}) {
+  const { t } = useI18n();
+  const [email, setEmail] = useState(profile.email ?? "");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<{
+    text: string;
+    ok: boolean;
+  } | null>(null);
+  const [verifying, setVerifying] = useState(false);
+
+  const handleSave = async () => {
+    if (password && password !== confirmPassword) {
+      setNotice({ text: t("settings.passwordMismatch"), ok: false });
+      return;
+    }
+    if (password && password.length < 6) {
+      setNotice({ text: t("settings.passwordTooShort"), ok: false });
+      return;
+    }
+
+    setSaving(true);
+    setNotice(null);
+    try {
+      const body: Record<string, string> = {};
+      if (email.trim() && email.trim() !== profile.email) {
+        body.email = email.trim();
+      }
+      if (password) {
+        body.password = password;
+      }
+      if (Object.keys(body).length === 0) {
+        setNotice({ text: t("settings.noChanges"), ok: false });
+        setSaving(false);
+        return;
+      }
+      const updated = await api.profile.updateSettings(body);
+      onUpdate({ ...profile, ...updated });
+      setPassword("");
+      setConfirmPassword("");
+      setNotice({ text: t("settings.saved"), ok: true });
+    } catch (err) {
+      setNotice({
+        text: err instanceof Error ? err.message : t("common.error"),
+        ok: false,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleVerifyEmail = async () => {
+    setVerifying(true);
+    setNotice(null);
+    try {
+      await api.profile.sendVerification();
+      setNotice({ text: t("settings.verificationSent"), ok: true });
+    } catch (err) {
+      setNotice({
+        text: err instanceof Error ? err.message : t("common.error"),
+        ok: false,
+      });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  return (
+    <div className="settings-section">
+      <div className="section-title">{t("settings.title")}</div>
+
+      {notice && (
+        <div
+          className={`payment-notice${notice.ok ? " payment-notice--ok" : " payment-notice--err"}`}
+        >
+          {notice.text}
+        </div>
+      )}
+
+      <div className="settings-field">
+        <label className="settings-field__label">{t("settings.email")}</label>
+        <div className="settings-field__row">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="your@email.com"
+          />
+          {profile.emailVerified ? (
+            <span className="settings-badge settings-badge--ok">✓ {t("settings.verified")}</span>
+          ) : profile.email ? (
+            <button
+              className="admin-btn admin-btn--accent"
+              onClick={handleVerifyEmail}
+              disabled={verifying}
+            >
+              {verifying ? t("common.loading") : t("settings.verify")}
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="settings-field">
+        <label className="settings-field__label">{t("settings.password")}</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder={t("settings.newPassword")}
+        />
+      </div>
+
+      <div className="settings-field">
+        <label className="settings-field__label">{t("settings.confirmPassword")}</label>
+        <input
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          placeholder={t("settings.confirmPasswordPlaceholder")}
+        />
+      </div>
+
+      <button className="btn btn--primary settings-save-btn" onClick={handleSave} disabled={saving}>
+        {saving ? t("common.loading") : t("settings.save")}
+      </button>
     </div>
   );
 }

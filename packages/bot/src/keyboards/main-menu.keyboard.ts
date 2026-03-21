@@ -15,11 +15,5 @@ export function buildMainMenuKeyboard(t: Translations): Keyboard {
 
   kb.row().text(t.menu.gpt).text(t.menu.design).row().text(t.menu.audio).text(t.menu.video).row();
 
-  if (webappUrl) {
-    kb.webApp(t.menu.storage, `${webappUrl}?page=gallery`);
-  } else {
-    kb.text(t.menu.storage);
-  }
-
-  return kb.row().text(t.menu.help).text(t.menu.knowledgeBase).resized().persistent();
+  return kb.text(t.menu.help).text(t.menu.knowledgeBase).resized().persistent();
 }
