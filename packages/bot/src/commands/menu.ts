@@ -1,7 +1,7 @@
 import type { BotContext } from "../types/context.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { userStateService, dialogService } from "@metabox/api/services";
-import { config } from "@metabox/shared";
+import { config, generateWebToken } from "@metabox/shared";
 import type { Section } from "@metabox/shared";
 
 /** Returns the active dialog name for a section, or undefined. */
@@ -31,8 +31,12 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
     : ctx.t.gpt.sectionTitle;
 
   const webappUrl = config.bot.webappUrl;
+  const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
   const managementBtn = webappUrl
-    ? { text: ctx.t.gpt.management, web_app: { url: `${webappUrl}?page=management&section=gpt` } }
+    ? {
+        text: ctx.t.gpt.management,
+        web_app: { url: `${webappUrl}?page=management&section=gpt&wtoken=${token}` },
+      }
     : { text: ctx.t.gpt.management };
 
   await ctx.reply(text, {
@@ -58,10 +62,11 @@ export async function handleDesign(ctx: BotContext): Promise<void> {
     : ctx.t.design.sectionTitle;
 
   const webappUrl = config.bot.webappUrl;
+  const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
   const managementBtn = webappUrl
     ? {
         text: ctx.t.design.management,
-        web_app: { url: `${webappUrl}?page=management&section=design` },
+        web_app: { url: `${webappUrl}?page=management&section=design&wtoken=${token}` },
       }
     : { text: ctx.t.design.management };
 

@@ -6,15 +6,18 @@ export function buildMainMenuKeyboard(t: Translations, userId?: bigint): Keyboar
   const webappUrl = config.bot.webappUrl;
   const kb = new Keyboard();
 
-  // Profile — full-width first row, opens mini app directly if configured.
-  // Appends a short-lived HMAC token so the webapp can authenticate even when
-  // Telegram's requestSimpleWebView (KeyboardButtonWebApp) doesn't inject initData.
-  if (webappUrl) {
-    const token = userId ? generateWebToken(userId, config.bot.token) : "";
-    const url = token ? `${webappUrl}?page=profile&wtoken=${token}` : `${webappUrl}?page=profile`;
-    kb.webApp(t.menu.profile, url);
+  if (webappUrl && userId) {
+    const token = generateWebToken(userId, config.bot.token);
+    kb.webApp(t.menu.profile, `${webappUrl}?page=profile&wtoken=${token}`).webApp(
+      t.menu.storage,
+      `${webappUrl}?page=gallery&wtoken=${token}`,
+    );
+  } else if (webappUrl) {
+    kb.webApp(t.menu.profile, `${webappUrl}?page=profile`)
+      .row()
+      .webApp(t.menu.storage, `${webappUrl}?page=gallery`);
   } else {
-    kb.text(t.menu.profile);
+    kb.text(t.menu.profile).row().text(t.menu.storage);
   }
 
   kb.row().text(t.menu.gpt).text(t.menu.design).row().text(t.menu.audio).text(t.menu.video).row();

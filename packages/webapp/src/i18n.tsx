@@ -158,6 +158,10 @@ const translations = {
     // Common
     "common.loading": "Loading…",
     "common.error": "Error",
+
+    // Auth errors
+    "auth.tokenExpired": "Link expired. Press the «Profile» button in the bot menu again.",
+    "auth.openFromTelegram": "Please open this app from Telegram",
   },
   ru: {
     // Header
@@ -313,6 +317,11 @@ const translations = {
     // Common
     "common.loading": "Загрузка…",
     "common.error": "Ошибка",
+
+    // Auth errors
+    "auth.tokenExpired":
+      "Ссылка устарела. Заново откройте главное меню и нажмите кнопку «Профиль».",
+    "auth.openFromTelegram": "Пожалуйста, откройте приложение через Telegram",
   },
 } as const;
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { setInitDataRaw, setWebToken, api } from "../api/client.js";
+import { useI18n } from "../i18n.js";
 
 type TelegramWebApp = { initData: string; ready?: () => void };
 
@@ -25,6 +26,7 @@ function getUrlWebToken(): string {
 }
 
 export function useTelegramInit(): TelegramInitState {
+  const { t } = useI18n();
   const [state, setState] = useState<TelegramInitState>({
     ready: false,
     error: null,
@@ -58,11 +60,9 @@ export function useTelegramInit(): TelegramInitState {
           });
         })
         .catch(() => {
-          // Token expired or invalid — ask user to reopen via bot keyboard
           setState({
             ready: false,
-            error:
-              "Ссылка устарела. Заного откройте главное меню и нажмите кнопку «Профиль» в меню бота.",
+            error: t("auth.tokenExpired"),
             warning: null,
             userId: null,
             initDataRaw: null,
@@ -115,10 +115,7 @@ export function useTelegramInit(): TelegramInitState {
 
       if (!warned && elapsed >= WARN_AFTER_MS) {
         warned = true;
-        setState((prev) => ({
-          ...prev,
-          warning: "Please open this app from Telegram",
-        }));
+        setState((prev) => ({ ...prev, warning: t("auth.openFromTelegram") }));
       }
 
       elapsed += POLL_INTERVAL_MS;
@@ -130,7 +127,7 @@ export function useTelegramInit(): TelegramInitState {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, []); // t is stable (never changes after mount)
 
   return state;
 }
