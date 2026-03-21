@@ -6,19 +6,13 @@ type TelegramWebApp = { initData: string; ready?: () => void };
 export interface TelegramInitState {
   ready: boolean;
   error: string | null;
+  /** Non-fatal warning shown while still polling (loader stays visible). */
+  warning: string | null;
   userId: string | null;
   initDataRaw: string | null;
 }
 
-/**
- * Polls window.Telegram.WebApp.initData until it becomes non-empty,
- * then verifies auth with the backend.
- *
- * Some Telegram clients (especially via reply-keyboard webApp buttons) populate
- * initData asynchronously, so a simple synchronous check in useEffect is not
- * enough — we retry for up to MAX_WAIT_MS before giving up.
- */
-const MAX_WAIT_MS = 3000;
+const WARN_AFTER_MS = 3000;
 const POLL_INTERVAL_MS = 50;
 
 function getTgWebApp(): TelegramWebApp | undefined {
@@ -29,22 +23,23 @@ export function useTelegramInit(): TelegramInitState {
   const [state, setState] = useState<TelegramInitState>({
     ready: false,
     error: null,
+    warning: null,
     userId: null,
     initDataRaw: null,
   });
 
   useEffect(() => {
-    // Signal "app is ready" to Telegram as early as possible so the loading
-    // overlay is removed. Safe to call even before initData is available.
     getTgWebApp()?.ready?.();
 
     if (import.meta.env.DEV) {
-      setState({ ready: true, error: null, userId: "dev", initDataRaw: null });
+      setState({ ready: true, error: null, warning: null, userId: "dev", initDataRaw: null });
       return;
     }
 
     let elapsed = 0;
     let cancelled = false;
+    let warned = false;
+    let authInProgress = false;
 
     const poll = () => {
       if (cancelled) return;
@@ -52,33 +47,43 @@ export function useTelegramInit(): TelegramInitState {
       const tg = getTgWebApp();
       const raw = tg?.initData ?? "";
 
-      if (raw) {
-        // initData is available — authenticate with the backend
+      if (raw && !authInProgress) {
+        authInProgress = true;
         setInitDataRaw(raw);
         api.auth
           .verify(raw)
           .then((user) => {
             if (!cancelled) {
-              setState({ ready: true, error: null, userId: user.id, initDataRaw: raw });
+              setState({
+                ready: true,
+                error: null,
+                warning: null,
+                userId: user.id,
+                initDataRaw: raw,
+              });
             }
           })
           .catch((err: Error) => {
             if (!cancelled) {
-              setState({ ready: false, error: err.message, userId: null, initDataRaw: raw });
+              setState({
+                ready: false,
+                error: err.message,
+                warning: null,
+                userId: null,
+                initDataRaw: raw,
+              });
             }
           });
         return;
       }
 
-      if (elapsed >= MAX_WAIT_MS) {
-        // Gave up waiting — not running inside Telegram or SDK failed to load
-        setState({
-          ready: false,
-          error: "Please open this app from Telegram",
-          userId: null,
-          initDataRaw: null,
-        });
-        return;
+      // Show warning after WARN_AFTER_MS but keep polling indefinitely
+      if (!warned && elapsed >= WARN_AFTER_MS) {
+        warned = true;
+        setState((prev) => ({
+          ...prev,
+          warning: "Please open this app from Telegram",
+        }));
       }
 
       elapsed += POLL_INTERVAL_MS;

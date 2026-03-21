@@ -42,7 +42,7 @@ function AppContent() {
   const initial = parseHash();
   const [page, setPage] = useState<Page>(initial.page);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const { ready, error } = useTelegramInit();
+  const { ready, error, warning } = useTelegramInit();
   const { t } = useI18n();
 
   useEffect(() => {
@@ -85,6 +85,7 @@ function AppContent() {
           </svg>
         </div>
         <div className="splash__text">{t("common.loading")}</div>
+        {warning && <div className="splash__warning">{warning}</div>}
       </div>
     );
   }

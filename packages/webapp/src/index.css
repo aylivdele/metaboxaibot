@@ -320,6 +320,13 @@ input::placeholder {
   font-size: 48px;
   animation: pulse 2s var(--ease) infinite;
 }
+.splash__warning {
+  color: var(--text-hint);
+  font-size: 13px;
+  text-align: center;
+  padding: 0 32px;
+  line-height: 1.5;
+}
 .splash__text {
   color: var(--text-secondary);
   font-size: 16px;
