@@ -69,8 +69,8 @@ function AppContent() {
           <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
             <defs>
               <linearGradient id="sg" x1="0" y1="0" x2="48" y2="48">
-                <stop offset="0%" stopColor="#9B8ED8" />
-                <stop offset="100%" stopColor="#7B6FB8" />
+                <stop offset="0%" stopColor="#5A9DF7" />
+                <stop offset="100%" stopColor="#3A7DE5" />
               </linearGradient>
             </defs>
             <rect x="4" y="4" width="40" height="40" rx="12" fill="url(#sg)" />
