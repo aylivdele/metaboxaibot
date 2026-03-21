@@ -78,6 +78,22 @@ export const dialogService = {
     });
   },
 
+  /** Fetch all messages for a dialog (for webapp history view). */
+  async getMessages(dialogId: string) {
+    return db.message.findMany({
+      where: { dialogId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        role: true,
+        content: true,
+        mediaUrl: true,
+        mediaType: true,
+        createdAt: true,
+      },
+    });
+  },
+
   /** Fetch last N messages for db_history strategy. */
   async getHistory(
     dialogId: string,

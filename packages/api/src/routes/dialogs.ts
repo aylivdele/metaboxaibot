@@ -2,7 +2,9 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { dialogService } from "../services/dialog.service.js";
 import { userStateService } from "../services/user-state.service.js";
-import type { Section } from "@metabox/shared";
+import { db } from "../db.js";
+import { getT, AI_MODELS, config, type Section } from "@metabox/shared";
+import type { Language } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
@@ -96,6 +98,48 @@ export const dialogsRoutes: FastifyPluginAsync = async (fastify) => {
     if (dialog.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
 
     await userStateService.setDialogForSection(userId, dialog.section as Section, id);
+
+    // Notify user in chat (fire-and-forget)
+    sendDialogSelectedNotification(userId, dialog.title, dialog.modelId).catch(() => void 0);
+
     return { success: true };
   });
+
+  /** GET /dialogs/:id/messages — message history */
+  fastify.get<{ Params: { id: string } }>("/dialogs/:id/messages", async (request, reply) => {
+    const { userId } = request as AuthRequest;
+    const { id } = request.params;
+
+    const dialog = await dialogService.findById(id);
+    if (!dialog) return reply.code(404).send({ error: "Dialog not found" });
+    if (dialog.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+
+    const messages = await dialogService.getMessages(id);
+    return messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      mediaUrl: m.mediaUrl ?? null,
+      mediaType: m.mediaType ?? null,
+      createdAt: m.createdAt.toISOString(),
+    }));
+  });
 };
+
+async function sendDialogSelectedNotification(
+  userId: bigint,
+  title: string | null,
+  modelId: string,
+): Promise<void> {
+  const user = await db.user.findUnique({ where: { id: userId }, select: { language: true } });
+  const t = getT((user?.language ?? "en") as Language);
+  const modelName = AI_MODELS[modelId]?.name ?? modelId;
+  const text = t.gpt.dialogSelected
+    .replace("{title}", title ?? modelId)
+    .replace("{model}", modelName);
+  await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: String(userId), text }),
+  });
+}

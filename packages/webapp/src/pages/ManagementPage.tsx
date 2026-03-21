@@ -1,22 +1,68 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
-import type { Dialog, Model, UserState } from "../types.js";
-
-const SECTION_LABELS: Record<string, string> = {
-  gpt: "💡 GPT",
-  design: "🎨 Design",
-  audio: "🎧 Audio",
-  video: "🎬 Video",
-};
-
-const VALID_SECTIONS = ["gpt", "design", "audio", "video"] as const;
+import type { Dialog, Message, Model, UserState } from "../types.js";
 
 interface ManagementPageProps {
   initialSection?: string;
 }
 
-export function ManagementPage({ initialSection }: ManagementPageProps) {
+// ── Chat history view ────────────────────────────────────────────────────────
+
+function ChatHistory({ dialog, onBack }: { dialog: Dialog; onBack: () => void }) {
+  const { t } = useI18n();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api.dialogs
+      .messages(dialog.id)
+      .then(setMessages)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [dialog.id]);
+
+  return (
+    <div className="chat-view">
+      <div className="chat-view__header">
+        <button className="chat-back-btn" onClick={onBack}>
+          {t("manage.back")}
+        </button>
+        <div className="chat-view__title">
+          <div className="chat-view__name">{dialog.title ?? dialog.modelId}</div>
+          <div className="chat-view__model">{dialog.modelId}</div>
+        </div>
+      </div>
+
+      <div className="chat-messages">
+        {loading && <div className="chat-empty">{t("common.loading")}</div>}
+        {!loading && messages.length === 0 && (
+          <div className="chat-empty">{t("manage.noMessages")}</div>
+        )}
+        {!loading &&
+          messages.map((msg) => (
+            <div key={msg.id} className={`chat-bubble chat-bubble--${msg.role}`}>
+              {msg.mediaUrl && msg.mediaType === "image" && (
+                <img className="chat-bubble__image" src={msg.mediaUrl} alt="" loading="lazy" />
+              )}
+              {msg.content && <div className="chat-bubble__text">{msg.content}</div>}
+              <div className="chat-bubble__time">
+                {new Date(msg.createdAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </div>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
+
+export function ManagementPage({ initialSection: _initialSection }: ManagementPageProps) {
   const { t } = useI18n();
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const [models, setModels] = useState<Model[]>([]);
@@ -26,16 +72,13 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
   const [renameValue, setRenameValue] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [creating, setCreating] = useState(false);
-  const validInitial = VALID_SECTIONS.includes(initialSection as (typeof VALID_SECTIONS)[number])
-    ? initialSection!
-    : "gpt";
-  const [activeSection, setActiveSection] = useState<string>(validInitial);
+  const [viewingDialog, setViewingDialog] = useState<Dialog | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     const [ds, ms, st] = await Promise.all([
-      api.dialogs.list(),
-      api.models.list(),
+      api.dialogs.list("gpt"),
+      api.models.list("gpt"),
       api.state.get(),
     ]);
     setDialogs(ds);
@@ -48,30 +91,19 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
     loadData().catch(console.error);
   }, [loadData]);
 
-  function sectionDialogKey(section: string): keyof UserState {
-    const map: Record<string, keyof UserState> = {
-      gpt: "gptDialogId",
-      design: "designDialogId",
-      audio: "audioDialogId",
-      video: "videoDialogId",
-    };
-    return map[section] ?? "gptDialogId";
-  }
-
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this dialog?")) return;
     await api.dialogs.delete(id);
     setDialogs((ds) => ds.filter((d) => d.id !== id));
-    const key = sectionDialogKey(activeSection);
-    if (state?.[key] === id) {
-      setState((s) => (s ? { ...s, [key]: null } : s));
+    if (state?.gptDialogId === id) {
+      setState((s) => (s ? { ...s, gptDialogId: null } : s));
     }
+    if (viewingDialog?.id === id) setViewingDialog(null);
   };
 
   const handleActivate = async (dialog: Dialog) => {
     await api.dialogs.activate(dialog.id);
-    const key = sectionDialogKey(activeSection);
-    setState((s) => (s ? { ...s, [key]: dialog.id, modelId: dialog.modelId } : s));
+    setState((s) => (s ? { ...s, gptDialogId: dialog.id, modelId: dialog.modelId } : s));
   };
 
   const handleRename = async (id: string) => {
@@ -85,10 +117,9 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
   const handleCreateDialog = async (modelId: string) => {
     setCreating(true);
     try {
-      const dialog = await api.dialogs.create(activeSection, modelId);
+      const dialog = await api.dialogs.create("gpt", modelId);
       await api.dialogs.activate(dialog.id);
-      const key = sectionDialogKey(activeSection);
-      setState((s) => (s ? { ...s, [key]: dialog.id, modelId } : s));
+      setState((s) => (s ? { ...s, gptDialogId: dialog.id, modelId } : s));
       setDialogs((ds) => [dialog, ...ds]);
       setIsCreating(false);
     } finally {
@@ -96,31 +127,18 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
     }
   };
 
-  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
+  // Show history view
+  if (viewingDialog) {
+    return <ChatHistory dialog={viewingDialog} onBack={() => setViewingDialog(null)} />;
+  }
 
-  const filteredDialogs = dialogs.filter((d) => d.section === activeSection);
-  const sectionModels = models.filter((m) => m.section === activeSection);
+  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 
   return (
     <div className="page">
       <div className="page-header">
         <h2>{t("manage.title")}</h2>
         <p className="page-subtitle">{t("manage.subtitle")}</p>
-      </div>
-
-      <div className="section-chips">
-        {VALID_SECTIONS.map((s) => (
-          <button
-            key={s}
-            className={`chip${activeSection === s ? " chip--active" : ""}`}
-            onClick={() => {
-              setActiveSection(s);
-              setIsCreating(false);
-            }}
-          >
-            {SECTION_LABELS[s]}
-          </button>
-        ))}
       </div>
 
       {isCreating ? (
@@ -131,10 +149,10 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
               ✕
             </button>
           </div>
-          {sectionModels.length === 0 ? (
+          {models.length === 0 ? (
             <div className="empty-state">{t("manage.noModels")}</div>
           ) : (
-            sectionModels.map((m) => (
+            models.map((m) => (
               <div
                 key={m.id}
                 className={`model-item${creating ? " model-item--disabled" : ""}`}
@@ -145,7 +163,6 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
                   ${m.costUsdPerRequest.toFixed(3)} · {m.provider}
                   {m.supportsImages && " · 🖼"}
                   {m.supportsVoice && " · 🎙"}
-                  {m.isAsync && " · ⏳"}
                 </div>
               </div>
             ))
@@ -157,13 +174,13 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
             {t("manage.newDialog")}
           </button>
 
-          {filteredDialogs.length === 0 ? (
+          {dialogs.length === 0 ? (
             <div className="empty-state">{t("manage.noDialogs")}</div>
           ) : (
-            filteredDialogs.map((d) => (
+            dialogs.map((d) => (
               <div
                 key={d.id}
-                className={`dialog-item${state?.[sectionDialogKey(activeSection)] === d.id ? " dialog-item--active" : ""}`}
+                className={`dialog-item${state?.gptDialogId === d.id ? " dialog-item--active" : ""}`}
               >
                 {renamingId === d.id ? (
                   <div className="dialog-item__rename">
@@ -188,22 +205,33 @@ export function ManagementPage({ initialSection }: ManagementPageProps) {
                   </div>
                 ) : (
                   <>
-                    <div className="dialog-item__info">
+                    <div
+                      className="dialog-item__info"
+                      onClick={() => setViewingDialog(d)}
+                      style={{ cursor: "pointer" }}
+                    >
                       <div className="dialog-item__title">{d.title ?? d.modelId}</div>
                       <div className="dialog-item__meta">
                         {d.modelId} · {new Date(d.updatedAt).toLocaleDateString()}
                       </div>
                     </div>
                     <div className="dialog-item__actions">
-                      {state?.[sectionDialogKey(activeSection)] !== d.id && (
+                      {state?.gptDialogId !== d.id && (
                         <button
                           className="action-btn action-btn--primary"
                           onClick={() => void handleActivate(d)}
-                          title="Set active"
+                          title={t("manage.activate")}
                         >
                           ▶
                         </button>
                       )}
+                      <button
+                        className="action-btn"
+                        onClick={() => setViewingDialog(d)}
+                        title={t("manage.history")}
+                      >
+                        💬
+                      </button>
                       <button
                         className="action-btn"
                         onClick={() => {

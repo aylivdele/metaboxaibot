@@ -6,29 +6,36 @@ import type { GalleryItem } from "../types.js";
 const SECTIONS = ["image", "audio", "video"] as const;
 type Section = (typeof SECTIONS)[number];
 
-const SECTION_ICON: Record<Section, string> = {
-  image: "🎨",
-  audio: "🎧",
-  video: "🎬",
+const SECTION_LABELS: Record<Section, string> = {
+  image: "🎨 Images",
+  audio: "🎧 Audio",
+  video: "🎬 Video",
 };
 
-function GalleryItemCard({
+const SECTION_LABELS_RU: Record<Section, string> = {
+  image: "🎨 Изображения",
+  audio: "🎧 Аудио",
+  video: "🎬 Видео",
+};
+
+function GalleryCard({
   item,
-  onDownload,
+  onSend,
 }: {
   item: GalleryItem;
-  onDownload: (id: string) => Promise<void>;
+  onSend: (id: string) => Promise<void>;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imgError, setImgError] = useState(false);
 
-  const handleDownload = async () => {
+  const handleSend = async () => {
     setLoading(true);
     setError(null);
     try {
-      await onDownload(item.id);
+      await onSend(item.id);
       setSent(true);
       setTimeout(() => setSent(false), 3000);
     } catch (err) {
@@ -38,31 +45,57 @@ function GalleryItemCard({
     }
   };
 
+  const previewUrl = item.outputUrl;
+  const isImage = item.section === "image";
+  const isVideo = item.section === "video";
+  const isAudio = item.section === "audio";
+
   return (
-    <div className="gallery-item">
-      <div className="gallery-item__meta">
-        <span className="gallery-item__model">{item.modelId}</span>
-        {item.completedAt && (
-          <span className="gallery-item__date">
-            {new Date(item.completedAt).toLocaleDateString()}
-          </span>
-        )}
+    <div className="gallery-card">
+      {/* Media preview */}
+      {isImage && previewUrl && !imgError && (
+        <div className="gallery-card__preview">
+          <img
+            src={previewUrl}
+            alt={item.prompt}
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+        </div>
+      )}
+      {isVideo && previewUrl && (
+        <div className="gallery-card__preview gallery-card__preview--video">
+          <video src={previewUrl} preload="metadata" controls={false} muted playsInline />
+          <div className="gallery-card__video-overlay">▶</div>
+        </div>
+      )}
+      {isAudio && <div className="gallery-card__audio-icon">🎵</div>}
+
+      <div className="gallery-card__body">
+        <div className="gallery-card__meta">
+          <span className="gallery-card__model">{item.modelId}</span>
+          {item.completedAt && (
+            <span className="gallery-card__date">
+              {new Date(item.completedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
+            </span>
+          )}
+        </div>
+        <p className="gallery-card__prompt">{item.prompt}</p>
+        {error && <p className="gallery-card__error">❌ {error}</p>}
+        <button
+          className={`gallery-card__btn${sent ? " gallery-card__btn--sent" : ""}`}
+          onClick={handleSend}
+          disabled={loading || sent}
+        >
+          {loading ? "…" : sent ? t("gallery.sent") : t("gallery.download")}
+        </button>
       </div>
-      <p className="gallery-item__prompt">{item.prompt}</p>
-      {error && <p className="gallery-item__error">❌ {error}</p>}
-      <button
-        className={`gallery-item__download${sent ? " gallery-item__download--sent" : ""}`}
-        onClick={handleDownload}
-        disabled={loading || sent}
-      >
-        {loading ? "…" : sent ? t("gallery.sent") : t("gallery.download")}
-      </button>
     </div>
   );
 }
 
 export function GalleryPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [section, setSection] = useState<Section>("image");
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -94,25 +127,28 @@ export function GalleryPage() {
     setPage(1);
   };
 
-  const handleDownload = useCallback(async (id: string) => {
+  const handleSend = useCallback(async (id: string) => {
     await api.gallery.download(id);
   }, []);
 
   const totalPages = Math.ceil(total / LIMIT);
+  const labels = locale === "ru" ? SECTION_LABELS_RU : SECTION_LABELS;
 
   return (
     <div className="page">
-      <div className="section-title">{t("gallery.title")}</div>
-      <p className="page-subtitle">{t("gallery.subtitle")}</p>
+      <div className="page-header">
+        <h2>{t("gallery.title")}</h2>
+        <p className="page-subtitle">{t("gallery.subtitle")}</p>
+      </div>
 
-      <div className="tab-bar">
+      <div className="section-chips">
         {SECTIONS.map((sec) => (
           <button
             key={sec}
-            className={`tab-bar__tab${section === sec ? " tab-bar__tab--active" : ""}`}
+            className={`chip${section === sec ? " chip--active" : ""}`}
             onClick={() => handleSectionChange(sec)}
           >
-            {SECTION_ICON[sec]} {t(`gallery.section.${sec}` as any)}
+            {labels[sec]}
           </button>
         ))}
       </div>
@@ -125,9 +161,9 @@ export function GalleryPage() {
       )}
 
       {!loading && items.length > 0 && (
-        <div className="gallery-list">
+        <div className={`gallery-grid${section === "image" ? " gallery-grid--2col" : ""}`}>
           {items.map((item) => (
-            <GalleryItemCard key={item.id} item={item} onDownload={handleDownload} />
+            <GalleryCard key={item.id} item={item} onSend={handleSend} />
           ))}
         </div>
       )}

@@ -39,6 +39,7 @@ export default {
     newDialogCreated:
       '💬 New dialog created. View all dialogs in the "⚙ Management" menu, "Dialogs" tab.',
     backToMain: "🏠 Main Menu",
+    dialogSelected: "✅ Dialog selected: {title}\nModel: {model}",
   },
   design: {
     sectionTitle: "🎨 AI Design\nChoose a section to work with images 👇",

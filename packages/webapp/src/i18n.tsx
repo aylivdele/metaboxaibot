@@ -40,7 +40,11 @@ const translations = {
     "manage.newDialog": "＋ New dialog",
     "manage.chooseModel": "Choose a model",
     "manage.noModels": "No models available",
-    "manage.noDialogs": "No dialogs in this section",
+    "manage.noDialogs": "No dialogs yet",
+    "manage.history": "History",
+    "manage.back": "← Back",
+    "manage.noMessages": "No messages yet",
+    "manage.activate": "Select",
 
     // Tariffs
     "tariffs.title": "Token Packages",
@@ -171,7 +175,11 @@ const translations = {
     "manage.newDialog": "＋ Новый диалог",
     "manage.chooseModel": "Выберите модель",
     "manage.noModels": "Нет доступных моделей",
-    "manage.noDialogs": "Нет диалогов в этом разделе",
+    "manage.noDialogs": "Диалогов пока нет",
+    "manage.history": "История",
+    "manage.back": "← Назад",
+    "manage.noMessages": "Сообщений пока нет",
+    "manage.activate": "Выбрать",
 
     // Tariffs
     "tariffs.title": "Пакеты токенов",

@@ -34,6 +34,7 @@ export interface Translations {
     gptEditorActivated: string;
     newDialogCreated: string;
     backToMain: string;
+    dialogSelected: string;
   };
   design: {
     sectionTitle: string;

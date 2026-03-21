@@ -1,6 +1,7 @@
 import type {
   UserProfile,
   Dialog,
+  Message,
   UserState,
   Model,
   AdminUsersResponse,
@@ -88,6 +89,7 @@ export const api = {
     delete: (id: string) => request<{ success: boolean }>(`/dialogs/${id}`, { method: "DELETE" }),
     activate: (id: string) =>
       request<{ success: boolean }>(`/dialogs/${id}/activate`, { method: "POST" }),
+    messages: (id: string) => request<Message[]>(`/dialogs/${id}/messages`),
   },
 
   state: {

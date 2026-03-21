@@ -75,6 +75,15 @@ export interface BannerSlide {
   active: boolean;
 }
 
+export interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  mediaUrl: string | null;
+  mediaType: string | null;
+  createdAt: string;
+}
+
 export interface GalleryItem {
   id: string;
   section: string;
