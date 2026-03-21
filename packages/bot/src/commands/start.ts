@@ -5,7 +5,7 @@ import { userStateService } from "@metabox/api/services";
 import { buildLanguageKeyboard } from "../keyboards/language.keyboard.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { SUPPORTED_LANGUAGES, getT, config } from "@metabox/shared";
-import type { Language } from "@metabox/shared";
+import type { Language, Translations } from "@metabox/shared";
 
 /**
  * /start — resets FSM state and shows language selection.
@@ -16,6 +16,7 @@ export async function handleStart(ctx: BotContext): Promise<void> {
   }
   await ctx.reply(ctx.t.start.welcome, {
     reply_markup: buildLanguageKeyboard(),
+    parse_mode: "HTML",
   });
 }
 
@@ -42,34 +43,44 @@ export async function handleLanguageSelect(ctx: BotContext): Promise<void> {
     await userService.creditWelcomeBonus(ctx.user.id);
   }
 
-  // Message 1: tokens granted + inline button to open Profile in mini app
+  // Inline button to open Profile in mini app
   const webappUrl = config.bot.webappUrl;
   const profileKb = webappUrl
     ? new InlineKeyboard().webApp(t.menu.profile, `${webappUrl}#profile`)
     : undefined;
-  await ctx.reply(t.start.tokensGranted, profileKb ? { reply_markup: profileKb } : undefined);
 
+  // New users: show tokens credited; returning users: show current balance
+  if (isNew) {
+    await ctx.reply(t.start.tokensGranted, profileKb ? { reply_markup: profileKb } : undefined);
+  } else {
+    const balance = (updatedUser.tokenBalance as number).toFixed(2);
+    const balanceText = t.start.yourBalance.replace("{balance}", balance);
+    await ctx.reply(balanceText, profileKb ? { reply_markup: profileKb } : undefined);
+  }
 
-  //   // Message 2: brief video intro
-  // await ctx.reply(t.start.videoIntro, {
-  //   reply_markup: {
-  //     inline_keyboard: [
-  //       [
-  //         { text: t.start.howToVideo_vk, url: "https://vk.com/metaboxai" },
-  //         { text: t.start.howToVideo_yt, url: "https://youtube.com/@metaboxai" },
-  //       ],
-  //       [
-  //         { text: t.start.knowledgeBase, url: "https://t.me/metaboxai_bot" },
-  //         { text: t.start.channel, url: "https://t.me/metaboxai" },
-  //       ],
-  //     ],
-  //   },
-  // });
-
-  // Message 3: main menu with reply keyboard
+  // Main menu with reply keyboard
   await ctx.reply(t.start.mainMenuTitle, {
     reply_markup: buildMainMenuKeyboard(t),
   });
 
+  // Set per-chat bot commands in user's language
+  if (ctx.chat?.id) {
+    await ctx.api
+      .setMyCommands(buildCommands(t), { scope: { type: "chat", chat_id: ctx.chat.id } })
+      .catch(() => void 0);
+  }
+
   ctx.user = { ...updatedUser, isNew: false };
+}
+
+function buildCommands(t: Translations) {
+  return [
+    { command: "start", description: t.start.restart },
+    { command: "menu", description: t.start.mainMenuTitle.split("\n")[0] },
+    // { command: "profile", description: t.menu.profile },
+    { command: "gpt", description: t.menu.gpt },
+    { command: "design", description: t.menu.design },
+    { command: "audio", description: t.menu.audio },
+    { command: "video", description: t.menu.video },
+  ];
 }

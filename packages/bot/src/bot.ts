@@ -28,7 +28,7 @@ import {
 import { handleAudioSubSection, handleAudioMessage } from "./scenes/audio.js";
 import { handlePreCheckoutQuery, handleSuccessfulPayment } from "./scenes/payment.js";
 import { userStateService } from "@metabox/api/services";
-import { getT } from "@metabox/shared";
+import { getT, config } from "@metabox/shared";
 import { rateLimitMiddleware } from "./middlewares/rate-limit.middleware.js";
 import { logger } from "./logger.js";
 
@@ -48,6 +48,12 @@ export function createBot(token: string): Bot<BotContext> {
   // ── Commands ─────────────────────────────────────────────────────────────
   bot.command("start", handleStart);
   bot.command("menu", handleMenu);
+  bot.command("profile", async (ctx) => {
+    const webappUrl = config.bot.webappUrl;
+    if (!webappUrl || !ctx.t) return;
+    const kb = new InlineKeyboard().webApp(ctx.t.menu.profile, `${webappUrl}#profile`);
+    await ctx.reply(ctx.t.menu.profile, { reply_markup: kb });
+  });
   bot.command("gpt", handleGpt);
   bot.command("design", handleDesign);
   bot.command("audio", handleAudio);

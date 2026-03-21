@@ -4,6 +4,8 @@ export interface Translations {
   start: {
     welcome: string;
     tokensGranted: string;
+    yourBalance: string;
+    restart: string;
     videoIntro: string;
     mainMenuTitle: string;
     community: string;
@@ -88,6 +90,7 @@ export interface Translations {
     management: string;
     newDialog: string;
     comingSoon: string;
+    tokens: string;
   };
   payments: {
     success: string;
