@@ -13,7 +13,7 @@ function ChatHistory({ dialog, onBack }: { dialog: Dialog; onBack: () => void })
   const { t } = useI18n();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -24,11 +24,12 @@ function ChatHistory({ dialog, onBack }: { dialog: Dialog; onBack: () => void })
       .finally(() => setLoading(false));
   }, [dialog.id]);
 
+  // Scroll container to bottom after messages render
   useEffect(() => {
-    if (!loading) {
-      bottomRef.current?.scrollIntoView();
+    if (!loading && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [loading]);
+  }, [loading, messages]);
 
   return (
     <div className="chat-view">
@@ -42,7 +43,7 @@ function ChatHistory({ dialog, onBack }: { dialog: Dialog; onBack: () => void })
         </div>
       </div>
 
-      <div className="chat-messages">
+      <div className="chat-messages" ref={containerRef}>
         {loading && <div className="chat-empty">{t("common.loading")}</div>}
         {!loading && messages.length === 0 && (
           <div className="chat-empty">{t("manage.noMessages")}</div>
@@ -62,7 +63,6 @@ function ChatHistory({ dialog, onBack }: { dialog: Dialog; onBack: () => void })
               </div>
             </div>
           ))}
-        <div ref={bottomRef} />
       </div>
     </div>
   );
