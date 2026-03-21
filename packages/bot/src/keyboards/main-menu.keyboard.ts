@@ -11,9 +11,7 @@ export function buildMainMenuKeyboard(t: Translations, userId?: bigint): Keyboar
   // Telegram's requestSimpleWebView (KeyboardButtonWebApp) doesn't inject initData.
   if (webappUrl) {
     const token = userId ? generateWebToken(userId, config.bot.token) : "";
-    const url = token
-      ? `${webappUrl}?page=profile&wtoken=${token}`
-      : `${webappUrl}?page=profile`;
+    const url = token ? `${webappUrl}?page=profile&wtoken=${token}` : `${webappUrl}?page=profile`;
     kb.webApp(t.menu.profile, url);
   } else {
     kb.text(t.menu.profile);
