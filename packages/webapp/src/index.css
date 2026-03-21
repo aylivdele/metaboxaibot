@@ -1628,6 +1628,110 @@ input::placeholder {
   text-align: center;
 }
 
+/* ── Center learning button ─────────────────────────────────────────────── */
+.bottom-nav__tab--center {
+  position: relative;
+}
+
+.bottom-nav__center-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-accent);
+  margin-top: -18px;
+  transition: transform 0.25s var(--ease);
+}
+
+.bottom-nav__tab--center:active .bottom-nav__center-icon {
+  transform: scale(0.92);
+}
+
+.bottom-nav__center-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: #fff;
+  fill: none;
+}
+
+/* ── Profile Tabs ──────────────────────────────────────────────────────────── */
+.profile-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  margin-bottom: 16px;
+}
+
+.profile-tabs__btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  text-align: center;
+}
+
+.profile-tabs__btn--active {
+  background: var(--bg-card);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Settings ──────────────────────────────────────────────────────────────── */
+.settings-section {
+  animation: fadeIn 0.3s var(--ease);
+}
+
+.settings-field {
+  margin-bottom: 16px;
+}
+
+.settings-field__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.settings-field__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-field__row input {
+  flex: 1;
+}
+
+.settings-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.settings-badge--ok {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.settings-save-btn {
+  width: 100%;
+  margin-top: 8px;
+}
+
 /* ── Animations ───────────────────────────────────────────────────────────── */
 @keyframes fadeIn {
   from {

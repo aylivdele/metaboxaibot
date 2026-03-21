@@ -8,11 +8,14 @@ interface Props {
   showAdmin: boolean;
 }
 
+const LEARNING_URL = "https://app.meta-box.ru/dashboard";
+
 const TABS: Array<{
-  id: Page;
+  id: Page | "learning";
   labelKey: string;
   icon: (active: boolean) => ReactElement;
   adminOnly?: boolean;
+  isExternal?: boolean;
 }> = [
   {
     id: "profile",
@@ -37,6 +40,18 @@ const TABS: Array<{
     ),
   },
   {
+    id: "learning" as Page | "learning",
+    labelKey: "nav.learning",
+    isExternal: true,
+    icon: () => (
+      <svg viewBox="0 0 24 24" strokeWidth={1.8} fill="none" stroke="currentColor">
+        <path d="M12 14l9-5-9-5-9 5 9 5z" />
+        <path d="M12 14l6.16-3.422A12.083 12.083 0 0119 14.5C19 18.09 15.866 21 12 21s-7-2.91-7-6.5c0-.825.155-1.614.44-2.34L12 14z" />
+        <path d="M21 9v6" />
+      </svg>
+    ),
+  },
+  {
     id: "tariffs",
     labelKey: "nav.tariffs",
     icon: (active) => (
@@ -53,17 +68,6 @@ const TABS: Array<{
     icon: (active) => (
       <svg viewBox="0 0 24 24" strokeWidth={active ? 2 : 1.8}>
         <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-      </svg>
-    ),
-  },
-  {
-    id: "gallery",
-    labelKey: "nav.gallery",
-    icon: (active) => (
-      <svg viewBox="0 0 24 24" strokeWidth={active ? 2 : 1.8}>
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <path d="M21 15l-5-5L5 21" />
       </svg>
     ),
   },
@@ -86,12 +90,24 @@ export function BottomNav({ current, onChange, showAdmin }: Props) {
   return (
     <nav className="bottom-nav">
       {visibleTabs.map((tab) => {
+        if (tab.isExternal) {
+          return (
+            <button
+              key={tab.id}
+              className="bottom-nav__tab bottom-nav__tab--center"
+              onClick={() => window.open(LEARNING_URL, "_blank")}
+            >
+              <span className="bottom-nav__center-icon">{tab.icon(false)}</span>
+              <span className="bottom-nav__label">{t(tab.labelKey as any)}</span>
+            </button>
+          );
+        }
         const isActive = current === tab.id;
         return (
           <button
             key={tab.id}
             className={`bottom-nav__tab${isActive ? " bottom-nav__tab--active" : ""}`}
-            onClick={() => onChange(tab.id)}
+            onClick={() => onChange(tab.id as Page)}
           >
             <span className="bottom-nav__icon">{tab.icon(isActive)}</span>
             <span className="bottom-nav__label">{t(tab.labelKey as any)}</span>
