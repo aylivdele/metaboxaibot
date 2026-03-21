@@ -50,8 +50,8 @@ export function useTelegramInit(): TelegramInitState {
       // so initData stays "" on the SDK object. Read the hash directly as fallback.
       const hashRaw = new URLSearchParams(window.location.hash.slice(1)).get("tgWebAppData") ?? "";
       const raw = tg?.initData || hashRaw;
-      console.log(`Hash: ${window.location.hash}`)
-      console.log(`tg: ${JSON.stringify(tg)}`)
+      console.log(`Hash: ${window.location.hash}`);
+      console.log(`tg: ${JSON.stringify(tg)}`);
 
       if (raw && !authInProgress) {
         authInProgress = true;
