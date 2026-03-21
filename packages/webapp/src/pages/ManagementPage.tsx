@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { Dialog, Message, Model, UserState } from "../types.js";
@@ -13,6 +13,7 @@ function ChatHistory({ dialog, onBack }: { dialog: Dialog; onBack: () => void })
   const { t } = useI18n();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -22,6 +23,12 @@ function ChatHistory({ dialog, onBack }: { dialog: Dialog; onBack: () => void })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [dialog.id]);
+
+  useEffect(() => {
+    if (!loading) {
+      bottomRef.current?.scrollIntoView();
+    }
+  }, [loading]);
 
   return (
     <div className="chat-view">
@@ -55,6 +62,7 @@ function ChatHistory({ dialog, onBack }: { dialog: Dialog; onBack: () => void })
               </div>
             </div>
           ))}
+        <div ref={bottomRef} />
       </div>
     </div>
   );
