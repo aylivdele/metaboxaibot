@@ -12,11 +12,11 @@ import {
   handleGptPrompts,
 } from "./scenes/gpt.js";
 import {
+  activateDesignModel,
   handleDesignModelSelect,
   handleDesignMessage,
   handleDesignPhoto,
   handleDesignRefSelect,
-  handleNewDesignDialog,
 } from "./scenes/design.js";
 import {
   handleVideoModelSelect,
@@ -32,6 +32,7 @@ import { userStateService } from "@metabox/api/services";
 import { getT, config } from "@metabox/shared";
 import { rateLimitMiddleware } from "./middlewares/rate-limit.middleware.js";
 import { logger } from "./logger.js";
+import { MODELS_BY_SECTION } from "@metabox/shared";
 
 export function createBot(token: string): Bot<BotContext> {
   const bot = new Bot<BotContext>(token);
@@ -95,8 +96,13 @@ export function createBot(token: string): Bot<BotContext> {
       [t.gpt.newDialog]: () => handleNewGptDialog(ctx),
       [t.gpt.activateEditor]: () => handleActivateGptEditor(ctx),
       [t.gpt.prompts]: () => handleGptPrompts(ctx),
-      // Design section buttons
-      [t.design.newDialog]: () => handleNewDesignDialog(ctx),
+      // Design section buttons — one entry per model name
+      ...Object.fromEntries(
+        (MODELS_BY_SECTION["design"] ?? []).map((m) => [
+          m.name,
+          () => activateDesignModel(ctx, m.id),
+        ]),
+      ),
       // Video section buttons
       [t.video.newDialog]: () => handleNewVideoDialog(ctx),
       [t.video.avatars]: () => handleVideoAvatars(ctx),

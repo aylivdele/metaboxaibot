@@ -159,6 +159,12 @@ const translations = {
     "common.loading": "Loading…",
     "common.error": "Error",
 
+    // Image settings
+    "imageSettings.title": "Image Settings",
+    "imageSettings.subtitle": "Choose aspect ratio per model",
+    "imageSettings.noSupport": "This model doesn't support custom aspect ratios",
+    "imageSettings.saved": "✓ Saved",
+
     // Auth errors
     "auth.tokenExpired": "Link expired. Press the «Profile» button in the bot menu again.",
     "auth.openFromTelegram": "Please open this app from Telegram",
@@ -317,6 +323,12 @@ const translations = {
     // Common
     "common.loading": "Загрузка…",
     "common.error": "Ошибка",
+
+    // Image settings
+    "imageSettings.title": "Настройки изображений",
+    "imageSettings.subtitle": "Соотношение сторон для каждой модели",
+    "imageSettings.noSupport": "Эта модель не поддерживает выбор соотношения сторон",
+    "imageSettings.saved": "✓ Сохранено",
 
     // Auth errors
     "auth.tokenExpired":

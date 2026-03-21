@@ -58,6 +58,9 @@ model UserState {
   // Референс для img2img: Message.id выбранного изображения (one-shot, сбрасывается после использования)
   designRefMessageId String?
 
+  // Настройки генерации изображений: { [modelId]: { aspectRatio: string } }
+  imageSettings Json?
+
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

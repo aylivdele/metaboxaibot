@@ -1,6 +1,6 @@
 import type { BotContext } from "../types/context.js";
 import { dialogService, generationService, userStateService } from "@metabox/api/services";
-import { MODELS_BY_SECTION, AI_MODELS, config } from "@metabox/shared";
+import { MODELS_BY_SECTION, AI_MODELS, config, generateWebToken } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 
@@ -17,17 +17,22 @@ export function buildDesignModelKeyboard(): InlineKeyboard {
   return kb;
 }
 
+// ── Model activation (shared logic) ──────────────────────────────────────────
+
+export async function activateDesignModel(ctx: BotContext, modelId: string): Promise<void> {
+  if (!ctx.user) return;
+  await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE", "design");
+  await userStateService.setModel(ctx.user.id, modelId);
+  await ctx.reply(ctx.t.design.modelActivated);
+}
+
 // ── Model selected via inline callback ───────────────────────────────────────
 
 export async function handleDesignModelSelect(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   const modelId = ctx.callbackQuery?.data?.replace("design_model_", "") ?? "";
-
   await ctx.answerCallbackQuery();
-  await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE", "design");
-  await userStateService.setModel(ctx.user.id, modelId);
-
-  await ctx.reply(ctx.t.design.modelActivated);
+  await activateDesignModel(ctx, modelId);
 }
 
 // ── Incoming prompt in DESIGN_ACTIVE state ────────────────────────────────────
@@ -61,6 +66,10 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
     await userStateService.setDesignRefMessage(ctx.user.id, null);
   }
 
+  // Read saved aspect ratio for this model
+  const imageSettings = await userStateService.getImageSettings(ctx.user.id);
+  const aspectRatio = imageSettings[modelId]?.aspectRatio;
+
   const prompt = ctx.message.text;
   const pendingMsg = await ctx.reply(ctx.t.design.generating);
 
@@ -73,6 +82,7 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
       telegramChatId: chatId,
       dialogId,
       sendOriginalLabel: ctx.t.common.sendOriginal,
+      aspectRatio,
     });
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
@@ -160,9 +170,10 @@ export async function handleDesignManagement(ctx: BotContext): Promise<void> {
     await ctx.reply(ctx.t.errors.unexpected);
     return;
   }
+  const token = generateWebToken(ctx.user.id, config.bot.token);
   const kb = new InlineKeyboard().webApp(
     ctx.t.design.management,
-    `${webappUrl}?page=management&section=design`,
+    `${webappUrl}?page=management&section=design&wtoken=${token}`,
   );
   await ctx.reply(ctx.t.design.management, { reply_markup: kb });
 }

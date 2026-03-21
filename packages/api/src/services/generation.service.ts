@@ -17,6 +17,8 @@ export interface SubmitImageParams {
   dialogId?: string;
   /** Pre-translated label for the "Send as file" inline button. */
   sendOriginalLabel?: string;
+  /** Aspect ratio chosen by user, e.g. "16:9", "1:1". */
+  aspectRatio?: string;
 }
 
 export interface SubmitImageResult {
@@ -39,6 +41,7 @@ export const generationService = {
       telegramChatId,
       dialogId,
       sendOriginalLabel,
+      aspectRatio,
     } = params;
 
     const model = AI_MODELS[modelId];
@@ -63,7 +66,12 @@ export const generationService = {
     if (!adapter.isAsync && adapter.generate) {
       // ── Sync generation (DALL-E 3) ──────────────────────────────────────
       try {
-        const result = await adapter.generate({ prompt, negativePrompt, imageUrl: sourceImageUrl });
+        const result = await adapter.generate({
+          prompt,
+          negativePrompt,
+          imageUrl: sourceImageUrl,
+          aspectRatio,
+        });
 
         await db.generationJob.update({
           where: { id: job.id },
@@ -120,6 +128,7 @@ export const generationService = {
         telegramChatId,
         dialogId,
         sendOriginalLabel,
+        aspectRatio,
       },
       { attempts: 3, backoff: { type: "exponential", delay: 5000 } },
     );

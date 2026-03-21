@@ -39,6 +39,7 @@ export interface Model {
   supportsImages: boolean;
   supportsVoice: boolean;
   isAsync: boolean;
+  supportedAspectRatios?: string[] | null;
 }
 
 export interface UserState {

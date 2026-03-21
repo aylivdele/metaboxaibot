@@ -54,11 +54,22 @@ export class FalAdapter implements ImageAdapter {
   }
 
   private resolveSize(input: ImageInput): string {
+    const FAL_SIZES: Record<string, string> = {
+      "1:1": "square_hd",
+      "4:3": "landscape_4_3",
+      "3:4": "portrait_4_3",
+      "16:9": "landscape_16_9",
+      "9:16": "portrait_16_9",
+    };
+    if (input.aspectRatio && FAL_SIZES[input.aspectRatio]) {
+      return FAL_SIZES[input.aspectRatio];
+    }
+    // Legacy fallback: derive from explicit dimensions
     if (input.width && input.height) {
       const ratio = input.width / input.height;
       if (ratio > 1.4) return "landscape_16_9";
       if (ratio < 0.7) return "portrait_16_9";
     }
-    return "square";
+    return "square_hd";
   }
 }

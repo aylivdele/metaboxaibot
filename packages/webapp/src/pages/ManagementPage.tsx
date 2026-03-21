@@ -3,6 +3,85 @@ import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { Dialog, Message, Model, UserState } from "../types.js";
 
+// ── Image settings view (section=design) ────────────────────────────────────
+
+function ImageSettingsView() {
+  const { t } = useI18n();
+  const [models, setModels] = useState<Model[]>([]);
+  const [settings, setSettings] = useState<Record<string, { aspectRatio: string }>>({});
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([api.models.list("design"), api.imageSettings.get()])
+      .then(([ms, s]) => {
+        setModels(ms);
+        setSettings(s);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSelect = async (modelId: string, ratio: string) => {
+    setSettings((prev) => ({ ...prev, [modelId]: { aspectRatio: ratio } }));
+    await api.imageSettings.set(modelId, ratio);
+    setSavedId(modelId);
+    setTimeout(() => setSavedId((id) => (id === modelId ? null : id)), 1500);
+  };
+
+  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h2>{t("imageSettings.title")}</h2>
+        <p className="page-subtitle">{t("imageSettings.subtitle")}</p>
+      </div>
+
+      <div className="image-settings-list">
+        {models.map((model) => {
+          const ratios = model.supportedAspectRatios;
+          const current = settings[model.id]?.aspectRatio;
+          return (
+            <div key={model.id} className="image-settings-model">
+              <div className="image-settings-model__header">
+                <span className="image-settings-model__name">{model.name}</span>
+                {savedId === model.id && (
+                  <span className="image-settings-model__saved">{t("imageSettings.saved")}</span>
+                )}
+              </div>
+              {!ratios || ratios.length === 0 ? (
+                <div className="image-settings-model__no-support">
+                  {t("imageSettings.noSupport")}
+                </div>
+              ) : (
+                <div className="image-settings-ratios">
+                  {ratios.map((ratio) => (
+                    <button
+                      key={ratio}
+                      className={`ratio-btn${current === ratio ? " ratio-btn--active" : ""}`}
+                      onClick={() => void handleSelect(model.id, ratio)}
+                    >
+                      {ratio}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Dispatcher ───────────────────────────────────────────────────────────────
+
+export function ManagementPage({ initialSection }: { initialSection?: string }) {
+  if (initialSection === "design") return <ImageSettingsView />;
+  return <GptManagementView />;
+}
+
 interface ManagementPageProps {
   initialSection?: string;
 }
@@ -68,9 +147,9 @@ function ChatHistory({ dialog, onBack }: { dialog: Dialog; onBack: () => void })
   );
 }
 
-// ── Main page ────────────────────────────────────────────────────────────────
+// ── GPT dialogs view ─────────────────────────────────────────────────────────
 
-export function ManagementPage({ initialSection: _initialSection }: ManagementPageProps) {
+function GptManagementView() {
   const { t } = useI18n();
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const [models, setModels] = useState<Model[]>([]);

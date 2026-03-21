@@ -23,6 +23,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     telegramChatId,
     dialogId,
     sendOriginalLabel,
+    aspectRatio,
   } = job.data;
 
   logger.info({ dbJobId, modelId }, "Processing image job");
@@ -40,6 +41,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       prompt,
       negativePrompt,
       imageUrl: job.data.sourceImageUrl,
+      aspectRatio,
     });
 
     let imageResult = null;

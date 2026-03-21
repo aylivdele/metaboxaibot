@@ -134,7 +134,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     name: "DALL-E 3",
     section: "design",
     provider: "openai",
-    costUsdPerRequest: 0.04, // $0.040 standard 1024×1024
+    costUsdPerRequest: 0.04,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
@@ -143,13 +143,15 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    // DALL-E 3 only supports exactly 3 sizes
+    supportedAspectRatios: ["1:1", "16:9", "9:16"],
   },
   midjourney: {
     id: "midjourney",
     name: "MidJourney",
     section: "design",
     provider: "midjourney",
-    costUsdPerRequest: 0.03, // ~$0.01–$0.05 via 3rd-party API
+    costUsdPerRequest: 0.03,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -158,13 +160,14 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
   },
   flux: {
     id: "flux",
     name: "Flux",
     section: "design",
     provider: "fal",
-    costUsdPerRequest: 0.01, // fal.ai ~$0.003–$0.030
+    costUsdPerRequest: 0.01,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -173,13 +176,15 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    // FAL image_size categories: square_hd, landscape_4_3, portrait_4_3, landscape_16_9, portrait_16_9
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
   },
   ideogram: {
     id: "ideogram",
     name: "IdeoGram",
     section: "design",
     provider: "ideogram",
-    costUsdPerRequest: 0.04, // ~$0.020–$0.060
+    costUsdPerRequest: 0.04,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
@@ -188,13 +193,14 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
   },
   "imagen-4": {
     id: "imagen-4",
     name: "Imagen 4",
     section: "design",
     provider: "google",
-    costUsdPerRequest: 0.03, // Vertex AI ~$0.020–$0.040
+    costUsdPerRequest: 0.03,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
@@ -203,13 +209,14 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
   },
   "stable-diffusion": {
     id: "stable-diffusion",
     name: "Stable Diffusion",
     section: "design",
     provider: "replicate",
-    costUsdPerRequest: 0.003, // Replicate ~$0.002–$0.005
+    costUsdPerRequest: 0.003,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -218,6 +225,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    // Replicate/SDXL accepts arbitrary dimensions — offer extended set
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3"],
   },
 
   // ── Видео ─────────────────────────────────────────────────────────────────

@@ -17,6 +17,8 @@ export interface ImageJobData {
   dialogId?: string;
   /** Pre-translated label for the "Send as file" button. */
   sendOriginalLabel?: string;
+  /** Aspect ratio chosen by user, e.g. "16:9", "1:1". */
+  aspectRatio?: string;
 }
 
 let _connection: Redis | undefined;

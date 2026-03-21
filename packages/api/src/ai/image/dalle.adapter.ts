@@ -23,10 +23,12 @@ export class DalleAdapter implements ImageAdapter {
       return this.generateVariation(input.imageUrl);
     }
 
-    const size =
-      input.width && input.height
-        ? (`${input.width}x${input.height}` as "1024x1024" | "1792x1024" | "1024x1792")
-        : "1024x1024";
+    const DALLE_SIZES: Record<string, "1024x1024" | "1792x1024" | "1024x1792"> = {
+      "1:1": "1024x1024",
+      "16:9": "1792x1024",
+      "9:16": "1024x1792",
+    };
+    const size = DALLE_SIZES[input.aspectRatio ?? ""] ?? "1024x1024";
 
     const response = await this.client.images.generate({
       model: "dall-e-3",

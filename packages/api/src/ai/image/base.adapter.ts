@@ -5,6 +5,8 @@ export interface ImageInput {
   imageUrl?: string;
   width?: number;
   height?: number;
+  /** Aspect ratio in "W:H" format, e.g. "16:9", "1:1". Each adapter converts to its own format. */
+  aspectRatio?: string;
 }
 
 export interface ImageResult {

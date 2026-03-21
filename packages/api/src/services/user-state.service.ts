@@ -64,4 +64,22 @@ export const userStateService = {
       update: { designRefMessageId: messageId },
     });
   },
+
+  /** Returns per-model image settings: { [modelId]: { aspectRatio: string } } */
+  async getImageSettings(userId: bigint): Promise<Record<string, { aspectRatio: string }>> {
+    const state = await db.userState.findUnique({ where: { userId } });
+    if (!state?.imageSettings) return {};
+    return state.imageSettings as Record<string, { aspectRatio: string }>;
+  },
+
+  /** Saves the aspect ratio for a specific model without touching other models' settings. */
+  async setImageAspectRatio(userId: bigint, modelId: string, aspectRatio: string): Promise<void> {
+    const current = await this.getImageSettings(userId);
+    const updated = { ...current, [modelId]: { aspectRatio } };
+    await db.userState.upsert({
+      where: { userId },
+      create: { userId, state: "IDLE", imageSettings: updated },
+      update: { imageSettings: updated },
+    });
+  },
 };

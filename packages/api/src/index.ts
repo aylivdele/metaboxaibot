@@ -23,6 +23,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { paymentsRoutes } from "./routes/payments.js";
 import { galleryRoutes } from "./routes/gallery.js";
 import { slidesRoutes } from "./routes/slides.js";
+import { imageSettingsRoutes } from "./routes/image-settings.js";
 import { config } from "@metabox/shared";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -90,6 +91,7 @@ await server.register(adminRoutes);
 await server.register(paymentsRoutes);
 await server.register(galleryRoutes);
 await server.register(slidesRoutes);
+await server.register(imageSettingsRoutes);
 
 const port = config.api.port;
 await server.listen({ port, host: "0.0.0.0" });

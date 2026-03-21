@@ -26,6 +26,12 @@ export interface AIModel {
   isAsync: boolean; // требует очереди (для image/video/audio)
   contextStrategy: ContextStrategy;
   contextMaxMessages: number; // актуально для db_history: сколько сообщений отправлять
+  /**
+   * Supported aspect ratios for image generation models.
+   * null = model does not support aspect ratio customization.
+   * Ratios are in "W:H" string format, e.g. "16:9", "1:1", "9:16".
+   */
+  supportedAspectRatios?: string[] | null;
 }
 
 /** Входные данные для LLM-чата (с учётом стратегии контекста) */

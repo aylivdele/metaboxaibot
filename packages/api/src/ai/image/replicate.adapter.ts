@@ -25,15 +25,33 @@ export class ReplicateAdapter implements ImageAdapter {
     this.client = new Replicate({ auth: apiKey });
   }
 
+  private resolveSize(input: ImageInput): { width: number; height: number } {
+    // Aspect ratio → nearest clean dimensions at ~1024px long-side (multiples of 8)
+    const REPLICATE_SIZES: Record<string, { width: number; height: number }> = {
+      "1:1": { width: 1024, height: 1024 },
+      "4:3": { width: 1024, height: 768 },
+      "3:4": { width: 768, height: 1024 },
+      "16:9": { width: 1280, height: 720 },
+      "9:16": { width: 720, height: 1280 },
+      "3:2": { width: 1152, height: 768 },
+      "2:3": { width: 768, height: 1152 },
+    };
+    if (input.aspectRatio && REPLICATE_SIZES[input.aspectRatio]) {
+      return REPLICATE_SIZES[input.aspectRatio];
+    }
+    return { width: input.width ?? 1024, height: input.height ?? 1024 };
+  }
+
   async submit(input: ImageInput): Promise<string> {
     const model = MODEL_VERSIONS[this.modelId] ?? this.modelId;
+    const { width, height } = this.resolveSize(input);
     const prediction = await this.client.predictions.create({
       model,
       input: {
         prompt: input.prompt,
         negative_prompt: input.negativePrompt,
-        width: input.width ?? 1024,
-        height: input.height ?? 1024,
+        width,
+        height,
         ...(input.imageUrl ? { image: input.imageUrl } : {}),
       },
     });

@@ -1737,6 +1737,72 @@ input::placeholder {
   margin-top: 8px;
 }
 
+/* ── Image settings ──────────────────────────────────────────────────────── */
+.image-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.image-settings-model {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.image-settings-model__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.image-settings-model__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.image-settings-model__saved {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--success, #4caf7d);
+}
+
+.image-settings-model__no-support {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.image-settings-ratios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ratio-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary, var(--card-bg));
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.ratio-btn:active {
+  opacity: 0.75;
+}
+
+.ratio-btn--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* ── Animations ───────────────────────────────────────────────────────────── */
 @keyframes fadeIn {
   from {
@@ -1748,3 +1814,4 @@ input::placeholder {
     transform: translateY(0);
   }
 }
+

@@ -1,7 +1,7 @@
 import type { BotContext } from "../types/context.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { userStateService, dialogService } from "@metabox/api/services";
-import { config, generateWebToken } from "@metabox/shared";
+import { config, generateWebToken, MODELS_BY_SECTION } from "@metabox/shared";
 import type { Section } from "@metabox/shared";
 
 /** Returns the active dialog name for a section, or undefined. */
@@ -70,12 +70,17 @@ export async function handleDesign(ctx: BotContext): Promise<void> {
       }
     : { text: ctx.t.design.management };
 
+  const designModels = MODELS_BY_SECTION["design"] ?? [];
+  const modelRows: { text: string }[][] = [];
+  for (let i = 0; i < designModels.length; i += 2) {
+    const row: { text: string }[] = [{ text: designModels[i].name }];
+    if (designModels[i + 1]) row.push({ text: designModels[i + 1].name });
+    modelRows.push(row);
+  }
+
   await ctx.reply(text, {
     reply_markup: {
-      keyboard: [
-        [{ text: ctx.t.design.newDialog }, managementBtn],
-        [{ text: ctx.t.common.backToMain }],
-      ],
+      keyboard: [...modelRows, [managementBtn], [{ text: ctx.t.common.backToMain }]],
       resize_keyboard: true,
       is_persistent: true,
     },

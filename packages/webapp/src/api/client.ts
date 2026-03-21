@@ -151,6 +151,15 @@ export const api = {
       request<{ success: boolean }>(`/gallery/${id}/download`, { method: "POST" }),
   },
 
+  imageSettings: {
+    get: () => request<Record<string, { aspectRatio: string }>>("/image-settings"),
+    set: (modelId: string, aspectRatio: string) =>
+      request<{ success: boolean }>("/image-settings", {
+        method: "PATCH",
+        body: JSON.stringify({ modelId, aspectRatio }),
+      }),
+  },
+
   admin: {
     users: (params: { page?: number; limit?: number; search?: string }) => {
       const qs = new URLSearchParams();
