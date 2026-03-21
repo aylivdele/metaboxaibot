@@ -152,7 +152,7 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d --no-build --remove-orphans
 
             echo "Pruning old images..."
-            docker image prune -f
+            docker image prune -af
 
             echo "Updating repo (nginx config)..."
             # nginx.server.conf is symlinked from /etc/nginx/sites-available/metabox
