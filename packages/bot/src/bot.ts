@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot, InlineKeyboard } from "grammy";
 import type { BotContext } from "./types/context.js";
 import { authMiddleware } from "./middlewares/auth.middleware.js";
 import { i18nMiddleware } from "./middlewares/i18n.middleware.js";
@@ -9,7 +9,6 @@ import {
   handleNewGptDialog,
   handleGptMessage,
   handleActivateGptEditor,
-  handleGptManagement,
   handleGptPrompts,
 } from "./scenes/gpt.js";
 import {
@@ -18,7 +17,6 @@ import {
   handleDesignPhoto,
   handleDesignRefSelect,
   handleNewDesignDialog,
-  handleDesignManagement,
 } from "./scenes/design.js";
 import {
   handleVideoModelSelect,
@@ -73,15 +71,6 @@ export function createBot(token: string): Bot<BotContext> {
     const t = ctx.t;
     const text = ctx.message.text;
 
-    // Management text is identical across GPT and Design sections — route by section.
-    if (text === t.gpt.management) {
-      if (!ctx.user) return next();
-      const state = await userStateService.get(ctx.user.id);
-      if (state?.section === "gpt") return handleGptManagement(ctx);
-      if (state?.section === "design") return handleDesignManagement(ctx);
-      return next();
-    }
-
     const menuMap: Record<string, () => Promise<void>> = {
       [t.menu.gpt]: () => handleGpt(ctx),
       [t.menu.design]: () => handleDesign(ctx),
@@ -102,6 +91,12 @@ export function createBot(token: string): Bot<BotContext> {
       [t.video.newDialog]: () => handleNewVideoDialog(ctx),
       [t.video.avatars]: () => handleVideoAvatars(ctx),
       [t.video.lipSync]: () => handleVideoLipSync(ctx),
+      // Help button — send inline link to support chat
+      [t.menu.help]: async () => {
+        await ctx.reply(ctx.t.menu.help, {
+          reply_markup: new InlineKeyboard().url(ctx.t.start.support, "https://t.me/metaboxsupport"),
+        });
+      },
       // Audio section buttons
       [t.audio.tts]: () => handleAudioSubSection(ctx, "tts-openai"),
       [t.audio.voiceClone]: () => handleAudioSubSection(ctx, "voice-clone"),

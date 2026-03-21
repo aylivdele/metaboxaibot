@@ -1,6 +1,7 @@
 import type { BotContext } from "../types/context.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { userStateService, dialogService } from "@metabox/api/services";
+import { config } from "@metabox/shared";
 import type { Section } from "@metabox/shared";
 
 /** Returns the active dialog name for a section, or undefined. */
@@ -28,11 +29,18 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
   const text = dialogLabel
     ? `${ctx.t.gpt.sectionTitle}\n\n💬 Активный диалог: ${dialogLabel}`
     : ctx.t.gpt.sectionTitle;
+
+  const webappUrl = config.bot.webappUrl;
+  const managementBtn = webappUrl
+    ? { text: ctx.t.gpt.management, web_app: { url: `${webappUrl}#management/gpt` } }
+    : { text: ctx.t.gpt.management };
+
   await ctx.reply(text, {
     reply_markup: {
       keyboard: [
-        [{ text: ctx.t.gpt.newDialog }, { text: ctx.t.gpt.activateEditor }],
-        [{ text: ctx.t.gpt.management }, { text: ctx.t.gpt.prompts }],
+        [{ text: ctx.t.gpt.newDialog }],
+        [{ text: ctx.t.gpt.activateEditor }],
+        [managementBtn, { text: ctx.t.gpt.prompts }],
         [{ text: ctx.t.common.backToMain }],
       ],
       resize_keyboard: true,
@@ -48,10 +56,16 @@ export async function handleDesign(ctx: BotContext): Promise<void> {
   const text = dialogLabel
     ? `${ctx.t.design.sectionTitle}\n\n💬 ${dialogLabel}`
     : ctx.t.design.sectionTitle;
+
+  const webappUrl = config.bot.webappUrl;
+  const managementBtn = webappUrl
+    ? { text: ctx.t.design.management, web_app: { url: `${webappUrl}#management/design` } }
+    : { text: ctx.t.design.management };
+
   await ctx.reply(text, {
     reply_markup: {
       keyboard: [
-        [{ text: ctx.t.design.newDialog }, { text: ctx.t.design.management }],
+        [{ text: ctx.t.design.newDialog }, managementBtn],
         [{ text: ctx.t.common.backToMain }],
       ],
       resize_keyboard: true,
@@ -61,6 +75,8 @@ export async function handleDesign(ctx: BotContext): Promise<void> {
 }
 
 export async function handleAudio(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await userStateService.setState(ctx.user.id, "AUDIO_SECTION", "audio");
   await ctx.reply(ctx.t.audio.sectionTitle, {
     reply_markup: {
       keyboard: [
@@ -75,6 +91,8 @@ export async function handleAudio(ctx: BotContext): Promise<void> {
 }
 
 export async function handleVideo(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await userStateService.setState(ctx.user.id, "VIDEO_SECTION", "video");
   await ctx.reply(ctx.t.video.sectionTitle, {
     reply_markup: {
       keyboard: [

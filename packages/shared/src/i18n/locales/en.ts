@@ -3,7 +3,7 @@ export default {
     welcome:
       "🔶 Welcome to Metabox! By continuing, you agree to the Terms of Service ([link]). Please choose your language:",
     tokensGranted:
-      '⚡ 5.50 tokens have been credited for you to explore the bot. To learn more about your account and plans, click the "Profile" button below in the main menu.',
+      '⚡ 5.50 tokens have been credited for you to explore the bot. To learn more about your account and plans, click the "Profile" button or use /profile command.',
     videoIntro:
       "📌 A brief overview of the main bot tools.\nMetabox provides access to more than 70 AI tools.\n📎 Detailed video on how to use the bot and description of all features",
     mainMenuTitle: "🏠 Main Menu\nChoose a section 👇",
