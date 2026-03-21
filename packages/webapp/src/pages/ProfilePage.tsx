@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
+import type { TranslationKey } from "../i18n.js";
 import { BannerSlider } from "../components/BannerSlider.js";
 import type { UserProfile, GalleryItem } from "../types.js";
 
@@ -97,7 +98,7 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
             <li key={tx.id} className="tx-item">
               <div className="tx-item__info">
                 <span className="tx-item__reason">
-                  {REASON_KEYS[tx.reason] ? t(REASON_KEYS[tx.reason] as any) : tx.reason}
+                  {REASON_KEYS[tx.reason] ? t(REASON_KEYS[tx.reason] as TranslationKey) : tx.reason}
                 </span>
                 {tx.modelId && <span className="tx-item__model">{tx.modelId}</span>}
                 <span className="tx-item__date">{new Date(tx.createdAt).toLocaleDateString()}</span>

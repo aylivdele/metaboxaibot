@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { useI18n } from "../i18n.js";
+import type { TranslationKey } from "../i18n.js";
 import type { Page } from "../types.js";
 
 interface Props {
@@ -98,7 +99,7 @@ export function BottomNav({ current, onChange, showAdmin }: Props) {
               onClick={() => window.open(LEARNING_URL, "_blank")}
             >
               <span className="bottom-nav__center-icon">{tab.icon(false)}</span>
-              <span className="bottom-nav__label">{t(tab.labelKey as any)}</span>
+              <span className="bottom-nav__label">{t(tab.labelKey as TranslationKey)}</span>
             </button>
           );
         }
@@ -110,7 +111,7 @@ export function BottomNav({ current, onChange, showAdmin }: Props) {
             onClick={() => onChange(tab.id as Page)}
           >
             <span className="bottom-nav__icon">{tab.icon(isActive)}</span>
-            <span className="bottom-nav__label">{t(tab.labelKey as any)}</span>
+            <span className="bottom-nav__label">{t(tab.labelKey as TranslationKey)}</span>
           </button>
         );
       })}

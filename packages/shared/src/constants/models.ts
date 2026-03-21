@@ -244,6 +244,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: [5, 10],
   },
   sora: {
     id: "sora",
@@ -259,6 +261,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: [5, 10, 20],
   },
   runway: {
     id: "runway",
@@ -274,6 +278,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["1280:768", "768:1280", "1104:832", "832:1104"],
+    supportedDurations: [5, 10],
   },
   veo: {
     id: "veo",
@@ -289,6 +295,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16"],
+    supportedDurations: [5, 10],
   },
   luma: {
     id: "luma",
@@ -304,6 +312,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"],
+    supportedDurations: [5, 10],
   },
   minimax: {
     id: "minimax",
@@ -319,6 +329,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: null, // fixed 6s
   },
   pika: {
     id: "pika",
@@ -334,6 +346,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: [3, 5, 10],
   },
   hailuo: {
     id: "hailuo",
@@ -349,6 +363,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: null, // fixed 6s
   },
   heygen: {
     id: "heygen",
@@ -364,6 +380,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: null, // avatar duration is script-driven
   },
   "d-id": {
     id: "d-id",
@@ -379,6 +397,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: null, // script-driven
   },
 
   // ── Аудио ─────────────────────────────────────────────────────────────────

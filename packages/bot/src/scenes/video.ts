@@ -41,6 +41,10 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
   const activeDialog =
     !!state?.videoDialogId && (await dialogService.findById(state.videoDialogId));
   const modelId = activeDialog ? activeDialog.modelId : "kling";
+
+  const videoSettings = await userStateService.getVideoSettings(ctx.user.id);
+  const modelSettings = videoSettings[modelId];
+
   const prompt = ctx.message.text;
 
   const pendingMsg = await ctx.reply(ctx.t.video.queuing);
@@ -52,6 +56,8 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
       prompt,
       telegramChatId: chatId,
       sendOriginalLabel: ctx.t.common.sendOriginal,
+      aspectRatio: modelSettings?.aspectRatio,
+      duration: modelSettings?.duration,
     });
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);

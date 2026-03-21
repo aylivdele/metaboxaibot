@@ -82,4 +82,29 @@ export const userStateService = {
       update: { imageSettings: updated },
     });
   },
+
+  /** Returns per-model video settings: { [modelId]: { aspectRatio?: string; duration?: number } } */
+  async getVideoSettings(
+    userId: bigint,
+  ): Promise<Record<string, { aspectRatio?: string; duration?: number }>> {
+    const state = await db.userState.findUnique({ where: { userId } });
+    if (!state?.videoSettings) return {};
+    return state.videoSettings as Record<string, { aspectRatio?: string; duration?: number }>;
+  },
+
+  /** Saves aspectRatio and/or duration for a video model, merging with existing settings. */
+  async setVideoSetting(
+    userId: bigint,
+    modelId: string,
+    patch: { aspectRatio?: string; duration?: number },
+  ): Promise<void> {
+    const current = await this.getVideoSettings(userId);
+    const existing = current[modelId] ?? {};
+    const updated = { ...current, [modelId]: { ...existing, ...patch } };
+    await db.userState.upsert({
+      where: { userId },
+      create: { userId, state: "IDLE", videoSettings: updated },
+      update: { videoSettings: updated },
+    });
+  },
 };

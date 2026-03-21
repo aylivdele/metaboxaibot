@@ -11,6 +11,10 @@ export interface SubmitVideoParams {
   telegramChatId: number;
   /** Pre-translated label for the "Send as file" inline button. */
   sendOriginalLabel?: string;
+  /** Aspect ratio chosen by user, e.g. "16:9". */
+  aspectRatio?: string;
+  /** Clip duration in seconds chosen by user. */
+  duration?: number;
 }
 
 export interface SubmitVideoResult {
@@ -20,7 +24,16 @@ export interface SubmitVideoResult {
 
 export const videoGenerationService = {
   async submitVideo(params: SubmitVideoParams): Promise<SubmitVideoResult> {
-    const { userId, modelId, prompt, imageUrl, telegramChatId, sendOriginalLabel } = params;
+    const {
+      userId,
+      modelId,
+      prompt,
+      imageUrl,
+      telegramChatId,
+      sendOriginalLabel,
+      aspectRatio,
+      duration,
+    } = params;
 
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
@@ -52,6 +65,8 @@ export const videoGenerationService = {
         imageUrl,
         telegramChatId,
         sendOriginalLabel,
+        aspectRatio,
+        duration,
       },
       { attempts: 3, backoff: { type: "exponential", delay: 10000 } },
     );

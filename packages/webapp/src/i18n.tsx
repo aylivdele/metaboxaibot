@@ -165,6 +165,16 @@ const translations = {
     "imageSettings.noSupport": "This model doesn't support custom aspect ratios",
     "imageSettings.saved": "✓ Saved",
 
+    // Video settings
+    "videoSettings.title": "Video Settings",
+    "videoSettings.subtitle": "Choose aspect ratio and duration per model",
+    "videoSettings.aspectRatio": "Aspect ratio",
+    "videoSettings.duration": "Duration",
+    "videoSettings.seconds": "s",
+    "videoSettings.noAspectSupport": "Fixed aspect ratio",
+    "videoSettings.noDurationSupport": "Fixed duration",
+    "videoSettings.saved": "✓ Saved",
+
     // Auth errors
     "auth.tokenExpired": "Link expired. Press the «Profile» button in the bot menu again.",
     "auth.openFromTelegram": "Please open this app from Telegram",
@@ -330,6 +340,16 @@ const translations = {
     "imageSettings.noSupport": "Эта модель не поддерживает выбор соотношения сторон",
     "imageSettings.saved": "✓ Сохранено",
 
+    // Video settings
+    "videoSettings.title": "Настройки видео",
+    "videoSettings.subtitle": "Соотношение сторон и длительность для каждой модели",
+    "videoSettings.aspectRatio": "Соотношение сторон",
+    "videoSettings.duration": "Длительность",
+    "videoSettings.seconds": "с",
+    "videoSettings.noAspectSupport": "Фиксированное соотношение",
+    "videoSettings.noDurationSupport": "Фиксированная длительность",
+    "videoSettings.saved": "✓ Сохранено",
+
     // Auth errors
     "auth.tokenExpired":
       "Ссылка устарела. Заново откройте главное меню и нажмите кнопку «Профиль».",
@@ -337,7 +357,7 @@ const translations = {
   },
 } as const;
 
-type TranslationKey = keyof (typeof translations)["en"];
+export type TranslationKey = keyof (typeof translations)["en"];
 
 interface I18nContextValue {
   locale: Locale;

@@ -40,6 +40,7 @@ export interface Model {
   supportsVoice: boolean;
   isAsync: boolean;
   supportedAspectRatios?: string[] | null;
+  supportedDurations?: number[] | null;
 }
 
 export interface UserState {

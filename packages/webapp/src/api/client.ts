@@ -160,6 +160,16 @@ export const api = {
       }),
   },
 
+  videoSettings: {
+    get: () =>
+      request<Record<string, { aspectRatio?: string; duration?: number }>>("/video-settings"),
+    set: (modelId: string, patch: { aspectRatio?: string; duration?: number }) =>
+      request<{ success: boolean }>("/video-settings", {
+        method: "PATCH",
+        body: JSON.stringify({ modelId, ...patch }),
+      }),
+  },
+
   admin: {
     users: (params: { page?: number; limit?: number; search?: string }) => {
       const qs = new URLSearchParams();

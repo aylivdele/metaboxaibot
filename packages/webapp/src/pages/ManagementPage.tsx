@@ -3,6 +3,111 @@ import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { Dialog, Message, Model, UserState } from "../types.js";
 
+// ── Video settings view (section=video) ──────────────────────────────────────
+
+function VideoSettingsView() {
+  const { t } = useI18n();
+  const [models, setModels] = useState<Model[]>([]);
+  const [settings, setSettings] = useState<
+    Record<string, { aspectRatio?: string; duration?: number }>
+  >({});
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([api.models.list("video"), api.videoSettings.get()])
+      .then(([ms, s]) => {
+        setModels(ms);
+        setSettings(s);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handlePatch = async (
+    modelId: string,
+    patch: { aspectRatio?: string; duration?: number },
+  ) => {
+    setSettings((prev) => ({
+      ...prev,
+      [modelId]: { ...prev[modelId], ...patch },
+    }));
+    await api.videoSettings.set(modelId, patch);
+    setSavedId(modelId);
+    setTimeout(() => setSavedId((id) => (id === modelId ? null : id)), 1500);
+  };
+
+  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h2>{t("videoSettings.title")}</h2>
+        <p className="page-subtitle">{t("videoSettings.subtitle")}</p>
+      </div>
+
+      <div className="image-settings-list">
+        {models.map((model) => {
+          const current = settings[model.id] ?? {};
+          return (
+            <div key={model.id} className="image-settings-model">
+              <div className="image-settings-model__header">
+                <span className="image-settings-model__name">{model.name}</span>
+                {savedId === model.id && (
+                  <span className="image-settings-model__saved">{t("videoSettings.saved")}</span>
+                )}
+              </div>
+
+              <div className="video-settings-section">
+                <div className="video-settings-label">{t("videoSettings.aspectRatio")}</div>
+                {!model.supportedAspectRatios || model.supportedAspectRatios.length === 0 ? (
+                  <div className="image-settings-model__no-support">
+                    {t("videoSettings.noAspectSupport")}
+                  </div>
+                ) : (
+                  <div className="image-settings-ratios">
+                    {model.supportedAspectRatios.map((ratio) => (
+                      <button
+                        key={ratio}
+                        className={`ratio-btn${current.aspectRatio === ratio ? " ratio-btn--active" : ""}`}
+                        onClick={() => void handlePatch(model.id, { aspectRatio: ratio })}
+                      >
+                        {ratio}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="video-settings-section">
+                <div className="video-settings-label">{t("videoSettings.duration")}</div>
+                {!model.supportedDurations || model.supportedDurations.length === 0 ? (
+                  <div className="image-settings-model__no-support">
+                    {t("videoSettings.noDurationSupport")}
+                  </div>
+                ) : (
+                  <div className="image-settings-ratios">
+                    {model.supportedDurations.map((sec) => (
+                      <button
+                        key={sec}
+                        className={`ratio-btn${current.duration === sec ? " ratio-btn--active" : ""}`}
+                        onClick={() => void handlePatch(model.id, { duration: sec })}
+                      >
+                        {sec}
+                        {t("videoSettings.seconds")}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Image settings view (section=design) ────────────────────────────────────
 
 function ImageSettingsView() {
@@ -79,11 +184,8 @@ function ImageSettingsView() {
 
 export function ManagementPage({ initialSection }: { initialSection?: string }) {
   if (initialSection === "design") return <ImageSettingsView />;
+  if (initialSection === "video") return <VideoSettingsView />;
   return <GptManagementView />;
-}
-
-interface ManagementPageProps {
-  initialSection?: string;
 }
 
 // ── Chat history view ────────────────────────────────────────────────────────

@@ -15,6 +15,10 @@ export interface VideoJobData {
   telegramChatId: number;
   /** Pre-translated label for the "Send as file" button. */
   sendOriginalLabel?: string;
+  /** Aspect ratio chosen by user, e.g. "16:9". */
+  aspectRatio?: string;
+  /** Clip duration in seconds chosen by user. */
+  duration?: number;
 }
 
 let _connection: Redis | undefined;

@@ -1803,6 +1803,25 @@ input::placeholder {
   color: #fff;
 }
 
+.video-settings-section {
+  margin-top: 10px;
+}
+
+.video-settings-section + .video-settings-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.video-settings-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ── Animations ───────────────────────────────────────────────────────────── */
 @keyframes fadeIn {
   from {
