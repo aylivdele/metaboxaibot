@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTelegramInit } from "./hooks/useTelegramInit.js";
 import { BottomNav } from "./components/BottomNav.js";
-import { ProfilePage } from "./pages/ProfilePage.js";
+import { ProfilePage, type ProfileTab } from "./pages/ProfilePage.js";
 import { ManagementPage } from "./pages/ManagementPage.js";
 import { TariffsPage } from "./pages/TariffsPage.js";
 import { ReferralPage } from "./pages/ReferralPage.js";
@@ -107,7 +107,15 @@ function AppContent() {
       </header>
 
       <main className="app-main">
-        {page === "profile" && <ProfilePage />}
+        {page === "profile" && (
+          <ProfilePage
+            initialSection={
+              initial.section && ["overview", "gallery", "settings"].includes(initial.section)
+                ? (initial.section as ProfileTab)
+                : undefined
+            }
+          />
+        )}
         {page === "management" && <ManagementPage initialSection={initial.section} />}
         {page === "tariffs" && <TariffsPage />}
         {page === "referral" && <ReferralPage />}

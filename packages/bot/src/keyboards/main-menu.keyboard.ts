@@ -8,10 +8,9 @@ export function buildMainMenuKeyboard(t: Translations, userId?: bigint): Keyboar
 
   if (webappUrl && userId) {
     const token = generateWebToken(userId, config.bot.token);
-    kb.webApp(t.menu.profile, `${webappUrl}?page=profile&wtoken=${token}`).webApp(
-      t.menu.storage,
-      `${webappUrl}?page=gallery&wtoken=${token}`,
-    );
+    kb.webApp(t.menu.profile, `${webappUrl}?page=profile&wtoken=${token}`)
+      .row()
+      .webApp(t.menu.storage, `${webappUrl}?page=profile&section=gallery&wtoken=${token}`);
   } else if (webappUrl) {
     kb.webApp(t.menu.profile, `${webappUrl}?page=profile`)
       .row()

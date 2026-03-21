@@ -4,7 +4,7 @@ import { useI18n } from "../i18n.js";
 import { BannerSlider } from "../components/BannerSlider.js";
 import type { UserProfile, GalleryItem } from "../types.js";
 
-type ProfileTab = "overview" | "gallery" | "settings";
+export type ProfileTab = "overview" | "gallery" | "settings";
 
 const REASON_KEYS: Record<string, string> = {
   welcome_bonus: "profile.reason.welcome_bonus",
@@ -14,12 +14,12 @@ const REASON_KEYS: Record<string, string> = {
   admin: "profile.reason.admin",
 };
 
-export function ProfilePage() {
+export function ProfilePage({ initialSection }: { initialSection?: ProfileTab }) {
   const { t } = useI18n();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ProfileTab>("overview");
+  const [activeTab, setActiveTab] = useState<ProfileTab>(initialSection ?? "overview");
 
   useEffect(() => {
     api.profile
