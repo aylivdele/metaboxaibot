@@ -13,13 +13,7 @@ export function buildMainMenuKeyboard(t: Translations): Keyboard {
     kb.text(t.menu.profile);
   }
 
-  kb.row()
-    .text(t.menu.gpt)
-    .text(t.menu.design)
-    .row()
-    .text(t.menu.audio)
-    .text(t.menu.video)
-    .row();
+  kb.row().text(t.menu.gpt).text(t.menu.design).row().text(t.menu.audio).text(t.menu.video).row();
 
   if (webappUrl) {
     kb.webApp(t.menu.storage, `${webappUrl}#gallery`);
@@ -27,10 +21,5 @@ export function buildMainMenuKeyboard(t: Translations): Keyboard {
     kb.text(t.menu.storage);
   }
 
-  return kb
-    .row()
-    .text(t.menu.help)
-    .text(t.menu.knowledgeBase)
-    .resized()
-    .persistent();
+  return kb.row().text(t.menu.help).text(t.menu.knowledgeBase).resized().persistent();
 }

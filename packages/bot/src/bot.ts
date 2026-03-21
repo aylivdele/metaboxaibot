@@ -26,6 +26,7 @@ import {
   handleVideoLipSync,
 } from "./scenes/video.js";
 import { handleAudioSubSection, handleAudioMessage } from "./scenes/audio.js";
+import { handleSendOriginal } from "./handlers/send-original.handler.js";
 import { handlePreCheckoutQuery, handleSuccessfulPayment } from "./scenes/payment.js";
 import { userStateService } from "@metabox/api/services";
 import { getT, config } from "@metabox/shared";
@@ -71,6 +72,9 @@ export function createBot(token: string): Bot<BotContext> {
   // ── Video model selection callback ───────────────────────────────────────
   bot.callbackQuery(/^video_model_/, handleVideoModelSelect);
 
+  // ── Send original file callback ───────────────────────────────────────────
+  bot.callbackQuery(/^orig_/, handleSendOriginal);
+
   // ── Reply keyboard — menu navigation ─────────────────────────────────────
   // Translation keys are resolved at runtime after i18n middleware runs.
   bot.on("message:text", async (ctx, next) => {
@@ -100,7 +104,10 @@ export function createBot(token: string): Bot<BotContext> {
       // Help button — send inline link to support chat
       [t.menu.help]: async () => {
         await ctx.reply(ctx.t.menu.help, {
-          reply_markup: new InlineKeyboard().url(ctx.t.start.support, "https://t.me/metaboxsupport"),
+          reply_markup: new InlineKeyboard().url(
+            ctx.t.start.support,
+            "https://t.me/metaboxsupport",
+          ),
         });
       },
       // Audio section buttons

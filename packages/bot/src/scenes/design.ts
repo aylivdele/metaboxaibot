@@ -72,21 +72,20 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
       sourceImageUrl,
       telegramChatId: chatId,
       dialogId,
+      sendOriginalLabel: ctx.t.common.sendOriginal,
     });
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
 
     if (!result.isPending && result.imageUrl) {
-      // Sync result (DALL-E 3) — send immediately with optional Refine button
+      // Sync result (DALL-E 3) — send immediately with optional Refine + Send as file buttons
       const model = AI_MODELS[modelId];
       const caption = `🎨 ${prompt.slice(0, 200)}${sourceImageUrl ? ` ${ctx.t.design.withReference}` : ""}`;
-      const kb =
-        model?.supportsImages && result.assistantMessageId
-          ? new InlineKeyboard().text(
-              ctx.t.design.refine,
-              `design_ref_${result.assistantMessageId}`,
-            )
-          : undefined;
+      const kb = new InlineKeyboard();
+      if (model?.supportsImages && result.assistantMessageId) {
+        kb.text(ctx.t.design.refine, `design_ref_${result.assistantMessageId}`);
+      }
+      kb.text(ctx.t.common.sendOriginal, `orig_${result.dbJobId}`);
       await ctx.replyWithPhoto(result.imageUrl, { caption, reply_markup: kb });
     } else {
       // Async — worker will notify when done

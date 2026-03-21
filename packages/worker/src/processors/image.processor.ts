@@ -22,6 +22,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     negativePrompt,
     telegramChatId,
     dialogId,
+    sendOriginalLabel,
   } = job.data;
 
   logger.info({ dbJobId, modelId }, "Processing image job");
@@ -88,15 +89,19 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       assistantMessageId = assistantMsg.id;
     }
 
-    // Show Refine button only for img2img-capable models
-    const replyMarkup =
+    // Build inline keyboard: optional Refine row + optional Send as file row
+    const refineRow =
       model?.supportsImages && assistantMessageId
-        ? {
-            inline_keyboard: [
-              [{ text: "🔄 Доработать", callback_data: `design_ref_${assistantMessageId}` }],
-            ],
-          }
-        : undefined;
+        ? [{ text: "🔄 Доработать", callback_data: `design_ref_${assistantMessageId}` }]
+        : null;
+    const origRow = sendOriginalLabel
+      ? [{ text: sendOriginalLabel, callback_data: `orig_${dbJobId}` }]
+      : null;
+    const rows = [refineRow, origRow].filter(Boolean) as {
+      text: string;
+      callback_data: string;
+    }[][];
+    const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
     await telegram.sendPhoto(telegramChatId, imageResult.url, {
       caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,

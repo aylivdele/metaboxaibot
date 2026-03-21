@@ -15,6 +15,8 @@ export interface ImageJobData {
   telegramChatId: number;
   /** Dialog.id for saving messages and enabling img2img context. */
   dialogId?: string;
+  /** Pre-translated label for the "Send as file" button. */
+  sendOriginalLabel?: string;
 }
 
 let _connection: Redis | undefined;

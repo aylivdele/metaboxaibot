@@ -9,6 +9,8 @@ export interface SubmitVideoParams {
   prompt: string;
   imageUrl?: string;
   telegramChatId: number;
+  /** Pre-translated label for the "Send as file" inline button. */
+  sendOriginalLabel?: string;
 }
 
 export interface SubmitVideoResult {
@@ -18,7 +20,7 @@ export interface SubmitVideoResult {
 
 export const videoGenerationService = {
   async submitVideo(params: SubmitVideoParams): Promise<SubmitVideoResult> {
-    const { userId, modelId, prompt, imageUrl, telegramChatId } = params;
+    const { userId, modelId, prompt, imageUrl, telegramChatId, sendOriginalLabel } = params;
 
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
@@ -49,6 +51,7 @@ export const videoGenerationService = {
         prompt,
         imageUrl,
         telegramChatId,
+        sendOriginalLabel,
       },
       { attempts: 3, backoff: { type: "exponential", delay: 10000 } },
     );

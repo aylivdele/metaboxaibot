@@ -4,7 +4,8 @@ export default {
       '🔶 Welcome to Metabox! By continuing, you agree to the <a href="https://google.com">Terms of Service</a>. Please choose your language:',
     tokensGranted:
       '⚡ 5.50 tokens have been credited for you to explore the bot. To learn more about your account and plans, click the "Profile" button below.',
-    yourBalance: "💰 Your balance: {balance} tokens. To view your account and plans, click the \"Profile\" button below.",
+    yourBalance:
+      '💰 Your balance: {balance} tokens. To view your account and plans, click the "Profile" button below.',
     restart: "Restart",
     videoIntro:
       "📌 A brief overview of the main bot tools.\nMetabox provides access to more than 70 AI tools.\n📎 Detailed video on how to use the bot and description of all features",
@@ -102,6 +103,7 @@ export default {
     newDialog: "💬 New Dialog",
     comingSoon: " — coming soon.",
     tokens: "tokens",
+    sendOriginal: "📎 Send as file",
   },
   payments: {
     success: "✅ Payment successful! Tokens have been credited to your balance.",

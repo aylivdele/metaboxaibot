@@ -14,7 +14,15 @@ const MAX_POLLS = 144; // 12 minutes max
 const telegram = new Api(config.bot.token);
 
 export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
-  const { dbJobId, userId: userIdStr, modelId, prompt, imageUrl, telegramChatId } = job.data;
+  const {
+    dbJobId,
+    userId: userIdStr,
+    modelId,
+    prompt,
+    imageUrl,
+    telegramChatId,
+    sendOriginalLabel,
+  } = job.data;
 
   logger.info({ dbJobId, modelId }, "Processing video job");
 
@@ -56,8 +64,13 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       await deductTokens(BigInt(userIdStr), calculateCost(model), modelId);
     }
 
+    const replyMarkup = sendOriginalLabel
+      ? { inline_keyboard: [[{ text: sendOriginalLabel, callback_data: `orig_${dbJobId}` }]] }
+      : undefined;
+
     await telegram.sendVideo(telegramChatId, videoResult.url, {
       caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
+      reply_markup: replyMarkup,
     });
 
     logger.info({ dbJobId }, "Video job completed");

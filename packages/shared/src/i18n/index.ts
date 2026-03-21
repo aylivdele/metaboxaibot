@@ -91,6 +91,7 @@ export interface Translations {
     newDialog: string;
     comingSoon: string;
     tokens: string;
+    sendOriginal: string;
   };
   payments: {
     success: string;

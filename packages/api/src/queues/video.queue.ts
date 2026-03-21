@@ -13,6 +13,8 @@ export interface VideoJobData {
   imageUrl?: string;
   /** Telegram chat id to notify when done */
   telegramChatId: number;
+  /** Pre-translated label for the "Send as file" button. */
+  sendOriginalLabel?: string;
 }
 
 let _connection: Redis | undefined;

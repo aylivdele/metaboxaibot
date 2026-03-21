@@ -51,6 +51,7 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
       modelId,
       prompt,
       telegramChatId: chatId,
+      sendOriginalLabel: ctx.t.common.sendOriginal,
     });
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);

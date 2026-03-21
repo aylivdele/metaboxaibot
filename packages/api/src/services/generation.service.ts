@@ -15,6 +15,8 @@ export interface SubmitImageParams {
   telegramChatId: number;
   /** If set, user/assistant messages are saved to this dialog for img2img context. */
   dialogId?: string;
+  /** Pre-translated label for the "Send as file" inline button. */
+  sendOriginalLabel?: string;
 }
 
 export interface SubmitImageResult {
@@ -28,8 +30,16 @@ export interface SubmitImageResult {
 
 export const generationService = {
   async submitImage(params: SubmitImageParams): Promise<SubmitImageResult> {
-    const { userId, modelId, prompt, negativePrompt, sourceImageUrl, telegramChatId, dialogId } =
-      params;
+    const {
+      userId,
+      modelId,
+      prompt,
+      negativePrompt,
+      sourceImageUrl,
+      telegramChatId,
+      dialogId,
+      sendOriginalLabel,
+    } = params;
 
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
@@ -109,6 +119,7 @@ export const generationService = {
         sourceImageUrl,
         telegramChatId,
         dialogId,
+        sendOriginalLabel,
       },
       { attempts: 3, backoff: { type: "exponential", delay: 5000 } },
     );
