@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { db } from "../db.js";
-import { config } from "@metabox/shared";
+import { config, verifyWebToken } from "@metabox/shared";
 
 /**
  * Verifies a Telegram Mini App initData string.
@@ -42,17 +42,30 @@ export async function telegramAuthHook(
   reply: FastifyReply,
 ): Promise<void> {
   const authHeader = request.headers.authorization;
-  if (!authHeader?.startsWith("tma ")) {
+  if (!authHeader) {
     return reply.code(401).send({ error: "Missing Telegram auth" });
   }
-  const initDataRaw = authHeader.slice(4);
-  try {
-    const userId = verifyTelegramInitData(initDataRaw);
-    // Attach to request so route handlers can use it
-    (request as FastifyRequest & { userId: bigint }).userId = userId;
-  } catch (err) {
-    return reply.code(401).send({ error: "Invalid Telegram auth", detail: String(err) });
+
+  let userId: bigint;
+  if (authHeader.startsWith("tma ")) {
+    try {
+      userId = verifyTelegramInitData(authHeader.slice(4));
+    } catch (err) {
+      return reply.code(401).send({ error: "Invalid Telegram auth", detail: String(err) });
+    }
+  } else if (authHeader.startsWith("wtoken ")) {
+    // URL-based HMAC token issued by the bot for KeyboardButtonWebApp launches
+    try {
+      userId = verifyWebToken(authHeader.slice(7), config.bot.token);
+    } catch (err) {
+      return reply.code(401).send({ error: "Invalid web token", detail: String(err) });
+    }
+  } else {
+    return reply.code(401).send({ error: "Unsupported auth scheme" });
   }
+
+  // Attach to request so route handlers can use it
+  (request as FastifyRequest & { userId: bigint }).userId = userId;
 
   // Ensure user exists (the bot may not have /start-ed yet in some edge cases)
   const user = await db.user.findUnique({

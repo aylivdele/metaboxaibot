@@ -18,7 +18,7 @@ export async function handleMenu(ctx: BotContext): Promise<void> {
     await userStateService.setState(ctx.user.id, "MAIN_MENU");
   }
   await ctx.reply(ctx.t.start.mainMenuTitle, {
-    reply_markup: buildMainMenuKeyboard(ctx.t),
+    reply_markup: buildMainMenuKeyboard(ctx.t, ctx.user?.id),
   });
 }
 

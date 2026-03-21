@@ -60,7 +60,7 @@ export async function handleLanguageSelect(ctx: BotContext): Promise<void> {
 
   // Main menu with reply keyboard
   await ctx.reply(t.start.mainMenuTitle, {
-    reply_markup: buildMainMenuKeyboard(t),
+    reply_markup: buildMainMenuKeyboard(t, ctx.user?.id),
   });
 
   // Set per-chat bot commands in user's language

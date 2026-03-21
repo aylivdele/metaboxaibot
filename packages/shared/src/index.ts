@@ -25,6 +25,9 @@ export { BOT_STATES, SECTION_BY_STATE, WELCOME_BONUS_TOKENS } from "./constants/
 export { PLANS } from "./constants/plans.js";
 export type { Plan } from "./constants/plans.js";
 
+// Web token (URL-based auth for KeyboardButtonWebApp where initData is unavailable)
+export { generateWebToken, verifyWebToken } from "./webtoken.js";
+
 // Config
 export { config } from "./config.js";
 export type { Config } from "./config.js";
