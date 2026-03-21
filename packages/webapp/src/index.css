@@ -1182,7 +1182,7 @@ input::placeholder {
 /* ── Admin Tabs ──────────────────────────────────────────────────────────── */
 .admin-tabs {
   display: flex;
-  gap: 4px;
+  gap: 0;
   background: var(--bg-secondary);
   border-radius: var(--radius-sm);
   padding: 3px;
@@ -1190,20 +1190,21 @@ input::placeholder {
 }
 .admin-tab {
   flex: 1;
-  padding: 8px 16px;
+  padding: 9px 16px;
   border-radius: calc(var(--radius-sm) - 2px);
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-hint);
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: all 0.2s var(--ease);
+  transition:
+    background 0.25s var(--ease),
+    color 0.25s var(--ease);
 }
 .admin-tab--active {
-  background: var(--bg-card);
-  color: var(--text);
-  box-shadow: var(--shadow-sm);
+  background: var(--accent-gradient);
+  color: var(--text-on-accent);
 }
 
 /* ── Admin Slides Management ─────────────────────────────────────────────── */
@@ -1631,18 +1632,21 @@ input::placeholder {
 /* ── Center learning button ─────────────────────────────────────────────── */
 .bottom-nav__tab--center {
   position: relative;
+  flex: 1.15;
 }
 
 .bottom-nav__center-icon {
-  width: 44px;
-  height: 44px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: var(--accent-gradient);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--shadow-accent);
-  margin-top: -18px;
+  box-shadow:
+    0 4px 20px rgba(74, 141, 245, 0.35),
+    0 0 0 4px var(--bg-card);
+  margin-top: -28px;
   transition: transform 0.25s var(--ease);
 }
 
@@ -1651,8 +1655,8 @@ input::placeholder {
 }
 
 .bottom-nav__center-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   stroke: #fff;
   fill: none;
 }
@@ -1660,7 +1664,7 @@ input::placeholder {
 /* ── Profile Tabs ──────────────────────────────────────────────────────────── */
 .profile-tabs {
   display: flex;
-  gap: 4px;
+  gap: 0;
   background: var(--bg-secondary);
   border-radius: var(--radius-sm);
   padding: 3px;
@@ -1669,22 +1673,23 @@ input::placeholder {
 
 .profile-tabs__btn {
   flex: 1;
-  padding: 8px 12px;
+  padding: 9px 12px;
   border-radius: calc(var(--radius-sm) - 2px);
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-hint);
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: all 0.2s var(--ease);
+  transition:
+    background 0.25s var(--ease),
+    color 0.25s var(--ease);
   text-align: center;
 }
 
 .profile-tabs__btn--active {
-  background: var(--bg-card);
-  color: var(--text);
-  box-shadow: var(--shadow-sm);
+  background: var(--accent-gradient);
+  color: var(--text-on-accent);
 }
 
 /* ── Settings ──────────────────────────────────────────────────────────────── */
