@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { setInitDataRaw, setWebToken, api } from "../api/client.js";
+import { setInitDataRaw, setWebToken, setWebToken, api } from "../api/client.js";
 
 type TelegramWebApp = { initData: string; ready?: () => void };
 
@@ -17,6 +17,11 @@ const POLL_INTERVAL_MS = 50;
 
 function getTgWebApp(): TelegramWebApp | undefined {
   return (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
+}
+
+/** Read ?wtoken= from URL — issued by the bot for KeyboardButtonWebApp launches. */
+function getUrlWebToken(): string {
+  return new URLSearchParams(window.location.search).get("wtoken") ?? "";
 }
 
 /** Read ?wtoken= from URL — issued by the bot for KeyboardButtonWebApp launches. */
