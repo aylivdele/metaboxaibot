@@ -50,6 +50,7 @@ export interface Translations {
     withReference: string;
     refSelected: string;
     refine: string;
+    chooseModel: string;
   };
   audio: {
     sectionTitle: string;
@@ -77,6 +78,7 @@ export interface Translations {
     queuing: string;
     asyncPending: string;
     generationFailed: string;
+    management: string;
   };
   errors: {
     noTool: string;

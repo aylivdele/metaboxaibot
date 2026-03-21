@@ -55,6 +55,7 @@ export default {
     withReference: "(with reference)",
     refSelected: "✅ Selected as reference",
     refine: "🔄 Refine",
+    chooseModel: "🎨 Choose model",
   },
   audio: {
     sectionTitle: "🎧 AI Audio\nChoose a section to work with audio 👇",
@@ -87,6 +88,7 @@ export default {
     asyncPending:
       "⏳ Your video is being generated. This may take several minutes — you will receive it when it's ready.",
     generationFailed: "❌ Failed to queue video generation. Please try again.",
+    management: "⚙ Management",
   },
   errors: {
     unexpected: "Unexpected error. Please, try again later.",

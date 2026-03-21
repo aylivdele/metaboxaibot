@@ -1,7 +1,7 @@
 import type { BotContext } from "../types/context.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { userStateService, dialogService } from "@metabox/api/services";
-import { config, generateWebToken, MODELS_BY_SECTION } from "@metabox/shared";
+import { config, generateWebToken } from "@metabox/shared";
 import type { Section } from "@metabox/shared";
 
 /** Returns the active dialog name for a section, or undefined. */
@@ -70,17 +70,13 @@ export async function handleDesign(ctx: BotContext): Promise<void> {
       }
     : { text: ctx.t.design.management };
 
-  const designModels = MODELS_BY_SECTION["design"] ?? [];
-  const modelRows: { text: string }[][] = [];
-  for (let i = 0; i < designModels.length; i += 2) {
-    const row: { text: string }[] = [{ text: designModels[i].name }];
-    if (designModels[i + 1]) row.push({ text: designModels[i + 1].name });
-    modelRows.push(row);
-  }
-
   await ctx.reply(text, {
     reply_markup: {
-      keyboard: [...modelRows, [managementBtn], [{ text: ctx.t.common.backToMain }]],
+      keyboard: [
+        [{ text: ctx.t.design.chooseModel }],
+        [managementBtn],
+        [{ text: ctx.t.common.backToMain }],
+      ],
       resize_keyboard: true,
       is_persistent: true,
     },
@@ -106,11 +102,22 @@ export async function handleAudio(ctx: BotContext): Promise<void> {
 export async function handleVideo(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "VIDEO_SECTION", "video");
+
+  const webappUrl = config.bot.webappUrl;
+  const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
+  const managementBtn = webappUrl
+    ? {
+        text: ctx.t.video.management,
+        web_app: { url: `${webappUrl}?page=management&section=video&wtoken=${token}` },
+      }
+    : { text: ctx.t.video.management };
+
   await ctx.reply(ctx.t.video.sectionTitle, {
     reply_markup: {
       keyboard: [
         [{ text: ctx.t.video.newDialog }],
         [{ text: ctx.t.video.avatars }, { text: ctx.t.video.lipSync }],
+        [managementBtn],
         [{ text: ctx.t.common.backToMain }],
       ],
       resize_keyboard: true,

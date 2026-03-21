@@ -1737,6 +1737,40 @@ input::placeholder {
   margin-top: 8px;
 }
 
+/* ── Management tabs ─────────────────────────────────────────────────────── */
+.manage-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.manage-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px 0;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.manage-tab {
+  flex: 1;
+  padding: 8px 4px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.manage-tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
 /* ── Image settings ──────────────────────────────────────────────────────── */
 .image-settings-list {
   display: flex;

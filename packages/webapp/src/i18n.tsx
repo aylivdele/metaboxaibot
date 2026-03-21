@@ -40,6 +40,9 @@ const translations = {
     "banner.referral.text": "Earn bonus tokens for every referral",
 
     // Management
+    "manage.tab.gpt": "GPT",
+    "manage.tab.design": "Design",
+    "manage.tab.video": "Video",
     "manage.title": "Dialogs",
     "manage.subtitle": "Manage your AI conversations",
     "manage.newDialog": "＋ New dialog",
@@ -216,6 +219,9 @@ const translations = {
     "banner.referral.text": "Получай бонусные токены за каждого реферала",
 
     // Management
+    "manage.tab.gpt": "GPT",
+    "manage.tab.design": "Дизайн",
+    "manage.tab.video": "Видео",
     "manage.title": "Диалоги",
     "manage.subtitle": "Управление AI-диалогами",
     "manage.newDialog": "＋ Новый диалог",

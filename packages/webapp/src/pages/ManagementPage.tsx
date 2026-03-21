@@ -180,12 +180,34 @@ function ImageSettingsView() {
   );
 }
 
-// ── Dispatcher ───────────────────────────────────────────────────────────────
+// ── Dispatcher with tab bar ───────────────────────────────────────────────────
+
+type ManageTab = "gpt" | "design" | "video";
 
 export function ManagementPage({ initialSection }: { initialSection?: string }) {
-  if (initialSection === "design") return <ImageSettingsView />;
-  if (initialSection === "video") return <VideoSettingsView />;
-  return <GptManagementView />;
+  const { t } = useI18n();
+  const [tab, setTab] = useState<ManageTab>(
+    initialSection === "design" ? "design" : initialSection === "video" ? "video" : "gpt",
+  );
+
+  return (
+    <div className="manage-root">
+      <div className="manage-tabs">
+        {(["gpt", "design", "video"] as ManageTab[]).map((s) => (
+          <button
+            key={s}
+            className={`manage-tab${tab === s ? " manage-tab--active" : ""}`}
+            onClick={() => setTab(s)}
+          >
+            {t(`manage.tab.${s}` as Parameters<typeof t>[0])}
+          </button>
+        ))}
+      </div>
+      {tab === "gpt" && <GptManagementView />}
+      {tab === "design" && <ImageSettingsView />}
+      {tab === "video" && <VideoSettingsView />}
+    </div>
+  );
 }
 
 // ── Chat history view ────────────────────────────────────────────────────────
