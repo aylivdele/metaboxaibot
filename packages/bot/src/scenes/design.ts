@@ -160,7 +160,10 @@ export async function handleDesignManagement(ctx: BotContext): Promise<void> {
     await ctx.reply(ctx.t.errors.unexpected);
     return;
   }
-  const kb = new InlineKeyboard().webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
+  const kb = new InlineKeyboard().webApp(
+    ctx.t.design.management,
+    `${webappUrl}?page=management&section=design`,
+  );
   await ctx.reply(ctx.t.design.management, { reply_markup: kb });
 }
 
