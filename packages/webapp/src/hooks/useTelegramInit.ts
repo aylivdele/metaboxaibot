@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { setInitDataRaw, api } from "../api/client.js";
+import { setInitDataRaw, setWebToken, api } from "../api/client.js";
 
 type TelegramWebApp = { initData: string; ready?: () => void };
 
@@ -19,6 +19,11 @@ function getTgWebApp(): TelegramWebApp | undefined {
   return (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
 }
 
+/** Read ?wtoken= from URL — issued by the bot for KeyboardButtonWebApp launches. */
+function getUrlWebToken(): string {
+  return new URLSearchParams(window.location.search).get("wtoken") ?? "";
+}
+
 export function useTelegramInit(): TelegramInitState {
   const [state, setState] = useState<TelegramInitState>({
     ready: false,
@@ -36,6 +41,29 @@ export function useTelegramInit(): TelegramInitState {
       return;
     }
 
+    // Try URL-based token immediately (KeyboardButtonWebApp / requestSimpleWebView
+    // never injects initData by Telegram design — token in URL is the fallback).
+    const wtoken = getUrlWebToken();
+    if (wtoken) {
+      api.auth
+        .verifyToken(wtoken)
+        .then((user) => {
+          setWebToken(wtoken);
+          setState({
+            ready: true,
+            error: null,
+            warning: null,
+            userId: user.id,
+            initDataRaw: null,
+          });
+        })
+        .catch((err: Error) => {
+          setState({ ready: false, error: err.message, warning: null, userId: null, initDataRaw: null });
+        });
+      return;
+    }
+
+    // No wtoken — poll for initData (inline keyboard webApp buttons inject it normally)
     let elapsed = 0;
     let cancelled = false;
     let warned = false;
@@ -45,13 +73,7 @@ export function useTelegramInit(): TelegramInitState {
       if (cancelled) return;
 
       const tg = getTgWebApp();
-      // For reply-keyboard webApp buttons Telegram may inject #tgWebAppData=...
-      // into the URL hash asynchronously (after the SDK already ran synchronously),
-      // so initData stays "" on the SDK object. Read the hash directly as fallback.
-      const hashRaw = new URLSearchParams(window.location.hash.slice(1)).get("tgWebAppData") ?? "";
-      const raw = tg?.initData || hashRaw;
-      console.log(`Hash: ${window.location.hash}`);
-      console.log(`tg: ${JSON.stringify(tg)}`);
+      const raw = tg?.initData ?? "";
 
       if (raw && !authInProgress) {
         authInProgress = true;
@@ -83,7 +105,6 @@ export function useTelegramInit(): TelegramInitState {
         return;
       }
 
-      // Show warning after WARN_AFTER_MS but keep polling indefinitely
       if (!warned && elapsed >= WARN_AFTER_MS) {
         warned = true;
         setState((prev) => ({

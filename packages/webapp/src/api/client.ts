@@ -12,9 +12,14 @@ import type {
 export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
 
 let _initDataRaw: string | null = null;
+let _webToken: string | null = null;
 
 export function setInitDataRaw(raw: string): void {
   _initDataRaw = raw;
+}
+
+export function setWebToken(token: string): void {
+  _webToken = token;
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -25,6 +30,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (_initDataRaw) {
     headers["Authorization"] = `tma ${_initDataRaw}`;
+  } else if (_webToken) {
+    headers["Authorization"] = `wtoken ${_webToken}`;
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -44,6 +51,8 @@ async function uploadRequest<T>(path: string, body: FormData): Promise<T> {
   const headers: Record<string, string> = {};
   if (_initDataRaw) {
     headers["Authorization"] = `tma ${_initDataRaw}`;
+  } else if (_webToken) {
+    headers["Authorization"] = `wtoken ${_webToken}`;
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -66,6 +75,11 @@ export const api = {
       request<{ id: string; tokenBalance: string }>("/auth/verify", {
         method: "POST",
         body: JSON.stringify({ initData }),
+      }),
+    verifyToken: (token: string) =>
+      request<{ id: string; tokenBalance: string }>("/auth/webtoken", {
+        method: "POST",
+        body: JSON.stringify({ token }),
       }),
   },
 
