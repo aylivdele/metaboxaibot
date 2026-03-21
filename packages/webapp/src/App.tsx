@@ -12,8 +12,16 @@ import { api } from "./api/client.js";
 import type { Page, UserProfile } from "./types.js";
 
 function parseHash(): { page: Page; section?: string } {
-  const [pagePart, sectionPart] = window.location.hash.slice(1).split("/");
   const validPages: Page[] = ["profile", "management", "tariffs", "referral", "admin", "gallery"];
+  // Prefer query params (?page=...) — avoids conflict with Telegram's #tgWebAppData hash injection
+  const params = new URLSearchParams(window.location.search);
+  const qPage = params.get("page");
+  const qSection = params.get("section") ?? undefined;
+  if (qPage && validPages.includes(qPage as Page)) {
+    return { page: qPage as Page, section: qSection };
+  }
+  // Fallback: legacy hash routing (#page or #page/section)
+  const [pagePart, sectionPart] = window.location.hash.slice(1).split("/");
   const page = validPages.includes(pagePart as Page) ? (pagePart as Page) : "profile";
   return { page, section: sectionPart };
 }

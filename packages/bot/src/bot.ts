@@ -52,7 +52,7 @@ export function createBot(token: string): Bot<BotContext> {
   bot.command("profile", async (ctx) => {
     const webappUrl = config.bot.webappUrl;
     if (!webappUrl || !ctx.t) return;
-    const kb = new InlineKeyboard().webApp(ctx.t.menu.profile, `${webappUrl}#profile`);
+    const kb = new InlineKeyboard().webApp(ctx.t.menu.profile, `${webappUrl}?page=profile`);
     await ctx.reply(ctx.t.menu.profile, { reply_markup: kb });
   });
   bot.command("gpt", handleGpt);

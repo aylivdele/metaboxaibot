@@ -8,7 +8,7 @@ export function buildMainMenuKeyboard(t: Translations): Keyboard {
 
   // Profile — full-width first row, opens mini app directly if configured
   if (webappUrl) {
-    kb.webApp(t.menu.profile, `${webappUrl}#profile`);
+    kb.webApp(t.menu.profile, `${webappUrl}?page=profile`);
   } else {
     kb.text(t.menu.profile);
   }
@@ -16,7 +16,7 @@ export function buildMainMenuKeyboard(t: Translations): Keyboard {
   kb.row().text(t.menu.gpt).text(t.menu.design).row().text(t.menu.audio).text(t.menu.video).row();
 
   if (webappUrl) {
-    kb.webApp(t.menu.storage, `${webappUrl}#gallery`);
+    kb.webApp(t.menu.storage, `${webappUrl}?page=gallery`);
   } else {
     kb.text(t.menu.storage);
   }

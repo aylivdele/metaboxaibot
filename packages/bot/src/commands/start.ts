@@ -46,7 +46,7 @@ export async function handleLanguageSelect(ctx: BotContext): Promise<void> {
   // Inline button to open Profile in mini app
   const webappUrl = config.bot.webappUrl;
   const profileKb = webappUrl
-    ? new InlineKeyboard().webApp(t.menu.profile, `${webappUrl}#profile`)
+    ? new InlineKeyboard().webApp(t.menu.profile, `${webappUrl}?page=profile`)
     : undefined;
 
   // New users: show tokens credited; returning users: show current balance

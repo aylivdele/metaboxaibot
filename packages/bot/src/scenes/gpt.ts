@@ -105,7 +105,7 @@ export async function handleGptManagement(ctx: BotContext): Promise<void> {
     await ctx.reply(ctx.t.errors.unexpected);
     return;
   }
-  const kb = new InlineKeyboard().webApp(ctx.t.gpt.management, `${webappUrl}#management/gpt`);
+  const kb = new InlineKeyboard().webApp(ctx.t.gpt.management, `${webappUrl}?page=management&section=gpt`);
   await ctx.reply(ctx.t.gpt.management, { reply_markup: kb });
 }
 

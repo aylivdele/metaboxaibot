@@ -32,7 +32,7 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
 
   const webappUrl = config.bot.webappUrl;
   const managementBtn = webappUrl
-    ? { text: ctx.t.gpt.management, web_app: { url: `${webappUrl}#management/gpt` } }
+    ? { text: ctx.t.gpt.management, web_app: { url: `${webappUrl}?page=management&section=gpt` } }
     : { text: ctx.t.gpt.management };
 
   await ctx.reply(text, {
@@ -59,7 +59,7 @@ export async function handleDesign(ctx: BotContext): Promise<void> {
 
   const webappUrl = config.bot.webappUrl;
   const managementBtn = webappUrl
-    ? { text: ctx.t.design.management, web_app: { url: `${webappUrl}#management/design` } }
+    ? { text: ctx.t.design.management, web_app: { url: `${webappUrl}?page=management&section=design` } }
     : { text: ctx.t.design.management };
 
   await ctx.reply(text, {
