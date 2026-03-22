@@ -10,6 +10,7 @@ export interface UserProfile {
   email: string | null;
   emailVerified: boolean;
   metaboxUserId: string | null;
+  metaboxReferralCode: string | null;
   transactions: Transaction[];
 }
 

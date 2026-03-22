@@ -70,6 +70,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 export interface RegisterFromBotResult {
   metaboxUserId: string;
   ssoToken: string;
+  referralCode: string;
 }
 
 /** Register a new Metabox user from the bot (email + password). */

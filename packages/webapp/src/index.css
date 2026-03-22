@@ -914,6 +914,17 @@ input::placeholder {
   padding: 20px;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.referral-card__type {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.referral-card__link-cta {
+  margin-top: 10px;
+  width: 100%;
 }
 .referral-card__label {
   font-size: 12px;

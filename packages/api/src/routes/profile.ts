@@ -43,6 +43,7 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       email: user.email ?? null,
       emailVerified: user.emailVerified,
       metaboxUserId: user.metaboxUserId ?? null,
+      metaboxReferralCode: user.metaboxReferralCode ?? null,
       tokenBalance: user.tokenBalance.toString(),
       referralCount,
       createdAt: user.createdAt.toISOString(),
@@ -131,7 +132,10 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       firstName,
       referrerTelegramId: user?.referredById ?? undefined,
     });
-    await db.user.update({ where: { id: userId }, data: { metaboxUserId: result.metaboxUserId } });
+    await db.user.update({
+      where: { id: userId },
+      data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
+    });
     const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
     return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
   });
@@ -148,7 +152,10 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const { loginAndLink } = await import("../services/metabox-bridge.service.js");
     const result = await loginAndLink({ email, password, telegramId: userId });
-    await db.user.update({ where: { id: userId }, data: { metaboxUserId: result.metaboxUserId } });
+    await db.user.update({
+      where: { id: userId },
+      data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
+    });
     const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
     return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
   });

@@ -135,7 +135,7 @@ function AppContent() {
         )}
         {page === "management" && <ManagementPage initialSection={initial.section} />}
         {page === "tariffs" && <TariffsPage />}
-        {page === "referral" && <ReferralPage />}
+        {page === "referral" && <ReferralPage onLinkMetabox={() => setPage("linkMetabox")} />}
         {page === "admin" && <AdminPage />}
         {page === "linkMetabox" && (
           <LinkMetaboxPage
