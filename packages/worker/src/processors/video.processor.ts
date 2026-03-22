@@ -79,7 +79,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
   } catch (err) {
     logger.error({ dbJobId, err }, "Video job failed");
 
-    const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 1);
+    const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 1) - 1;
 
     if (isLastAttempt) {
       await db.generationJob.update({
