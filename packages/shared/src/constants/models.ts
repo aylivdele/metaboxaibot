@@ -262,7 +262,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    supportedDurations: [5, 10, 20],
+    supportedDurations: [4, 8, 12], // sora-2 discrete values
   },
   runway: {
     id: "runway",
@@ -279,7 +279,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1280:768", "768:1280", "1104:832", "832:1104"],
-    supportedDurations: [5, 10],
+    durationRange: { min: 2, max: 10 }, // Gen-4: any integer 2–10s
   },
   veo: {
     id: "veo",
@@ -296,7 +296,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
-    supportedDurations: [5, 10],
+    durationRange: { min: 5, max: 8 }, // veo-2: any integer 5–8s
   },
   luma: {
     id: "luma",
@@ -313,7 +313,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"],
-    supportedDurations: [5, 10],
+    supportedDurations: [5, 9], // "5s" / "9s"
   },
   minimax: {
     id: "minimax",

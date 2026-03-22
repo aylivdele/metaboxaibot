@@ -3,6 +3,80 @@ import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { Dialog, Message, Model, UserState } from "../types.js";
 
+// ── Universal duration control ────────────────────────────────────────────────
+
+interface DurationControlProps {
+  model: Model;
+  value: number | undefined;
+  onChange: (duration: number) => void;
+  secondsLabel: string;
+  fixedLabel: string;
+}
+
+function DurationControl({
+  model,
+  value,
+  onChange,
+  secondsLabel,
+  fixedLabel,
+}: DurationControlProps) {
+  const { durationRange, supportedDurations } = model;
+
+  // Continuous slider
+  if (durationRange) {
+    const { min, max } = durationRange;
+    const current = value ?? min;
+    return (
+      <div className="duration-slider-wrap">
+        <div className="duration-slider-value">
+          {current}
+          <span>{secondsLabel}</span>
+        </div>
+        <input
+          type="range"
+          className="duration-slider"
+          min={min}
+          max={max}
+          step={1}
+          value={current}
+          onChange={(e) => onChange(Number(e.target.value))}
+        />
+        <div className="duration-range-labels">
+          <span>
+            {min}
+            {secondsLabel}
+          </span>
+          <span>
+            {max}
+            {secondsLabel}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Discrete presets
+  if (supportedDurations && supportedDurations.length > 0) {
+    return (
+      <div className="image-settings-ratios">
+        {supportedDurations.map((sec) => (
+          <button
+            key={sec}
+            className={`ratio-btn${value === sec ? " ratio-btn--active" : ""}`}
+            onClick={() => onChange(sec)}
+          >
+            {sec}
+            {secondsLabel}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  // Fixed / not configurable
+  return <div className="image-settings-model__no-support">{fixedLabel}</div>;
+}
+
 // ── Video settings view (section=video) ──────────────────────────────────────
 
 function VideoSettingsView() {
@@ -81,24 +155,13 @@ function VideoSettingsView() {
 
               <div className="video-settings-section">
                 <div className="video-settings-label">{t("videoSettings.duration")}</div>
-                {!model.supportedDurations || model.supportedDurations.length === 0 ? (
-                  <div className="image-settings-model__no-support">
-                    {t("videoSettings.noDurationSupport")}
-                  </div>
-                ) : (
-                  <div className="image-settings-ratios">
-                    {model.supportedDurations.map((sec) => (
-                      <button
-                        key={sec}
-                        className={`ratio-btn${current.duration === sec ? " ratio-btn--active" : ""}`}
-                        onClick={() => void handlePatch(model.id, { duration: sec })}
-                      >
-                        {sec}
-                        {t("videoSettings.seconds")}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <DurationControl
+                  model={model}
+                  value={current.duration}
+                  onChange={(duration) => void handlePatch(model.id, { duration })}
+                  secondsLabel={t("videoSettings.seconds")}
+                  fixedLabel={t("videoSettings.noDurationSupport")}
+                />
               </div>
             </div>
           );
@@ -203,9 +266,11 @@ export function ManagementPage({ initialSection }: { initialSection?: string }) 
           </button>
         ))}
       </div>
-      {tab === "gpt" && <GptManagementView />}
-      {tab === "design" && <ImageSettingsView />}
-      {tab === "video" && <VideoSettingsView />}
+      <div className="manage-content">
+        {tab === "gpt" && <GptManagementView />}
+        {tab === "design" && <ImageSettingsView />}
+        {tab === "video" && <VideoSettingsView />}
+      </div>
     </div>
   );
 }

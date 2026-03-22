@@ -41,6 +41,7 @@ export interface Model {
   isAsync: boolean;
   supportedAspectRatios?: string[] | null;
   supportedDurations?: number[] | null;
+  durationRange?: { min: number; max: number } | null;
 }
 
 export interface UserState {

@@ -79,14 +79,21 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
   } catch (err) {
     logger.error({ dbJobId, err }, "Video job failed");
 
-    await db.generationJob.update({
-      where: { id: dbJobId },
-      data: { status: "failed", error: String(err) },
-    });
+    const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 1);
 
-    await telegram
-      .sendMessage(telegramChatId, `❌ Video generation failed: ${String(err).slice(0, 200)}`)
-      .catch(() => void 0);
+    if (isLastAttempt) {
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "failed", error: String(err) },
+      });
+
+      await telegram
+        .sendMessage(
+          telegramChatId,
+          "❌ Ошибка при генерации, попробуйте позже или обратитесь в поддержку.",
+        )
+        .catch(() => void 0);
+    }
 
     throw err;
   }

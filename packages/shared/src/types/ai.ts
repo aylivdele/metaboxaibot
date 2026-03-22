@@ -34,9 +34,15 @@ export interface AIModel {
   supportedAspectRatios?: string[] | null;
   /**
    * Supported clip durations in seconds for video generation models.
-   * null = model does not support duration selection.
+   * null = model does not support duration selection (fixed).
+   * Use supportedDurations for discrete presets, durationRange for continuous slider.
    */
   supportedDurations?: number[] | null;
+  /**
+   * Continuous duration range for models that accept any integer value between min and max.
+   * When set, a slider is shown instead of preset buttons.
+   */
+  durationRange?: { min: number; max: number } | null;
 }
 
 /** Входные данные для LLM-чата (с учётом стратегии контекста) */
