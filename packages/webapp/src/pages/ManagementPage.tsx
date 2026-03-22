@@ -234,9 +234,7 @@ function ImageSettingsView() {
       {model && (
         <div className="model-settings-panel">
           {!ratios || ratios.length === 0 ? (
-            <div className="image-settings-model__no-support">
-              {t("imageSettings.noSupport")}
-            </div>
+            <div className="image-settings-model__no-support">{t("imageSettings.noSupport")}</div>
           ) : (
             <div className="image-settings-ratios">
               {ratios.map((ratio) => (
@@ -497,9 +495,7 @@ function GptManagementView() {
                   onClick={() => !creating && void handleCreateDialog(m.id)}
                 >
                   <div className="model-item__name">{m.name}</div>
-                  {m.description && (
-                    <div className="model-item__desc">{m.description}</div>
-                  )}
+                  {m.description && <div className="model-item__desc">{m.description}</div>}
                   <div className="model-item__meta">
                     {formatModelPrice(m, t("manage.price.perReq"), t("manage.price.perMsg"))} ·{" "}
                     {m.provider}

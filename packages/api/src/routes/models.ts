@@ -24,9 +24,7 @@ function serializeModel(m: AIModel) {
     /** Fixed cost per request in internal tokens (0 for LLM) */
     tokenCostPerRequest: isLLM ? 0 : calculateCost(m),
     /** Estimated cost per message in internal tokens (LLM only, based on typical msg size) */
-    tokenCostApproxMsg: isLLM
-      ? calculateCost(m, TYPICAL_INPUT_TOKENS, TYPICAL_OUTPUT_TOKENS)
-      : 0,
+    tokenCostApproxMsg: isLLM ? calculateCost(m, TYPICAL_INPUT_TOKENS, TYPICAL_OUTPUT_TOKENS) : 0,
     isLLM,
   };
 }
@@ -36,9 +34,7 @@ export const modelsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Querystring: { section?: string } }>("/models", async (request) => {
     const { section } = request.query;
 
-    const models = section
-      ? (MODELS_BY_SECTION[section] ?? [])
-      : Object.values(AI_MODELS);
+    const models = section ? (MODELS_BY_SECTION[section] ?? []) : Object.values(AI_MODELS);
 
     return models.map(serializeModel);
   });

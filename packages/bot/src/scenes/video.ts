@@ -1,5 +1,10 @@
 import type { BotContext } from "../types/context.js";
-import { videoGenerationService, userStateService, dialogService, calculateCost } from "@metabox/api/services";
+import {
+  videoGenerationService,
+  userStateService,
+  dialogService,
+  calculateCost,
+} from "@metabox/api/services";
 import { MODELS_BY_SECTION, AI_MODELS } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
