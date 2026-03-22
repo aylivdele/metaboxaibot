@@ -114,7 +114,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
   } catch (err) {
     logger.error({ dbJobId, err }, "Image job failed");
 
-    const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 1);
+    const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 1) - 1;
 
     if (isLastAttempt) {
       await db.generationJob.update({
