@@ -4,7 +4,8 @@ import { config } from "@metabox/shared";
 
 const MODEL_ENDPOINTS: Record<string, string> = {
   flux: "fal-ai/flux/dev",
-  "flux-pro": "fal-ai/flux-pro",
+  "flux-pro": "fal-ai/flux-pro/v1.1",
+  "recraft-v3": "fal-ai/recraft-v3",
   "stable-diffusion": "fal-ai/stable-diffusion-v3-medium",
 };
 

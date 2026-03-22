@@ -121,6 +121,8 @@ export const config = {
     anthropic: opt("ANTHROPIC_API_KEY"),
     google: opt("GOOGLE_AI_API_KEY"),
     qwen: opt("QWEN_API_KEY"),
+    grok: opt("GROK_API_KEY"),
+    deepseek: opt("DEEPSEEK_API_KEY"),
     fal: opt("FAL_API_KEY"),
     replicate: opt("REPLICATE_API_KEY") ?? opt("REPLICATE_API_TOKEN"),
     runway: opt("RUNWAY_API_KEY"),

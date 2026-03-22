@@ -9,8 +9,8 @@ import type {
 import { config } from "@metabox/shared";
 
 const MODEL_MAP: Record<string, string> = {
-  "gemini-2-flash": "gemini-2.0-flash",
-  "gemini-2-pro": "gemini-2.0-pro",
+  "gemini-2-flash": "gemini-2.5-flash",
+  "gemini-2-pro": "gemini-2.5-pro",
 };
 
 /**

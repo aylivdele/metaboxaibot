@@ -6,10 +6,11 @@ import { config } from "@metabox/shared";
  * FAL.ai video adapter — used for Kling, MiniMax, Pika, Hailuo.
  */
 const FAL_ENDPOINTS: Record<string, string> = {
-  kling: "fal-ai/kling-video/v1.6/standard/text-to-video",
+  kling: "fal-ai/kling-video/v2/standard/text-to-video",
   minimax: "fal-ai/minimax/video-01-live",
   pika: "fal-ai/pika-v2/text-to-video",
   hailuo: "fal-ai/hailuo-ai/video-01",
+  wan: "fal-ai/wan/v2.1/text-to-video",
 };
 
 export class FalVideoAdapter implements VideoAdapter {
