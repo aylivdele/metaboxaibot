@@ -146,6 +146,18 @@ export const api = {
       }),
   },
 
+  metaboxAibot: {
+    products: () =>
+      request<{ id: string; name: string; tokens: number; priceRub: string }[]>(
+        "/metabox-aibot/products"
+      ),
+    buy: (productId: string) =>
+      request<{ paymentUrl: string }>("/metabox-aibot/buy", {
+        method: "POST",
+        body: JSON.stringify({ productId }),
+      }),
+  },
+
   slides: {
     list: () => request<{ slides: BannerSlide[] }>("/slides"),
   },

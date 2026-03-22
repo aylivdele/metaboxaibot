@@ -1,5 +1,6 @@
 import { db } from "../db.js";
 import { config, PLANS } from "@metabox/shared";
+import { recordSale } from "./metabox-bridge.service.js";
 
 export const paymentService = {
   /** Create a Telegram Stars invoice link via Bot API. */
@@ -44,5 +45,19 @@ export const paymentService = {
         },
       }),
     ]);
+
+    // Notify Metabox for MLM bonus calculation (non-fatal: user is linked only if metaboxUserId is set)
+    const user = await db.user.findUnique({ where: { id: userId }, select: { metaboxUserId: true } });
+    if (user?.metaboxUserId) {
+      recordSale({
+        telegramId: userId,
+        tokens: plan.tokens,
+        priceRub: plan.priceRub,
+        marginRub: plan.marginRub,
+      }).catch((err: unknown) => {
+        // Non-fatal: log but don't fail the payment
+        console.error("[payment] recordSale error:", err);
+      });
+    }
   },
 };

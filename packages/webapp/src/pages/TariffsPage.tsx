@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
+import type { UserProfile } from "../types.js";
 
 interface Plan {
   id: string;
@@ -8,6 +9,13 @@ interface Plan {
   tokens: number;
   stars: number;
   popular: boolean;
+}
+
+interface MetaboxProduct {
+  id: string;
+  name: string;
+  tokens: number;
+  priceRub: string;
 }
 
 const PLANS: Plan[] = [
@@ -20,6 +28,7 @@ const PLANS: Plan[] = [
 
 type TgWebApp = {
   openInvoice?: (url: string, cb?: (status: string) => void) => void;
+  openLink?: (url: string) => void;
 };
 
 function getTgWebApp(): TgWebApp | undefined {
@@ -31,11 +40,20 @@ export function TariffsPage() {
   const [balance, setBalance] = useState<string | null>(null);
   const [buying, setBuying] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [metaboxProducts, setMetaboxProducts] = useState<MetaboxProduct[]>([]);
 
   useEffect(() => {
     api.profile
       .get()
-      .then((p) => setBalance(p.tokenBalance))
+      .then((p) => {
+        setBalance(p.tokenBalance);
+        setProfile(p);
+        // Fetch Metabox products only if account is linked
+        if (p.metaboxUserId) {
+          api.metaboxAibot.products().then(setMetaboxProducts).catch(() => void 0);
+        }
+      })
       .catch(() => void 0);
   }, []);
 
@@ -56,7 +74,6 @@ export function TariffsPage() {
       tg.openInvoice(invoiceUrl, (status) => {
         if (status === "paid") {
           setNotice({ text: `✅ ${plan.tokens} ${t("tariffs.success")}`, ok: true });
-          // Refresh balance
           api.profile
             .get()
             .then((p) => setBalance(p.tokenBalance))
@@ -67,6 +84,26 @@ export function TariffsPage() {
           setNotice({ text: t("tariffs.failed"), ok: false });
         }
       });
+    } catch {
+      setNotice({ text: t("tariffs.invoiceError"), ok: false });
+    } finally {
+      setBuying(null);
+    }
+  };
+
+  const handleMetaboxBuy = async (productId: string) => {
+    if (buying) return;
+    setBuying(`mb_${productId}`);
+    setNotice(null);
+
+    try {
+      const { paymentUrl } = await api.metaboxAibot.buy(productId);
+      const tg = getTgWebApp();
+      if (tg?.openLink) {
+        tg.openLink(paymentUrl);
+      } else {
+        window.open(paymentUrl, "_blank");
+      }
     } catch {
       setNotice({ text: t("tariffs.invoiceError"), ok: false });
     } finally {
@@ -94,6 +131,7 @@ export function TariffsPage() {
         </div>
       )}
 
+      {/* Telegram Stars payments */}
       <div className="plans-grid">
         {PLANS.map((plan) => (
           <div key={plan.id} className={`plan-card${plan.popular ? " plan-card--popular" : ""}`}>
@@ -111,6 +149,30 @@ export function TariffsPage() {
           </div>
         ))}
       </div>
+
+      {/* Metabox card payments (only if Metabox account is linked and products loaded) */}
+      {profile?.metaboxUserId && metaboxProducts.length > 0 && (
+        <div className="metabox-plans-section">
+          <h3 className="metabox-plans-title">{t("tariffs.metaboxTitle")}</h3>
+          <p className="page-subtitle">{t("tariffs.metaboxDescription")}</p>
+          <div className="plans-grid">
+            {metaboxProducts.map((product) => (
+              <div key={product.id} className="plan-card">
+                <div className="plan-card__label">{product.name}</div>
+                <div className="plan-card__tokens">✦ {product.tokens}</div>
+                <div className="plan-card__price">{Number(product.priceRub).toLocaleString("ru-RU")} ₽</div>
+                <button
+                  className="plan-card__btn plan-card__btn--metabox"
+                  onClick={() => handleMetaboxBuy(product.id)}
+                  disabled={buying !== null}
+                >
+                  {buying === `mb_${product.id}` ? t("tariffs.buying") : t("tariffs.buyCard")}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="tariff-note">
         {t("tariffs.note")}

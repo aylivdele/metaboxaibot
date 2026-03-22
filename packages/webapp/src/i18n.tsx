@@ -69,6 +69,9 @@ const translations = {
     "tariffs.success": "tokens credited to your balance!",
     "tariffs.failed": "Payment failed. Please try again.",
     "tariffs.invoiceError": "Could not create invoice. Please try again.",
+    "tariffs.metaboxTitle": "Pay by Card (via Metabox)",
+    "tariffs.metaboxDescription": "Pay with a bank card through the Metabox platform. Tokens are credited after payment confirmation.",
+    "tariffs.buyCard": "Pay by Card",
 
     // Referral
     "referral.title": "Referral Program",
@@ -266,6 +269,9 @@ const translations = {
     "tariffs.success": "токенов зачислено на ваш баланс!",
     "tariffs.failed": "Оплата не удалась. Попробуйте снова.",
     "tariffs.invoiceError": "Не удалось создать счёт. Попробуйте снова.",
+    "tariffs.metaboxTitle": "Оплата картой (через Metabox)",
+    "tariffs.metaboxDescription": "Оплатите банковской картой через платформу Metabox. Токены зачисляются после подтверждения оплаты.",
+    "tariffs.buyCard": "Оплатить картой",
 
     // Referral
     "referral.title": "Реферальная программа",

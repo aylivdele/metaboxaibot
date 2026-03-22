@@ -65,6 +65,16 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function get<T>(path: string): Promise<T> {
+  const { url } = base();
+  const res = await fetch(`${url}/api${path}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Metabox API GET ${path} → ${res.status}: ${text}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 // ── API methods ───────────────────────────────────────────────────────────────
 
 export interface RegisterFromBotResult {
@@ -118,11 +128,38 @@ export async function issueSsoTokenRemote(metaboxUserId: string): Promise<{ ssoT
 /** Notify Metabox of a token purchase made inside the bot (for MLM bonus calculation). */
 export async function recordSale(params: {
   telegramId: bigint;
-  productId: string;
-  priceUsd: number;
-  costUsd: number;
+  productId?: string;
+  tokens: number;
+  priceRub: number;
+  marginRub: number;
 }): Promise<void> {
   await post("/record-sale", {
+    ...params,
+    telegramId: params.telegramId.toString(),
+  });
+}
+
+// ── AI token product catalog ─────────────────────────────────────────────────
+
+export interface AiBotProduct {
+  id: string;
+  name: string;
+  tokens: number;
+  priceRub: string; // Decimal as string
+}
+
+/** Fetch the list of active AI token packages from Metabox. */
+export async function getAiBotProducts(): Promise<AiBotProduct[]> {
+  return get<AiBotProduct[]>("/aibot/products");
+}
+
+/** Ask Metabox to create an AiBotOrder + Lava invoice for a linked user. */
+export async function createAiBotInvoice(params: {
+  metaboxUserId: string;
+  productId: string;
+  telegramId: bigint;
+}): Promise<{ paymentUrl: string; orderId: string }> {
+  return post<{ paymentUrl: string; orderId: string }>("/aibot-invoice", {
     ...params,
     telegramId: params.telegramId.toString(),
   });

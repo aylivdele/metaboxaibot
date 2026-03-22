@@ -12,4 +12,5 @@ export type { SubmitAudioParams, SubmitAudioResult } from "./audio-generation.se
 export { paymentService } from "./payment.service.js";
 export { deductTokens, checkBalance, calculateCost } from "./token.service.js";
 export { s3Service, getFileUrl } from "./s3.service.js";
-export { verifyLinkToken, issueSsoToken, registerFromBot, loginAndLink, recordSale, issueSsoTokenRemote } from "./metabox-bridge.service.js";
+export { verifyLinkToken, issueSsoToken, registerFromBot, loginAndLink, recordSale, issueSsoTokenRemote, getAiBotProducts, createAiBotInvoice } from "./metabox-bridge.service.js";
+export type { AiBotProduct } from "./metabox-bridge.service.js";
