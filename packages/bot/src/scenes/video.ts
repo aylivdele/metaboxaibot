@@ -1,6 +1,6 @@
 import type { BotContext } from "../types/context.js";
-import { videoGenerationService, userStateService, dialogService } from "@metabox/api/services";
-import { MODELS_BY_SECTION } from "@metabox/shared";
+import { videoGenerationService, userStateService, dialogService, calculateCost } from "@metabox/api/services";
+import { MODELS_BY_SECTION, AI_MODELS } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 
@@ -27,7 +27,14 @@ export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
   await userStateService.setState(ctx.user.id, "VIDEO_ACTIVE", "video");
   await userStateService.setModel(ctx.user.id, modelId);
 
-  await ctx.reply(ctx.t.video.modelActivated);
+  const model = AI_MODELS[modelId];
+  if (model) {
+    const cost = calculateCost(model);
+    const costLine = ctx.t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
+    await ctx.reply(`🎬 ${model.name}\n\n${model.description}\n\n${costLine}`);
+  } else {
+    await ctx.reply(ctx.t.video.modelActivated);
+  }
 }
 
 // ── Incoming prompt in VIDEO_ACTIVE state ─────────────────────────────────────

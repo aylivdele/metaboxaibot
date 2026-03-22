@@ -746,6 +746,12 @@ input::placeholder {
   font-weight: 600;
   font-size: 15px;
 }
+.model-item__desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 2px 0 1px;
+  line-height: 1.4;
+}
 .model-item__meta {
   font-size: 12px;
   color: var(--text-hint);
@@ -758,6 +764,41 @@ input::placeholder {
   font-size: 12px;
   font-weight: 700;
   color: var(--accent);
+}
+
+.model-filter-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.model-filter-btn {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.model-filter-btn--active {
+  border-color: var(--accent);
+  background: var(--accent-lighter);
+  color: var(--accent-light);
+}
+
+.model-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-hint);
+  line-height: 1.6;
 }
 
 /* ── Tariffs ────────────────────────────────────────────────────────────────── */
@@ -1776,6 +1817,22 @@ input::placeholder {
 .manage-tab--active {
   color: var(--accent);
   border-bottom-color: var(--accent);
+}
+
+/* ── Model settings panel (design / video select-based UI) ───────────────── */
+.model-settings-panel {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.model-settings-saved {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--success, #4caf7d);
 }
 
 /* ── Image settings ──────────────────────────────────────────────────────── */

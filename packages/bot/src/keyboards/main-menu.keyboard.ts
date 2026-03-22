@@ -19,11 +19,11 @@ export function buildMainMenuKeyboard(t: Translations, userId?: bigint): Keyboar
 
   if (webappUrl && userId) {
     const token = generateWebToken(userId, config.bot.token);
-    kb.row().webApp(t.menu.storage, `${webappUrl}?page=profile&section=gallery&wtoken=${token}`);
+    kb.webApp(t.menu.storage, `${webappUrl}?page=profile&section=gallery&wtoken=${token}`).row();
   } else if (webappUrl) {
-    kb.row().webApp(t.menu.storage, `${webappUrl}?page=gallery`);
+    kb.webApp(t.menu.storage, `${webappUrl}?page=gallery`).row();
   } else {
-    kb.row().text(t.menu.storage);
+    kb.text(t.menu.storage).row();
   }
 
   return kb.text(t.menu.help).text(t.menu.knowledgeBase).resized().persistent();

@@ -53,6 +53,15 @@ const translations = {
     "manage.back": "← Back",
     "manage.noMessages": "No messages yet",
     "manage.activate": "Select",
+    "manage.filter.all": "All",
+    "manage.filter.images": "🖼 Vision",
+    "manage.filter.voice": "🎙 Voice",
+    "manage.filter.web": "🌐 Web",
+    "manage.legend.images": "🖼 Vision — can process images",
+    "manage.legend.voice": "🎙 Voice — supports audio input",
+    "manage.legend.web": "🌐 Web — can search the internet",
+    "manage.price.perReq": "/req",
+    "manage.price.perMsg": "/msg",
 
     // Tariffs
     "tariffs.title": "Token Packages",
@@ -165,12 +174,14 @@ const translations = {
     // Image settings
     "imageSettings.title": "Image Settings",
     "imageSettings.subtitle": "Choose aspect ratio per model",
+    "imageSettings.model": "Model",
     "imageSettings.noSupport": "This model doesn't support custom aspect ratios",
     "imageSettings.saved": "✓ Saved",
 
     // Video settings
     "videoSettings.title": "Video Settings",
     "videoSettings.subtitle": "Choose aspect ratio and duration per model",
+    "videoSettings.model": "Model",
     "videoSettings.aspectRatio": "Aspect ratio",
     "videoSettings.duration": "Duration",
     "videoSettings.seconds": "s",
@@ -232,6 +243,15 @@ const translations = {
     "manage.back": "← Назад",
     "manage.noMessages": "Сообщений пока нет",
     "manage.activate": "Выбрать",
+    "manage.filter.all": "Все",
+    "manage.filter.images": "🖼 Зрение",
+    "manage.filter.voice": "🎙 Голос",
+    "manage.filter.web": "🌐 Веб",
+    "manage.legend.images": "🖼 Зрение — понимает изображения",
+    "manage.legend.voice": "🎙 Голос — принимает аудио",
+    "manage.legend.web": "🌐 Веб — ищет в интернете",
+    "manage.price.perReq": "/запрос",
+    "manage.price.perMsg": "/сообщение",
 
     // Tariffs
     "tariffs.title": "Пакеты токенов",
@@ -343,12 +363,14 @@ const translations = {
     // Image settings
     "imageSettings.title": "Настройки изображений",
     "imageSettings.subtitle": "Соотношение сторон для каждой модели",
+    "imageSettings.model": "Модель",
     "imageSettings.noSupport": "Эта модель не поддерживает выбор соотношения сторон",
     "imageSettings.saved": "✓ Сохранено",
 
     // Video settings
     "videoSettings.title": "Настройки видео",
     "videoSettings.subtitle": "Соотношение сторон и длительность для каждой модели",
+    "videoSettings.model": "Модель",
     "videoSettings.aspectRatio": "Соотношение сторон",
     "videoSettings.duration": "Длительность",
     "videoSettings.seconds": "с",

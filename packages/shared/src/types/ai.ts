@@ -4,6 +4,8 @@ import type { ContextStrategy } from "./dialog.js";
 export interface AIModel {
   id: string;
   name: string;
+  /** Short model description shown to users (1–2 sentences). */
+  description: string;
   section: Section;
   provider: string;
   /**

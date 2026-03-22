@@ -7,6 +7,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gpt-4o": {
     id: "gpt-4o",
     name: "GPT-4o",
+    description:
+      "Флагман OpenAI. Понимает изображения и голос, отлично справляется с анализом, кодом и сложными задачами.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -22,6 +24,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gpt-4o-mini": {
     id: "gpt-4o-mini",
     name: "GPT-4o Mini",
+    description:
+      "Лёгкая и быстрая версия GPT-4o. Отлично подходит для простых диалогов и повседневных задач при минимальных затратах.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -37,6 +41,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gpt-4o-assistants": {
     id: "gpt-4o-assistants",
     name: "GPT-4o (Assistants)",
+    description:
+      "GPT-4o с расширенными инструментами через OpenAI Assistants. Поддерживает поиск в интернете, выполнение кода и работу с файлами.",
     section: "gpt",
     provider: "openai-assistants",
     costUsdPerRequest: 0,
@@ -52,6 +58,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "claude-sonnet": {
     id: "claude-sonnet",
     name: "Claude Sonnet 4.6",
+    description:
+      "Умный и быстрый ИИ от Anthropic. Отлично справляется с длинными текстами, кодом и нюансированными инструкциями. Понимает изображения.",
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
@@ -67,6 +75,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "claude-haiku": {
     id: "claude-haiku",
     name: "Claude Haiku 4.5",
+    description:
+      "Самая быстрая и лёгкая модель Claude. Идеальна для быстрых ответов, простых вопросов и задач, не требующих глубокого анализа.",
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
@@ -82,6 +92,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gemini-2-flash": {
     id: "gemini-2-flash",
     name: "Gemini 2.5 Flash",
+    description:
+      "Быстрая мультимодальная модель Google с выходом в интернет. Понимает изображения, хорошо справляется с длинными текстами.",
     section: "gpt",
     provider: "google",
     costUsdPerRequest: 0,
@@ -98,6 +110,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gemini-2-pro": {
     id: "gemini-2-pro",
     name: "Gemini 2.5 Pro",
+    description:
+      "Самая мощная модель Google. Превосходит аналоги в сложных рассуждениях, математике и длинных контекстах. Поддерживает поиск в интернете.",
     section: "gpt",
     provider: "google",
     costUsdPerRequest: 0,
@@ -113,6 +127,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "qwen-max": {
     id: "qwen-max",
     name: "Qwen Max",
+    description:
+      "Флагманская модель Alibaba. Сильна в работе с азиатскими языками, кодом, деловыми задачами и длинными документами.",
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,
@@ -128,6 +144,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gpt-4.1": {
     id: "gpt-4.1",
     name: "GPT-4.1",
+    description:
+      "Обновлённый GPT-4 с улучшенным следованием инструкциям и работой с длинными контекстами. Понимает изображения.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -143,6 +161,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gpt-4.1-mini": {
     id: "gpt-4.1-mini",
     name: "GPT-4.1 Mini",
+    description:
+      "Компактная версия GPT-4.1 — отличный баланс качества и цены для повседневных задач. Понимает изображения.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -158,6 +178,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "o4-mini": {
     id: "o4-mini",
     name: "o4-mini",
+    description:
+      "Рассуждающая модель OpenAI. Думает перед ответом, что повышает точность в математике, логике и сложном программировании.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -173,6 +195,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "claude-opus": {
     id: "claude-opus",
     name: "Claude Opus 4.6",
+    description:
+      "Самая мощная модель Anthropic. Выдающиеся результаты в исследованиях, сложном анализе и написании кода. Понимает изображения.",
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
@@ -188,6 +212,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "grok-3": {
     id: "grok-3",
     name: "Grok 3",
+    description:
+      "Флагманская модель xAI. Сильна в рассуждениях, научных задачах и реальных событиях. Обширные знания об актуальных новостях.",
     section: "gpt",
     provider: "xai",
     costUsdPerRequest: 0,
@@ -203,6 +229,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "grok-3-mini": {
     id: "grok-3-mini",
     name: "Grok 3 Mini",
+    description:
+      "Лёгкая версия Grok 3 — быстрая, доступная и хорошо справляется с логическими задачами и программированием.",
     section: "gpt",
     provider: "xai",
     costUsdPerRequest: 0,
@@ -218,6 +246,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "deepseek-v3": {
     id: "deepseek-v3",
     name: "DeepSeek V3",
+    description:
+      "Мощная открытая модель DeepSeek. Отличные результаты в коде, математике и анализе при очень низкой стоимости.",
     section: "gpt",
     provider: "deepseek",
     costUsdPerRequest: 0,
@@ -233,6 +263,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "deepseek-r1": {
     id: "deepseek-r1",
     name: "DeepSeek R1",
+    description:
+      "Рассуждающая модель DeepSeek с подробным процессом обдумывания. Превосходит многие коммерческие модели в математике и программировании.",
     section: "gpt",
     provider: "deepseek",
     costUsdPerRequest: 0,
@@ -252,6 +284,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "dall-e-3": {
     id: "dall-e-3",
     name: "DALL-E 3",
+    description:
+      "Классический генератор изображений от OpenAI. Точно следует текстовым описаниям и создаёт детализированные, чёткие изображения.",
     section: "design",
     provider: "openai",
     costUsdPerRequest: 0.04,
@@ -269,6 +303,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   midjourney: {
     id: "midjourney",
     name: "MidJourney",
+    description:
+      "Индустриальный стандарт художественной генерации. Создаёт потрясающие изображения в широком диапазоне художественных стилей.",
     section: "design",
     provider: "midjourney",
     costUsdPerRequest: 0.03,
@@ -285,6 +321,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   flux: {
     id: "flux",
     name: "Flux",
+    description:
+      "Быстрая открытая модель для реалистичных изображений. Хороша для прототипирования и создания фотореалистичных сцен.",
     section: "design",
     provider: "fal",
     costUsdPerRequest: 0.01,
@@ -302,6 +340,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   ideogram: {
     id: "ideogram",
     name: "Ideogram V3",
+    description:
+      "Специализируется на точном рендеринге текста внутри изображений. Лучший выбор для постеров, логотипов и инфографики.",
     section: "design",
     provider: "ideogram",
     costUsdPerRequest: 0.04,
@@ -318,6 +358,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "imagen-4": {
     id: "imagen-4",
     name: "Imagen 4",
+    description:
+      "Новая модель генерации изображений от Google. Высокая фотореалистичность и точное следование текстовым описаниям.",
     section: "design",
     provider: "google",
     costUsdPerRequest: 0.03,
@@ -334,6 +376,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "stable-diffusion": {
     id: "stable-diffusion",
     name: "Stable Diffusion",
+    description:
+      "Классическая открытая модель. Гибкая, быстрая, с широкими возможностями настройки стиля и поддержкой I2I.",
     section: "design",
     provider: "replicate",
     costUsdPerRequest: 0.003,
@@ -351,6 +395,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "flux-pro": {
     id: "flux-pro",
     name: "Flux Pro 1.1",
+    description:
+      "Профессиональная версия Flux с улучшенным качеством деталей и цветопередачей. Оптимальна для коммерческих и дизайн-проектов.",
     section: "design",
     provider: "fal",
     costUsdPerRequest: 0.05,
@@ -367,6 +413,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "recraft-v3": {
     id: "recraft-v3",
     name: "Recraft V3",
+    description:
+      "Специализируется на векторной и брендовой графике. Отлично создаёт логотипы, иконки и маркетинговые материалы.",
     section: "design",
     provider: "fal",
     costUsdPerRequest: 0.04,
@@ -385,6 +433,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   kling: {
     id: "kling",
     name: "Kling 2.0",
+    description:
+      "Передовая китайская видеомодель. Высокое качество движения, реалистичная физика и поддержка анимации по изображению.",
     section: "video",
     provider: "kling",
     costUsdPerRequest: 0.525, // 5s clip ~$0.35–$0.70
@@ -402,6 +452,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   sora: {
     id: "sora",
     name: "SORA",
+    description:
+      "Флагманская видеомодель OpenAI. Впечатляющее понимание физики мира, плавные движения и высокий уровень кинематографичности.",
     section: "video",
     provider: "openai",
     costUsdPerRequest: 0.5, // 5s @ $0.10/s
@@ -419,6 +471,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   runway: {
     id: "runway",
     name: "RunWay",
+    description:
+      "Профессиональный инструмент для видеопроизводства. Гибкое управление длительностью, высокая стабильность и контроль над движением.",
     section: "video",
     provider: "runway",
     costUsdPerRequest: 0.75, // 5s clip ~$0.50–$1.00
@@ -436,6 +490,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   veo: {
     id: "veo",
     name: "Veo",
+    description:
+      "Видеомодель Google с высоким реализмом. Отлично справляется с природными сценами, динамикой воды и кинематографическими кадрами.",
     section: "video",
     provider: "google",
     costUsdPerRequest: 0.75, // 5s @ $0.15/s
@@ -453,6 +509,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   luma: {
     id: "luma",
     name: "Luma: DM",
+    description:
+      "Универсальная видеомодель с широким набором форматов кадра. Хороша для коротких динамичных клипов и анимации изображений.",
     section: "video",
     provider: "luma",
     costUsdPerRequest: 0.079, // ~$0.033–$0.125/gen
@@ -470,6 +528,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   minimax: {
     id: "minimax",
     name: "MiniMax",
+    description:
+      "Китайская видеомодель с отличным качеством движения персонажей. Генерирует 6-секундные клипы с высокой плавностью.",
     section: "video",
     provider: "minimax",
     costUsdPerRequest: 0.25, // ~$0.10–$0.40/gen
@@ -487,6 +547,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   pika: {
     id: "pika",
     name: "Pika",
+    description:
+      "Простой и доступный инструмент для создания коротких видеоклипов. Хорош для анимации изображений и быстрых творческих экспериментов.",
     section: "video",
     provider: "pika",
     costUsdPerRequest: 0.25, // ~$0.10–$0.40/gen
@@ -504,6 +566,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   hailuo: {
     id: "hailuo",
     name: "Hailuo",
+    description:
+      "Видеомодель с акцентом на плавность и кинематографичность. Поддерживает анимацию изображений и генерирует 6-секундные клипы.",
     section: "video",
     provider: "hailuo",
     costUsdPerRequest: 0.25, // ~$0.10–$0.40/gen
@@ -521,6 +585,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   wan: {
     id: "wan",
     name: "Wan 2.1",
+    description:
+      "Открытая видеомодель от Alibaba. Доступная и качественная генерация коротких клипов с поддержкой анимации по изображению.",
     section: "video",
     provider: "fal",
     costUsdPerRequest: 0.06,
@@ -538,6 +604,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   heygen: {
     id: "heygen",
     name: "HeyGen",
+    description:
+      "Специализируется на создании видео с говорящими аватарами. Идеально для обучающего и маркетингового контента.",
     section: "video",
     provider: "heygen",
     costUsdPerRequest: 1.5, // ~$1–$2/min video
@@ -555,6 +623,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "d-id": {
     id: "d-id",
     name: "D-ID",
+    description:
+      "Оживляет фотографии и аватары. Синхронизирует речь с движением губ для создания реалистичных говорящих персонажей.",
     section: "video",
     provider: "d-id",
     costUsdPerRequest: 0.3, // ~$0.10–$0.50/clip
@@ -574,6 +644,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "tts-openai": {
     id: "tts-openai",
     name: "Синтез речи (OpenAI)",
+    description:
+      "Синтез речи от OpenAI. Несколько голосов, естественная интонация и быстрая генерация для любого текста.",
     section: "audio",
     provider: "openai",
     costUsdPerRequest: 0.0045, // $0.015/1K chars, ~300 chars typical
@@ -589,6 +661,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "voice-clone": {
     id: "voice-clone",
     name: "Клонирование голоса",
+    description:
+      "Клонирование голоса с высокой точностью. Воспроизводит тембр и интонации исходного голоса по короткому аудиообразцу.",
     section: "audio",
     provider: "elevenlabs",
     costUsdPerRequest: 0.072, // ElevenLabs ~$0.054–$0.090 per ~300 chars
@@ -604,6 +678,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   suno: {
     id: "suno",
     name: "Генерация музыки (Suno)",
+    description:
+      "Генерирует полноценные музыкальные треки с вокалом и аранжировкой по текстовому описанию стиля и настроения.",
     section: "audio",
     provider: "suno",
     costUsdPerRequest: 0.035, // ~$0.030–$0.040/track
@@ -619,6 +695,8 @@ export const AI_MODELS: Record<string, AIModel> = {
   "sounds-el": {
     id: "sounds-el",
     name: "Звуковые эффекты (ElevenLabs)",
+    description:
+      "Генерирует оригинальные звуковые эффекты по описанию. Подходит для видеопроизводства, игр и подкастов.",
     section: "audio",
     provider: "elevenlabs",
     costUsdPerRequest: 0.048, // ElevenLabs ~$0.036–$0.060 per ~200 chars

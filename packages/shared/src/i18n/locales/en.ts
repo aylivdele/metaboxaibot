@@ -107,6 +107,7 @@ export default {
     comingSoon: " — coming soon.",
     tokens: "tokens",
     sendOriginal: "📎 Send as file",
+    costPerRequest: "💰 {cost} ✦ per request",
   },
   payments: {
     success: "✅ Payment successful! Tokens have been credited to your balance.",

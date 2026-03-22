@@ -33,12 +33,18 @@ export interface Dialog {
 export interface Model {
   id: string;
   name: string;
+  description: string;
   section: string;
   provider: string;
-  costUsdPerRequest: number;
   supportsImages: boolean;
   supportsVoice: boolean;
+  supportsWeb: boolean;
   isAsync: boolean;
+  isLLM: boolean;
+  /** Fixed cost in internal tokens per request (0 for LLM models) */
+  tokenCostPerRequest: number;
+  /** Estimated cost in internal tokens per typical message (LLM only, 0 for fixed-cost models) */
+  tokenCostApproxMsg: number;
   supportedAspectRatios?: string[] | null;
   supportedDurations?: number[] | null;
   durationRange?: { min: number; max: number } | null;

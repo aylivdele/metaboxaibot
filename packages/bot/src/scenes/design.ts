@@ -1,5 +1,5 @@
 import type { BotContext } from "../types/context.js";
-import { dialogService, generationService, userStateService } from "@metabox/api/services";
+import { dialogService, generationService, userStateService, calculateCost } from "@metabox/api/services";
 import { MODELS_BY_SECTION, AI_MODELS, config, generateWebToken } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -23,7 +23,15 @@ export async function activateDesignModel(ctx: BotContext, modelId: string): Pro
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE", "design");
   await userStateService.setModel(ctx.user.id, modelId);
-  await ctx.reply(ctx.t.design.modelActivated);
+
+  const model = AI_MODELS[modelId];
+  if (model) {
+    const cost = calculateCost(model);
+    const costLine = ctx.t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
+    await ctx.reply(`🎨 ${model.name}\n\n${model.description}\n\n${costLine}`);
+  } else {
+    await ctx.reply(ctx.t.design.modelActivated);
+  }
 }
 
 // ── Model selected via inline callback ───────────────────────────────────────
