@@ -16,6 +16,8 @@ export default {
     howToVideo_yt: "▶️ Как пользоваться? Видео (YT)",
     knowledgeBase: "📖 База знаний",
     channel: "📢 Канал Metabox Family",
+    metaboxLinked: "✅ Аккаунт Metabox успешно привязан!",
+    metaboxLinkFailed: "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.",
   },
   menu: {
     profile: "👤 Профиль",
@@ -111,5 +113,16 @@ export default {
     success: "✅ Оплата прошла успешно! Токены зачислены на ваш баланс.",
     error:
       "⚠️ Оплата получена, но токены не удалось зачислить. Пожалуйста, обратитесь в поддержку.",
+  },
+  linkMetabox: {
+    title: "Metabox Обучение",
+    subtitle: "Чтобы открыть раздел обучения, привяжите аккаунт Metabox.",
+    newAccount: "Создать аккаунт",
+    existingAccount: "Уже есть аккаунт",
+    registerHint: "Введите email и пароль для создания аккаунта Metabox.",
+    loginHint: "Введите email и пароль от существующего аккаунта Metabox.",
+    password: "Пароль",
+    submit: "Продолжить",
+    error: "Ошибка. Проверьте данные и попробуйте снова.",
   },
 } as const;

@@ -161,6 +161,18 @@ const translations = {
     // Common
     "common.loading": "Loading…",
     "common.error": "Error",
+    "common.back": "← Back",
+
+    // Link Metabox
+    "linkMetabox.title": "Metabox Learning",
+    "linkMetabox.subtitle": "Link your Metabox account to access the learning section.",
+    "linkMetabox.newAccount": "Create account",
+    "linkMetabox.existingAccount": "I already have an account",
+    "linkMetabox.registerHint": "Enter an email and password to create your Metabox account.",
+    "linkMetabox.loginHint": "Enter your existing Metabox email and password.",
+    "linkMetabox.password": "Password",
+    "linkMetabox.submit": "Continue",
+    "linkMetabox.error": "Error. Please check your details and try again.",
 
     // Image settings
     "imageSettings.title": "Image Settings",
@@ -339,6 +351,18 @@ const translations = {
     // Common
     "common.loading": "Загрузка…",
     "common.error": "Ошибка",
+    "common.back": "← Назад",
+
+    // Link Metabox
+    "linkMetabox.title": "Обучение Metabox",
+    "linkMetabox.subtitle": "Привяжите аккаунт Metabox, чтобы открыть раздел обучения.",
+    "linkMetabox.newAccount": "Создать аккаунт",
+    "linkMetabox.existingAccount": "Уже есть аккаунт",
+    "linkMetabox.registerHint": "Введите email и пароль для создания аккаунта Metabox.",
+    "linkMetabox.loginHint": "Введите email и пароль от существующего аккаунта Metabox.",
+    "linkMetabox.password": "Пароль",
+    "linkMetabox.submit": "Продолжить",
+    "linkMetabox.error": "Ошибка. Проверьте данные и попробуйте снова.",
 
     // Image settings
     "imageSettings.title": "Настройки изображений",

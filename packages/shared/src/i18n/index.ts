@@ -14,6 +14,8 @@ export interface Translations {
     howToVideo_yt: string;
     knowledgeBase: string;
     channel: string;
+    metaboxLinked: string;
+    metaboxLinkFailed: string;
   };
   menu: {
     profile: string;
@@ -98,6 +100,17 @@ export interface Translations {
   };
   payments: {
     success: string;
+    error: string;
+  };
+  linkMetabox: {
+    title: string;
+    subtitle: string;
+    newAccount: string;
+    existingAccount: string;
+    registerHint: string;
+    loginHint: string;
+    password: string;
+    submit: string;
     error: string;
   };
 }

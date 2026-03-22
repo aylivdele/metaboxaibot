@@ -6,6 +6,7 @@ import { ManagementPage } from "./pages/ManagementPage.js";
 import { TariffsPage } from "./pages/TariffsPage.js";
 import { ReferralPage } from "./pages/ReferralPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
+import { LinkMetaboxPage } from "./pages/LinkMetaboxPage.js";
 import { I18nProvider, useI18n } from "./i18n.js";
 import { api } from "./api/client.js";
 import type { Page, UserProfile } from "./types.js";
@@ -59,6 +60,22 @@ function AppContent() {
   }, [ready]);
 
   const isAdmin = profile?.role === "ADMIN" || profile?.role === "MODERATOR";
+
+  const handleLearning = async () => {
+    if (profile?.metaboxUserId) {
+      try {
+        const { ssoUrl } = await api.profile.metaboxSso();
+        const tg = (window as Window & { Telegram?: { WebApp?: { openLink?: (u: string) => void } } })
+          .Telegram?.WebApp;
+        if (tg?.openLink) tg.openLink(ssoUrl);
+        else window.open(ssoUrl, "_blank");
+      } catch {
+        setPage("linkMetabox");
+      }
+    } else {
+      setPage("linkMetabox");
+    }
+  };
 
   if (error) {
     return (
@@ -120,9 +137,17 @@ function AppContent() {
         {page === "tariffs" && <TariffsPage />}
         {page === "referral" && <ReferralPage />}
         {page === "admin" && <AdminPage />}
+        {page === "linkMetabox" && (
+          <LinkMetaboxPage
+            firstName={profile?.firstName}
+            onBack={() => setPage("profile")}
+          />
+        )}
       </main>
 
-      <BottomNav current={page} onChange={setPage} showAdmin={isAdmin} />
+      {page !== "linkMetabox" && (
+        <BottomNav current={page} onChange={setPage} showAdmin={isAdmin} onLearning={() => void handleLearning()} />
+      )}
     </div>
   );
 }

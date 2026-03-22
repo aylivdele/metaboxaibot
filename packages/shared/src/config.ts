@@ -114,6 +114,18 @@ export const config = {
     elevenlabsThresholdChars: optInt("ALERT_ELEVENLABS_THRESHOLD_CHARS", 50_000),
   },
 
+  /**
+   * Metabox site integration (optional — only needed for ecosystem linking).
+   * METABOX_API_URL      — base URL of Metabox Next.js app, e.g. https://app.meta-box.ru
+   * METABOX_INTERNAL_KEY — shared secret for X-Internal-Key header
+   * METABOX_SSO_SECRET   — HMAC secret for signing/verifying SSO tokens (same on both apps)
+   */
+  metabox: {
+    apiUrl: opt("METABOX_API_URL"),
+    internalKey: opt("METABOX_INTERNAL_KEY"),
+    ssoSecret: opt("METABOX_SSO_SECRET"),
+  },
+
   /** AI providers (all optional — only needed for models you enable) */
   ai: {
     openai: opt("OPENAI_API_KEY"),

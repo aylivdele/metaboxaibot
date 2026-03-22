@@ -14,6 +14,8 @@ function mapUser(user: User): UserDto {
     isNew: user.isNew,
     isBlocked: user.isBlocked,
     createdAt: user.createdAt,
+    referredById: user.referredById ?? null,
+    metaboxUserId: user.metaboxUserId ?? null,
   };
 }
 

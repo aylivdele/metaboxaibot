@@ -7,9 +7,8 @@ interface Props {
   current: Page;
   onChange: (page: Page) => void;
   showAdmin: boolean;
+  onLearning: () => void;
 }
-
-const LEARNING_URL = "https://app.meta-box.ru/dashboard";
 
 const TABS: Array<{
   id: Page | "learning";
@@ -84,7 +83,7 @@ const TABS: Array<{
   },
 ];
 
-export function BottomNav({ current, onChange, showAdmin }: Props) {
+export function BottomNav({ current, onChange, showAdmin, onLearning }: Props) {
   const { t } = useI18n();
   const visibleTabs = TABS.filter((tab) => !tab.adminOnly || showAdmin);
 
@@ -96,7 +95,7 @@ export function BottomNav({ current, onChange, showAdmin }: Props) {
             <button
               key={tab.id}
               className="bottom-nav__tab bottom-nav__tab--center"
-              onClick={() => window.open(LEARNING_URL, "_blank")}
+              onClick={onLearning}
             >
               <span className="bottom-nav__center-icon">{tab.icon(false)}</span>
               <span className="bottom-nav__label">{t(tab.labelKey as TranslationKey)}</span>
