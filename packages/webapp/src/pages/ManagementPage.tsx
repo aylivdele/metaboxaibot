@@ -326,9 +326,7 @@ function AudioSettingsView() {
 
       {model && (
         <div className="model-settings-panel">
-          {model.description && (
-            <p className="model-settings-panel__desc">{model.description}</p>
-          )}
+          {model.description && <p className="model-settings-panel__desc">{model.description}</p>}
           <div className="model-settings-panel__cost">
             {model.tokenCostPerRequest > 0
               ? `${model.tokenCostPerRequest.toFixed(2)} ✦ / запрос`

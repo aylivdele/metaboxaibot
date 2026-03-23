@@ -75,8 +75,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "claude-haiku": {
     id: "claude-haiku",
     name: "Claude 4.5 Haiku",
-    description:
-      "Самая быстрая и дешёвая модель Anthropic, мгновенные ответы для простых задач.",
+    description: "Самая быстрая и дешёвая модель Anthropic, мгновенные ответы для простых задач.",
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
@@ -178,8 +177,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "o4-mini": {
     id: "o4-mini",
     name: "GPT-o4 Mini",
-    description:
-      "Reasoning-модель OpenAI, цепочка рассуждений для сложных задач за низкую цену.",
+    description: "Reasoning-модель OpenAI, цепочка рассуждений для сложных задач за низкую цену.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -212,8 +210,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "grok-3": {
     id: "grok-3",
     name: "Grok 3",
-    description:
-      "Предыдущий флагман xAI, сильный в анализе и генерации с минимальной цензурой.",
+    description: "Предыдущий флагман xAI, сильный в анализе и генерации с минимальной цензурой.",
     section: "gpt",
     provider: "xai",
     costUsdPerRequest: 0,
@@ -282,8 +279,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gpt-5.4-pro": {
     id: "gpt-5.4-pro",
     name: "GPT 5.4 Pro",
-    description:
-      "Самая мощная модель OpenAI, максимальная точность и глубина рассуждений.",
+    description: "Самая мощная модель OpenAI, максимальная точность и глубина рассуждений.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -299,8 +295,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gpt-5.4": {
     id: "gpt-5.4",
     name: "GPT 5.4",
-    description:
-      "Флагман OpenAI, отличный баланс интеллекта и скорости.",
+    description: "Флагман OpenAI, отличный баланс интеллекта и скорости.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -316,8 +311,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gpt-5.3": {
     id: "gpt-5.3",
     name: "GPT 5.3",
-    description:
-      "Предыдущий флагман OpenAI, всё ещё очень сильная модель.",
+    description: "Предыдущий флагман OpenAI, всё ещё очень сильная модель.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -333,8 +327,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gpt-5-mini": {
     id: "gpt-5-mini",
     name: "GPT 5 Mini",
-    description:
-      "Компактная и быстрая, хороша для повседневных задач.",
+    description: "Компактная и быстрая, хороша для повседневных задач.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -350,8 +343,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "gpt-5-nano": {
     id: "gpt-5-nano",
     name: "GPT 5 Nano",
-    description:
-      "Самая лёгкая и дешёвая в линейке GPT 5, мгновенные ответы.",
+    description: "Самая лёгкая и дешёвая в линейке GPT 5, мгновенные ответы.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -386,8 +378,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "claude-sonnet-4-5": {
     id: "claude-sonnet-4-5",
     name: "Claude 4.5 Sonnet",
-    description:
-      "Надёжная рабочая лошадка Anthropic, отлично для кода и текстов.",
+    description: "Надёжная рабочая лошадка Anthropic, отлично для кода и текстов.",
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
@@ -441,8 +432,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "grok-4": {
     id: "grok-4",
     name: "Grok 4",
-    description:
-      "Флагман xAI (Илон Маск), мощные рассуждения с доступом к данным X.",
+    description: "Флагман xAI (Илон Маск), мощные рассуждения с доступом к данным X.",
     section: "gpt",
     provider: "xai",
     costUsdPerRequest: 0,
@@ -458,8 +448,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "grok-3-deep-search": {
     id: "grok-3-deep-search",
     name: "Grok 3 Deep Search",
-    description:
-      "Grok 3 с глубоким поиском по интернету и X в реальном времени.",
+    description: "Grok 3 с глубоким поиском по интернету и X в реальном времени.",
     section: "gpt",
     provider: "xai",
     costUsdPerRequest: 0,
@@ -475,8 +464,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "grok-3-reasoner": {
     id: "grok-3-reasoner",
     name: "Grok 3 Reasoner",
-    description:
-      "Grok 3 с цепочкой рассуждений для сложных логических и математических задач.",
+    description: "Grok 3 с цепочкой рассуждений для сложных логических и математических задач.",
     section: "gpt",
     provider: "xai",
     costUsdPerRequest: 0,
@@ -492,8 +480,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "grok-3-image": {
     id: "grok-3-image",
     name: "Grok 3 Images Generation",
-    description:
-      "Генерация изображений от xAI, минимальные ограничения на контент.",
+    description: "Генерация изображений от xAI, минимальные ограничения на контент.",
     section: "gpt",
     provider: "xai",
     costUsdPerRequest: 0.04,
@@ -511,8 +498,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "perplexity-sonar-pro": {
     id: "perplexity-sonar-pro",
     name: "Perplexity Sonar Pro + Internet",
-    description:
-      "Мощный AI-поиск с глубокими ответами. Актуальные данные из интернета.",
+    description: "Мощный AI-поиск с глубокими ответами. Актуальные данные из интернета.",
     section: "gpt",
     provider: "perplexity",
     costUsdPerRequest: 0,
@@ -528,8 +514,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "perplexity-sonar-research": {
     id: "perplexity-sonar-research",
     name: "Perplexity Sonar Deep Research",
-    description:
-      "Автономный исследователь, анализирует десятки источников за один запрос.",
+    description: "Автономный исследователь, анализирует десятки источников за один запрос.",
     section: "gpt",
     provider: "perplexity",
     costUsdPerRequest: 0,
@@ -545,8 +530,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "perplexity-sonar": {
     id: "perplexity-sonar",
     name: "Perplexity Sonar + Internet",
-    description:
-      "Быстрый AI-поиск с актуальными данными из интернета.",
+    description: "Быстрый AI-поиск с актуальными данными из интернета.",
     section: "gpt",
     provider: "perplexity",
     costUsdPerRequest: 0,
@@ -564,8 +548,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "qwen-3-max-thinking": {
     id: "qwen-3-max-thinking",
     name: "Qwen 3 Max Thinking",
-    description:
-      "Крупнейшая reasoning-модель Alibaba, конкурент GPT и Claude.",
+    description: "Крупнейшая reasoning-модель Alibaba, конкурент GPT и Claude.",
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,
@@ -581,8 +564,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "qwen-3-thinking": {
     id: "qwen-3-thinking",
     name: "Qwen 3 Thinking",
-    description:
-      "Reasoning-модель Alibaba среднего размера, сильна в коде и математике.",
+    description: "Reasoning-модель Alibaba среднего размера, сильна в коде и математике.",
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,
@@ -598,8 +580,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "qwen-3": {
     id: "qwen-3",
     name: "Qwen 3",
-    description:
-      "Быстрая модель Alibaba, отличная для мультиязычных задач.",
+    description: "Быстрая модель Alibaba, отличная для мультиязычных задач.",
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,
