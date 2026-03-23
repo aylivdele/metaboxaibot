@@ -1,13 +1,10 @@
-name: CD → Test
+name: Test Pipeline
 
 on:
-  # Runs automatically after CI passes on develop
-  workflow_run:
-    workflows: ["CI"]
+  push:
     branches: [develop]
-    types: [completed]
-
-  # Manual trigger — use force_all to rebuild everything regardless of changes
+  pull_request:
+    branches: [develop]
   workflow_dispatch:
     inputs:
       force_all:
@@ -15,74 +12,56 @@ on:
         type: boolean
         default: false
 
-# Only one test deployment at a time per branch; newer push cancels the queued one.
-# Branch is included in the group key so a main CI run can never cancel a develop deploy.
+# One test deployment at a time; newer push cancels the queued one
 concurrency:
-  group: deploy-test-${{ github.event.workflow_run.head_branch || 'manual' }}
+  group: test-pipeline-${{ github.event_name }}
   cancel-in-progress: true
 
 env:
-  REGISTRY: ghcr.io
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  # ── Detect which modules changed ────────────────────────────────────────────
+  # ── CI: runs on push and pull_request ────────────────────────────────────────
+  lint-and-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+
+  # ── CD: only on push to develop ──────────────────────────────────────────────
   changes:
     name: Detect changes
+    needs: lint-and-typecheck
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    # For workflow_run: only proceed when CI ran on develop (not main or PRs)
-    # and the run succeeded. The `branches` filter in `on.workflow_run` is not
-    # reliable enough on its own — an explicit head_branch check is required.
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'develop')
     outputs:
       api: ${{ steps.filter.outputs.api }}
       bot: ${{ steps.filter.outputs.bot }}
       worker: ${{ steps.filter.outputs.worker }}
       webapp: ${{ steps.filter.outputs.webapp }}
-      sha: ${{ steps.sha.outputs.sha }}
     steps:
-      - name: Resolve SHA
-        id: sha
-        run: |
-          SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ steps.sha.outputs.sha }}
           fetch-depth: 0
 
-      # Abort if a newer commit has already been deployed or is being deployed.
-      # workflow_run events arrive out of order: a re-run of an old CI job can
-      # fire AFTER a newer CI run and — with cancel-in-progress — would otherwise
-      # cancel the correct deploy and start one for the stale SHA.
-      - name: Skip if SHA is not latest on develop
-        id: stale-check
-        if: github.event_name == 'workflow_run'
-        run: |
-          git fetch origin develop --depth=1
-          LATEST=$(git rev-parse origin/develop)
-          SHA="${{ steps.sha.outputs.sha }}"
-          if [ "$SHA" != "$LATEST" ]; then
-            echo "::warning::SHA $SHA is not the latest on develop (HEAD: $LATEST). Skipping stale deploy."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # Compares HEAD against the last deployed tag via plain git diff.
-      # Falls back to building everything when the tag doesn't exist yet,
-      # or when force_all is requested via workflow_dispatch.
       - name: Detect changes
         id: filter
         run: |
           set -e
 
-          # force_all or first run → build everything
           if [ "${{ github.event.inputs.force_all }}" = "true" ]; then
             echo "api=true"    >> "$GITHUB_OUTPUT"
             echo "bot=true"    >> "$GITHUB_OUTPUT"
@@ -94,7 +73,7 @@ jobs:
           git fetch origin refs/tags/test-deployed:refs/tags/test-deployed 2>/dev/null || true
 
           if ! git rev-parse --verify test-deployed >/dev/null 2>&1; then
-            echo "No test-deployed tag found — building everything"
+            echo "No test-deployed tag — building everything"
             echo "api=true"    >> "$GITHUB_OUTPUT"
             echo "bot=true"    >> "$GITHUB_OUTPUT"
             echo "worker=true" >> "$GITHUB_OUTPUT"
@@ -111,9 +90,8 @@ jobs:
           echo "api=$(match    '^(packages/api|packages/shared|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.api)')"    >> "$GITHUB_OUTPUT"
           echo "bot=$(match    '^(packages/bot|packages/api|packages/shared|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.bot)')"    >> "$GITHUB_OUTPUT"
           echo "worker=$(match '^(packages/worker|packages/api|packages/shared|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.worker)')" >> "$GITHUB_OUTPUT"
-          echo "webapp=$(match '^(packages/webapp|packages/shared|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.webapp)')" >> "$GITHUB_OUTPUT"
+          echo "webapp=$(match '^(packages/webapp|packages/shared|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.webapp)')"     >> "$GITHUB_OUTPUT"
 
-  # ── Build & push Docker images ───────────────────────────────────────────────
   build-api:
     name: Build API
     needs: changes
@@ -124,26 +102,20 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.changes.outputs.sha }}
-
       - uses: docker/setup-buildx-action@v3
-
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           file: infra/docker/Dockerfile.api
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/metabox-api:test
-            ghcr.io/${{ github.repository_owner }}/metabox-api:test-${{ needs.changes.outputs.sha }}
+            ghcr.io/${{ github.repository_owner }}/metabox-api:test-${{ github.sha }}
           cache-from: type=gha,scope=api-test
           cache-to: type=gha,scope=api-test,mode=max
 
@@ -157,26 +129,20 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.changes.outputs.sha }}
-
       - uses: docker/setup-buildx-action@v3
-
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           file: infra/docker/Dockerfile.bot
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/metabox-bot:test
-            ghcr.io/${{ github.repository_owner }}/metabox-bot:test-${{ needs.changes.outputs.sha }}
+            ghcr.io/${{ github.repository_owner }}/metabox-bot:test-${{ github.sha }}
           cache-from: type=gha,scope=bot-test
           cache-to: type=gha,scope=bot-test,mode=max
 
@@ -190,30 +156,23 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.changes.outputs.sha }}
-
       - uses: docker/setup-buildx-action@v3
-
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           file: infra/docker/Dockerfile.worker
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/metabox-worker:test
-            ghcr.io/${{ github.repository_owner }}/metabox-worker:test-${{ needs.changes.outputs.sha }}
+            ghcr.io/${{ github.repository_owner }}/metabox-worker:test-${{ github.sha }}
           cache-from: type=gha,scope=worker-test
           cache-to: type=gha,scope=worker-test,mode=max
 
-  # ── Build React webapp and upload to test VPS ────────────────────────────────
   build-webapp:
     name: Build & deploy webapp
     needs: changes
@@ -221,19 +180,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.changes.outputs.sha }}
-
       - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+      - run: pnpm install --frozen-lockfile
       - name: Build webapp
         run: pnpm --filter @metabox/webapp build
         env:
@@ -241,7 +193,6 @@ jobs:
           VITE_BOT_USERNAME: ${{ secrets.TEST_VITE_BOT_USERNAME }}
           VITE_LEARNING_URL: ${{ secrets.TEST_VITE_LEARNING_URL }}
           VITE_METABOX_LANDING_URL: ${{ secrets.TEST_VITE_METABOX_LANDING_URL }}
-
       - name: Clear webapp dir on test VPS
         uses: appleboy/ssh-action@v1
         with:
@@ -249,7 +200,6 @@ jobs:
           username: ${{ secrets.TEST_VPS_USER }}
           key: ${{ secrets.TEST_VPS_SSH_KEY }}
           script: rm -rf /var/www/metabox-ai-test/*
-
       - name: Upload webapp dist to test VPS
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -260,14 +210,12 @@ jobs:
           target: /var/www/metabox-ai-test
           strip_components: 3
 
-  # ── Pull new images and restart services on test VPS ────────────────────────
   deploy:
     name: Deploy to test VPS
     runs-on: ubuntu-latest
     needs: [changes, build-api, build-bot, build-worker, build-webapp]
     permissions:
       contents: write
-    # Run if at least one backend image was (re)built; skip if everything was skipped
     if: |
       always() && !cancelled() &&
       (needs.build-api.result == 'success' ||
@@ -282,7 +230,7 @@ jobs:
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_ACTOR: ${{ github.actor }}
-          IMAGE_TAG: test-${{ needs.changes.outputs.sha }}
+          IMAGE_TAG: test-${{ github.sha }}
           GHCR_IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
         with:
           host: ${{ secrets.TEST_VPS_HOST }}
@@ -318,13 +266,11 @@ jobs:
 
             echo "Test deploy complete — $IMAGE_TAG"
 
-      # Move the test-deployed tag to the current SHA so the next run
-      # only rebuilds what actually changed since this deploy.
       - name: Mark deployed SHA
         uses: actions/github-script@v7
         with:
           script: |
-            const sha = '${{ needs.changes.outputs.sha }}';
+            const sha = context.sha;
             try {
               await github.rest.git.updateRef({
                 owner: context.repo.owner,
