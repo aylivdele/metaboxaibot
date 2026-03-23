@@ -65,8 +65,9 @@ function AppContent() {
     if (profile?.metaboxUserId) {
       try {
         const { ssoUrl } = await api.profile.metaboxSso();
-        const tg = (window as Window & { Telegram?: { WebApp?: { openLink?: (u: string) => void } } })
-          .Telegram?.WebApp;
+        const tg = (
+          window as Window & { Telegram?: { WebApp?: { openLink?: (u: string) => void } } }
+        ).Telegram?.WebApp;
         if (tg?.openLink) tg.openLink(ssoUrl);
         else window.open(ssoUrl, "_blank");
       } catch {
@@ -138,15 +139,17 @@ function AppContent() {
         {page === "referral" && <ReferralPage onLinkMetabox={() => setPage("linkMetabox")} />}
         {page === "admin" && <AdminPage />}
         {page === "linkMetabox" && (
-          <LinkMetaboxPage
-            firstName={profile?.firstName}
-            onBack={() => setPage("profile")}
-          />
+          <LinkMetaboxPage firstName={profile?.firstName} onBack={() => setPage("profile")} />
         )}
       </main>
 
       {page !== "linkMetabox" && (
-        <BottomNav current={page} onChange={setPage} showAdmin={isAdmin} onLearning={() => void handleLearning()} />
+        <BottomNav
+          current={page}
+          onChange={setPage}
+          showAdmin={isAdmin}
+          onLearning={() => void handleLearning()}
+        />
       )}
     </div>
   );

@@ -30,7 +30,9 @@ export async function handleStart(ctx: BotContext): Promise<void> {
       });
       await ctx.reply(ctx.t.start.metaboxLinked ?? "✅ Аккаунт Metabox успешно привязан!");
     } catch {
-      await ctx.reply(ctx.t.start.metaboxLinkFailed ?? "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.");
+      await ctx.reply(
+        ctx.t.start.metaboxLinkFailed ?? "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.",
+      );
     }
     return;
   }

@@ -47,7 +47,10 @@ export const paymentService = {
     ]);
 
     // Notify Metabox for MLM bonus calculation (non-fatal: user is linked only if metaboxUserId is set)
-    const user = await db.user.findUnique({ where: { id: userId }, select: { metaboxUserId: true } });
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { metaboxUserId: true },
+    });
     if (user?.metaboxUserId) {
       recordSale({
         telegramId: userId,

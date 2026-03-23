@@ -94,10 +94,7 @@ export function ReferralPage({ onLinkMetabox }: { onLinkMetabox: () => void }) {
           <>
             <div className="referral-card__link">{metaboxLink}</div>
             <div className="referral-card__actions">
-              <button
-                className="btn btn--secondary"
-                onClick={() => metaboxCopy.copy(metaboxLink)}
-              >
+              <button className="btn btn--secondary" onClick={() => metaboxCopy.copy(metaboxLink)}>
                 {metaboxCopy.copied ? t("referral.copied") : t("referral.copy")}
               </button>
               <button

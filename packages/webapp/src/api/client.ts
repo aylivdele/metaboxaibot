@@ -154,7 +154,7 @@ export const api = {
   metaboxAibot: {
     products: () =>
       request<{ id: string; name: string; tokens: number; priceRub: string }[]>(
-        "/metabox-aibot/products"
+        "/metabox-aibot/products",
       ),
     buy: (productId: string) =>
       request<{ paymentUrl: string }>("/metabox-aibot/buy", {

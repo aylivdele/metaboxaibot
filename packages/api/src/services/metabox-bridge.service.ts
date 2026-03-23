@@ -112,7 +112,10 @@ export async function loginAndLink(params: {
 
 /** Verify a TelegramAuthToken created by Metabox (for Metabox→Bot deep link flow).
  *  Also tells Metabox to link telegramId to the user account. */
-export async function verifyLinkToken(token: string, telegramId: bigint): Promise<{
+export async function verifyLinkToken(
+  token: string,
+  telegramId: bigint,
+): Promise<{
   metaboxUserId: string;
   email: string;
   firstName: string;

@@ -51,7 +51,10 @@ export function TariffsPage() {
         setProfile(p);
         // Fetch Metabox products only if account is linked
         if (p.metaboxUserId) {
-          api.metaboxAibot.products().then(setMetaboxProducts).catch(() => void 0);
+          api.metaboxAibot
+            .products()
+            .then(setMetaboxProducts)
+            .catch(() => void 0);
         }
       })
       .catch(() => void 0);
@@ -160,7 +163,9 @@ export function TariffsPage() {
               <div key={product.id} className="plan-card">
                 <div className="plan-card__label">{product.name}</div>
                 <div className="plan-card__tokens">✦ {product.tokens}</div>
-                <div className="plan-card__price">{Number(product.priceRub).toLocaleString("ru-RU")} ₽</div>
+                <div className="plan-card__price">
+                  {Number(product.priceRub).toLocaleString("ru-RU")} ₽
+                </div>
                 <button
                   className="plan-card__btn plan-card__btn--metabox"
                   onClick={() => handleMetaboxBuy(product.id)}

@@ -94,7 +94,10 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get("/profile/metabox-sso", async (request, reply) => {
     const { userId } = request as AuthRequest;
-    const user = await db.user.findUnique({ where: { id: userId }, select: { metaboxUserId: true } });
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { metaboxUserId: true },
+    });
     if (!user?.metaboxUserId) {
       return reply.code(409).send({ error: "Metabox account not linked" });
     }
@@ -123,7 +126,10 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     if (!email || !password) {
       return reply.code(400).send({ error: "email and password are required" });
     }
-    const user = await db.user.findUnique({ where: { id: userId }, select: { referredById: true } });
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { referredById: true },
+    });
     const { registerFromBot } = await import("../services/metabox-bridge.service.js");
     const result = await registerFromBot({
       email,
