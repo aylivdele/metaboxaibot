@@ -9,7 +9,7 @@ interface Props {
   showAdmin: boolean;
 }
 
-const LEARNING_URL = "https://app.meta-box.ru/dashboard";
+const LEARNING_URL = import.meta.env.VITE_LEARNING_URL as string | undefined;
 
 const TABS: Array<{
   id: Page | "learning";
@@ -96,7 +96,7 @@ export function BottomNav({ current, onChange, showAdmin }: Props) {
             <button
               key={tab.id}
               className="bottom-nav__tab bottom-nav__tab--center"
-              onClick={() => window.open(LEARNING_URL, "_blank")}
+              onClick={() => LEARNING_URL && window.open(LEARNING_URL, "_blank")}
             >
               <span className="bottom-nav__center-icon">{tab.icon(false)}</span>
               <span className="bottom-nav__label">{t(tab.labelKey as TranslationKey)}</span>

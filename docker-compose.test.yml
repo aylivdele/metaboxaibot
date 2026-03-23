@@ -1,14 +1,15 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: metabox_postgres
+    container_name: metabox_test_postgres
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_test_data:/var/lib/postgresql/data
+    # Not exposed externally — accessible within Docker network only
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -17,11 +18,11 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: metabox_redis
+    container_name: metabox_test_redis
     restart: always
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
-      - redis_data:/data
+      - redis_test_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
@@ -29,10 +30,8 @@ services:
       retries: 5
 
   bot:
-    build:
-      context: .
-      dockerfile: infra/docker/Dockerfile.bot
-    container_name: metabox_bot
+    image: ${GHCR_IMAGE_PREFIX}/metabox-bot:${IMAGE_TAG:-test}
+    container_name: metabox_test_bot
     restart: always
     env_file: .env
     environment:
@@ -46,18 +45,17 @@ services:
         condition: service_healthy
 
   api:
-    build:
-      context: .
-      dockerfile: infra/docker/Dockerfile.api
-    container_name: metabox_api
+    image: ${GHCR_IMAGE_PREFIX}/metabox-api:${IMAGE_TAG:-test}
+    container_name: metabox_test_api
     restart: always
     env_file: .env
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    # Separate port from production (3001) to allow both on the same host
     ports:
-      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:3002:3001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,10 +63,8 @@ services:
         condition: service_healthy
 
   worker:
-    build:
-      context: .
-      dockerfile: infra/docker/Dockerfile.worker
-    container_name: metabox_worker
+    image: ${GHCR_IMAGE_PREFIX}/metabox-worker:${IMAGE_TAG:-test}
+    container_name: metabox_test_worker
     restart: always
     env_file: .env
     environment:
@@ -82,5 +78,5 @@ services:
         condition: service_healthy
 
 volumes:
-  postgres_data:
-  redis_data:
+  postgres_test_data:
+  redis_test_data:
