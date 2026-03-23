@@ -602,9 +602,82 @@ export const AI_MODELS: Record<string, AIModel> = {
   // ── Дизайн ────────────────────────────────────────────────────────────────
   // Media models have no per-token pricing; cost is driven by costUsdPerRequest.
   // Values are mid-range provider prices used as break-even basis.
+  "nano-banana-pro": {
+    id: "nano-banana-pro",
+    name: "🍌 Nano Banana PRO",
+    description:
+      "Генерирует реалистичные фото и позволяет менять детали прямо словами: «убери фон», «добавь шляпу», «сделай вечер».",
+    section: "design",
+    provider: "fal",
+    costUsdPerRequest: 0.15,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+  },
+  midjourney: {
+    id: "midjourney",
+    name: "🎨 MidJourney v7",
+    description:
+      "Создаёт самые красивые и стильные изображения. Лучший выбор для арта, иллюстраций и эффектных визуалов.",
+    section: "design",
+    provider: "midjourney",
+    costUsdPerRequest: 0.03,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+  },
+  "gpt-image-1.5": {
+    id: "gpt-image-1.5",
+    name: "🖼️ GPT Image 1.5",
+    description:
+      "Лучше всех понимает сложные текстовые запросы. Точно рисует то, что вы описали, включая текст на картинках.",
+    section: "design",
+    provider: "fal",
+    costUsdPerRequest: 0.04,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["1:1", "16:9", "9:16"],
+  },
+  "stable-diffusion": {
+    id: "stable-diffusion",
+    name: "🌊 Stable Diffusion 3.5",
+    description:
+      "Генерирует детальные изображения в любом стиле: от фотореализма до аниме и фэнтези. Отличается гибкостью.",
+    section: "design",
+    provider: "replicate",
+    costUsdPerRequest: 0.003,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    // Replicate/SDXL accepts arbitrary dimensions — offer extended set
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3"],
+  },
   "dall-e-3": {
     id: "dall-e-3",
-    name: "DALL-E 3 Turbo",
+    name: "🎯 DALL-E 3 Turbo",
     description:
       "Простой и понятный генератор от OpenAI. Хорошо понимает запросы на любом языке, отлично для быстрых идей.",
     section: "design",
@@ -621,27 +694,9 @@ export const AI_MODELS: Record<string, AIModel> = {
     // DALL-E 3 only supports exactly 3 sizes
     supportedAspectRatios: ["1:1", "16:9", "9:16"],
   },
-  midjourney: {
-    id: "midjourney",
-    name: "MidJourney v7",
-    description:
-      "Создаёт самые красивые и стильные изображения. Лучший выбор для арта, иллюстраций и эффектных визуалов.",
-    section: "design",
-    provider: "midjourney",
-    costUsdPerRequest: 0.03,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
-  },
   flux: {
     id: "flux",
-    name: "FLUX.2",
+    name: "⚡ FLUX.2",
     description:
       "Максимально реалистичные фото за секунды. Лучший выбор, когда нужно быстро и неотличимо от настоящего снимка.",
     section: "design",
@@ -661,7 +716,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   ideogram: {
     id: "ideogram",
-    name: "Ideogram v3.0",
+    name: "✍️ Ideogram v3.0",
     description:
       "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров, обложек и рекламы.",
     section: "design",
@@ -679,7 +734,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "imagen-4": {
     id: "imagen-4",
-    name: "Imagen 4",
+    name: "🔮 Imagen 4",
     description:
       "Новая модель генерации изображений от Google. Высокая фотореалистичность и точное следование текстовым описаниям.",
     section: "design",
@@ -695,28 +750,9 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
   },
-  "stable-diffusion": {
-    id: "stable-diffusion",
-    name: "Stable Diffusion 3.5",
-    description:
-      "Генерирует детальные изображения в любом стиле: от фотореализма до аниме и фэнтези. Отличается гибкостью.",
-    section: "design",
-    provider: "replicate",
-    costUsdPerRequest: 0.003,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    // Replicate/SDXL accepts arbitrary dimensions — offer extended set
-    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3"],
-  },
   "flux-pro": {
     id: "flux-pro",
-    name: "FLUX.1.1 Pro",
+    name: "⚡ FLUX.1.1 Pro",
     description:
       "Предыдущая версия FLUX — такой же фотореализм, чуть медленнее, но проверенная и стабильная.",
     section: "design",
@@ -735,7 +771,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "recraft-v3": {
     id: "recraft-v3",
-    name: "Recraft v3",
+    name: "🖌️ Recraft v3",
     description:
       "Быстро создаёт иллюстрации, иконки и графику в едином стиле. Отлично подходит для дизайна и презентаций.",
     section: "design",
@@ -753,7 +789,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "recraft-v4": {
     id: "recraft-v4",
-    name: "Recraft V4",
+    name: "🖌️ Recraft V4",
     description:
       "Recraft V4 создан специально для дизайна и маркетинга: чистая композиция, точный рендеринг текста и профессиональная полировка. Результат готов для кампании, презентации или страницы продукта без пост-обработки.",
     section: "design",
@@ -771,7 +807,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "recraft-v4-pro": {
     id: "recraft-v4-pro",
-    name: "Recraft V4 Pro",
+    name: "💠 Recraft V4 Pro",
     description:
       "Расширенная версия Recraft V4 с повышенным разрешением и детализацией. Идеальна для ответственных дизайн-проектов, где требуется максимальная визуальная точность — без правок, прямо в производство.",
     section: "design",
@@ -789,7 +825,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "recraft-v4-vector": {
     id: "recraft-v4-vector",
-    name: "Recraft V4 Vector (SVG)",
+    name: "📐 Recraft V4 Vector (SVG)",
     description:
       "Генерирует масштабируемые SVG-векторы — идеально для логотипов, иллюстраций и иконок. Результат масштабируется без потери качества до любого размера и готов к прямому использованию в вёрстке и полиграфии.",
     section: "design",
@@ -807,7 +843,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "recraft-v4-pro-vector": {
     id: "recraft-v4-pro-vector",
-    name: "Recraft V4 Pro Vector (SVG)",
+    name: "📐 Recraft V4 Pro Vector (SVG)",
     description:
       "Профессиональная векторная генерация с максимальным качеством SVG. Подходит для сложных иллюстраций, брендинга и любого дизайна, требующего безупречной масштабируемости и детализации.",
     section: "design",
@@ -823,28 +859,9 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
   },
-
-  "nano-banana-pro": {
-    id: "nano-banana-pro",
-    name: "Nano Banana PRO",
-    description:
-      "Генерирует реалистичные фото и позволяет менять детали прямо словами: «убери фон», «добавь шляпу», «сделай вечер».",
-    section: "design",
-    provider: "fal",
-    costUsdPerRequest: 0.15,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
-  },
   "seedream-5": {
     id: "seedream-5",
-    name: "Seedream 5.0 (ByteDance)",
+    name: "🛍️ Seedream 5.0 (ByteDance)",
     description:
       "Идеально для товарных фото, одежды и каталогов. Создаёт чистые, профессиональные изображения для продаж.",
     section: "design",
@@ -862,7 +879,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "seedream-4.5": {
     id: "seedream-4.5",
-    name: "Seedream 4.5",
+    name: "🛍️ Seedream 4.5",
     description:
       "Предыдущая версия Seedream — чуть проще, но быстрее и дешевле. Подойдёт для массовой генерации товарных фото.",
     section: "design",
@@ -877,24 +894,6 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
-  },
-  "gpt-image-1.5": {
-    id: "gpt-image-1.5",
-    name: "GPT Image 1.5",
-    description:
-      "Лучше всех понимает сложные текстовые запросы. Точно рисует то, что вы описали, включая текст на картинках.",
-    section: "design",
-    provider: "fal",
-    costUsdPerRequest: 0.04,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["1:1", "16:9", "9:16"],
   },
 
   // ── Видео ─────────────────────────────────────────────────────────────────

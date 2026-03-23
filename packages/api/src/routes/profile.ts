@@ -93,7 +93,7 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
           select: { passwordHash: true },
         });
         if (!user?.passwordHash || !verifyPassword(body.oldPassword, user.passwordHash)) {
-          return reply.code(400).send({ error: "Current password is incorrect" });
+          return reply.code(400).send({ error: "Old password is incorrect" });
         }
       }
       data.passwordHash = hashPassword(body.password);
@@ -176,7 +176,7 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
     } catch (err) {
       if (err instanceof MetaboxApiError) {
-        return reply.code(err.status).send({ error: err.body });
+        return reply.code(err.status).send({ error: err.body, code: err.code });
       }
       throw err;
     }
@@ -203,7 +203,7 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
     } catch (err) {
       if (err instanceof MetaboxApiError) {
-        return reply.code(err.status).send({ error: err.body });
+        return reply.code(err.status).send({ error: err.body, code: err.code });
       }
       throw err;
     }

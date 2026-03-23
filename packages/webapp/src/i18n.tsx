@@ -204,6 +204,12 @@ const translations = {
     "linkMetabox.passwordMismatch": "Passwords do not match",
     "linkMetabox.submit": "Continue",
     "linkMetabox.error": "Error. Please check your details and try again.",
+    "linkMetabox.error.emailExists": "This email is already registered. Try logging in instead.",
+    "linkMetabox.error.telegramLinked": "This Telegram account is already linked to a Metabox account.",
+    "linkMetabox.error.userNotFound": "No account found with this email.",
+    "linkMetabox.error.invalidPassword": "Incorrect password.",
+    "linkMetabox.error.emailNotVerified": "Email is not verified. Please verify it on the Metabox website.",
+    "linkMetabox.error.passwordTooShort": "Password must be at least 6 characters.",
 
     // Image settings
     "imageSettings.title": "Image Settings",
@@ -427,6 +433,12 @@ const translations = {
     "linkMetabox.passwordMismatch": "Пароли не совпадают",
     "linkMetabox.submit": "Продолжить",
     "linkMetabox.error": "Ошибка. Проверьте данные и попробуйте снова.",
+    "linkMetabox.error.emailExists": "Этот email уже зарегистрирован. Попробуйте войти.",
+    "linkMetabox.error.telegramLinked": "Этот аккаунт Telegram уже привязан к Metabox.",
+    "linkMetabox.error.userNotFound": "Аккаунт с таким email не найден.",
+    "linkMetabox.error.invalidPassword": "Неверный пароль.",
+    "linkMetabox.error.emailNotVerified": "Email не подтверждён. Подтвердите его на сайте Metabox.",
+    "linkMetabox.error.passwordTooShort": "Пароль должен быть не менее 6 символов.",
 
     // Image settings
     "imageSettings.title": "Настройки изображений",

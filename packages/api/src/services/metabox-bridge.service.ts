@@ -53,6 +53,7 @@ export class MetaboxApiError extends Error {
     public readonly status: number,
     public readonly body: string,
     path: string,
+    public readonly code?: string,
   ) {
     super(`Metabox internal API ${path} → ${status}: ${body}`);
   }
@@ -70,7 +71,16 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new MetaboxApiError(res.status, text, path);
+    let message = text;
+    let code: string | undefined;
+    try {
+      const parsed = JSON.parse(text) as { error?: string; code?: string };
+      if (parsed.error) message = parsed.error;
+      if (parsed.code) code = parsed.code;
+    } catch {
+      // keep raw text
+    }
+    throw new MetaboxApiError(res.status, message, path, code);
   }
   return res.json() as Promise<T>;
 }
@@ -131,6 +141,7 @@ export async function verifyLinkToken(
   metaboxUserId: string;
   email: string;
   firstName: string;
+  referralCode: string;
 }> {
   return post("/verify-link-token", { token, telegramId: telegramId.toString() });
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
+import type { TranslationKey } from "../i18n.js";
 
 interface Props {
   firstName?: string | null;
@@ -28,6 +29,15 @@ function getTgLastName(): string | undefined {
   const tg = (window as Window & { Telegram?: { WebApp?: TgWebApp } }).Telegram?.WebApp;
   return tg?.initDataUnsafe?.user?.last_name || undefined;
 }
+
+const ERROR_MAP: Record<string, TranslationKey> = {
+  EMAIL_EXISTS: "linkMetabox.error.emailExists",
+  TELEGRAM_LINKED: "linkMetabox.error.telegramLinked",
+  USER_NOT_FOUND: "linkMetabox.error.userNotFound",
+  INVALID_PASSWORD: "linkMetabox.error.invalidPassword",
+  EMAIL_NOT_VERIFIED: "linkMetabox.error.emailNotVerified",
+  PASSWORD_TOO_SHORT: "linkMetabox.error.passwordTooShort",
+};
 
 export function LinkMetaboxPage({ firstName, username, onBack }: Props) {
   const { t } = useI18n();
@@ -62,7 +72,9 @@ export function LinkMetaboxPage({ firstName, username, onBack }: Props) {
       openSso(result.ssoUrl);
       onBack();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("linkMetabox.error"));
+      const code = (err as Error & { code?: string }).code;
+      const key = code ? ERROR_MAP[code] : undefined;
+      setError(key ? t(key) : t("linkMetabox.error"));
     } finally {
       setLoading(false);
     }

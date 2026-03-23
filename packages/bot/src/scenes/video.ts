@@ -1,6 +1,6 @@
 import type { BotContext } from "../types/context.js";
 import { videoGenerationService, userStateService, calculateCost } from "@metabox/api/services";
-import { MODELS_BY_SECTION, AI_MODELS } from "@metabox/shared";
+import { MODELS_BY_SECTION, AI_MODELS, config } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 
@@ -31,7 +31,16 @@ export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
   if (model) {
     const cost = calculateCost(model);
     const costLine = ctx.t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
-    await ctx.reply(`🎬 ${model.name}\n\n${model.description}\n\n${costLine}`);
+    const webappUrl = config.bot.webappUrl;
+    const kb = webappUrl
+      ? new InlineKeyboard().webApp(
+          ctx.t.video.management,
+          `${webappUrl}?page=management&section=video`,
+        )
+      : undefined;
+    await ctx.reply(`🎬 ${model.name}\n\n${model.description}\n\n${costLine}`, {
+      reply_markup: kb,
+    });
   } else {
     await ctx.reply(ctx.t.video.modelActivated);
   }

@@ -20,7 +20,9 @@ jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
     outputs:
       api: ${{ steps.filter.outputs.api }}
       bot: ${{ steps.filter.outputs.bot }}
@@ -190,6 +192,7 @@ jobs:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_BOT_USERNAME: ${{ secrets.VITE_BOT_USERNAME }}
           VITE_LEARNING_URL: ${{ secrets.VITE_LEARNING_URL }}
+          VITE_METABOX_LANDING_URL: ${{ secrets.VITE_METABOX_LANDING_URL }}
 
       - name: Clear webapp dir on VPS
         uses: appleboy/ssh-action@v1

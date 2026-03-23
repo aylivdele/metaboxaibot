@@ -23,10 +23,10 @@ export async function handleStart(ctx: BotContext): Promise<void> {
   if (param?.startsWith("link_") && ctx.user) {
     const token = param.slice("link_".length);
     try {
-      const { metaboxUserId } = await verifyLinkToken(token, ctx.user.id);
+      const { metaboxUserId, referralCode } = await verifyLinkToken(token, ctx.user.id);
       await db.user.update({
         where: { id: ctx.user.id },
-        data: { metaboxUserId },
+        data: { metaboxUserId, metaboxReferralCode: referralCode },
       });
       await ctx.reply(ctx.t.start.metaboxLinked ?? "✅ Аккаунт Metabox успешно привязан!");
     } catch {

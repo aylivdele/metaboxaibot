@@ -29,10 +29,13 @@ jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
-    # Skip if CI failed (only gate for workflow_run trigger)
+    # For workflow_run: only proceed when CI ran on develop (not main or PRs)
+    # and the run succeeded. The `branches` filter in `on.workflow_run` is not
+    # reliable enough on its own — an explicit head_branch check is required.
     if: |
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'develop')
     outputs:
       api: ${{ steps.filter.outputs.api }}
       bot: ${{ steps.filter.outputs.bot }}
@@ -51,6 +54,24 @@ jobs:
         with:
           ref: ${{ steps.sha.outputs.sha }}
           fetch-depth: 0
+
+      # Abort if a newer commit has already been deployed or is being deployed.
+      # workflow_run events arrive out of order: a re-run of an old CI job can
+      # fire AFTER a newer CI run and — with cancel-in-progress — would otherwise
+      # cancel the correct deploy and start one for the stale SHA.
+      - name: Skip if SHA is not latest on develop
+        id: stale-check
+        if: github.event_name == 'workflow_run'
+        run: |
+          git fetch origin develop --depth=1
+          LATEST=$(git rev-parse origin/develop)
+          SHA="${{ steps.sha.outputs.sha }}"
+          if [ "$SHA" != "$LATEST" ]; then
+            echo "::warning::SHA $SHA is not the latest on develop (HEAD: $LATEST). Skipping stale deploy."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
 
       # Compares HEAD against the last deployed tag via plain git diff.
       # Falls back to building everything when the tag doesn't exist yet,
@@ -218,6 +239,7 @@ jobs:
           VITE_API_BASE_URL: ${{ secrets.TEST_VITE_API_BASE_URL }}
           VITE_BOT_USERNAME: ${{ secrets.TEST_VITE_BOT_USERNAME }}
           VITE_LEARNING_URL: ${{ secrets.TEST_VITE_LEARNING_URL }}
+          VITE_METABOX_LANDING_URL: ${{ secrets.TEST_VITE_METABOX_LANDING_URL }}
 
       - name: Clear webapp dir on test VPS
         uses: appleboy/ssh-action@v1

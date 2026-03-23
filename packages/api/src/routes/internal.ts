@@ -80,6 +80,35 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * POST /internal/unlink-metabox
+   * Called by Metabox admin when an admin disconnects a user's Telegram account.
+   * Clears metaboxUserId and metaboxReferralCode from the AI Box user record.
+   */
+  fastify.post("/internal/unlink-metabox", async (request, reply) => {
+    const { telegramId } = request.body as { telegramId: string };
+
+    if (!telegramId) {
+      return reply.code(400).send({ error: "telegramId is required" });
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: BigInt(telegramId) },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return { ok: true }; // user never started the bot — nothing to unlink
+    }
+
+    await db.user.update({
+      where: { id: BigInt(telegramId) },
+      data: { metaboxUserId: null, metaboxReferralCode: null },
+    });
+
+    return { ok: true };
+  });
+
+  /**
    * GET /internal/check-bot-user?telegramId=<id>
    * Called by Metabox to check whether a user has ever started the AI Box bot.
    * Returns { activated: true } if the user exists in the bot DB, { activated: false } otherwise.
