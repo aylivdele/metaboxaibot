@@ -52,12 +52,24 @@ jobs:
           ref: ${{ steps.sha.outputs.sha }}
           fetch-depth: 0
 
-      # Compares HEAD against the previous commit on the branch.
+      # Use the last successfully deployed SHA as the base for change detection.
+      # Falls back to HEAD~1 on first run (tag doesn't exist yet).
+      - name: Determine base ref
+        id: base
+        run: |
+          git fetch origin refs/tags/test-deployed:refs/tags/test-deployed 2>/dev/null || true
+          if git rev-parse --verify test-deployed >/dev/null 2>&1; then
+            echo "ref=test-deployed" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=HEAD~1" >> "$GITHUB_OUTPUT"
+          fi
+
       # On workflow_dispatch all outputs are 'false' — use force_all to override.
       - name: Filter changed paths
         uses: dorny/paths-filter@v3
         id: filter
         with:
+          base: ${{ steps.base.outputs.ref }}
           filters: |
             api:
               - 'packages/api/**'
@@ -240,6 +252,8 @@ jobs:
     name: Deploy to test VPS
     runs-on: ubuntu-latest
     needs: [changes, build-api, build-bot, build-worker, build-webapp]
+    permissions:
+      contents: write
     # Run if at least one backend image was (re)built; skip if everything was skipped
     if: |
       always() && !cancelled() &&
@@ -290,3 +304,27 @@ jobs:
             sudo nginx -t && sudo nginx -s reload
 
             echo "Test deploy complete — $IMAGE_TAG"
+
+      # Move the test-deployed tag to the current SHA so the next run
+      # only rebuilds what actually changed since this deploy.
+      - name: Mark deployed SHA
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = '${{ needs.changes.outputs.sha }}';
+            try {
+              await github.rest.git.updateRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'tags/test-deployed',
+                sha,
+                force: true,
+              });
+            } catch {
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'refs/tags/test-deployed',
+                sha,
+              });
+            }

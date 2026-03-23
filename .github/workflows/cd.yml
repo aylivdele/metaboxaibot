@@ -16,72 +16,203 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  # ── Build & push Docker images in parallel ──────────────────────────────────
-  build-images:
-    name: Build ${{ matrix.service }}
+  # ── Detect which modules changed ────────────────────────────────────────────
+  changes:
+    name: Detect changes
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    permissions:
-      contents: read
-      packages: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service: api
-            dockerfile: infra/docker/Dockerfile.api
-          - service: bot
-            dockerfile: infra/docker/Dockerfile.bot
-          - service: worker
-            dockerfile: infra/docker/Dockerfile.worker
-
+    if: github.event.workflow_run.conclusion == 'success'
+    outputs:
+      api: ${{ steps.resolved.outputs.api }}
+      bot: ${{ steps.resolved.outputs.bot }}
+      worker: ${{ steps.resolved.outputs.worker }}
+      webapp: ${{ steps.resolved.outputs.webapp }}
+      sha: ${{ github.event.workflow_run.head_sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      # Use the last successfully deployed SHA as the base for change detection.
+      # Falls back to building everything on first run (tag doesn't exist yet).
+      - name: Determine base ref
+        id: base
+        run: |
+          git fetch origin refs/tags/prod-deployed:refs/tags/prod-deployed 2>/dev/null || true
+          if git rev-parse --verify prod-deployed >/dev/null 2>&1; then
+            echo "has_tag=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_tag=false" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Filter changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        if: steps.base.outputs.has_tag == 'true'
+        with:
+          base: prod-deployed
+          filters: |
+            api:
+              - 'packages/api/**'
+              - 'packages/shared/**'
+              - 'prisma/**'
+              - 'pnpm-lock.yaml'
+              - 'package.json'
+              - 'infra/docker/Dockerfile.api'
+            bot:
+              - 'packages/bot/**'
+              - 'packages/api/**'
+              - 'packages/shared/**'
+              - 'prisma/**'
+              - 'pnpm-lock.yaml'
+              - 'package.json'
+              - 'infra/docker/Dockerfile.bot'
+            worker:
+              - 'packages/worker/**'
+              - 'packages/api/**'
+              - 'packages/shared/**'
+              - 'prisma/**'
+              - 'pnpm-lock.yaml'
+              - 'package.json'
+              - 'infra/docker/Dockerfile.worker'
+            webapp:
+              - 'packages/webapp/**'
+              - 'packages/shared/**'
+              - 'pnpm-lock.yaml'
+              - 'package.json'
+              - 'infra/docker/Dockerfile.webapp'
+
+      # On first run (no tag) build everything; otherwise use filter results.
+      - name: Resolve outputs
+        id: resolved
+        run: |
+          if [ "${{ steps.base.outputs.has_tag }}" = "false" ]; then
+            echo "api=true"    >> "$GITHUB_OUTPUT"
+            echo "bot=true"    >> "$GITHUB_OUTPUT"
+            echo "worker=true" >> "$GITHUB_OUTPUT"
+            echo "webapp=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api=${{ steps.filter.outputs.api }}"       >> "$GITHUB_OUTPUT"
+            echo "bot=${{ steps.filter.outputs.bot }}"       >> "$GITHUB_OUTPUT"
+            echo "worker=${{ steps.filter.outputs.worker }}" >> "$GITHUB_OUTPUT"
+            echo "webapp=${{ steps.filter.outputs.webapp }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Build & push Docker images ───────────────────────────────────────────────
+  build-api:
+    name: Build API
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.changes.outputs.sha }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push ${{ matrix.service }}
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          file: infra/docker/Dockerfile.api
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/metabox-${{ matrix.service }}:latest
-            ghcr.io/${{ github.repository_owner }}/metabox-${{ matrix.service }}:${{ github.event.workflow_run.head_sha }}
-          # GitHub Actions layer cache — next build reuses unchanged layers
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+            ghcr.io/${{ github.repository_owner }}/metabox-api:latest
+            ghcr.io/${{ github.repository_owner }}/metabox-api:${{ needs.changes.outputs.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+  build-bot:
+    name: Build Bot
+    needs: changes
+    if: needs.changes.outputs.bot == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.changes.outputs.sha }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.bot
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/metabox-bot:latest
+            ghcr.io/${{ github.repository_owner }}/metabox-bot:${{ needs.changes.outputs.sha }}
+          cache-from: type=gha,scope=bot
+          cache-to: type=gha,scope=bot,mode=max
+
+  build-worker:
+    name: Build Worker
+    needs: changes
+    if: needs.changes.outputs.worker == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.changes.outputs.sha }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.worker
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/metabox-worker:latest
+            ghcr.io/${{ github.repository_owner }}/metabox-worker:${{ needs.changes.outputs.sha }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,scope=worker,mode=max
 
   # ── Build React webapp and upload to VPS ────────────────────────────────────
   build-webapp:
     name: Build & deploy webapp
+    needs: changes
+    if: needs.changes.outputs.webapp == 'true'
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ needs.changes.outputs.sha }}
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
@@ -118,15 +249,24 @@ jobs:
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
-    needs: [build-images, build-webapp]
-
+    needs: [changes, build-api, build-bot, build-worker, build-webapp]
+    permissions:
+      contents: write
+    if: |
+      always() && !cancelled() &&
+      (needs.build-api.result == 'success' ||
+       needs.build-bot.result == 'success' ||
+       needs.build-worker.result == 'success') &&
+      needs.build-api.result != 'failure' &&
+      needs.build-bot.result != 'failure' &&
+      needs.build-worker.result != 'failure'
     steps:
       - name: Deploy on VPS
         uses: appleboy/ssh-action@v1
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_ACTOR: ${{ github.actor }}
-          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          IMAGE_TAG: ${{ needs.changes.outputs.sha }}
           GHCR_IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -141,9 +281,6 @@ jobs:
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
 
             echo "Updating repo (compose file, nginx config)..."
-            # nginx.server.conf is symlinked from /etc/nginx/sites-available/metabox
-            # (set up once: ln -sf /opt/metaboxaibot/infra/nginx/nginx.server.conf /etc/nginx/sites-available/metabox)
-            # GHCR_TOKEN is GITHUB_TOKEN — auto-generated per job, read access to repo
             git -c "url.https://x-access-token:${GHCR_TOKEN}@github.com/.insteadOf=https://github.com/" pull origin main
 
             echo "Updating IMAGE_TAG and GHCR_IMAGE_PREFIX in .env..."
@@ -155,13 +292,36 @@ jobs:
             echo "Pulling new images..."
             docker compose -f docker-compose.prod.yml pull bot api worker
 
-            echo "Restarting services with zero-downtime..."
+            echo "Restarting services..."
             docker compose -f docker-compose.prod.yml up -d --no-build --remove-orphans
 
             echo "Pruning old images..."
             docker image prune -af
 
-            sudo nginx -t
-            sudo systemctl reload nginx
+            sudo nginx -t && sudo systemctl reload nginx
 
             echo "Deploy complete — $IMAGE_TAG"
+
+      # Move the prod-deployed tag to the current SHA so the next run
+      # only rebuilds what actually changed since this deploy.
+      - name: Mark deployed SHA
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = '${{ needs.changes.outputs.sha }}';
+            try {
+              await github.rest.git.updateRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'tags/prod-deployed',
+                sha,
+                force: true,
+              });
+            } catch {
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'refs/tags/prod-deployed',
+                sha,
+              });
+            }
