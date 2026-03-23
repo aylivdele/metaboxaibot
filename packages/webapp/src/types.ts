@@ -9,6 +9,8 @@ export interface UserProfile {
   createdAt: string;
   email: string | null;
   emailVerified: boolean;
+  metaboxUserId: string | null;
+  metaboxReferralCode: string | null;
   transactions: Transaction[];
 }
 
@@ -117,4 +119,4 @@ export interface GalleryResponse {
   limit: number;
 }
 
-export type Page = "profile" | "management" | "tariffs" | "referral" | "admin";
+export type Page = "profile" | "management" | "tariffs" | "referral" | "admin" | "linkMetabox";

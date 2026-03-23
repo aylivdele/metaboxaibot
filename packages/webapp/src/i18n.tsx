@@ -83,6 +83,10 @@ const translations = {
     "tariffs.success": "tokens credited to your balance!",
     "tariffs.failed": "Payment failed. Please try again.",
     "tariffs.invoiceError": "Could not create invoice. Please try again.",
+    "tariffs.metaboxTitle": "Pay by Card (via Metabox)",
+    "tariffs.metaboxDescription":
+      "Pay with a bank card through the Metabox platform. Tokens are credited after payment confirmation.",
+    "tariffs.buyCard": "Pay by Card",
 
     // Referral
     "referral.title": "Referral Program",
@@ -91,9 +95,15 @@ const translations = {
     "referral.invited": "Friends invited",
     "referral.perReferral": "Tokens per referral",
     "referral.yourLink": "Your referral link",
-    "referral.copy": "Copy link",
+    "referral.copy": "Copy",
     "referral.copied": "✓ Copied!",
     "referral.share": "Share",
+    "referral.shareText": "Try Metabox — 70+ AI tools in one Telegram bot! 🚀",
+    "referral.botLink": "🤖 Bot referral link",
+    "referral.botLinkHint": "Friend joins the bot — you earn token bonuses",
+    "referral.metaboxLink": "🎓 Metabox referral link",
+    "referral.metaboxLinkHint": "Friend registers on the platform — you earn MLM bonuses",
+    "referral.metaboxLinkCta": "Link Metabox account to get this link",
     "referral.howTitle": "How it works",
     "referral.step1": "Share your unique link with friends",
     "referral.step2": "Friend opens the bot via your link",
@@ -175,6 +185,18 @@ const translations = {
     // Common
     "common.loading": "Loading…",
     "common.error": "Error",
+    "common.back": "← Back",
+
+    // Link Metabox
+    "linkMetabox.title": "Metabox Learning",
+    "linkMetabox.subtitle": "Link your Metabox account to access the learning section.",
+    "linkMetabox.newAccount": "Create account",
+    "linkMetabox.existingAccount": "I already have an account",
+    "linkMetabox.registerHint": "Enter an email and password to create your Metabox account.",
+    "linkMetabox.loginHint": "Enter your existing Metabox email and password.",
+    "linkMetabox.password": "Password",
+    "linkMetabox.submit": "Continue",
+    "linkMetabox.error": "Error. Please check your details and try again.",
 
     // Image settings
     "imageSettings.title": "Image Settings",
@@ -278,6 +300,10 @@ const translations = {
     "tariffs.success": "токенов зачислено на ваш баланс!",
     "tariffs.failed": "Оплата не удалась. Попробуйте снова.",
     "tariffs.invoiceError": "Не удалось создать счёт. Попробуйте снова.",
+    "tariffs.metaboxTitle": "Оплата картой (через Metabox)",
+    "tariffs.metaboxDescription":
+      "Оплатите банковской картой через платформу Metabox. Токены зачисляются после подтверждения оплаты.",
+    "tariffs.buyCard": "Оплатить картой",
 
     // Referral
     "referral.title": "Реферальная программа",
@@ -288,6 +314,12 @@ const translations = {
     "referral.copy": "Копировать",
     "referral.copied": "✓ Скопировано!",
     "referral.share": "Поделиться",
+    "referral.shareText": "Попробуй Metabox — 70+ AI инструментов в одном Telegram-боте! 🚀",
+    "referral.botLink": "🤖 Ссылка на бота",
+    "referral.botLinkHint": "Друг присоединяется к боту — вы получаете бонусные токены",
+    "referral.metaboxLink": "🎓 Ссылка на платформу Metabox",
+    "referral.metaboxLinkHint": "Друг регистрируется на платформе — вы получаете MLM-бонусы",
+    "referral.metaboxLinkCta": "Привяжите аккаунт Metabox, чтобы получить эту ссылку",
     "referral.howTitle": "Как это работает",
     "referral.step1": "Поделитесь своей ссылкой с друзьями",
     "referral.step2": "Друг открывает бота по вашей ссылке",
@@ -369,6 +401,18 @@ const translations = {
     // Common
     "common.loading": "Загрузка…",
     "common.error": "Ошибка",
+    "common.back": "← Назад",
+
+    // Link Metabox
+    "linkMetabox.title": "Обучение Metabox",
+    "linkMetabox.subtitle": "Привяжите аккаунт Metabox, чтобы открыть раздел обучения.",
+    "linkMetabox.newAccount": "Создать аккаунт",
+    "linkMetabox.existingAccount": "Уже есть аккаунт",
+    "linkMetabox.registerHint": "Введите email и пароль для создания аккаунта Metabox.",
+    "linkMetabox.loginHint": "Введите email и пароль от существующего аккаунта Metabox.",
+    "linkMetabox.password": "Пароль",
+    "linkMetabox.submit": "Продолжить",
+    "linkMetabox.error": "Ошибка. Проверьте данные и попробуйте снова.",
 
     // Image settings
     "imageSettings.title": "Настройки изображений",

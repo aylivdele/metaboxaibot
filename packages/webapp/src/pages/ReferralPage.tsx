@@ -1,48 +1,49 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
+import type { UserProfile } from "../types.js";
 
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME ?? "MetaboxAIBot";
+const METABOX_URL = import.meta.env.VITE_METABOX_URL ?? "https://app.meta-box.ru";
 
-export function ReferralPage() {
-  const { t } = useI18n();
-  const [userId, setUserId] = useState<string | null>(null);
-  const [referralCount, setReferralCount] = useState(0);
+function useCopy(timeout = 2000) {
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    api.profile
-      .get()
-      .then((p) => {
-        setUserId(p.id);
-        setReferralCount(p.referralCount);
-      })
-      .catch(console.error);
-  }, []);
-
-  const referralLink = userId ? `https://t.me/${BOT_USERNAME}?start=${userId}` : null;
-
-  const handleCopy = () => {
-    if (!referralLink) return;
-    navigator.clipboard.writeText(referralLink).then(() => {
+  const copy = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), timeout);
     });
   };
+  return { copied, copy };
+}
 
-  const handleShare = () => {
-    if (!referralLink) return;
-    const tg = (
-      window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } }
-    ).Telegram?.WebApp;
+function shareLink(url: string, text: string) {
+  const tg = (
+    window as Window & { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } }
+  ).Telegram?.WebApp;
+  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+  if (tg?.openTelegramLink) {
+    tg.openTelegramLink(shareUrl);
+  } else {
+    window.open(shareUrl, "_blank");
+  }
+}
 
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent("Try Metabox — 70+ AI tools in one Telegram bot! 🚀")}`;
-    if (tg?.openTelegramLink) {
-      tg.openTelegramLink(shareUrl);
-    } else {
-      window.open(shareUrl, "_blank");
-    }
-  };
+export function ReferralPage({ onLinkMetabox }: { onLinkMetabox: () => void }) {
+  const { t } = useI18n();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    api.profile.get().then(setProfile).catch(console.error);
+  }, []);
+
+  const botLink = profile ? `https://t.me/${BOT_USERNAME}?start=ref_${profile.id}` : null;
+  const metaboxLink = profile?.metaboxReferralCode
+    ? `${METABOX_URL}/register?ref=${profile.metaboxReferralCode}`
+    : null;
+
+  const botCopy = useCopy();
+  const metaboxCopy = useCopy();
 
   return (
     <div className="page">
@@ -53,7 +54,7 @@ export function ReferralPage() {
 
       <div className="referral-stats">
         <div className="referral-stat">
-          <div className="referral-stat__value">{referralCount}</div>
+          <div className="referral-stat__value">{profile?.referralCount ?? "—"}</div>
           <div className="referral-stat__label">{t("referral.invited")}</div>
         </div>
         <div className="referral-stat">
@@ -62,17 +63,53 @@ export function ReferralPage() {
         </div>
       </div>
 
+      {/* Bot referral link */}
       <div className="referral-card">
-        <div className="referral-card__label">{t("referral.yourLink")}</div>
-        <div className="referral-card__link">{referralLink ?? t("common.loading")}</div>
+        <div className="referral-card__type">{t("referral.botLink")}</div>
+        <div className="referral-card__label">{t("referral.botLinkHint")}</div>
+        <div className="referral-card__link">{botLink ?? t("common.loading")}</div>
         <div className="referral-card__actions">
-          <button className="btn btn--secondary" onClick={handleCopy} disabled={!referralLink}>
-            {copied ? t("referral.copied") : t("referral.copy")}
+          <button
+            className="btn btn--secondary"
+            onClick={() => botLink && botCopy.copy(botLink)}
+            disabled={!botLink}
+          >
+            {botCopy.copied ? t("referral.copied") : t("referral.copy")}
           </button>
-          <button className="btn btn--primary" onClick={handleShare} disabled={!referralLink}>
+          <button
+            className="btn btn--primary"
+            onClick={() => botLink && shareLink(botLink, t("referral.shareText"))}
+            disabled={!botLink}
+          >
             {t("referral.share")}
           </button>
         </div>
+      </div>
+
+      {/* Metabox referral link */}
+      <div className="referral-card">
+        <div className="referral-card__type">{t("referral.metaboxLink")}</div>
+        <div className="referral-card__label">{t("referral.metaboxLinkHint")}</div>
+        {metaboxLink ? (
+          <>
+            <div className="referral-card__link">{metaboxLink}</div>
+            <div className="referral-card__actions">
+              <button className="btn btn--secondary" onClick={() => metaboxCopy.copy(metaboxLink)}>
+                {metaboxCopy.copied ? t("referral.copied") : t("referral.copy")}
+              </button>
+              <button
+                className="btn btn--primary"
+                onClick={() => shareLink(metaboxLink, t("referral.shareText"))}
+              >
+                {t("referral.share")}
+              </button>
+            </div>
+          </>
+        ) : (
+          <button className="btn btn--secondary referral-card__link-cta" onClick={onLinkMetabox}>
+            {t("referral.metaboxLinkCta")}
+          </button>
+        )}
       </div>
 
       <div className="referral-how">

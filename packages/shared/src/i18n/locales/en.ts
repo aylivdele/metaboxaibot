@@ -16,6 +16,8 @@ export default {
     howToVideo_yt: "▶️ How to use? Video (YT)",
     knowledgeBase: "📖 Knowledge Base",
     channel: "📢 Metabox Family Channel",
+    metaboxLinked: "✅ Metabox account linked successfully!",
+    metaboxLinkFailed: "❌ Failed to link account. Please try again.",
   },
   menu: {
     profile: "👤 Profile",
@@ -112,5 +114,16 @@ export default {
   payments: {
     success: "✅ Payment successful! Tokens have been credited to your balance.",
     error: "⚠️ Payment received but tokens could not be credited. Please contact support.",
+  },
+  linkMetabox: {
+    title: "Metabox Learning",
+    subtitle: "Link your Metabox account to access the learning section.",
+    newAccount: "Create account",
+    existingAccount: "I already have an account",
+    registerHint: "Enter an email and password to create your Metabox account.",
+    loginHint: "Enter your existing Metabox email and password.",
+    password: "Password",
+    submit: "Continue",
+    error: "Error. Please check your details and try again.",
   },
 } as const;

@@ -29,6 +29,8 @@ model User {
   isNew        Boolean  @default(true)
   isBlocked    Boolean  @default(false)
   referredById BigInt?
+  metaboxUserId      String? // UUID пользователя в Metabox (после привязки)
+  metaboxReferralCode String? // Реферальный код Metabox (кешируется при привязке)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -38,6 +38,8 @@ export interface UserDto {
   isNew: boolean;
   isBlocked: boolean;
   createdAt: Date;
+  referredById?: bigint | null;
+  metaboxUserId?: string | null;
 }
 
 export interface UserStateDto {

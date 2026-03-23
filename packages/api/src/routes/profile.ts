@@ -2,6 +2,8 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
 import { createHash, randomBytes } from "crypto";
+import { issueSsoToken, issueSsoTokenRemote } from "../services/metabox-bridge.service.js";
+import { config } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
@@ -40,6 +42,8 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       role: user.role,
       email: user.email ?? null,
       emailVerified: user.emailVerified,
+      metaboxUserId: user.metaboxUserId ?? null,
+      metaboxReferralCode: user.metaboxReferralCode ?? null,
       tokenBalance: user.tokenBalance.toString(),
       referralCount,
       createdAt: user.createdAt.toISOString(),
@@ -82,6 +86,84 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       email: user.email ?? null,
       emailVerified: user.emailVerified,
     };
+  });
+
+  /**
+   * GET /profile/metabox-sso — get SSO redirect URL for linked Metabox account.
+   * Returns { ssoUrl } for already-linked users, 409 if not linked.
+   */
+  fastify.get("/profile/metabox-sso", async (request, reply) => {
+    const { userId } = request as AuthRequest;
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { metaboxUserId: true },
+    });
+    if (!user?.metaboxUserId) {
+      return reply.code(409).send({ error: "Metabox account not linked" });
+    }
+    const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
+    let ssoToken: string;
+    if (config.metabox.ssoSecret) {
+      ssoToken = issueSsoToken(user.metaboxUserId);
+    } else {
+      const result = await issueSsoTokenRemote(user.metaboxUserId);
+      ssoToken = result.ssoToken;
+    }
+    return { ssoUrl: `${metaboxUrl}/auth/sso?token=${ssoToken}` };
+  });
+
+  /**
+   * POST /profile/metabox-register — register a new Metabox account from the bot mini-app.
+   * Body: { email, password, firstName? }
+   */
+  fastify.post("/profile/metabox-register", async (request, reply) => {
+    const { userId } = request as AuthRequest;
+    const { email, password, firstName } = request.body as {
+      email: string;
+      password: string;
+      firstName?: string;
+    };
+    if (!email || !password) {
+      return reply.code(400).send({ error: "email and password are required" });
+    }
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { referredById: true },
+    });
+    const { registerFromBot } = await import("../services/metabox-bridge.service.js");
+    const result = await registerFromBot({
+      email,
+      password,
+      telegramId: userId,
+      firstName,
+      referrerTelegramId: user?.referredById ?? undefined,
+    });
+    await db.user.update({
+      where: { id: userId },
+      data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
+    });
+    const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
+    return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
+  });
+
+  /**
+   * POST /profile/metabox-login — link existing Metabox account to the bot.
+   * Body: { email, password }
+   */
+  fastify.post("/profile/metabox-login", async (request, reply) => {
+    const { userId } = request as AuthRequest;
+    const { email, password } = request.body as { email: string; password: string };
+    if (!email || !password) {
+      return reply.code(400).send({ error: "email and password are required" });
+    }
+    const { loginAndLink } = await import("../services/metabox-bridge.service.js");
+    const result = await loginAndLink({ email, password, telegramId: userId });
+    await db.user.update({
+      where: { id: userId },
+      data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
+    });
+    const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
+    return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
   });
 
   /** POST /profile/verify-email — send verification email */
