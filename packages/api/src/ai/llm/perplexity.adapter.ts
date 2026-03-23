@@ -9,19 +9,16 @@ import type {
 import { config } from "@metabox/shared";
 
 const MODEL_MAP: Record<string, string> = {
-  "grok-3": "grok-3",
-  "grok-3-mini": "grok-3-mini",
-  "grok-4": "grok-4",
-  "grok-3-deep-search": "grok-3-deepsearch",
-  "grok-3-reasoner": "grok-3-reasoner",
-  "grok-3-image": "aurora",
+  "perplexity-sonar-pro": "sonar-pro",
+  "perplexity-sonar-research": "sonar-deep-research",
+  "perplexity-sonar": "sonar",
 };
 
 /**
- * xAI Grok adapter (db_history strategy).
- * Uses OpenAI-compatible API via xAI.
+ * Perplexity adapter (db_history strategy).
+ * Uses OpenAI-compatible API. All models have built-in web search.
  */
-export class GrokAdapter implements LLMAdapter {
+export class PerplexityAdapter implements LLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
 
@@ -30,12 +27,12 @@ export class GrokAdapter implements LLMAdapter {
 
   constructor(
     private readonly modelId: string,
-    contextMaxMessages = 40,
-    apiKey = config.ai.grok,
+    contextMaxMessages = 20,
+    apiKey = config.ai.perplexity,
   ) {
     this.client = new OpenAI({
       apiKey,
-      baseURL: "https://api.x.ai/v1",
+      baseURL: "https://api.perplexity.ai",
     });
     this.apiModel = MODEL_MAP[modelId] ?? modelId;
     this.contextMaxMessages = contextMaxMessages;

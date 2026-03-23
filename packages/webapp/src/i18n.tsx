@@ -199,7 +199,7 @@ const translations = {
 
     // Bottom Nav
     "nav.profile": "Профиль",
-    "nav.manage": "Диалоги",
+    "nav.manage": "Управление",
     "nav.learning": "Обучение",
     "nav.tariffs": "Тарифы",
     "nav.referral": "Рефералы",

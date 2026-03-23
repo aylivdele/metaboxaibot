@@ -7,6 +7,7 @@ import { OpenAIAssistantsAdapter } from "./openai-assistants.adapter.js";
 import { QwenAdapter } from "./qwen.adapter.js";
 import { GrokAdapter } from "./grok.adapter.js";
 import { DeepSeekAdapter } from "./deepseek.adapter.js";
+import { PerplexityAdapter } from "./perplexity.adapter.js";
 
 export function createLLMAdapter(modelId: string): LLMAdapter {
   const model = AI_MODELS[modelId];
@@ -27,6 +28,8 @@ export function createLLMAdapter(modelId: string): LLMAdapter {
       return new GrokAdapter(modelId, model.contextMaxMessages);
     case "deepseek":
       return new DeepSeekAdapter(modelId, model.contextMaxMessages);
+    case "perplexity":
+      return new PerplexityAdapter(modelId, model.contextMaxMessages);
     default:
       throw new Error(`No LLM adapter for provider: ${model.provider}`);
   }

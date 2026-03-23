@@ -12,6 +12,8 @@ const MODEL_MAP: Record<string, string> = {
   "claude-sonnet": "claude-sonnet-4-6",
   "claude-haiku": "claude-haiku-4-5-20251001",
   "claude-opus": "claude-opus-4-6",
+  "claude-opus-4-5": "claude-opus-4-5",
+  "claude-sonnet-4-5": "claude-sonnet-4-5-20251001",
 };
 
 /**

@@ -8,6 +8,13 @@ import type {
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
+const MODEL_MAP: Record<string, string> = {
+  "qwen-max": "qwen-max",
+  "qwen-3-max-thinking": "qwen3-235b-a22b",
+  "qwen-3-thinking": "qwen3-30b-a3b",
+  "qwen-3": "qwen3-8b",
+};
+
 /**
  * Alibaba Qwen adapter (db_history strategy).
  * Uses OpenAI-compatible API via DashScope.
@@ -17,6 +24,7 @@ export class QwenAdapter implements LLMAdapter {
   readonly contextMaxMessages: number;
 
   private client: OpenAI;
+  private apiModel: string;
 
   constructor(
     private readonly model: string,
@@ -27,6 +35,7 @@ export class QwenAdapter implements LLMAdapter {
       apiKey,
       baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     });
+    this.apiModel = MODEL_MAP[model] ?? model;
     this.contextMaxMessages = contextMaxMessages;
   }
 
@@ -48,7 +57,7 @@ export class QwenAdapter implements LLMAdapter {
     ];
 
     const stream = await this.client.chat.completions.create({
-      model: this.model,
+      model: this.apiModel,
       messages,
       stream: true,
       stream_options: { include_usage: true },

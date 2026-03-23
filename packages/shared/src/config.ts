@@ -123,6 +123,7 @@ export const config = {
     qwen: opt("QWEN_API_KEY"),
     grok: opt("GROK_API_KEY"),
     deepseek: opt("DEEPSEEK_API_KEY"),
+    perplexity: opt("PERPLEXITY_API_KEY"),
     fal: opt("FAL_API_KEY"),
     replicate: opt("REPLICATE_API_KEY") ?? opt("REPLICATE_API_TOKEN"),
     runway: opt("RUNWAY_API_KEY"),
