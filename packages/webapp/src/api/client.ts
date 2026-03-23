@@ -93,10 +93,16 @@ export const api = {
     sendVerification: () =>
       request<{ success: boolean }>("/profile/verify-email", { method: "POST" }),
     metaboxSso: () => request<{ ssoUrl: string }>("/profile/metabox-sso"),
-    metaboxRegister: (email: string, password: string, firstName?: string) =>
+    metaboxRegister: (
+      email: string,
+      password: string,
+      firstName?: string,
+      lastName?: string,
+      username?: string,
+    ) =>
       request<{ ssoUrl: string }>("/profile/metabox-register", {
         method: "POST",
-        body: JSON.stringify({ email, password, firstName }),
+        body: JSON.stringify({ email, password, firstName, lastName, username }),
       }),
     metaboxLogin: (email: string, password: string) =>
       request<{ ssoUrl: string }>("/profile/metabox-login", {

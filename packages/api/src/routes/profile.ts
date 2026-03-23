@@ -2,7 +2,11 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
 import { createHash, randomBytes } from "crypto";
-import { issueSsoToken, issueSsoTokenRemote } from "../services/metabox-bridge.service.js";
+import {
+  issueSsoToken,
+  issueSsoTokenRemote,
+  MetaboxApiError,
+} from "../services/metabox-bridge.service.js";
 import { config } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
@@ -13,6 +17,15 @@ function hashPassword(password: string): string {
     .update(salt + password)
     .digest("hex");
   return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, storedHash: string): boolean {
+  const [salt, hash] = storedHash.split(":");
+  if (!salt || !hash) return false;
+  const expected = createHash("sha256")
+    .update(salt + password)
+    .digest("hex");
+  return expected === hash;
 }
 
 export const profileRoutes: FastifyPluginAsync = async (fastify) => {
@@ -59,9 +72,9 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /** PATCH /profile/settings — update email / password */
-  fastify.patch("/profile/settings", async (request) => {
+  fastify.patch("/profile/settings", async (request, reply) => {
     const { userId } = request as AuthRequest;
-    const body = request.body as { email?: string; password?: string };
+    const body = request.body as { email?: string; password?: string; oldPassword?: string };
 
     const data: Record<string, unknown> = {};
 
@@ -73,6 +86,15 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     if (body.password) {
       if (body.password.length < 6) {
         throw new Error("Password must be at least 6 characters");
+      }
+      if (body.oldPassword !== undefined) {
+        const user = await db.user.findUnique({
+          where: { id: userId },
+          select: { passwordHash: true },
+        });
+        if (!user?.passwordHash || !verifyPassword(body.oldPassword, user.passwordHash)) {
+          return reply.code(400).send({ error: "Current password is incorrect" });
+        }
       }
       data.passwordHash = hashPassword(body.password);
     }
@@ -118,32 +140,46 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
    */
   fastify.post("/profile/metabox-register", async (request, reply) => {
     const { userId } = request as AuthRequest;
-    const { email, password, firstName } = request.body as {
+    const { email, password, firstName, lastName, username } = request.body as {
       email: string;
       password: string;
       firstName?: string;
+      lastName?: string;
+      username?: string;
     };
     if (!email || !password) {
       return reply.code(400).send({ error: "email and password are required" });
     }
     const user = await db.user.findUnique({
       where: { id: userId },
-      select: { referredById: true },
+      select: { metaboxUserId: true, referredById: true },
     });
+    if (user?.metaboxUserId) {
+      return reply.code(409).send({ error: "Metabox account already linked" });
+    }
     const { registerFromBot } = await import("../services/metabox-bridge.service.js");
-    const result = await registerFromBot({
-      email,
-      password,
-      telegramId: userId,
-      firstName,
-      referrerTelegramId: user?.referredById ?? undefined,
-    });
-    await db.user.update({
-      where: { id: userId },
-      data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
-    });
-    const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
-    return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
+    try {
+      const result = await registerFromBot({
+        email,
+        password,
+        telegramId: userId,
+        firstName,
+        lastName,
+        username,
+        referrerTelegramId: user?.referredById ?? undefined,
+      });
+      await db.user.update({
+        where: { id: userId },
+        data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
+      });
+      const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
+      return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
+    } catch (err) {
+      if (err instanceof MetaboxApiError) {
+        return reply.code(err.status).send({ error: err.body });
+      }
+      throw err;
+    }
   });
 
   /**
@@ -157,13 +193,20 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(400).send({ error: "email and password are required" });
     }
     const { loginAndLink } = await import("../services/metabox-bridge.service.js");
-    const result = await loginAndLink({ email, password, telegramId: userId });
-    await db.user.update({
-      where: { id: userId },
-      data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
-    });
-    const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
-    return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
+    try {
+      const result = await loginAndLink({ email, password, telegramId: userId });
+      await db.user.update({
+        where: { id: userId },
+        data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
+      });
+      const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
+      return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
+    } catch (err) {
+      if (err instanceof MetaboxApiError) {
+        return reply.code(err.status).send({ error: err.body });
+      }
+      throw err;
+    }
   });
 
   /** POST /profile/verify-email — send verification email */

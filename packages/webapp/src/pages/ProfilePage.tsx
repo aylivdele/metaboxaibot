@@ -317,17 +317,55 @@ function SettingsTab({
   onUpdate: (p: UserProfile) => void;
 }) {
   const { t } = useI18n();
+  const isMetaboxLinked = !!profile.metaboxUserId;
+
+  // Standard settings (no metabox)
   const [email, setEmail] = useState(profile.email ?? "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  // Change-password form (metabox linked)
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<{
-    text: string;
-    ok: boolean;
-  } | null>(null);
+  const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [verifying, setVerifying] = useState(false);
 
   const handleSave = async () => {
+    if (isMetaboxLinked) {
+      if (!oldPassword || !newPassword) {
+        setNotice({ text: t("settings.noChanges"), ok: false });
+        return;
+      }
+      if (newPassword !== confirmNewPassword) {
+        setNotice({ text: t("settings.passwordMismatch"), ok: false });
+        return;
+      }
+      if (newPassword.length < 6) {
+        setNotice({ text: t("settings.passwordTooShort"), ok: false });
+        return;
+      }
+      setSaving(true);
+      setNotice(null);
+      try {
+        await api.profile.updateSettings({ oldPassword, password: newPassword });
+        setOldPassword("");
+        setNewPassword("");
+        setConfirmNewPassword("");
+        setNotice({ text: t("settings.saved"), ok: true });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : t("common.error");
+        setNotice({
+          text: msg.includes("incorrect") ? t("settings.wrongPassword") : msg,
+          ok: false,
+        });
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     if (password && password !== confirmPassword) {
       setNotice({ text: t("settings.passwordMismatch"), ok: false });
       return;
@@ -395,48 +433,93 @@ function SettingsTab({
         </div>
       )}
 
-      <div className="settings-field">
-        <label className="settings-field__label">{t("settings.email")}</label>
-        <div className="settings-field__row">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="your@email.com"
-          />
-          {profile.emailVerified ? (
-            <span className="settings-badge settings-badge--ok">✓ {t("settings.verified")}</span>
-          ) : profile.email ? (
-            <button
-              className="admin-btn admin-btn--accent"
-              onClick={handleVerifyEmail}
-              disabled={verifying}
-            >
-              {verifying ? t("common.loading") : t("settings.verify")}
-            </button>
-          ) : null}
-        </div>
-      </div>
+      {isMetaboxLinked ? (
+        <>
+          <div className="section-title" style={{ fontSize: "0.9rem", marginTop: 8 }}>
+            {t("settings.changePassword")}
+          </div>
 
-      <div className="settings-field">
-        <label className="settings-field__label">{t("settings.password")}</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder={t("settings.newPassword")}
-        />
-      </div>
+          <div className="settings-field">
+            <label className="settings-field__label">{t("settings.oldPassword")}</label>
+            <input
+              type="password"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              placeholder={t("settings.oldPasswordPlaceholder")}
+              autoComplete="current-password"
+            />
+          </div>
 
-      <div className="settings-field">
-        <label className="settings-field__label">{t("settings.confirmPassword")}</label>
-        <input
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder={t("settings.confirmPasswordPlaceholder")}
-        />
-      </div>
+          <div className="settings-field">
+            <label className="settings-field__label">{t("settings.password")}</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder={t("settings.newPassword")}
+              autoComplete="new-password"
+            />
+          </div>
+
+          <div className="settings-field">
+            <label className="settings-field__label">{t("settings.confirmPassword")}</label>
+            <input
+              type="password"
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
+              placeholder={t("settings.confirmPasswordPlaceholder")}
+              autoComplete="new-password"
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="settings-field">
+            <label className="settings-field__label">{t("settings.email")}</label>
+            <div className="settings-field__row">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+              />
+              {profile.emailVerified ? (
+                <span className="settings-badge settings-badge--ok">
+                  ✓ {t("settings.verified")}
+                </span>
+              ) : profile.email ? (
+                <button
+                  className="admin-btn admin-btn--accent"
+                  onClick={handleVerifyEmail}
+                  disabled={verifying}
+                >
+                  {verifying ? t("common.loading") : t("settings.verify")}
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="settings-field">
+            <label className="settings-field__label">{t("settings.password")}</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t("settings.newPassword")}
+            />
+          </div>
+
+          <div className="settings-field">
+            <label className="settings-field__label">{t("settings.confirmPassword")}</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder={t("settings.confirmPasswordPlaceholder")}
+            />
+          </div>
+        </>
+      )}
 
       <button className="btn btn--primary settings-save-btn" onClick={handleSave} disabled={saving}>
         {saving ? t("common.loading") : t("settings.save")}

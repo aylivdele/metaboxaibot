@@ -4,14 +4,19 @@ import { useI18n } from "../i18n.js";
 
 interface Props {
   firstName?: string | null;
+  username?: string | null;
   onBack: () => void;
 }
 
 type Mode = "choose" | "register" | "login";
 
+type TgWebApp = {
+  openLink?: (url: string) => void;
+  initDataUnsafe?: { user?: { last_name?: string } };
+};
+
 function openSso(ssoUrl: string) {
-  const tg = (window as Window & { Telegram?: { WebApp?: { openLink?: (url: string) => void } } })
-    .Telegram?.WebApp;
+  const tg = (window as Window & { Telegram?: { WebApp?: TgWebApp } }).Telegram?.WebApp;
   if (tg?.openLink) {
     tg.openLink(ssoUrl);
   } else {
@@ -19,22 +24,40 @@ function openSso(ssoUrl: string) {
   }
 }
 
-export function LinkMetaboxPage({ firstName, onBack }: Props) {
+function getTgLastName(): string | undefined {
+  const tg = (window as Window & { Telegram?: { WebApp?: TgWebApp } }).Telegram?.WebApp;
+  return tg?.initDataUnsafe?.user?.last_name || undefined;
+}
+
+export function LinkMetaboxPage({ firstName, username, onBack }: Props) {
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("choose");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     if (!email.trim() || !password) return;
+    if (mode === "register") {
+      if (password !== confirmPassword) {
+        setError(t("linkMetabox.passwordMismatch"));
+        return;
+      }
+    }
     setLoading(true);
     setError(null);
     try {
       const result =
         mode === "register"
-          ? await api.profile.metaboxRegister(email.trim(), password, firstName ?? undefined)
+          ? await api.profile.metaboxRegister(
+              email.trim(),
+              password,
+              firstName ?? undefined,
+              getTgLastName(),
+              username ?? undefined,
+            )
           : await api.profile.metaboxLogin(email.trim(), password);
       openSso(result.ssoUrl);
       onBack();
@@ -95,6 +118,20 @@ export function LinkMetaboxPage({ firstName, onBack }: Props) {
               autoComplete={mode === "register" ? "new-password" : "current-password"}
             />
           </div>
+
+          {mode === "register" && (
+            <div className="form-field">
+              <label className="form-label">{t("linkMetabox.confirmPassword")}</label>
+              <input
+                className="form-input"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••"
+                autoComplete="new-password"
+              />
+            </div>
+          )}
 
           {error && <div className="form-error">{error}</div>}
 

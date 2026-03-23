@@ -78,4 +78,24 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
 
     return { ok: true };
   });
+
+  /**
+   * GET /internal/check-bot-user?telegramId=<id>
+   * Called by Metabox to check whether a user has ever started the AI Box bot.
+   * Returns { activated: true } if the user exists in the bot DB, { activated: false } otherwise.
+   */
+  fastify.get<{ Querystring: { telegramId?: string } }>(
+    "/internal/check-bot-user",
+    async (request, reply) => {
+      const { telegramId } = request.query;
+      if (!telegramId) {
+        return reply.code(400).send({ error: "telegramId is required" });
+      }
+      const user = await db.user.findUnique({
+        where: { id: BigInt(telegramId) },
+        select: { id: true },
+      });
+      return { activated: !!user };
+    },
+  );
 };

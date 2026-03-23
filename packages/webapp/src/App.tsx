@@ -139,7 +139,11 @@ function AppContent() {
         {page === "referral" && <ReferralPage onLinkMetabox={() => setPage("linkMetabox")} />}
         {page === "admin" && <AdminPage />}
         {page === "linkMetabox" && (
-          <LinkMetaboxPage firstName={profile?.firstName} onBack={() => setPage("profile")} />
+          <LinkMetaboxPage
+            firstName={profile?.firstName}
+            username={profile?.username}
+            onBack={() => setPage("profile")}
+          />
         )}
       </main>
 

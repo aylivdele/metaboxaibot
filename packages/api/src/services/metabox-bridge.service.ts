@@ -48,6 +48,16 @@ function base() {
   return { url, key };
 }
 
+export class MetaboxApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly body: string,
+    path: string,
+  ) {
+    super(`Metabox internal API ${path} → ${status}: ${body}`);
+  }
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const { url, key } = base();
   const res = await fetch(`${url}/api/internal${path}`, {
@@ -60,7 +70,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Metabox internal API ${path} → ${res.status}: ${text}`);
+    throw new MetaboxApiError(res.status, text, path);
   }
   return res.json() as Promise<T>;
 }
@@ -89,6 +99,8 @@ export async function registerFromBot(params: {
   password: string;
   telegramId: bigint;
   firstName?: string;
+  lastName?: string;
+  username?: string;
   referrerTelegramId?: bigint;
 }): Promise<RegisterFromBotResult> {
   return post<RegisterFromBotResult>("/register-from-bot", {

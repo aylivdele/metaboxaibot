@@ -42,10 +42,18 @@ export async function handleStart(ctx: BotContext): Promise<void> {
     const referrerIdStr = param.slice("ref_".length);
     const referrerId = BigInt(referrerIdStr);
     if (referrerId !== ctx.user.id && !ctx.user.referredById) {
-      await db.user.update({
-        where: { id: ctx.user.id },
-        data: { referredById: referrerId },
+      // Only set referredById if the referrer actually exists in the bot DB.
+      // They may have shared the link from Metabox without ever starting the bot.
+      const referrerExists = await db.user.findUnique({
+        where: { id: referrerId },
+        select: { id: true },
       });
+      if (referrerExists) {
+        await db.user.update({
+          where: { id: ctx.user.id },
+          data: { referredById: referrerId },
+        });
+      }
     }
   }
 

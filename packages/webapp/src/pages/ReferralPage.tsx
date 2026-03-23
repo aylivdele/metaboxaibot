@@ -39,7 +39,7 @@ export function ReferralPage({ onLinkMetabox }: { onLinkMetabox: () => void }) {
 
   const botLink = profile ? `https://t.me/${BOT_USERNAME}?start=ref_${profile.id}` : null;
   const metaboxLink = profile?.metaboxReferralCode
-    ? `${METABOX_URL}/register?ref=${profile.metaboxReferralCode}`
+    ? `${METABOX_URL}/register?promo=${profile.metaboxReferralCode}`
     : null;
 
   const botCopy = useCopy();
