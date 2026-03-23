@@ -269,6 +269,9 @@ jobs:
             echo "Logging in to ghcr.io..."
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
 
+            echo "Updating repo (compose file, nginx config)..."
+            git -c "url.https://x-access-token:${GHCR_TOKEN}@github.com/.insteadOf=https://github.com/" pull origin develop
+
             echo "Updating IMAGE_TAG and GHCR_IMAGE_PREFIX in .env..."
             sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env \
               || echo "IMAGE_TAG=$IMAGE_TAG" >> .env
@@ -284,8 +287,6 @@ jobs:
             echo "Pruning old images..."
             docker image prune -af
 
-            echo "Updating repo (nginx config)..."
-            git -c "url.https://x-access-token:${GHCR_TOKEN}@github.com/.insteadOf=https://github.com/" pull origin develop
             sudo nginx -t && sudo systemctl reload nginx
 
             echo "Test deploy complete — $IMAGE_TAG"
