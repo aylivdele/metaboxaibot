@@ -223,7 +223,7 @@ jobs:
           host: ${{ secrets.TEST_VPS_HOST }}
           username: ${{ secrets.TEST_VPS_USER }}
           key: ${{ secrets.TEST_VPS_SSH_KEY }}
-          script: rm -rf /var/www/metabox-test/*
+          script: rm -rf /var/www/metabox-ai-test/*
 
       - name: Upload webapp dist to test VPS
         uses: appleboy/scp-action@v1.0.0
@@ -232,7 +232,7 @@ jobs:
           username: ${{ secrets.TEST_VPS_USER }}
           key: ${{ secrets.TEST_VPS_SSH_KEY }}
           source: "packages/webapp/dist/*"
-          target: /var/www/metabox-test
+          target: /var/www/metabox-ai-test
           strip_components: 3
 
   # ── Pull new images and restart services on test VPS ────────────────────────
