@@ -40,7 +40,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText })) as { error?: string; code?: string };
+    const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
+      error?: string;
+      code?: string;
+    };
     const error = new Error(err.error ?? `HTTP ${res.status}`) as Error & { code?: string };
     if (err.code) error.code = err.code;
     throw error;

@@ -205,10 +205,12 @@ const translations = {
     "linkMetabox.submit": "Continue",
     "linkMetabox.error": "Error. Please check your details and try again.",
     "linkMetabox.error.emailExists": "This email is already registered. Try logging in instead.",
-    "linkMetabox.error.telegramLinked": "This Telegram account is already linked to a Metabox account.",
+    "linkMetabox.error.telegramLinked":
+      "This Telegram account is already linked to a Metabox account.",
     "linkMetabox.error.userNotFound": "No account found with this email.",
     "linkMetabox.error.invalidPassword": "Incorrect password.",
-    "linkMetabox.error.emailNotVerified": "Email is not verified. Please verify it on the Metabox website.",
+    "linkMetabox.error.emailNotVerified":
+      "Email is not verified. Please verify it on the Metabox website.",
     "linkMetabox.error.passwordTooShort": "Password must be at least 6 characters.",
 
     // Image settings
