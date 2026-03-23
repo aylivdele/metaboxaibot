@@ -34,10 +34,10 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     outputs:
-      api: ${{ steps.filter.outputs.api }}
-      bot: ${{ steps.filter.outputs.bot }}
-      worker: ${{ steps.filter.outputs.worker }}
-      webapp: ${{ steps.filter.outputs.webapp }}
+      api: ${{ steps.resolved.outputs.api }}
+      bot: ${{ steps.resolved.outputs.bot }}
+      worker: ${{ steps.resolved.outputs.worker }}
+      webapp: ${{ steps.resolved.outputs.webapp }}
       sha: ${{ steps.sha.outputs.sha }}
     steps:
       - name: Resolve SHA
@@ -53,23 +53,24 @@ jobs:
           fetch-depth: 0
 
       # Use the last successfully deployed SHA as the base for change detection.
-      # Falls back to HEAD~1 on first run (tag doesn't exist yet).
+      # Falls back to building everything on first run (tag doesn't exist yet).
       - name: Determine base ref
         id: base
         run: |
           git fetch origin refs/tags/test-deployed:refs/tags/test-deployed 2>/dev/null || true
           if git rev-parse --verify test-deployed >/dev/null 2>&1; then
-            echo "ref=test-deployed" >> "$GITHUB_OUTPUT"
+            echo "has_tag=true" >> "$GITHUB_OUTPUT"
           else
-            echo "ref=HEAD~1" >> "$GITHUB_OUTPUT"
+            echo "has_tag=false" >> "$GITHUB_OUTPUT"
           fi
 
       # On workflow_dispatch all outputs are 'false' — use force_all to override.
       - name: Filter changed paths
         uses: dorny/paths-filter@v3
         id: filter
+        if: steps.base.outputs.has_tag == 'true'
         with:
-          base: ${{ steps.base.outputs.ref }}
+          base: test-deployed
           filters: |
             api:
               - 'packages/api/**'
@@ -100,6 +101,22 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'package.json'
               - 'infra/docker/Dockerfile.webapp'
+
+      # On first run (no tag) build everything; otherwise use filter results.
+      - name: Resolve outputs
+        id: resolved
+        run: |
+          if [ "${{ steps.base.outputs.has_tag }}" = "false" ]; then
+            echo "api=true"    >> "$GITHUB_OUTPUT"
+            echo "bot=true"    >> "$GITHUB_OUTPUT"
+            echo "worker=true" >> "$GITHUB_OUTPUT"
+            echo "webapp=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "api=${{ steps.filter.outputs.api }}"       >> "$GITHUB_OUTPUT"
+            echo "bot=${{ steps.filter.outputs.bot }}"       >> "$GITHUB_OUTPUT"
+            echo "worker=${{ steps.filter.outputs.worker }}" >> "$GITHUB_OUTPUT"
+            echo "webapp=${{ steps.filter.outputs.webapp }}" >> "$GITHUB_OUTPUT"
+          fi
 
   # ── Build & push Docker images ───────────────────────────────────────────────
   build-api:
