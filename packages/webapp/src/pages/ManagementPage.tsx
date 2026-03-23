@@ -147,6 +147,9 @@ function VideoSettingsView() {
 
       {model && (
         <div className="model-settings-panel">
+          {model.description && (
+            <p className="model-settings-panel__desc">{model.description}</p>
+          )}
           <div className="video-settings-section">
             <div className="video-settings-label">{t("videoSettings.aspectRatio")}</div>
             {!model.supportedAspectRatios || model.supportedAspectRatios.length === 0 ? (
@@ -251,6 +254,9 @@ function ImageSettingsView() {
 
       {model && (
         <div className="model-settings-panel">
+          {model.description && (
+            <p className="model-settings-panel__desc">{model.description}</p>
+          )}
           {!ratios || ratios.length === 0 ? (
             <div className="image-settings-model__no-support">{t("imageSettings.noSupport")}</div>
           ) : (
