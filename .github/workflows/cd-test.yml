@@ -287,6 +287,6 @@ jobs:
             echo "Pruning old images..."
             docker image prune -af
 
-            sudo nginx -t && sudo systemctl reload nginx
+            sudo nginx -t && sudo nginx -s reload
 
             echo "Test deploy complete — $IMAGE_TAG"
