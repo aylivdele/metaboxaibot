@@ -15,9 +15,10 @@ on:
         type: boolean
         default: false
 
-# Only one test deployment at a time; newer push cancels the queued one
+# Only one test deployment at a time per branch; newer push cancels the queued one.
+# Branch is included in the group key so a main CI run can never cancel a develop deploy.
 concurrency:
-  group: deploy-test
+  group: deploy-test-${{ github.event.workflow_run.head_branch || 'manual' }}
   cancel-in-progress: true
 
 env:

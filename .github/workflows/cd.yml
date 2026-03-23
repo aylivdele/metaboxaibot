@@ -6,9 +6,10 @@ on:
     branches: [main]
     types: [completed]
 
-# Only one deployment at a time; a newer push cancels the queued one
+# Only one deployment at a time per branch; a newer push cancels the queued one.
+# Branch is included in the group key so a develop CI run can never cancel a main deploy.
 concurrency:
-  group: deploy-production
+  group: deploy-production-${{ github.event.workflow_run.head_branch || 'manual' }}
   cancel-in-progress: true
 
 env:
