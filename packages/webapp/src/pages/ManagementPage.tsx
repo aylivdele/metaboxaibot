@@ -90,11 +90,14 @@ function VideoSettingsView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([api.models.list("video"), api.videoSettings.get()])
-      .then(([ms, s]) => {
+    Promise.all([api.models.list("video"), api.videoSettings.get(), api.state.get()])
+      .then(([ms, s, state]) => {
         setModels(ms);
         setSettings(s);
-        if (ms.length > 0) setSelectedId(ms[0].id);
+        const fromSection = state.videoModelId ?? undefined;
+        const initial =
+          fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
+        setSelectedId(initial);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -127,7 +130,13 @@ function VideoSettingsView() {
 
       <div className="settings-field">
         <label className="settings-field__label">{t("videoSettings.model")}</label>
-        <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
+        <select
+          value={selectedId}
+          onChange={(e) => {
+            setSelectedId(e.target.value);
+            void api.state.patch({ section: "video", sectionModelId: e.target.value });
+          }}
+        >
           {models.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}
@@ -190,11 +199,14 @@ function ImageSettingsView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([api.models.list("design"), api.imageSettings.get()])
-      .then(([ms, s]) => {
+    Promise.all([api.models.list("design"), api.imageSettings.get(), api.state.get()])
+      .then(([ms, s, state]) => {
         setModels(ms);
         setSettings(s);
-        if (ms.length > 0) setSelectedId(ms[0].id);
+        const fromSection = state.designModelId ?? undefined;
+        const initial =
+          fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
+        setSelectedId(initial);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -222,7 +234,13 @@ function ImageSettingsView() {
 
       <div className="settings-field">
         <label className="settings-field__label">{t("imageSettings.model")}</label>
-        <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
+        <select
+          value={selectedId}
+          onChange={(e) => {
+            setSelectedId(e.target.value);
+            void api.state.patch({ section: "design", sectionModelId: e.target.value });
+          }}
+        >
           {models.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}
@@ -257,20 +275,93 @@ function ImageSettingsView() {
   );
 }
 
+// ── Audio settings view (section=audio) ──────────────────────────────────────
+
+function AudioSettingsView() {
+  const { t } = useI18n();
+  const [models, setModels] = useState<Model[]>([]);
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([api.models.list("audio"), api.state.get()])
+      .then(([ms, state]) => {
+        setModels(ms);
+        const fromSection = state.audioModelId ?? undefined;
+        const initial =
+          fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
+        setSelectedId(initial);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
+
+  const model = models.find((m) => m.id === selectedId);
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h2>{t("audioSettings.title")}</h2>
+        <p className="page-subtitle">{t("audioSettings.subtitle")}</p>
+      </div>
+
+      <div className="settings-field">
+        <label className="settings-field__label">{t("audioSettings.model")}</label>
+        <select
+          value={selectedId}
+          onChange={(e) => {
+            setSelectedId(e.target.value);
+            void api.state.patch({ section: "audio", sectionModelId: e.target.value });
+          }}
+        >
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {model && (
+        <div className="model-settings-panel">
+          {model.description && (
+            <p className="model-settings-panel__desc">{model.description}</p>
+          )}
+          <div className="model-settings-panel__cost">
+            {model.tokenCostPerRequest > 0
+              ? `${model.tokenCostPerRequest.toFixed(2)} ✦ / запрос`
+              : model.tokenCostApproxMsg > 0
+                ? `~${model.tokenCostApproxMsg.toFixed(2)} ✦ / сообщение`
+                : null}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Dispatcher with tab bar ───────────────────────────────────────────────────
 
-type ManageTab = "gpt" | "design" | "video";
+type ManageTab = "gpt" | "design" | "video" | "audio";
 
 export function ManagementPage({ initialSection }: { initialSection?: string }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<ManageTab>(
-    initialSection === "design" ? "design" : initialSection === "video" ? "video" : "gpt",
+    initialSection === "design"
+      ? "design"
+      : initialSection === "video"
+        ? "video"
+        : initialSection === "audio"
+          ? "audio"
+          : "gpt",
   );
 
   return (
     <div className="manage-root">
       <div className="manage-tabs">
-        {(["gpt", "design", "video"] as ManageTab[]).map((s) => (
+        {(["gpt", "design", "video", "audio"] as ManageTab[]).map((s) => (
           <button
             key={s}
             className={`manage-tab${tab === s ? " manage-tab--active" : ""}`}
@@ -284,6 +375,7 @@ export function ManagementPage({ initialSection }: { initialSection?: string }) 
         {tab === "gpt" && <GptManagementView />}
         {tab === "design" && <ImageSettingsView />}
         {tab === "video" && <VideoSettingsView />}
+        {tab === "audio" && <AudioSettingsView />}
       </div>
     </div>
   );
@@ -408,7 +500,7 @@ function GptManagementView() {
 
   const handleActivate = async (dialog: Dialog) => {
     await api.dialogs.activate(dialog.id);
-    setState((s) => (s ? { ...s, gptDialogId: dialog.id, modelId: dialog.modelId } : s));
+    setState((s) => (s ? { ...s, gptDialogId: dialog.id, gptModelId: dialog.modelId } : s));
   };
 
   const handleRename = async (id: string) => {
@@ -424,7 +516,7 @@ function GptManagementView() {
     try {
       const dialog = await api.dialogs.create("gpt", modelId);
       await api.dialogs.activate(dialog.id);
-      setState((s) => (s ? { ...s, gptDialogId: dialog.id, modelId } : s));
+      setState((s) => (s ? { ...s, gptDialogId: dialog.id, gptModelId: modelId } : s));
       setDialogs((ds) => [dialog, ...ds]);
       setIsCreating(false);
     } finally {

@@ -1860,6 +1860,19 @@ input::placeholder {
   color: var(--success, #4caf7d);
 }
 
+.model-settings-panel__desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+
+.model-settings-panel__cost {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
 /* ── Image settings ──────────────────────────────────────────────────────── */
 .image-settings-list {
   display: flex;

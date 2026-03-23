@@ -1,6 +1,6 @@
 import { InputFile } from "grammy";
 import type { BotContext } from "../types/context.js";
-import { audioGenerationService, dialogService, userStateService } from "@metabox/api/services";
+import { audioGenerationService, userStateService } from "@metabox/api/services";
 import { logger } from "../logger.js";
 
 // ── Sub-section entry points ──────────────────────────────────────────────────
@@ -13,7 +13,7 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
   if (!ctx.user) return;
 
   await userStateService.setState(ctx.user.id, "AUDIO_ACTIVE", "audio");
-  await userStateService.setModel(ctx.user.id, modelId);
+  await userStateService.setModelForSection(ctx.user.id, "audio", modelId);
 
   const instructions: Record<string, string> = {
     "tts-openai": ctx.t.audio.ttsActivated,
@@ -33,10 +33,7 @@ export async function handleAudioMessage(ctx: BotContext): Promise<void> {
   if (!chatId) return;
 
   const state = await userStateService.get(ctx.user.id);
-
-  const activeDialog =
-    !!state?.audioDialogId && (await dialogService.findById(state.audioDialogId));
-  const modelId = activeDialog ? activeDialog.modelId : "tts-openai";
+  const modelId = state?.audioModelId ?? "tts-openai";
   const prompt = ctx.message.text;
 
   const pendingMsg = await ctx.reply(ctx.t.audio.processing);

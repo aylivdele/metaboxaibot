@@ -2,7 +2,6 @@ import type { BotContext } from "../types/context.js";
 import {
   videoGenerationService,
   userStateService,
-  dialogService,
   calculateCost,
 } from "@metabox/api/services";
 import { MODELS_BY_SECTION, AI_MODELS } from "@metabox/shared";
@@ -30,7 +29,7 @@ export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
 
   await ctx.answerCallbackQuery();
   await userStateService.setState(ctx.user.id, "VIDEO_ACTIVE", "video");
-  await userStateService.setModel(ctx.user.id, modelId);
+  await userStateService.setModelForSection(ctx.user.id, "video", modelId);
 
   const model = AI_MODELS[modelId];
   if (model) {
@@ -50,9 +49,7 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
   if (!chatId) return;
 
   const state = await userStateService.get(ctx.user.id);
-  const activeDialog =
-    !!state?.videoDialogId && (await dialogService.findById(state.videoDialogId));
-  const modelId = activeDialog ? activeDialog.modelId : "kling";
+  const modelId = state?.videoModelId ?? "kling";
 
   const videoSettings = await userStateService.getVideoSettings(ctx.user.id);
   const modelSettings = videoSettings[modelId];

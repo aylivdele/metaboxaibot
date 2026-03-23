@@ -53,11 +53,14 @@ export interface Model {
 export interface UserState {
   state: string;
   section: string | null;
-  modelId: string | null;
+  gptModelId: string | null;
   gptDialogId: string | null;
   designDialogId: string | null;
   audioDialogId: string | null;
   videoDialogId: string | null;
+  designModelId: string | null;
+  audioModelId: string | null;
+  videoModelId: string | null;
 }
 
 export interface AdminUser {

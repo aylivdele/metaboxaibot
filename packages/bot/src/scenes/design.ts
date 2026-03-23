@@ -27,7 +27,7 @@ export function buildDesignModelKeyboard(): InlineKeyboard {
 export async function activateDesignModel(ctx: BotContext, modelId: string): Promise<void> {
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE", "design");
-  await userStateService.setModel(ctx.user.id, modelId);
+  await userStateService.setModelForSection(ctx.user.id, "design", modelId);
 
   const model = AI_MODELS[modelId];
   if (model) {
@@ -56,7 +56,7 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
   if (!chatId) return;
 
   const state = await userStateService.get(ctx.user.id);
-  const modelId = state?.modelId ?? "dall-e-3";
+  const modelId = state?.designModelId ?? "dall-e-3";
 
   // Auto-create dialog if none exists for this design session
   let dialogId = state?.designDialogId ?? null;
@@ -131,7 +131,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   if (!ctx.user || !ctx.message?.photo) return;
 
   const state = await userStateService.get(ctx.user.id);
-  const modelId = state?.modelId ?? "dall-e-3";
+  const modelId = state?.designModelId ?? "dall-e-3";
 
   // Auto-create dialog if none exists
   let dialogId = state?.designDialogId ?? null;

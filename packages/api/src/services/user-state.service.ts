@@ -15,6 +15,18 @@ function dialogField(
   return map[section];
 }
 
+/** Maps a media section to the corresponding UserState model-ID field. */
+function sectionModelField(
+  section: "design" | "audio" | "video",
+): "designModelId" | "audioModelId" | "videoModelId" {
+  const map = {
+    design: "designModelId",
+    audio: "audioModelId",
+    video: "videoModelId",
+  } as const;
+  return map[section];
+}
+
 export const userStateService = {
   async get(userId: bigint): Promise<UserState | null> {
     return db.userState.findUnique({ where: { userId } });
@@ -48,11 +60,25 @@ export const userStateService = {
     return state[dialogField(section)] ?? null;
   },
 
-  async setModel(userId: bigint, modelId: string): Promise<void> {
+  async setGptModel(userId: bigint, modelId: string): Promise<void> {
     await db.userState.upsert({
       where: { userId },
-      create: { userId, state: "IDLE", modelId },
-      update: { modelId },
+      create: { userId, state: "IDLE", gptModelId: modelId },
+      update: { gptModelId: modelId },
+    });
+  },
+
+  /** Saves the selected model for a media section (design/audio/video) independently. */
+  async setModelForSection(
+    userId: bigint,
+    section: "design" | "audio" | "video",
+    modelId: string,
+  ): Promise<void> {
+    const field = sectionModelField(section);
+    await db.userState.upsert({
+      where: { userId },
+      create: { userId, state: "IDLE", [field]: modelId },
+      update: { [field]: modelId },
     });
   },
 
