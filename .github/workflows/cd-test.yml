@@ -215,7 +215,7 @@ jobs:
         env:
           VITE_API_BASE_URL: ${{ secrets.TEST_VITE_API_BASE_URL }}
           VITE_BOT_USERNAME: ${{ secrets.TEST_VITE_BOT_USERNAME }}
-          VITE_LEARNING_URL: ${{ secrets.VITE_LEARNING_URL }}
+          VITE_LEARNING_URL: ${{ secrets.TEST_VITE_LEARNING_URL }}
 
       - name: Clear webapp dir on test VPS
         uses: appleboy/ssh-action@v1
