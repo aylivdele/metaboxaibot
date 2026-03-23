@@ -66,6 +66,7 @@ const translations = {
     "manage.legend.web": "🌐 Web — can search the internet",
     "manage.price.perReq": "/req",
     "manage.price.perMsg": "/msg",
+    "manage.price.perMPixel": "/MP",
 
     // Tariffs
     "tariffs.title": "Token Packages",
@@ -260,6 +261,7 @@ const translations = {
     "manage.legend.web": "🌐 Веб — ищет в интернете",
     "manage.price.perReq": "/запрос",
     "manage.price.perMsg": "/сообщение",
+    "manage.price.perMPixel": "/мегапиксель",
 
     // Tariffs
     "tariffs.title": "Пакеты токенов",

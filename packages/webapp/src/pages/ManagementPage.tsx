@@ -147,9 +147,7 @@ function VideoSettingsView() {
 
       {model && (
         <div className="model-settings-panel">
-          {model.description && (
-            <p className="model-settings-panel__desc">{model.description}</p>
-          )}
+          {model.description && <p className="model-settings-panel__desc">{model.description}</p>}
           <div className="video-settings-section">
             <div className="video-settings-label">{t("videoSettings.aspectRatio")}</div>
             {!model.supportedAspectRatios || model.supportedAspectRatios.length === 0 ? (
@@ -254,9 +252,14 @@ function ImageSettingsView() {
 
       {model && (
         <div className="model-settings-panel">
-          {model.description && (
-            <p className="model-settings-panel__desc">{model.description}</p>
-          )}
+          {model.description && <p className="model-settings-panel__desc">{model.description}</p>}
+          <div className="model-settings-panel__cost">
+            {model.tokenCostPerMPixel > 0
+              ? `${model.tokenCostPerMPixel.toFixed(2)} ✦${t("manage.price.perMPixel")}`
+              : model.tokenCostPerRequest > 0
+                ? `${model.tokenCostPerRequest.toFixed(2)} ✦${t("manage.price.perReq")}`
+                : null}
+          </div>
           {!ratios || ratios.length === 0 ? (
             <div className="image-settings-model__no-support">{t("imageSettings.noSupport")}</div>
           ) : (
@@ -334,11 +337,13 @@ function AudioSettingsView() {
         <div className="model-settings-panel">
           {model.description && <p className="model-settings-panel__desc">{model.description}</p>}
           <div className="model-settings-panel__cost">
-            {model.tokenCostPerRequest > 0
-              ? `${model.tokenCostPerRequest.toFixed(2)} ✦ / запрос`
-              : model.tokenCostApproxMsg > 0
-                ? `~${model.tokenCostApproxMsg.toFixed(2)} ✦ / сообщение`
-                : null}
+            {model.tokenCostPerMPixel > 0
+              ? `${model.tokenCostPerMPixel.toFixed(2)} ✦${t("manage.price.perMPixel")}`
+              : model.tokenCostPerRequest > 0
+                ? `${model.tokenCostPerRequest.toFixed(2)} ✦${t("manage.price.perReq")}`
+                : model.tokenCostApproxMsg > 0
+                  ? `~${model.tokenCostApproxMsg.toFixed(2)} ✦${t("manage.price.perMsg")}`
+                  : null}
           </div>
         </div>
       )}
@@ -450,9 +455,17 @@ function ChatHistory({ dialog, onBack }: { dialog: Dialog; onBack: () => void })
 
 type ModelFilter = "all" | "images" | "voice" | "web";
 
-function formatModelPrice(m: Model, perReqLabel: string, perMsgLabel: string): string {
+function formatModelPrice(
+  m: Model,
+  perReqLabel: string,
+  perMsgLabel: string,
+  perMPixelLabel: string,
+): string {
   if (m.isLLM) {
     return `~${m.tokenCostApproxMsg.toFixed(2)} ✦${perMsgLabel}`;
+  }
+  if (m.tokenCostPerMPixel > 0) {
+    return `${m.tokenCostPerMPixel.toFixed(2)} ✦${perMPixelLabel}`;
   }
   if (m.tokenCostPerRequest > 0) {
     return `${m.tokenCostPerRequest.toFixed(2)} ✦${perReqLabel}`;
@@ -593,8 +606,13 @@ function GptManagementView() {
                   <div className="model-item__name">{m.name}</div>
                   {m.description && <div className="model-item__desc">{m.description}</div>}
                   <div className="model-item__meta">
-                    {formatModelPrice(m, t("manage.price.perReq"), t("manage.price.perMsg"))} ·{" "}
-                    {m.provider}
+                    {formatModelPrice(
+                      m,
+                      t("manage.price.perReq"),
+                      t("manage.price.perMsg"),
+                      t("manage.price.perMPixel"),
+                    )}{" "}
+                    · {m.provider}
                     {m.supportsImages && " · 🖼"}
                     {m.supportsVoice && " · 🎙"}
                     {m.supportsWeb && " · 🌐"}

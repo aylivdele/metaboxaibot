@@ -55,7 +55,10 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       throw new Error(`Timed out waiting for ${modelId} job ${providerJobId}`);
     }
 
-    const { ext, contentType } = sectionMeta("image");
+    const isSvg = imageResult.filename?.endsWith(".svg") ?? false;
+    const { ext, contentType } = isSvg
+      ? { ext: "svg", contentType: "image/svg+xml" }
+      : sectionMeta("image");
     const s3Key = await uploadFromUrl(
       buildS3Key("image", userIdStr, dbJobId, ext),
       imageResult.url,
@@ -69,7 +72,11 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
     const model = AI_MODELS[modelId];
     if (model) {
-      await deductTokens(BigInt(userIdStr), calculateCost(model), modelId);
+      const megapixels =
+        model.costUsdPerMPixel && imageResult.width && imageResult.height
+          ? (imageResult.width * imageResult.height) / 1_000_000
+          : undefined;
+      await deductTokens(BigInt(userIdStr), calculateCost(model, 0, 0, megapixels), modelId);
     }
 
     // Save messages to dialog and get assistantMessageId for Refine button
@@ -105,10 +112,17 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     }[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
-    await telegram.sendPhoto(telegramChatId, imageResult.url, {
-      caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
-      reply_markup: replyMarkup,
-    });
+    if (isSvg) {
+      await telegram.sendDocument(telegramChatId, imageResult.url, {
+        caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
+        reply_markup: replyMarkup,
+      });
+    } else {
+      await telegram.sendPhoto(telegramChatId, imageResult.url, {
+        caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
+        reply_markup: replyMarkup,
+      });
+    }
 
     logger.info({ dbJobId }, "Image job completed");
   } catch (err) {
