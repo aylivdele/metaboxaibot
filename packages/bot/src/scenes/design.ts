@@ -1,5 +1,10 @@
 import type { BotContext } from "../types/context.js";
-import { dialogService, generationService, userStateService } from "@metabox/api/services";
+import {
+  dialogService,
+  generationService,
+  userStateService,
+  calculateCost,
+} from "@metabox/api/services";
 import { MODELS_BY_SECTION, AI_MODELS, config, generateWebToken } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -22,8 +27,16 @@ export function buildDesignModelKeyboard(): InlineKeyboard {
 export async function activateDesignModel(ctx: BotContext, modelId: string): Promise<void> {
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE", "design");
-  await userStateService.setModel(ctx.user.id, modelId);
-  await ctx.reply(ctx.t.design.modelActivated);
+  await userStateService.setModelForSection(ctx.user.id, "design", modelId);
+
+  const model = AI_MODELS[modelId];
+  if (model) {
+    const cost = calculateCost(model);
+    const costLine = ctx.t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
+    await ctx.reply(`🎨 ${model.name}\n\n${model.description}\n\n${costLine}`);
+  } else {
+    await ctx.reply(ctx.t.design.modelActivated);
+  }
 }
 
 // ── Model selected via inline callback ───────────────────────────────────────
@@ -43,7 +56,7 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
   if (!chatId) return;
 
   const state = await userStateService.get(ctx.user.id);
-  const modelId = state?.modelId ?? "dall-e-3";
+  const modelId = state?.designModelId ?? "dall-e-3";
 
   // Auto-create dialog if none exists for this design session
   let dialogId = state?.designDialogId ?? null;
@@ -118,7 +131,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   if (!ctx.user || !ctx.message?.photo) return;
 
   const state = await userStateService.get(ctx.user.id);
-  const modelId = state?.modelId ?? "dall-e-3";
+  const modelId = state?.designModelId ?? "dall-e-3";
 
   // Auto-create dialog if none exists
   let dialogId = state?.designDialogId ?? null;

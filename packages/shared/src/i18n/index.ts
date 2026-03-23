@@ -97,6 +97,7 @@ export interface Translations {
     comingSoon: string;
     tokens: string;
     sendOriginal: string;
+    costPerRequest: string;
   };
   payments: {
     success: string;

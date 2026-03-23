@@ -7,6 +7,20 @@ import type { UserProfile, GalleryItem } from "../types.js";
 
 export type ProfileTab = "overview" | "gallery" | "settings";
 
+/**
+ * Format a token amount with dynamic precision so small values never show as 0.00.
+ * ≥ 0.01  → 2 decimal places  (e.g. 0.29, 12.50)
+ * ≥ 0.001 → 3 decimal places  (e.g. 0.005)
+ * < 0.001 → 4 decimal places  (e.g. 0.0003)
+ */
+function formatTokens(value: string | number): string {
+  const n = Math.abs(Number(value));
+  if (n === 0) return "0.00";
+  if (n >= 0.01) return n.toFixed(2);
+  if (n >= 0.001) return n.toFixed(3);
+  return n.toFixed(4);
+}
+
 const REASON_KEYS: Record<string, string> = {
   welcome_bonus: "profile.reason.welcome_bonus",
   ai_usage: "profile.reason.ai_usage",
@@ -83,7 +97,7 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
     <>
       <div className="balance-card">
         <div className="balance-card__label">{t("profile.balance")}</div>
-        <div className="balance-card__amount">✦ {Number(profile.tokenBalance).toFixed(2)}</div>
+        <div className="balance-card__amount">✦ {formatTokens(profile.tokenBalance)}</div>
         <div className="balance-card__sub">
           {t("profile.referrals")}: {profile.referralCount}
         </div>
@@ -105,7 +119,7 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
               </div>
               <span className={`tx-item__amount tx-item__amount--${tx.type}`}>
                 {tx.type === "credit" ? "+" : "−"}
-                {Math.abs(Number(tx.amount)).toFixed(2)}
+                {formatTokens(tx.amount)}
               </span>
             </li>
           ))}

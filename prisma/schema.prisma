@@ -49,13 +49,18 @@ model UserState {
   userId    BigInt  @id
   state     String  @default("IDLE")          // IDLE | MAIN_MENU | GPT_SECTION | GPT_ACTIVE | ...
   section   String? // gpt | design | audio | video
-  modelId   String? // текущая выбранная модель
+  gptModelId String? // текущая выбранная GPT-модель
 
   // Активный диалог для каждого раздела (хранится независимо)
   gptDialogId    String?
   designDialogId String?
   audioDialogId  String?
   videoDialogId  String?
+
+  // Выбранная модель для каждого медиа-раздела (не зависит от диалога)
+  designModelId  String?
+  audioModelId   String?
+  videoModelId   String?
 
   // Референс для img2img: Message.id выбранного изображения (one-shot, сбрасывается после использования)
   designRefMessageId String?

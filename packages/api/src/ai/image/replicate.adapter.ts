@@ -10,7 +10,7 @@ import { config } from "@metabox/shared";
 const MODEL_IDS: Record<string, string> = {
   // Use deployment endpoint (no pinned version) — always resolves to latest published version
   "stable-diffusion": "stability-ai/sdxl",
-  ideogram: "ideogram-ai/ideogram-v2",
+  ideogram: "ideogram-ai/ideogram-v3",
   midjourney:
     "tstramer/midjourney-diffusion:436b051ebd8f68d23e83d22de5e198e0995357afef113768c20f0b6fcef23c8b",
 };

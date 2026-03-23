@@ -108,6 +108,7 @@ export default {
     comingSoon: " — скоро будет.",
     tokens: "токенов",
     sendOriginal: "📎 Отправить оригинал",
+    costPerRequest: "💰 {cost} ✦ за запрос",
   },
   payments: {
     success: "✅ Оплата прошла успешно! Токены зачислены на ваш баланс.",

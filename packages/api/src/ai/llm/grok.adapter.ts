@@ -9,17 +9,19 @@ import type {
 import { config } from "@metabox/shared";
 
 const MODEL_MAP: Record<string, string> = {
-  "qwen-max": "qwen-max",
-  "qwen-3-max-thinking": "qwen3-235b-a22b",
-  "qwen-3-thinking": "qwen3-30b-a3b",
-  "qwen-3": "qwen3-8b",
+  "grok-3": "grok-3",
+  "grok-3-mini": "grok-3-mini",
+  "grok-4": "grok-4",
+  "grok-3-deep-search": "grok-3-deepsearch",
+  "grok-3-reasoner": "grok-3-reasoner",
+  "grok-3-image": "aurora",
 };
 
 /**
- * Alibaba Qwen adapter (db_history strategy).
- * Uses OpenAI-compatible API via DashScope.
+ * xAI Grok adapter (db_history strategy).
+ * Uses OpenAI-compatible API via xAI.
  */
-export class QwenAdapter implements LLMAdapter {
+export class GrokAdapter implements LLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
 
@@ -27,15 +29,15 @@ export class QwenAdapter implements LLMAdapter {
   private apiModel: string;
 
   constructor(
-    private readonly model: string,
+    private readonly modelId: string,
     contextMaxMessages = 40,
-    apiKey = config.ai.qwen,
+    apiKey = config.ai.grok,
   ) {
     this.client = new OpenAI({
       apiKey,
-      baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      baseURL: "https://api.x.ai/v1",
     });
-    this.apiModel = MODEL_MAP[model] ?? model;
+    this.apiModel = MODEL_MAP[modelId] ?? modelId;
     this.contextMaxMessages = contextMaxMessages;
   }
 

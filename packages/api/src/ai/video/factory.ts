@@ -7,7 +7,7 @@ import { DIDAdapter } from "./d-id.adapter.js";
 import { ReplicateVideoAdapter } from "./replicate.adapter.js";
 
 /** FAL.ai-backed video models */
-const FAL_MODELS = new Set(["kling", "minimax", "pika", "hailuo"]);
+const FAL_MODELS = new Set(["kling", "minimax", "pika", "hailuo", "wan"]);
 
 /** Replicate-backed video models */
 const REPLICATE_MODELS = new Set(["sora", "veo"]);

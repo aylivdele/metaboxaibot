@@ -16,29 +16,43 @@ export const stateRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       state: state?.state ?? "IDLE",
       section: state?.section ?? null,
-      modelId: state?.modelId ?? null,
+      gptModelId: state?.gptModelId ?? null,
       gptDialogId: state?.gptDialogId ?? null,
       designDialogId: state?.designDialogId ?? null,
       audioDialogId: state?.audioDialogId ?? null,
       videoDialogId: state?.videoDialogId ?? null,
+      designModelId: state?.designModelId ?? null,
+      audioModelId: state?.audioModelId ?? null,
+      videoModelId: state?.videoModelId ?? null,
     };
   });
 
-  /** PATCH /state — update modelId or per-section dialogId */
-  fastify.patch<{ Body: { modelId?: string; section?: string; dialogId?: string | null } }>(
-    "/state",
-    async (request) => {
-      const { userId } = request as AuthRequest;
-      const { modelId, section, dialogId } = request.body;
+  /** PATCH /state — update gptModelId, per-section dialogId, or per-section modelId */
+  fastify.patch<{
+    Body: {
+      gptModelId?: string;
+      section?: string;
+      dialogId?: string | null;
+      sectionModelId?: string;
+    };
+  }>("/state", async (request) => {
+    const { userId } = request as AuthRequest;
+    const { gptModelId, section, dialogId, sectionModelId } = request.body;
 
-      if (modelId !== undefined) {
-        await userStateService.setModel(userId, modelId);
-      }
-      if (section !== undefined && dialogId !== undefined) {
-        await userStateService.setDialogForSection(userId, section as Section, dialogId);
-      }
+    if (gptModelId !== undefined) {
+      await userStateService.setGptModel(userId, gptModelId);
+    }
+    if (section !== undefined && dialogId !== undefined) {
+      await userStateService.setDialogForSection(userId, section as Section, dialogId);
+    }
+    if (section !== undefined && sectionModelId !== undefined) {
+      await userStateService.setModelForSection(
+        userId,
+        section as "design" | "audio" | "video",
+        sectionModelId,
+      );
+    }
 
-      return { success: true };
-    },
-  );
+    return { success: true };
+  });
 };

@@ -746,6 +746,12 @@ input::placeholder {
   font-weight: 600;
   font-size: 15px;
 }
+.model-item__desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 2px 0 1px;
+  line-height: 1.4;
+}
 .model-item__meta {
   font-size: 12px;
   color: var(--text-hint);
@@ -758,6 +764,41 @@ input::placeholder {
   font-size: 12px;
   font-weight: 700;
   color: var(--accent);
+}
+
+.model-filter-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.model-filter-btn {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.model-filter-btn--active {
+  border-color: var(--accent);
+  background: var(--accent-lighter);
+  color: var(--accent-light);
+}
+
+.model-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-hint);
+  line-height: 1.6;
 }
 
 /* ── Tariffs ────────────────────────────────────────────────────────────────── */
@@ -1730,6 +1771,31 @@ input::placeholder {
   flex: 1;
 }
 
+.settings-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--bg-secondary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 10px 40px 10px 14px;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+  cursor: pointer;
+  transition:
+    border-color 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
+}
+
+.settings-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-lighter);
+}
+
 .settings-badge {
   font-size: 12px;
   font-weight: 600;
@@ -1787,6 +1853,35 @@ input::placeholder {
 .manage-tab--active {
   color: var(--accent);
   border-bottom-color: var(--accent);
+}
+
+/* ── Model settings panel (design / video select-based UI) ───────────────── */
+.model-settings-panel {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.model-settings-saved {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--success, #4caf7d);
+}
+
+.model-settings-panel__desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+
+.model-settings-panel__cost {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
 }
 
 /* ── Image settings ──────────────────────────────────────────────────────── */

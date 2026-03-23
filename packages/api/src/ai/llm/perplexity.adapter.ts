@@ -9,17 +9,16 @@ import type {
 import { config } from "@metabox/shared";
 
 const MODEL_MAP: Record<string, string> = {
-  "qwen-max": "qwen-max",
-  "qwen-3-max-thinking": "qwen3-235b-a22b",
-  "qwen-3-thinking": "qwen3-30b-a3b",
-  "qwen-3": "qwen3-8b",
+  "perplexity-sonar-pro": "sonar-pro",
+  "perplexity-sonar-research": "sonar-deep-research",
+  "perplexity-sonar": "sonar",
 };
 
 /**
- * Alibaba Qwen adapter (db_history strategy).
- * Uses OpenAI-compatible API via DashScope.
+ * Perplexity adapter (db_history strategy).
+ * Uses OpenAI-compatible API. All models have built-in web search.
  */
-export class QwenAdapter implements LLMAdapter {
+export class PerplexityAdapter implements LLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
 
@@ -27,15 +26,15 @@ export class QwenAdapter implements LLMAdapter {
   private apiModel: string;
 
   constructor(
-    private readonly model: string,
-    contextMaxMessages = 40,
-    apiKey = config.ai.qwen,
+    private readonly modelId: string,
+    contextMaxMessages = 20,
+    apiKey = config.ai.perplexity,
   ) {
     this.client = new OpenAI({
       apiKey,
-      baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      baseURL: "https://api.perplexity.ai",
     });
-    this.apiModel = MODEL_MAP[model] ?? model;
+    this.apiModel = MODEL_MAP[modelId] ?? modelId;
     this.contextMaxMessages = contextMaxMessages;
   }
 

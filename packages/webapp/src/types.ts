@@ -35,12 +35,20 @@ export interface Dialog {
 export interface Model {
   id: string;
   name: string;
+  description: string;
   section: string;
   provider: string;
-  costUsdPerRequest: number;
   supportsImages: boolean;
   supportsVoice: boolean;
+  supportsWeb: boolean;
   isAsync: boolean;
+  isLLM: boolean;
+  /** Fixed cost in internal tokens per request (0 for LLM and per-MP models) */
+  tokenCostPerRequest: number;
+  /** Estimated cost in internal tokens per typical message (LLM only, 0 for fixed-cost models) */
+  tokenCostApproxMsg: number;
+  /** Cost per megapixel in internal tokens (>0 only for per-megapixel billing models, e.g. FLUX) */
+  tokenCostPerMPixel: number;
   supportedAspectRatios?: string[] | null;
   supportedDurations?: number[] | null;
   durationRange?: { min: number; max: number } | null;
@@ -49,11 +57,14 @@ export interface Model {
 export interface UserState {
   state: string;
   section: string | null;
-  modelId: string | null;
+  gptModelId: string | null;
   gptDialogId: string | null;
   designDialogId: string | null;
   audioDialogId: string | null;
   videoDialogId: string | null;
+  designModelId: string | null;
+  audioModelId: string | null;
+  videoModelId: string | null;
 }
 
 export interface AdminUser {

@@ -4,6 +4,8 @@ import type { ContextStrategy } from "./dialog.js";
 export interface AIModel {
   id: string;
   name: string;
+  /** Short model description shown to users (1–2 sentences). */
+  description: string;
   section: Section;
   provider: string;
   /**
@@ -26,6 +28,12 @@ export interface AIModel {
   isAsync: boolean; // требует очереди (для image/video/audio)
   contextStrategy: ContextStrategy;
   contextMaxMessages: number; // актуально для db_history: сколько сообщений отправлять
+  /**
+   * USD per megapixel for models with per-megapixel billing (e.g. FLUX).
+   * When set, costUsdPerRequest must be 0; actual cost = ceil(px/1_000_000) × this rate.
+   * The megapixels value is computed from the actual output image dimensions.
+   */
+  costUsdPerMPixel?: number;
   /**
    * Supported aspect ratios for image/video generation models.
    * null = model does not support aspect ratio customization.

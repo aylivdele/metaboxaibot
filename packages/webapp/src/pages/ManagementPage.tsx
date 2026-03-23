@@ -85,14 +85,19 @@ function VideoSettingsView() {
   const [settings, setSettings] = useState<
     Record<string, { aspectRatio?: string; duration?: number }>
   >({});
+  const [selectedId, setSelectedId] = useState<string>("");
   const [savedId, setSavedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([api.models.list("video"), api.videoSettings.get()])
-      .then(([ms, s]) => {
+    Promise.all([api.models.list("video"), api.videoSettings.get(), api.state.get()])
+      .then(([ms, s, state]) => {
         setModels(ms);
         setSettings(s);
+        const fromSection = state.videoModelId ?? undefined;
+        const initial =
+          fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
+        setSelectedId(initial);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -113,6 +118,9 @@ function VideoSettingsView() {
 
   if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 
+  const model = models.find((m) => m.id === selectedId);
+  const current = model ? (settings[model.id] ?? {}) : {};
+
   return (
     <div className="page">
       <div className="page-header">
@@ -120,53 +128,63 @@ function VideoSettingsView() {
         <p className="page-subtitle">{t("videoSettings.subtitle")}</p>
       </div>
 
-      <div className="image-settings-list">
-        {models.map((model) => {
-          const current = settings[model.id] ?? {};
-          return (
-            <div key={model.id} className="image-settings-model">
-              <div className="image-settings-model__header">
-                <span className="image-settings-model__name">{model.name}</span>
-                {savedId === model.id && (
-                  <span className="image-settings-model__saved">{t("videoSettings.saved")}</span>
-                )}
-              </div>
-
-              <div className="video-settings-section">
-                <div className="video-settings-label">{t("videoSettings.aspectRatio")}</div>
-                {!model.supportedAspectRatios || model.supportedAspectRatios.length === 0 ? (
-                  <div className="image-settings-model__no-support">
-                    {t("videoSettings.noAspectSupport")}
-                  </div>
-                ) : (
-                  <div className="image-settings-ratios">
-                    {model.supportedAspectRatios.map((ratio) => (
-                      <button
-                        key={ratio}
-                        className={`ratio-btn${current.aspectRatio === ratio ? " ratio-btn--active" : ""}`}
-                        onClick={() => void handlePatch(model.id, { aspectRatio: ratio })}
-                      >
-                        {ratio}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="video-settings-section">
-                <div className="video-settings-label">{t("videoSettings.duration")}</div>
-                <DurationControl
-                  model={model}
-                  value={current.duration}
-                  onChange={(duration) => void handlePatch(model.id, { duration })}
-                  secondsLabel={t("videoSettings.seconds")}
-                  fixedLabel={t("videoSettings.noDurationSupport")}
-                />
-              </div>
-            </div>
-          );
-        })}
+      <div className="settings-field">
+        <label className="settings-field__label">{t("videoSettings.model")}</label>
+        <select
+          value={selectedId}
+          onChange={(e) => {
+            setSelectedId(e.target.value);
+            void api.state.patch({ section: "video", sectionModelId: e.target.value });
+          }}
+        >
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
       </div>
+
+      {model && (
+        <div className="model-settings-panel">
+          {model.description && <p className="model-settings-panel__desc">{model.description}</p>}
+          <div className="video-settings-section">
+            <div className="video-settings-label">{t("videoSettings.aspectRatio")}</div>
+            {!model.supportedAspectRatios || model.supportedAspectRatios.length === 0 ? (
+              <div className="image-settings-model__no-support">
+                {t("videoSettings.noAspectSupport")}
+              </div>
+            ) : (
+              <div className="image-settings-ratios">
+                {model.supportedAspectRatios.map((ratio) => (
+                  <button
+                    key={ratio}
+                    className={`ratio-btn${current.aspectRatio === ratio ? " ratio-btn--active" : ""}`}
+                    onClick={() => void handlePatch(model.id, { aspectRatio: ratio })}
+                  >
+                    {ratio}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="video-settings-section">
+            <div className="video-settings-label">{t("videoSettings.duration")}</div>
+            <DurationControl
+              model={model}
+              value={current.duration}
+              onChange={(duration) => void handlePatch(model.id, { duration })}
+              secondsLabel={t("videoSettings.seconds")}
+              fixedLabel={t("videoSettings.noDurationSupport")}
+            />
+          </div>
+
+          {savedId === model.id && (
+            <div className="model-settings-saved">{t("videoSettings.saved")}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -177,14 +195,19 @@ function ImageSettingsView() {
   const { t } = useI18n();
   const [models, setModels] = useState<Model[]>([]);
   const [settings, setSettings] = useState<Record<string, { aspectRatio: string }>>({});
+  const [selectedId, setSelectedId] = useState<string>("");
   const [savedId, setSavedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([api.models.list("design"), api.imageSettings.get()])
-      .then(([ms, s]) => {
+    Promise.all([api.models.list("design"), api.imageSettings.get(), api.state.get()])
+      .then(([ms, s, state]) => {
         setModels(ms);
         setSettings(s);
+        const fromSection = state.designModelId ?? undefined;
+        const initial =
+          fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
+        setSelectedId(initial);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -199,6 +222,10 @@ function ImageSettingsView() {
 
   if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 
+  const model = models.find((m) => m.id === selectedId);
+  const ratios = model?.supportedAspectRatios;
+  const current = model ? settings[model.id]?.aspectRatio : undefined;
+
   return (
     <div className="page">
       <div className="page-header">
@@ -206,57 +233,144 @@ function ImageSettingsView() {
         <p className="page-subtitle">{t("imageSettings.subtitle")}</p>
       </div>
 
-      <div className="image-settings-list">
-        {models.map((model) => {
-          const ratios = model.supportedAspectRatios;
-          const current = settings[model.id]?.aspectRatio;
-          return (
-            <div key={model.id} className="image-settings-model">
-              <div className="image-settings-model__header">
-                <span className="image-settings-model__name">{model.name}</span>
-                {savedId === model.id && (
-                  <span className="image-settings-model__saved">{t("imageSettings.saved")}</span>
-                )}
-              </div>
-              {!ratios || ratios.length === 0 ? (
-                <div className="image-settings-model__no-support">
-                  {t("imageSettings.noSupport")}
-                </div>
-              ) : (
-                <div className="image-settings-ratios">
-                  {ratios.map((ratio) => (
-                    <button
-                      key={ratio}
-                      className={`ratio-btn${current === ratio ? " ratio-btn--active" : ""}`}
-                      onClick={() => void handleSelect(model.id, ratio)}
-                    >
-                      {ratio}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div className="settings-field">
+        <label className="settings-field__label">{t("imageSettings.model")}</label>
+        <select
+          value={selectedId}
+          onChange={(e) => {
+            setSelectedId(e.target.value);
+            void api.state.patch({ section: "design", sectionModelId: e.target.value });
+          }}
+        >
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
       </div>
+
+      {model && (
+        <div className="model-settings-panel">
+          {model.description && <p className="model-settings-panel__desc">{model.description}</p>}
+          <div className="model-settings-panel__cost">
+            {model.tokenCostPerMPixel > 0
+              ? `${model.tokenCostPerMPixel.toFixed(2)} ✦${t("manage.price.perMPixel")}`
+              : model.tokenCostPerRequest > 0
+                ? `${model.tokenCostPerRequest.toFixed(2)} ✦${t("manage.price.perReq")}`
+                : null}
+          </div>
+          {!ratios || ratios.length === 0 ? (
+            <div className="image-settings-model__no-support">{t("imageSettings.noSupport")}</div>
+          ) : (
+            <div className="image-settings-ratios">
+              {ratios.map((ratio) => (
+                <button
+                  key={ratio}
+                  className={`ratio-btn${current === ratio ? " ratio-btn--active" : ""}`}
+                  onClick={() => void handleSelect(model.id, ratio)}
+                >
+                  {ratio}
+                </button>
+              ))}
+            </div>
+          )}
+          {savedId === model.id && (
+            <div className="model-settings-saved">{t("imageSettings.saved")}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Audio settings view (section=audio) ──────────────────────────────────────
+
+function AudioSettingsView() {
+  const { t } = useI18n();
+  const [models, setModels] = useState<Model[]>([]);
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([api.models.list("audio"), api.state.get()])
+      .then(([ms, state]) => {
+        setModels(ms);
+        const fromSection = state.audioModelId ?? undefined;
+        const initial =
+          fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
+        setSelectedId(initial);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
+
+  const model = models.find((m) => m.id === selectedId);
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h2>{t("audioSettings.title")}</h2>
+        <p className="page-subtitle">{t("audioSettings.subtitle")}</p>
+      </div>
+
+      <div className="settings-field">
+        <label className="settings-field__label">{t("audioSettings.model")}</label>
+        <select
+          value={selectedId}
+          onChange={(e) => {
+            setSelectedId(e.target.value);
+            void api.state.patch({ section: "audio", sectionModelId: e.target.value });
+          }}
+        >
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {model && (
+        <div className="model-settings-panel">
+          {model.description && <p className="model-settings-panel__desc">{model.description}</p>}
+          <div className="model-settings-panel__cost">
+            {model.tokenCostPerMPixel > 0
+              ? `${model.tokenCostPerMPixel.toFixed(2)} ✦${t("manage.price.perMPixel")}`
+              : model.tokenCostPerRequest > 0
+                ? `${model.tokenCostPerRequest.toFixed(2)} ✦${t("manage.price.perReq")}`
+                : model.tokenCostApproxMsg > 0
+                  ? `~${model.tokenCostApproxMsg.toFixed(2)} ✦${t("manage.price.perMsg")}`
+                  : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Dispatcher with tab bar ───────────────────────────────────────────────────
 
-type ManageTab = "gpt" | "design" | "video";
+type ManageTab = "gpt" | "design" | "video" | "audio";
 
 export function ManagementPage({ initialSection }: { initialSection?: string }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<ManageTab>(
-    initialSection === "design" ? "design" : initialSection === "video" ? "video" : "gpt",
+    initialSection === "design"
+      ? "design"
+      : initialSection === "video"
+        ? "video"
+        : initialSection === "audio"
+          ? "audio"
+          : "gpt",
   );
 
   return (
     <div className="manage-root">
       <div className="manage-tabs">
-        {(["gpt", "design", "video"] as ManageTab[]).map((s) => (
+        {(["gpt", "design", "video", "audio"] as ManageTab[]).map((s) => (
           <button
             key={s}
             className={`manage-tab${tab === s ? " manage-tab--active" : ""}`}
@@ -270,6 +384,7 @@ export function ManagementPage({ initialSection }: { initialSection?: string }) 
         {tab === "gpt" && <GptManagementView />}
         {tab === "design" && <ImageSettingsView />}
         {tab === "video" && <VideoSettingsView />}
+        {tab === "audio" && <AudioSettingsView />}
       </div>
     </div>
   );
@@ -336,6 +451,28 @@ function ChatHistory({ dialog, onBack }: { dialog: Dialog; onBack: () => void })
   );
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+type ModelFilter = "all" | "images" | "voice" | "web";
+
+function formatModelPrice(
+  m: Model,
+  perReqLabel: string,
+  perMsgLabel: string,
+  perMPixelLabel: string,
+): string {
+  if (m.isLLM) {
+    return `~${m.tokenCostApproxMsg.toFixed(2)} ✦${perMsgLabel}`;
+  }
+  if (m.tokenCostPerMPixel > 0) {
+    return `${m.tokenCostPerMPixel.toFixed(2)} ✦${perMPixelLabel}`;
+  }
+  if (m.tokenCostPerRequest > 0) {
+    return `${m.tokenCostPerRequest.toFixed(2)} ✦${perReqLabel}`;
+  }
+  return m.provider;
+}
+
 // ── GPT dialogs view ─────────────────────────────────────────────────────────
 
 function GptManagementView() {
@@ -349,6 +486,7 @@ function GptManagementView() {
   const [isCreating, setIsCreating] = useState(false);
   const [creating, setCreating] = useState(false);
   const [viewingDialog, setViewingDialog] = useState<Dialog | null>(null);
+  const [filter, setFilter] = useState<ModelFilter>("all");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -379,7 +517,7 @@ function GptManagementView() {
 
   const handleActivate = async (dialog: Dialog) => {
     await api.dialogs.activate(dialog.id);
-    setState((s) => (s ? { ...s, gptDialogId: dialog.id, modelId: dialog.modelId } : s));
+    setState((s) => (s ? { ...s, gptDialogId: dialog.id, gptModelId: dialog.modelId } : s));
   };
 
   const handleRename = async (id: string) => {
@@ -395,7 +533,7 @@ function GptManagementView() {
     try {
       const dialog = await api.dialogs.create("gpt", modelId);
       await api.dialogs.activate(dialog.id);
-      setState((s) => (s ? { ...s, gptDialogId: dialog.id, modelId } : s));
+      setState((s) => (s ? { ...s, gptDialogId: dialog.id, gptModelId: modelId } : s));
       setDialogs((ds) => [dialog, ...ds]);
       setIsCreating(false);
     } finally {
@@ -425,23 +563,62 @@ function GptManagementView() {
               ✕
             </button>
           </div>
-          {models.length === 0 ? (
+
+          <div className="model-filter-bar">
+            {(["all", "images", "voice", "web"] as ModelFilter[]).map((f) => (
+              <button
+                key={f}
+                className={`model-filter-btn${filter === f ? " model-filter-btn--active" : ""}`}
+                onClick={() => setFilter(f)}
+              >
+                {t(`manage.filter.${f}` as Parameters<typeof t>[0])}
+              </button>
+            ))}
+          </div>
+
+          <div className="model-legend">
+            <span>{t("manage.legend.images")}</span>
+            <span>{t("manage.legend.voice")}</span>
+            <span>{t("manage.legend.web")}</span>
+          </div>
+
+          {models.filter((m) => {
+            if (filter === "images") return m.supportsImages;
+            if (filter === "voice") return m.supportsVoice;
+            if (filter === "web") return m.supportsWeb;
+            return true;
+          }).length === 0 ? (
             <div className="empty-state">{t("manage.noModels")}</div>
           ) : (
-            models.map((m) => (
-              <div
-                key={m.id}
-                className={`model-item${creating ? " model-item--disabled" : ""}`}
-                onClick={() => !creating && void handleCreateDialog(m.id)}
-              >
-                <div className="model-item__name">{m.name}</div>
-                <div className="model-item__meta">
-                  ${m.costUsdPerRequest.toFixed(3)} · {m.provider}
-                  {m.supportsImages && " · 🖼"}
-                  {m.supportsVoice && " · 🎙"}
+            models
+              .filter((m) => {
+                if (filter === "images") return m.supportsImages;
+                if (filter === "voice") return m.supportsVoice;
+                if (filter === "web") return m.supportsWeb;
+                return true;
+              })
+              .map((m) => (
+                <div
+                  key={m.id}
+                  className={`model-item${creating ? " model-item--disabled" : ""}`}
+                  onClick={() => !creating && void handleCreateDialog(m.id)}
+                >
+                  <div className="model-item__name">{m.name}</div>
+                  {m.description && <div className="model-item__desc">{m.description}</div>}
+                  <div className="model-item__meta">
+                    {formatModelPrice(
+                      m,
+                      t("manage.price.perReq"),
+                      t("manage.price.perMsg"),
+                      t("manage.price.perMPixel"),
+                    )}{" "}
+                    · {m.provider}
+                    {m.supportsImages && " · 🖼"}
+                    {m.supportsVoice && " · 🎙"}
+                    {m.supportsWeb && " · 🌐"}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))
           )}
         </div>
       ) : (

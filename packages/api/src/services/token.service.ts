@@ -47,14 +47,27 @@ export async function checkBalance(userId: bigint): Promise<void> {
  *   + inputTokens  × model.inputCostUsdPerMToken  / 1_000_000
  *   + outputTokens × model.outputCostUsdPerMToken / 1_000_000
  *
+ * For per-megapixel models (costUsdPerMPixel set): costUsdPerRequest must be 0
+ * and providerUsdCost = ceil(megapixels) × costUsdPerMPixel.
+ * megapixels = width × height / 1_000_000, ceiled to the nearest whole megapixel.
+ *
  * For media models (image/audio/video): inputTokens and outputTokens are 0,
- * so cost is driven by costUsdPerRequest alone.
+ * so cost is driven by costUsdPerRequest or costUsdPerMPixel alone.
  *
  * For LLM models: costUsdPerRequest is 0, cost is driven by per-token pricing.
  */
-export function calculateCost(model: AIModel, inputTokens = 0, outputTokens = 0): number {
+export function calculateCost(
+  model: AIModel,
+  inputTokens = 0,
+  outputTokens = 0,
+  megapixels?: number,
+): number {
+  const perRequestCost =
+    model.costUsdPerMPixel && megapixels
+      ? Math.ceil(megapixels) * model.costUsdPerMPixel
+      : model.costUsdPerRequest;
   const providerUsdCost =
-    model.costUsdPerRequest +
+    perRequestCost +
     (inputTokens * model.inputCostUsdPerMToken) / 1_000_000 +
     (outputTokens * model.outputCostUsdPerMToken) / 1_000_000;
   return (providerUsdCost / config.billing.usdPerToken) * config.billing.targetMargin;
