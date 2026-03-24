@@ -7,6 +7,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:5666:5432"
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
     # Not exposed externally — accessible within Docker network only

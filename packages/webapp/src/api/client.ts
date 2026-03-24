@@ -40,8 +40,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
+    const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
+      error?: string;
+      code?: string;
+    };
+    const error = new Error(err.error ?? `HTTP ${res.status}`) as Error & { code?: string };
+    if (err.code) error.code = err.code;
+    throw error;
   }
 
   return res.json() as Promise<T>;
@@ -92,6 +97,23 @@ export const api = {
       }),
     sendVerification: () =>
       request<{ success: boolean }>("/profile/verify-email", { method: "POST" }),
+    metaboxSso: () => request<{ ssoUrl: string }>("/profile/metabox-sso"),
+    metaboxRegister: (
+      email: string,
+      password: string,
+      firstName?: string,
+      lastName?: string,
+      username?: string,
+    ) =>
+      request<{ ssoUrl: string }>("/profile/metabox-register", {
+        method: "POST",
+        body: JSON.stringify({ email, password, firstName, lastName, username }),
+      }),
+    metaboxLogin: (email: string, password: string) =>
+      request<{ ssoUrl: string }>("/profile/metabox-login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      }),
   },
 
   dialogs: {
@@ -137,6 +159,18 @@ export const api = {
       request<{ invoiceUrl: string }>("/payments/invoice", {
         method: "POST",
         body: JSON.stringify({ planId }),
+      }),
+  },
+
+  metaboxAibot: {
+    products: () =>
+      request<{ id: string; name: string; tokens: number; priceRub: string }[]>(
+        "/metabox-aibot/products",
+      ),
+    buy: (productId: string) =>
+      request<{ paymentUrl: string }>("/metabox-aibot/buy", {
+        method: "POST",
+        body: JSON.stringify({ productId }),
       }),
   },
 

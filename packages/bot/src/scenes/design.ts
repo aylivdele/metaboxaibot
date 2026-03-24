@@ -33,7 +33,16 @@ export async function activateDesignModel(ctx: BotContext, modelId: string): Pro
   if (model) {
     const cost = calculateCost(model);
     const costLine = ctx.t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
-    await ctx.reply(`🎨 ${model.name}\n\n${model.description}\n\n${costLine}`);
+    const webappUrl = config.bot.webappUrl;
+    const kb = webappUrl
+      ? new InlineKeyboard().webApp(
+          ctx.t.design.management,
+          `${webappUrl}?page=management&section=design`,
+        )
+      : undefined;
+    await ctx.reply(`🎨 ${model.name}\n\n${model.description}\n\n${costLine}`, {
+      reply_markup: kb,
+    });
   } else {
     await ctx.reply(ctx.t.design.modelActivated);
   }

@@ -3,9 +3,10 @@ set -e
 
 if [ -d "prisma/migrations" ] && [ "$(ls -A prisma/migrations)" ]; then
   echo "Applying pending migrations..."
-  # Run migrate deploy and capture output for error detection
   if ! npx prisma migrate deploy 2>&1 | tee /tmp/migrate_out.txt; then
     if grep -q "P3005" /tmp/migrate_out.txt; then
+      # Database was created via db push and has no migration history at all —
+      # mark every migration as already applied, then sync any remaining drift.
       echo "Database has no migration history (was created via db push) — baselining..."
       for dir in prisma/migrations/*/; do
         migration_name=$(basename "$dir")
@@ -14,6 +15,12 @@ if [ -d "prisma/migrations" ] && [ "$(ls -A prisma/migrations)" ]; then
       done
       echo "Baselining complete. Syncing any schema drift..."
       npx prisma db push --accept-data-loss
+    elif grep -q "P3018" /tmp/migrate_out.txt && grep -q "00000000000000_init" /tmp/migrate_out.txt; then
+      # The init migration failed because the schema was created before migrations
+      # were introduced (tables already exist). Mark it as resolved and retry.
+      echo "Init migration conflicts with existing schema — marking as applied and retrying..."
+      npx prisma migrate resolve --applied "00000000000000_init"
+      npx prisma migrate deploy
     else
       cat /tmp/migrate_out.txt
       exit 1

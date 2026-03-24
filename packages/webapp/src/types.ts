@@ -9,6 +9,8 @@ export interface UserProfile {
   createdAt: string;
   email: string | null;
   emailVerified: boolean;
+  metaboxUserId: string | null;
+  metaboxReferralCode: string | null;
   transactions: Transaction[];
 }
 
@@ -41,10 +43,12 @@ export interface Model {
   supportsWeb: boolean;
   isAsync: boolean;
   isLLM: boolean;
-  /** Fixed cost in internal tokens per request (0 for LLM models) */
+  /** Fixed cost in internal tokens per request (0 for LLM and per-MP models) */
   tokenCostPerRequest: number;
   /** Estimated cost in internal tokens per typical message (LLM only, 0 for fixed-cost models) */
   tokenCostApproxMsg: number;
+  /** Cost per megapixel in internal tokens (>0 only for per-megapixel billing models, e.g. FLUX) */
+  tokenCostPerMPixel: number;
   supportedAspectRatios?: string[] | null;
   supportedDurations?: number[] | null;
   durationRange?: { min: number; max: number } | null;
@@ -115,4 +119,4 @@ export interface GalleryResponse {
   limit: number;
 }
 
-export type Page = "profile" | "management" | "tariffs" | "referral" | "admin";
+export type Page = "profile" | "management" | "tariffs" | "referral" | "admin" | "linkMetabox";

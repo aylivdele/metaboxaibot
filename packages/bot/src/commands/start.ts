@@ -2,15 +2,69 @@ import { InlineKeyboard } from "grammy";
 import type { BotContext } from "../types/context.js";
 import { userService } from "../services/user.service.js";
 import { userStateService } from "@metabox/api/services";
+import { db } from "@metabox/api/db";
 import { buildLanguageKeyboard } from "../keyboards/language.keyboard.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { SUPPORTED_LANGUAGES, getT, config } from "@metabox/shared";
 import type { Language, Translations } from "@metabox/shared";
+import { verifyLinkToken } from "@metabox/api/services";
 
 /**
- * /start — resets FSM state and shows language selection.
+ * /start — handles deep link params, resets FSM state, shows language selection.
+ *
+ * Supported deep link params:
+ *   /start link_<TOKEN>  — Metabox→Bot account linking (TelegramAuthToken)
+ *   /start ref_<TG_ID>   — referral link from another bot user
  */
 export async function handleStart(ctx: BotContext): Promise<void> {
+  const param = ctx.match as string | undefined;
+
+  // ── Metabox→Bot account linking ────────────────────────────────────────────
+  if (param?.startsWith("link_") && ctx.user) {
+    const token = param.slice("link_".length);
+    try {
+      const botPurchase = await db.tokenTransaction.findFirst({
+        where: { userId: ctx.user.id, type: "credit", reason: "purchase" },
+        select: { id: true },
+      });
+      const { metaboxUserId, referralCode } = await verifyLinkToken(token, ctx.user.id, {
+        referrerTelegramId: ctx.user.referredById,
+        botHasPurchase: !!botPurchase,
+        botCreatedAt: ctx.user.createdAt,
+      });
+      await db.user.update({
+        where: { id: ctx.user.id },
+        data: { metaboxUserId, metaboxReferralCode: referralCode },
+      });
+      await ctx.reply(ctx.t.start.metaboxLinked ?? "✅ Аккаунт Metabox успешно привязан!");
+    } catch {
+      await ctx.reply(
+        ctx.t.start.metaboxLinkFailed ?? "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.",
+      );
+    }
+    return;
+  }
+
+  // ── Referral deep link ─────────────────────────────────────────────────────
+  if (param?.startsWith("ref_") && ctx.user) {
+    const referrerIdStr = param.slice("ref_".length);
+    const referrerId = BigInt(referrerIdStr);
+    if (referrerId !== ctx.user.id && !ctx.user.referredById) {
+      // Only set referredById if the referrer actually exists in the bot DB.
+      // They may have shared the link from Metabox without ever starting the bot.
+      const referrerExists = await db.user.findUnique({
+        where: { id: referrerId },
+        select: { id: true },
+      });
+      if (referrerExists) {
+        await db.user.update({
+          where: { id: ctx.user.id },
+          data: { referredById: referrerId },
+        });
+      }
+    }
+  }
+
   if (ctx.user) {
     await userStateService.setState(ctx.user.id, "IDLE");
   }

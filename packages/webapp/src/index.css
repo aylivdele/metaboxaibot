@@ -955,6 +955,17 @@ input::placeholder {
   padding: 20px;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.referral-card__type {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.referral-card__link-cta {
+  margin-top: 10px;
+  width: 100%;
 }
 .referral-card__label {
   font-size: 12px;
@@ -2023,6 +2034,79 @@ input::placeholder {
 .duration-range-labels span {
   font-size: 11px;
   color: var(--text-hint);
+}
+
+/* ── Link Metabox form ───────────────────────────────────────────────────── */
+.link-metabox-choose,
+.link-metabox-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form-input {
+  padding: 10px 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.form-input:focus {
+  border-color: var(--accent);
+}
+
+.form-error {
+  font-size: 13px;
+  color: var(--danger, #e05c5c);
+  padding: 8px 12px;
+  background: rgba(224, 92, 92, 0.1);
+  border-radius: 8px;
+}
+
+.primary-btn {
+  padding: 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  padding: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
 }
 
 /* ── Animations ───────────────────────────────────────────────────────────── */
