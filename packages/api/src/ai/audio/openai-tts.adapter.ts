@@ -34,7 +34,8 @@ export class OpenAiTtsAdapter implements AudioAdapter {
       response_format: format,
     });
 
-    const ext = format === "opus" ? "ogg" : format === "aac" ? "aac" : format === "flac" ? "flac" : "mp3";
+    const ext =
+      format === "opus" ? "ogg" : format === "aac" ? "aac" : format === "flac" ? "flac" : "mp3";
     const buffer = Buffer.from(await response.arrayBuffer());
     return { buffer, ext, contentType: `audio/${ext === "mp3" ? "mpeg" : ext}` };
   }

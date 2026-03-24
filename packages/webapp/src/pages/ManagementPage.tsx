@@ -20,9 +20,7 @@ function SettingsPanel({ settings, values, onChange }: SettingsPanelProps) {
         return (
           <div key={def.key} className="settings-panel__row">
             <span className="settings-panel__label">{def.label}</span>
-            {def.description && (
-              <span className="settings-panel__desc">{def.description}</span>
-            )}
+            {def.description && <span className="settings-panel__desc">{def.description}</span>}
             {def.type === "select" && (
               <div className="image-settings-ratios">
                 {def.options!.map((opt) => (
@@ -46,9 +44,7 @@ function SettingsPanel({ settings, values, onChange }: SettingsPanelProps) {
                   value={Number(val ?? def.min ?? 0)}
                   onChange={(e) => onChange(def.key, parseFloat(e.target.value))}
                 />
-                <span className="settings-panel__slider-value">
-                  {Number(val ?? def.min ?? 0)}
-                </span>
+                <span className="settings-panel__slider-value">{Number(val ?? def.min ?? 0)}</span>
               </div>
             )}
             {def.type === "toggle" && (
@@ -79,9 +75,7 @@ function SettingsPanel({ settings, values, onChange }: SettingsPanelProps) {
                 max={def.max}
                 placeholder="auto"
                 value={val !== null && val !== undefined ? String(val) : ""}
-                onChange={(e) =>
-                  onChange(def.key, e.target.value ? Number(e.target.value) : null)
-                }
+                onChange={(e) => onChange(def.key, e.target.value ? Number(e.target.value) : null)}
               />
             )}
           </div>
@@ -96,7 +90,9 @@ function SettingsPanel({ settings, values, onChange }: SettingsPanelProps) {
 function VideoSettingsView() {
   const { t } = useI18n();
   const [models, setModels] = useState<Model[]>([]);
-  const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>({});
+  const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>(
+    {},
+  );
   const [selectedId, setSelectedId] = useState<string>("");
   const [savedId, setSavedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -280,7 +276,9 @@ function FamilyCard({
     <div className={`family-card${isGloballyActive ? " family-card--active" : ""}`}>
       <div className="family-card__header">
         <span className="family-card__name">{familyLabel}</span>
-        {isGloballyActive && <span className="family-card__badge">{t("imageSettings.active")}</span>}
+        {isGloballyActive && (
+          <span className="family-card__badge">{t("imageSettings.active")}</span>
+        )}
       </div>
 
       {description && <p className="family-card__desc">{description}</p>}
@@ -343,7 +341,9 @@ function FamilyCard({
 function ImageSettingsView() {
   const { t } = useI18n();
   const [models, setModels] = useState<Model[]>([]);
-  const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>({});
+  const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>(
+    {},
+  );
   const [activeModelId, setActiveModelId] = useState<string>("");
   const [savedId, setSavedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -453,7 +453,9 @@ function ImageSettingsView() {
 function AudioSettingsView() {
   const { t } = useI18n();
   const [models, setModels] = useState<Model[]>([]);
-  const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>({});
+  const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>(
+    {},
+  );
   const [selectedId, setSelectedId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -666,7 +668,9 @@ function GptManagementView() {
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [state, setState] = useState<UserState | null>(null);
-  const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>({});
+  const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>(
+    {},
+  );
   const [loading, setLoading] = useState(true);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");

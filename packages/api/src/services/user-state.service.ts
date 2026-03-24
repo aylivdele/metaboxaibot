@@ -135,9 +135,7 @@ export const userStateService = {
   },
 
   /** Returns all per-model custom settings for a user. */
-  async getModelSettings(
-    userId: bigint,
-  ): Promise<Record<string, Record<string, unknown>>> {
+  async getModelSettings(userId: bigint): Promise<Record<string, Record<string, unknown>>> {
     const state = await db.userState.findUnique({ where: { userId } });
     if (!state?.modelSettings) return {};
     return state.modelSettings as Record<string, Record<string, unknown>>;

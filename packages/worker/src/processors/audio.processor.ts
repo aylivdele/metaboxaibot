@@ -59,7 +59,12 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
     } else {
       // Async adapter (Suno)
       if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
-      const providerJobId = await adapter.submit({ prompt, voiceId, sourceAudioUrl, modelSettings });
+      const providerJobId = await adapter.submit({
+        prompt,
+        voiceId,
+        sourceAudioUrl,
+        modelSettings,
+      });
 
       let polled = null;
       for (let i = 0; i < MAX_POLLS; i++) {

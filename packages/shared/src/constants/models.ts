@@ -80,7 +80,8 @@ const LLM_SETTINGS: ModelSettingDef[] = [
 const PERPLEXITY_EXTRA: ModelSettingDef = {
   key: "search_recency_filter",
   label: "Период поиска",
-  description: "Ограничьте поиск свежими материалами: только за последний час, день, неделю или месяц.",
+  description:
+    "Ограничьте поиск свежими материалами: только за последний час, день, неделю или месяц.",
   type: "select",
   options: [
     { value: "month", label: "Месяц" },
@@ -154,8 +155,7 @@ const SEEDREAM_SETTINGS: ModelSettingDef[] = [
   {
     key: "seed",
     label: "Seed",
-    description:
-      "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+    description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
     type: "number",
     min: 0,
     max: 2147483647,
@@ -830,7 +830,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "output_format",
         label: "Формат файла",
-        description: "PNG — без потери качества, JPEG — компактнее, WebP — баланс качества и размера.",
+        description:
+          "PNG — без потери качества, JPEG — компактнее, WebP — баланс качества и размера.",
         type: "select",
         options: [
           { value: "png", label: "PNG" },
@@ -1022,7 +1023,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "style_type",
         label: "Стиль",
-        description: "Художественное направление изображения: универсальный, фотореализм или дизайн.",
+        description:
+          "Художественное направление изображения: универсальный, фотореализм или дизайн.",
         type: "select",
         options: [
           { value: "AUTO", label: "Auto" },
@@ -1158,7 +1160,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "seed",
         label: "Seed",
-        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        description:
+          "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
         type: "number",
         min: 0,
         max: 2147483647,
@@ -1191,7 +1194,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "seed",
         label: "Seed",
-        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        description:
+          "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
         type: "number",
         min: 0,
         max: 2147483647,
@@ -1223,7 +1227,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "seed",
         label: "Seed",
-        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        description:
+          "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
         type: "number",
         min: 0,
         max: 2147483647,
@@ -1255,7 +1260,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "seed",
         label: "Seed",
-        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        description:
+          "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
         type: "number",
         min: 0,
         max: 2147483647,
@@ -1337,7 +1343,7 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Генерирует самые длинные видео — до 2 минут сразу, со звуком. Лучше всех передаёт движения людей.",
     section: "video",
     provider: "fal",
-// For every second of video you generated, you will be charged $0.112 (audio off) or $0.168 (audio on), if voice control is used while generating audio you will be charged $0.196. For example, a 5s video with audio on and voice control will cost $0.98
+    // For every second of video you generated, you will be charged $0.112 (audio off) or $0.168 (audio on), if voice control is used while generating audio you will be charged $0.196. For example, a 5s video with audio on and voice control will cost $0.98
     costUsdPerRequest: 0.525, // recalc
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -1375,14 +1381,16 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "negative_prompt",
         label: "Негативный промпт",
-        description: "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
+        description:
+          "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
         type: "text",
         default: "",
       },
       {
         key: "seed",
         label: "Seed",
-        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        description:
+          "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
         type: "number",
         min: 0,
         max: 4294967295,
@@ -1429,20 +1437,18 @@ export const AI_MODELS: Record<string, AIModel> = {
     supportedAspectRatios: ["1280:768", "768:1280", "1104:832", "832:1104"],
     durationRange: { min: 2, max: 10 },
     settings: [
-      mkAspectRatio(
-        ["1280:768", "768:1280", "1104:832", "832:1104"],
-        {
-          "1280:768": "Горизонталь 16:9",
-          "768:1280": "Вертикаль 9:16",
-          "1104:832": "Горизонталь 4:3",
-          "832:1104": "Вертикаль 3:4",
-        },
-      ),
+      mkAspectRatio(["1280:768", "768:1280", "1104:832", "832:1104"], {
+        "1280:768": "Горизонталь 16:9",
+        "768:1280": "Вертикаль 9:16",
+        "1104:832": "Горизонталь 4:3",
+        "832:1104": "Вертикаль 3:4",
+      }),
       mkDurationSlider(2, 10),
       {
         key: "seed",
         label: "Seed",
-        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        description:
+          "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
         type: "number",
         min: 0,
         max: 4294967295,
@@ -1451,7 +1457,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "camera_horizontal",
         label: "Движение камеры: лево/право",
-        description: "Панорамирование камеры по горизонтали: отрицательные значения — влево, положительные — вправо.",
+        description:
+          "Панорамирование камеры по горизонтали: отрицательные значения — влево, положительные — вправо.",
         type: "slider",
         min: -10,
         max: 10,
@@ -1461,7 +1468,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "camera_vertical",
         label: "Движение камеры: вверх/вниз",
-        description: "Панорамирование камеры по вертикали: отрицательные значения — вниз, положительные — вверх.",
+        description:
+          "Панорамирование камеры по вертикали: отрицательные значения — вниз, положительные — вверх.",
         type: "slider",
         min: -10,
         max: 10,
@@ -1471,7 +1479,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "camera_zoom",
         label: "Зум камеры",
-        description: "Приближение или удаление камеры: положительные значения — наезд, отрицательные — отъезд.",
+        description:
+          "Приближение или удаление камеры: положительные значения — наезд, отрицательные — отъезд.",
         type: "slider",
         min: -10,
         max: 10,
@@ -1551,7 +1560,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "loop",
         label: "Зациклить видео",
-        description: "Последний кадр плавно переходит в первый — идеально для бесконечных анимаций.",
+        description:
+          "Последний кадр плавно переходит в первый — идеально для бесконечных анимаций.",
         type: "toggle",
         default: false,
       },
@@ -1581,7 +1591,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "loop",
         label: "Зациклить видео",
-        description: "Последний кадр плавно переходит в первый — идеально для бесконечных анимаций.",
+        description:
+          "Последний кадр плавно переходит в первый — идеально для бесконечных анимаций.",
         type: "toggle",
         default: false,
       },
@@ -1589,12 +1600,12 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   minimax: {
     id: "minimax",
-    name: "MiniMax",
+    name: "MiniMax Video-01",
     description:
       "Китайская видеомодель с отличным качеством движения персонажей. Генерирует 6-секундные клипы с высокой плавностью.",
     section: "video",
     provider: "minimax",
-    costUsdPerRequest: 0.25, // ~$0.10–$0.40/gen
+    costUsdPerRequest: 0.25,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1603,9 +1614,18 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    supportedDurations: null, // fixed 6s
-    settings: [mkAspectRatio(["16:9", "9:16", "1:1"])],
+    supportedAspectRatios: ["16:9"],
+    supportedDurations: [6],
+    settings: [
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "Качество выходного видео. 720P — стандартное HD.",
+        type: "select",
+        options: [{ value: "720P", label: "720p" }],
+        default: "720P",
+      },
+    ],
   },
   pika: {
     id: "pika",
@@ -1643,12 +1663,12 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   hailuo: {
     id: "hailuo",
-    name: "Hailuo",
+    name: "Hailuo 2.3",
     description:
-      "Видеомодель с акцентом на плавность и кинематографичность. Поддерживает анимацию изображений и генерирует 6-секундные клипы.",
+      "Новейшая видеомодель MiniMax с нативным разрешением 1080p, кинематографичным движением и поддержкой 10-секундных клипов.",
     section: "video",
-    provider: "fal",
-    costUsdPerRequest: 0.25, // ~$0.10–$0.40/gen
+    provider: "minimax",
+    costUsdPerRequest: 0.35,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1657,9 +1677,23 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    supportedDurations: null, // fixed 6s
-    settings: [mkAspectRatio(["16:9", "9:16", "1:1"])],
+    supportedAspectRatios: ["16:9"],
+    supportedDurations: [6, 10],
+    settings: [
+      mkDurationSelect([6, 10]),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description:
+          "1080p — Full HD, только для 6-секундных клипов. 768p — для любой длины включая 10с.",
+        type: "select",
+        options: [
+          { value: "768P", label: "768p" },
+          { value: "1080P", label: "1080p" },
+        ],
+        default: "1080P",
+      },
+    ],
   },
   higgsfield: {
     id: "higgsfield",
@@ -1704,7 +1738,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "negative_prompt",
         label: "Негативный промпт",
-        description: "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
+        description:
+          "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
         type: "text",
         default: "",
       },
@@ -1867,7 +1902,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "similarity_boost",
         label: "Схожесть с оригиналом",
-        description: "Насколько точно воспроизводится оригинальный тембр и интонации голоса-образца.",
+        description:
+          "Насколько точно воспроизводится оригинальный тембр и интонации голоса-образца.",
         type: "slider",
         min: 0,
         max: 1,

@@ -150,6 +150,7 @@ export const config = {
     alibaba: opt("ALIBABA_API_KEY"),
     apipass: opt("APIPASS_API_KEY"),
     recraft: opt("RECRAFT_API_KEY"),
+    minimax: opt("MINIMAX_API_KEY"),
   },
 } as const;
 

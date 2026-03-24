@@ -6,9 +6,7 @@ import { config } from "@metabox/shared";
 const FAL_ENDPOINTS: Record<string, string> = {
   kling: "fal-ai/kling-video/v3/standard/text-to-video",
   "kling-pro": "fal-ai/kling-video/v3/pro/text-to-video",
-  minimax: "fal-ai/minimax/video-01-live",
   pika: "fal-ai/pika-v2/text-to-video",
-  hailuo: "fal-ai/hailuo-ai/video-01",
   seedance: "fal-ai/bytedance/seedance/v1.5/pro/text-to-video",
 };
 

@@ -48,7 +48,9 @@ export class RunwayAdapter implements VideoAdapter {
       ms.camera_zoom !== undefined
     ) {
       body.motion = {
-        ...(ms.camera_horizontal !== undefined ? { camera: { horizontal: ms.camera_horizontal } } : {}),
+        ...(ms.camera_horizontal !== undefined
+          ? { camera: { horizontal: ms.camera_horizontal } }
+          : {}),
         ...(ms.camera_vertical !== undefined ? { camera: { vertical: ms.camera_vertical } } : {}),
         ...(ms.camera_zoom !== undefined ? { camera: { zoom: ms.camera_zoom } } : {}),
       };

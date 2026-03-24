@@ -65,18 +65,15 @@ export class AlibabaVideoAdapter implements VideoAdapter {
       parameters,
     };
 
-    const resp = await fetch(
-      `${DASHSCOPE_API_BASE}/services/aigc/video-generation/generation`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "X-DashScope-Async": "enable",
-        },
-        body: JSON.stringify(body),
+    const resp = await fetch(`${DASHSCOPE_API_BASE}/services/aigc/video-generation/generation`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "X-DashScope-Async": "enable",
       },
-    );
+      body: JSON.stringify(body),
+    });
 
     if (!resp.ok) {
       const txt = await resp.text();

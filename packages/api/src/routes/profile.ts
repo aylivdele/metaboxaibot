@@ -26,7 +26,6 @@ type AuthRequest = FastifyRequest & {
   };
 };
 
-
 export const profileRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", telegramAuthHook);
 
@@ -67,7 +66,6 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       })),
     };
   });
-
 
   /**
    * GET /profile/metabox-sso — get SSO redirect URL for linked Metabox account.
@@ -179,5 +177,4 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       throw err;
     }
   });
-
 };

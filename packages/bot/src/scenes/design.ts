@@ -5,7 +5,15 @@ import {
   userStateService,
   calculateCost,
 } from "@metabox/api/services";
-import { MODELS_BY_SECTION, AI_MODELS, MODEL_FAMILIES, MODEL_TO_FAMILY, FAMILIES_BY_SECTION, config, generateWebToken } from "@metabox/shared";
+import {
+  MODELS_BY_SECTION,
+  AI_MODELS,
+  MODEL_FAMILIES,
+  MODEL_TO_FAMILY,
+  FAMILIES_BY_SECTION,
+  config,
+  generateWebToken,
+} from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 
@@ -22,9 +30,7 @@ export function buildDesignModelKeyboard(savedModelId?: string | null): InlineKe
   const kb = new InlineKeyboard();
 
   // Collect all model IDs that belong to a family (skip individual buttons for them)
-  const familyModelIds = new Set(
-    families.flatMap((f) => f.members.map((m) => m.modelId)),
-  );
+  const familyModelIds = new Set(families.flatMap((f) => f.members.map((m) => m.modelId)));
 
   // One button per family, using saved model if it's in that family, else defaultModelId
   const rows: Array<[string, string]> = [];

@@ -37,7 +37,13 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
   const adapter = createVideoAdapter(modelId);
 
   try {
-    const providerJobId = await adapter.submit({ prompt, imageUrl, aspectRatio, duration, modelSettings });
+    const providerJobId = await adapter.submit({
+      prompt,
+      imageUrl,
+      aspectRatio,
+      duration,
+      modelSettings,
+    });
 
     let videoResult = null;
     for (let i = 0; i < MAX_POLLS; i++) {
@@ -67,7 +73,11 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       const videoTokens = model.costUsdPerMVideoToken
         ? computeVideoTokens(model, aspectRatio, duration ?? 5)
         : undefined;
-      await deductTokens(BigInt(userIdStr), calculateCost(model, 0, 0, undefined, videoTokens), modelId);
+      await deductTokens(
+        BigInt(userIdStr),
+        calculateCost(model, 0, 0, undefined, videoTokens),
+        modelId,
+      );
     }
 
     const replyMarkup = sendOriginalLabel

@@ -51,7 +51,9 @@ export const chatService = {
       ...(ms.temperature !== undefined ? { temperature: ms.temperature as number } : {}),
       ...(ms.max_tokens !== undefined ? { maxTokens: ms.max_tokens as number } : {}),
       ...(ms.system_prompt ? { systemPrompt: ms.system_prompt as string } : {}),
-      ...(ms.search_recency_filter ? { searchRecencyFilter: ms.search_recency_filter as string } : {}),
+      ...(ms.search_recency_filter
+        ? { searchRecencyFilter: ms.search_recency_filter as string }
+        : {}),
     };
 
     if (dialog.contextStrategy === "db_history") {
