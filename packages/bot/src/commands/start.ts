@@ -7,7 +7,7 @@ import { buildLanguageKeyboard } from "../keyboards/language.keyboard.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { SUPPORTED_LANGUAGES, getT, config } from "@metabox/shared";
 import type { Language, Translations } from "@metabox/shared";
-import { verifyLinkToken } from "@metabox/api/services";
+import { verifyLinkToken, lookupByTelegramId } from "@metabox/api/services";
 
 /**
  * /start — handles deep link params, resets FSM state, shows language selection.
@@ -67,6 +67,20 @@ export async function handleStart(ctx: BotContext): Promise<void> {
 
   if (ctx.user) {
     await userStateService.setState(ctx.user.id, "IDLE");
+
+    // Auto-link Metabox account if not yet linked and Metabox has a matching Telegram ID
+    if (!ctx.user.metaboxUserId && config.metabox?.apiUrl) {
+      lookupByTelegramId(ctx.user.id)
+        .then((found) => {
+          if (found) {
+            return db.user.update({
+              where: { id: ctx.user!.id },
+              data: { metaboxUserId: found.metaboxUserId, metaboxReferralCode: found.referralCode },
+            });
+          }
+        })
+        .catch(() => void 0); // silent — never block the start flow
+    }
   }
   await ctx.reply(ctx.t.start.welcome, {
     reply_markup: buildLanguageKeyboard(),

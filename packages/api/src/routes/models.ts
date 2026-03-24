@@ -9,6 +9,7 @@ const TYPICAL_OUTPUT_TOKENS = 500;
 function serializeModel(m: AIModel) {
   const isLLM = m.inputCostUsdPerMToken > 0;
   const isPerMPixel = (m.costUsdPerMPixel ?? 0) > 0;
+  const isPerMVideoToken = (m.costUsdPerMVideoToken ?? 0) > 0;
   return {
     id: m.id,
     name: m.name,
@@ -22,12 +23,19 @@ function serializeModel(m: AIModel) {
     supportedAspectRatios: m.supportedAspectRatios ?? null,
     supportedDurations: m.supportedDurations ?? null,
     durationRange: m.durationRange ?? null,
-    /** Fixed cost per request in internal tokens (0 for LLM and per-MP models) */
-    tokenCostPerRequest: isLLM || isPerMPixel ? 0 : calculateCost(m),
+    /** Fixed cost per request in internal tokens (0 for LLM, per-MP, and per-video-token models) */
+    tokenCostPerRequest: isLLM || isPerMPixel || isPerMVideoToken ? 0 : calculateCost(m),
     /** Estimated cost per message in internal tokens (LLM only, based on typical msg size) */
     tokenCostApproxMsg: isLLM ? calculateCost(m, TYPICAL_INPUT_TOKENS, TYPICAL_OUTPUT_TOKENS) : 0,
     /** Cost per megapixel in internal tokens (only for per-megapixel billing models, e.g. FLUX) */
     tokenCostPerMPixel: isPerMPixel ? calculateCost(m, 0, 0, 1) : 0,
+    /**
+     * Cost per 1M video tokens in internal tokens (only for per-video-token billing models, e.g. Seedance).
+     * videoTokens = (width × height × fps × duration) / 1024
+     */
+    tokenCostPerMVideoToken: isPerMVideoToken ? calculateCost(m, 0, 0, undefined, 1_000_000) : 0,
+    /** FPS used in video token calculation (only for per-video-token billing models). */
+    videoFps: m.videoFps ?? 0,
     isLLM,
   };
 }

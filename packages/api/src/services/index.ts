@@ -10,7 +10,7 @@ export type { SubmitVideoParams, SubmitVideoResult } from "./video-generation.se
 export { audioGenerationService } from "./audio-generation.service.js";
 export type { SubmitAudioParams, SubmitAudioResult } from "./audio-generation.service.js";
 export { paymentService } from "./payment.service.js";
-export { deductTokens, checkBalance, calculateCost } from "./token.service.js";
+export { deductTokens, checkBalance, calculateCost, computeVideoTokens } from "./token.service.js";
 export { s3Service, getFileUrl } from "./s3.service.js";
 export {
   verifyLinkToken,
@@ -21,5 +21,6 @@ export {
   issueSsoTokenRemote,
   getAiBotProducts,
   createAiBotInvoice,
+  lookupByTelegramId,
 } from "./metabox-bridge.service.js";
 export type { AiBotProduct } from "./metabox-bridge.service.js";

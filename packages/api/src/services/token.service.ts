@@ -51,8 +51,12 @@ export async function checkBalance(userId: bigint): Promise<void> {
  * and providerUsdCost = ceil(megapixels) × costUsdPerMPixel.
  * megapixels = width × height / 1_000_000, ceiled to the nearest whole megapixel.
  *
+ * For per-video-token models (costUsdPerMVideoToken set): costUsdPerRequest must be 0
+ * and providerUsdCost = videoTokens / 1_000_000 × costUsdPerMVideoToken.
+ * videoTokens = (width × height × fps × duration) / 1024
+ *
  * For media models (image/audio/video): inputTokens and outputTokens are 0,
- * so cost is driven by costUsdPerRequest or costUsdPerMPixel alone.
+ * so cost is driven by costUsdPerRequest, costUsdPerMPixel, or costUsdPerMVideoToken alone.
  *
  * For LLM models: costUsdPerRequest is 0, cost is driven by per-token pricing.
  */
@@ -61,14 +65,43 @@ export function calculateCost(
   inputTokens = 0,
   outputTokens = 0,
   megapixels?: number,
+  videoTokens?: number,
 ): number {
   const perRequestCost =
-    model.costUsdPerMPixel && megapixels
-      ? Math.ceil(megapixels) * model.costUsdPerMPixel
-      : model.costUsdPerRequest;
+    model.costUsdPerMVideoToken && videoTokens
+      ? (videoTokens / 1_000_000) * model.costUsdPerMVideoToken
+      : model.costUsdPerMPixel && megapixels
+        ? Math.ceil(megapixels) * model.costUsdPerMPixel
+        : model.costUsdPerRequest;
   const providerUsdCost =
     perRequestCost +
     (inputTokens * model.inputCostUsdPerMToken) / 1_000_000 +
     (outputTokens * model.outputCostUsdPerMToken) / 1_000_000;
   return (providerUsdCost / config.billing.usdPerToken) * config.billing.targetMargin;
+}
+
+/**
+ * Compute video tokens for per-video-token billing models (e.g. Seedance).
+ * videoTokens = (width × height × fps × duration) / 1024
+ *
+ * Resolution is derived from the aspect ratio using the model's typical output resolution.
+ */
+export function computeVideoTokens(
+  model: AIModel,
+  aspectRatio: string | undefined,
+  duration: number,
+): number {
+  if (!model.videoFps) return 0;
+
+  // Typical output resolution per aspect ratio for video-token models
+  const RESOLUTION: Record<string, [number, number]> = {
+    "16:9": [1280, 720],
+    "9:16": [720, 1280],
+    "1:1": [720, 720],
+    "4:3": [960, 720],
+    "3:4": [720, 960],
+  };
+
+  const [w, h] = RESOLUTION[aspectRatio ?? "16:9"] ?? [1280, 720];
+  return (w * h * model.videoFps * duration) / 1024;
 }

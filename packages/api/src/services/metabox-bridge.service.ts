@@ -199,6 +199,23 @@ export async function getAiBotProducts(): Promise<AiBotProduct[]> {
   return get<AiBotProduct[]>("/aibot/products");
 }
 
+/**
+ * Look up a Metabox user by Telegram ID.
+ * Returns null if no account is linked to that Telegram ID on the Metabox side.
+ */
+export async function lookupByTelegramId(
+  telegramId: bigint,
+): Promise<{ metaboxUserId: string; referralCode: string } | null> {
+  try {
+    return await post<{ metaboxUserId: string; referralCode: string }>("/lookup-telegram", {
+      telegramId: telegramId.toString(),
+    });
+  } catch (err) {
+    if (err instanceof MetaboxApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
 /** Ask Metabox to create an AiBotOrder + Lava invoice for a linked user. */
 export async function createAiBotInvoice(params: {
   metaboxUserId: string;

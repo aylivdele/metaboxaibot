@@ -145,6 +145,8 @@ export const config = {
     heygenAvatarId: opt("HEYGEN_AVATAR_ID"),
     did: opt("DID_API_KEY"),
     didPresenterUrl: opt("DID_PRESENTER_URL"),
+    higgsfieldApiKey: opt("HIGGSFIELD_API_KEY"),
+    higgsfieldApiSecret: opt("HIGGSFIELD_API_SECRET"),
   },
 } as const;
 

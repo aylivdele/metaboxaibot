@@ -4,8 +4,8 @@ import { config } from "@metabox/shared";
 
 /** Text-to-image endpoint for each model. */
 const T2I_ENDPOINTS: Record<string, string> = {
-  flux: "fal-ai/flux/dev",
-  "flux-pro": "fal-ai/flux-pro/v1.1",
+  flux: "fal-ai/flux-2",
+  "flux-pro": "fal-ai/flux-2-pro",
   "recraft-v3": "fal-ai/recraft-v3",
   "recraft-v4": "fal-ai/recraft/v4/text-to-image",
   "recraft-v4-pro": "fal-ai/recraft/v4/pro/text-to-image",
@@ -29,7 +29,8 @@ const EDIT_ENDPOINTS: Record<string, string> = {
   "gpt-image-1.5": "fal-ai/gpt-image-1.5/edit",
   "stable-diffusion": "fal-ai/stable-diffusion-v3-medium/image-to-image",
   "recraft-v3": "fal-ai/recraft/v3/image-to-image",
-  // flux, flux-pro pass image_url to the same endpoint
+  flux: "fal-ai/flux-2/edit",
+  "flux-pro": "fal-ai/flux-2-pro/edit",
 };
 
 /** Separator used to pack endpoint+requestId into a single opaque string. */

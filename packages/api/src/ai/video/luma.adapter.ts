@@ -11,14 +11,15 @@ interface LumaGeneration {
 }
 
 /**
- * Luma Dream Machine adapter (REST API).
+ * Luma Dream Machine adapter (REST API). Supports luma (Ray3.14) and luma-ray2.
  */
 export class LumaAdapter implements VideoAdapter {
-  readonly modelId = "luma";
+  readonly modelId: string;
 
   private readonly apiKey: string;
 
-  constructor(apiKey = config.ai.luma ?? "") {
+  constructor(modelId = "luma", apiKey = config.ai.luma ?? "") {
+    this.modelId = modelId;
     this.apiKey = apiKey;
   }
 

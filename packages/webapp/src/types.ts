@@ -47,6 +47,13 @@ export interface Model {
   tokenCostApproxMsg: number;
   /** Cost per megapixel in internal tokens (>0 only for per-megapixel billing models, e.g. FLUX) */
   tokenCostPerMPixel: number;
+  /**
+   * Cost per 1M video tokens in internal tokens (>0 only for per-video-token models, e.g. Seedance).
+   * videoTokens = (width × height × fps × duration) / 1024
+   */
+  tokenCostPerMVideoToken: number;
+  /** FPS used in video token calculation (0 if not applicable). */
+  videoFps: number;
   supportedAspectRatios?: string[] | null;
   supportedDurations?: number[] | null;
   durationRange?: { min: number; max: number } | null;

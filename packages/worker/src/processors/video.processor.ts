@@ -3,7 +3,7 @@ import { Api } from "grammy";
 import type { VideoJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createVideoAdapter } from "@metabox/api/ai/video";
-import { deductTokens, calculateCost } from "@metabox/api/services";
+import { deductTokens, calculateCost, computeVideoTokens } from "@metabox/api/services";
 import { buildS3Key, sectionMeta, uploadFromUrl } from "@metabox/api/services/s3";
 import { logger } from "../logger.js";
 import { config, AI_MODELS } from "@metabox/shared";
@@ -63,7 +63,10 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     const model = AI_MODELS[modelId];
     if (model) {
-      await deductTokens(BigInt(userIdStr), calculateCost(model), modelId);
+      const videoTokens = model.costUsdPerMVideoToken
+        ? computeVideoTokens(model, aspectRatio, duration ?? 5)
+        : undefined;
+      await deductTokens(BigInt(userIdStr), calculateCost(model, 0, 0, undefined, videoTokens), modelId);
     }
 
     const replyMarkup = sendOriginalLabel

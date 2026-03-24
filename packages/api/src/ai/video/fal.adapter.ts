@@ -2,16 +2,26 @@ import { fal } from "@fal-ai/client";
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
-/**
- * FAL.ai video adapter — used for Kling, MiniMax, Pika, Hailuo.
- */
+/** Text-to-video endpoint for each model. */
 const FAL_ENDPOINTS: Record<string, string> = {
-  kling: "fal-ai/kling-video/v2/standard/text-to-video",
+  kling: "fal-ai/kling-video/v3/standard/text-to-video",
+  "kling-pro": "fal-ai/kling-video/v3/pro/text-to-video",
   minimax: "fal-ai/minimax/video-01-live",
   pika: "fal-ai/pika-v2/text-to-video",
   hailuo: "fal-ai/hailuo-ai/video-01",
   wan: "fal-ai/wan/v2.1/text-to-video",
+  seedance: "fal-ai/bytedance/seedance/v1.5/pro/text-to-video",
 };
+
+/** Image-to-video endpoint. Falls back to the T2V endpoint when absent. */
+const FAL_I2V_ENDPOINTS: Record<string, string> = {
+  kling: "fal-ai/kling-video/v3/standard/image-to-video",
+  "kling-pro": "fal-ai/kling-video/v3/pro/image-to-video",
+  seedance: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
+};
+
+/** Separator used to pack endpoint+requestId into a single opaque string. */
+const SEP = "||";
 
 export class FalVideoAdapter implements VideoAdapter {
   constructor(
@@ -21,12 +31,16 @@ export class FalVideoAdapter implements VideoAdapter {
     fal.config({ credentials: apiKey });
   }
 
-  private get endpoint(): string {
+  private selectEndpoint(imageUrl: string | undefined): string {
+    if (imageUrl && FAL_I2V_ENDPOINTS[this.modelId]) {
+      return FAL_I2V_ENDPOINTS[this.modelId];
+    }
     return FAL_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`;
   }
 
   async submit(input: VideoInput): Promise<string> {
-    const { request_id } = await fal.queue.submit(this.endpoint, {
+    const endpoint = this.selectEndpoint(input.imageUrl);
+    const { request_id } = await fal.queue.submit(endpoint, {
       input: {
         prompt: input.prompt,
         ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
@@ -34,18 +48,30 @@ export class FalVideoAdapter implements VideoAdapter {
         ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
       },
     });
-    return request_id;
+    return `${endpoint}${SEP}${request_id}`;
   }
 
-  async poll(requestId: string): Promise<VideoResult | null> {
-    const status = await fal.queue.status(this.endpoint, {
+  async poll(providerJobId: string): Promise<VideoResult | null> {
+    // Support legacy plain request_id format (pre-encoding) for backwards compat
+    let endpoint: string;
+    let requestId: string;
+    if (providerJobId.includes(SEP)) {
+      const sepIdx = providerJobId.lastIndexOf(SEP);
+      endpoint = providerJobId.slice(0, sepIdx);
+      requestId = providerJobId.slice(sepIdx + SEP.length);
+    } else {
+      endpoint = FAL_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`;
+      requestId = providerJobId;
+    }
+
+    const status = await fal.queue.status(endpoint, {
       requestId,
       logs: false,
     });
 
     if (status.status !== "COMPLETED") return null;
 
-    const result = await fal.queue.result(this.endpoint, { requestId });
+    const result = await fal.queue.result(endpoint, { requestId });
     const data = result.data as { video?: { url: string }; video_url?: string };
     const url = data.video?.url ?? data.video_url;
     if (!url) throw new Error(`FAL video: no URL in result for ${this.modelId}`);

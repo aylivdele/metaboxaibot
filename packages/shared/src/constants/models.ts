@@ -752,16 +752,16 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "flux-pro": {
     id: "flux-pro",
-    name: "⚡ FLUX.1.1 Pro",
+    name: "⚡ FLUX.2 Pro",
     description:
-      "Предыдущая версия FLUX — такой же фотореализм, чуть медленнее, но проверенная и стабильная.",
+      "Профессиональная версия FLUX.2 — максимальное качество, точнее следует промпту, поддерживает редактирование загруженных изображений.",
     section: "design",
     provider: "fal",
     costUsdPerRequest: 0,
     costUsdPerMPixel: 0.04, // $0.04/MP, billed as ceil(px/1_000_000)
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
-    supportsImages: false,
+    supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -899,12 +899,13 @@ export const AI_MODELS: Record<string, AIModel> = {
   // ── Видео ─────────────────────────────────────────────────────────────────
   kling: {
     id: "kling",
-    name: "Kling 2.0",
+    name: "Kling 3.0",
     description:
-      "Передовая китайская видеомодель. Высокое качество движения, реалистичная физика и поддержка анимации по изображению.",
+      "Генерирует самые длинные видео — до 2 минут сразу, со звуком. Лучше всех передаёт движения людей.",
     section: "video",
-    provider: "kling",
-    costUsdPerRequest: 0.525, // 5s clip ~$0.35–$0.70
+    provider: "fal",
+    //For every second of video you generated, you will be charged $0.084 (audio off) or $0.126 (audio on), if voice control is used while generating audio you will be charged $0.154. For example, a 5s video with audio on and voice control will cost $0.77
+    costUsdPerRequest: 0.525, // recalc
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -916,14 +917,15 @@ export const AI_MODELS: Record<string, AIModel> = {
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: [5, 10],
   },
-  sora: {
-    id: "sora",
-    name: "SORA",
+  "kling-pro": {
+    id: "kling-pro",
+    name: "Kling 3.0 Pro",
     description:
-      "Флагманская видеомодель OpenAI. Впечатляющее понимание физики мира, плавные движения и высокий уровень кинематографичности.",
+      "Генерирует самые длинные видео — до 2 минут сразу, со звуком. Лучше всех передаёт движения людей.",
     section: "video",
-    provider: "openai",
-    costUsdPerRequest: 0.5, // 5s @ $0.10/s
+    provider: "fal",
+// For every second of video you generated, you will be charged $0.112 (audio off) or $0.168 (audio on), if voice control is used while generating audio you will be charged $0.196. For example, a 5s video with audio on and voice control will cost $0.98
+    costUsdPerRequest: 0.525, // recalc
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -933,32 +935,13 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    supportedDurations: [4, 8, 12], // sora-2 discrete values
-  },
-  runway: {
-    id: "runway",
-    name: "RunWay",
-    description:
-      "Профессиональный инструмент для видеопроизводства. Гибкое управление длительностью, высокая стабильность и контроль над движением.",
-    section: "video",
-    provider: "runway",
-    costUsdPerRequest: 0.75, // 5s clip ~$0.50–$1.00
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["1280:768", "768:1280", "1104:832", "832:1104"],
-    durationRange: { min: 2, max: 10 }, // Gen-4: any integer 2–10s
+    supportedDurations: [5, 10],
   },
   veo: {
     id: "veo",
-    name: "Veo",
+    name: "Veo 3.1",
     description:
-      "Видеомодель Google с высоким реализмом. Отлично справляется с природными сценами, динамикой воды и кинематографическими кадрами.",
+      "Видео от Google в качестве 4K со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts.",
     section: "video",
     provider: "google",
     costUsdPerRequest: 0.75, // 5s @ $0.15/s
@@ -971,13 +954,74 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
-    durationRange: { min: 5, max: 8 }, // veo-2: any integer 5–8s
+    durationRange: { min: 5, max: 8 },
+  },
+  sora: {
+    id: "sora",
+    name: "Sora 2 (OpenAI)",
+    description:
+      "Самое реалистичное видео от OpenAI. Объекты двигаются как в реальности, со звуком и правильной физикой.",
+    section: "video",
+    provider: "openai",
+    costUsdPerRequest: 0.5, // 5s @ $0.10/s
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: [4, 8, 12],
+  },
+  runway: {
+    id: "runway",
+    name: "Runway Gen-4.5",
+    description:
+      "Полный контроль над видео: указывайте, что и как должно двигаться, управляйте камерой. Выбор профессионалов.",
+    section: "video",
+    provider: "runway",
+    costUsdPerRequest: 0.75, // 5s clip ~$0.50–$1.00
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["1280:768", "768:1280", "1104:832", "832:1104"],
+    durationRange: { min: 2, max: 10 },
+  },
+  seedance: {
+    id: "seedance",
+    name: "Seedance 1.5 Pro (ByteDance)",
+    description:
+      "Создаёт видео с выразительным и необычным движением. Хорош для креативных и стилизованных роликов.",
+    section: "video",
+    provider: "fal",
+    // Per-video-token billing: $2.4/M tokens with audio.
+    // tokens = (w × h × fps × duration) / 1024; 720p 5s ≈ $0.26
+    costUsdPerRequest: 0,
+    costUsdPerMVideoToken: 2.4,
+    videoFps: 24,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: [5, 10],
   },
   luma: {
     id: "luma",
-    name: "Luma: DM",
+    name: "Luma: Ray3.14",
     description:
-      "Универсальная видеомодель с широким набором форматов кадра. Хороша для коротких динамичных клипов и анимации изображений.",
+      "Быстро создаёт видео в кинематографическом качестве. Режим черновика позволяет пробовать идеи за секунды.",
     section: "video",
     provider: "luma",
     costUsdPerRequest: 0.079, // ~$0.033–$0.125/gen
@@ -990,7 +1034,26 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"],
-    supportedDurations: [5, 9], // "5s" / "9s"
+    supportedDurations: [5, 9],
+  },
+  "luma-ray2": {
+    id: "luma-ray2",
+    name: "Luma: Ray2",
+    description:
+      "Предыдущая версия Luma — проще и дешевле. Хороший выбор для быстрых видео без лишних затрат.",
+    section: "video",
+    provider: "luma",
+    costUsdPerRequest: 0.04,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "4:3", "3:4", "1:1"],
+    supportedDurations: [5, 9],
   },
   minimax: {
     id: "minimax",
@@ -1013,9 +1076,9 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   pika: {
     id: "pika",
-    name: "Pika",
+    name: "Pika 2.5",
     description:
-      "Простой и доступный инструмент для создания коротких видеоклипов. Хорош для анимации изображений и быстрых творческих экспериментов.",
+      "Быстрые и дешёвые видео с крутыми спецэффектами: взрывы, плавление, сжатие. Идеально для TikTok и Reels.",
     section: "video",
     provider: "pika",
     costUsdPerRequest: 0.25, // ~$0.10–$0.40/gen
@@ -1049,11 +1112,30 @@ export const AI_MODELS: Record<string, AIModel> = {
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: null, // fixed 6s
   },
+  higgsfield: {
+    id: "higgsfield",
+    name: "Higgsfield",
+    description:
+      "Специализируется на реалистичной анимации людей — мимика, жесты, движения тела выглядят естественно.",
+    section: "video",
+    provider: "higgsfield",
+    costUsdPerRequest: 0.2,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: [5],
+  },
   wan: {
     id: "wan",
-    name: "Wan 2.1",
+    name: "Wan 2.2 (Alibaba)",
     description:
-      "Открытая видеомодель от Alibaba. Доступная и качественная генерация коротких клипов с поддержкой анимации по изображению.",
+      "Создаёт качественные видео с плавным естественным движением. Хорошо справляется со сложными сценами и динамичными действиями.",
     section: "video",
     provider: "fal",
     costUsdPerRequest: 0.06,
@@ -1072,7 +1154,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     id: "heygen",
     name: "HeyGen",
     description:
-      "Специализируется на создании видео с говорящими аватарами. Идеально для обучающего и маркетингового контента.",
+      "Особенно популярен среди соло-креаторов, инфлюенсеров и небольших команд. Для аватаров, lip-sync, перевода видео на 175+ языков.",
     section: "video",
     provider: "heygen",
     costUsdPerRequest: 1.5, // ~$1–$2/min video

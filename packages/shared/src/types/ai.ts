@@ -35,6 +35,14 @@ export interface AIModel {
    */
   costUsdPerMPixel?: number;
   /**
+   * USD per 1 million video tokens for models with per-video-token billing (e.g. Seedance).
+   * When set, costUsdPerRequest must be 0.
+   * videoTokens = (width × height × fps × duration) / 1024
+   */
+  costUsdPerMVideoToken?: number;
+  /** FPS assumed for video token billing. Required when costUsdPerMVideoToken is set. */
+  videoFps?: number;
+  /**
    * Supported aspect ratios for image/video generation models.
    * null = model does not support aspect ratio customization.
    * Ratios are in "W:H" string format, e.g. "16:9", "1:1", "9:16".
