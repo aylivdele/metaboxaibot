@@ -82,9 +82,6 @@ export async function telegramAuthHook(
         firstName: string | null;
         lastName: string | null;
         language: string;
-        email: string | null;
-        emailVerified: boolean;
-        passwordHash: string | null;
         isNew: boolean;
         isBlocked: boolean;
         referredById: bigint | null;

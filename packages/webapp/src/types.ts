@@ -7,8 +7,6 @@ export interface UserProfile {
   tokenBalance: string;
   referralCount: number;
   createdAt: string;
-  email: string | null;
-  emailVerified: boolean;
   metaboxUserId: string | null;
   metaboxReferralCode: string | null;
   transactions: Transaction[];

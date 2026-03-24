@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
-import { createHash, randomBytes } from "crypto";
 import {
   issueSsoToken,
   issueSsoTokenRemote,
@@ -17,9 +16,6 @@ type AuthRequest = FastifyRequest & {
     firstName: string | null;
     lastName: string | null;
     language: string;
-    email: string | null;
-    emailVerified: boolean;
-    passwordHash: string | null;
     isNew: boolean;
     isBlocked: boolean;
     referredById: bigint | null;
@@ -30,22 +26,6 @@ type AuthRequest = FastifyRequest & {
   };
 };
 
-function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString("hex");
-  const hash = createHash("sha256")
-    .update(salt + password)
-    .digest("hex");
-  return `${salt}:${hash}`;
-}
-
-function verifyPassword(password: string, storedHash: string): boolean {
-  const [salt, hash] = storedHash.split(":");
-  if (!salt || !hash) return false;
-  const expected = createHash("sha256")
-    .update(salt + password)
-    .digest("hex");
-  return expected === hash;
-}
 
 export const profileRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", telegramAuthHook);
@@ -72,8 +52,6 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       firstName: user.firstName ?? null,
       language: user.language,
       role: user.role,
-      email: user.email ?? null,
-      emailVerified: user.emailVerified,
       metaboxUserId: user.metaboxUserId ?? null,
       metaboxReferralCode: user.metaboxReferralCode ?? null,
       tokenBalance: user.tokenBalance.toString(),
@@ -90,44 +68,6 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  /** PATCH /profile/settings — update email / password */
-  fastify.patch("/profile/settings", async (request, reply) => {
-    const { userId } = request as AuthRequest;
-    const body = request.body as { email?: string; password?: string; oldPassword?: string };
-
-    const data: Record<string, unknown> = {};
-
-    if (body.email !== undefined) {
-      data.email = body.email;
-      data.emailVerified = false;
-    }
-
-    if (body.password) {
-      if (body.password.length < 6) {
-        throw new Error("Password must be at least 6 characters");
-      }
-      if (body.oldPassword !== undefined) {
-        const user = await db.user.findUnique({
-          where: { id: userId },
-          select: { passwordHash: true },
-        });
-        if (!user?.passwordHash || !verifyPassword(body.oldPassword, user.passwordHash)) {
-          return reply.code(400).send({ error: "Old password is incorrect" });
-        }
-      }
-      data.passwordHash = hashPassword(body.password);
-    }
-
-    const user = await db.user.update({
-      where: { id: userId },
-      data,
-    });
-
-    return {
-      email: user.email ?? null,
-      emailVerified: user.emailVerified,
-    };
-  });
 
   /**
    * GET /profile/metabox-sso — get SSO redirect URL for linked Metabox account.
@@ -240,26 +180,4 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  /** POST /profile/verify-email — send verification email */
-  fastify.post("/profile/verify-email", async (request) => {
-    const { userId } = request as AuthRequest;
-
-    const user = await db.user.findUnique({ where: { id: userId } });
-    if (!user?.email) {
-      throw new Error("No email set");
-    }
-
-    if (user.emailVerified) {
-      throw new Error("Email already verified");
-    }
-
-    // TODO: integrate real email service (SendGrid, AWS SES, etc.)
-    // For now, auto-verify for development
-    await db.user.update({
-      where: { id: userId },
-      data: { emailVerified: true },
-    });
-
-    return { success: true };
-  });
 };
