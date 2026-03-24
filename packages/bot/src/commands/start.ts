@@ -23,7 +23,15 @@ export async function handleStart(ctx: BotContext): Promise<void> {
   if (param?.startsWith("link_") && ctx.user) {
     const token = param.slice("link_".length);
     try {
-      const { metaboxUserId, referralCode } = await verifyLinkToken(token, ctx.user.id);
+      const botPurchase = await db.tokenTransaction.findFirst({
+        where: { userId: ctx.user.id, type: "credit", reason: "purchase" },
+        select: { id: true },
+      });
+      const { metaboxUserId, referralCode } = await verifyLinkToken(token, ctx.user.id, {
+        referrerTelegramId: ctx.user.referredById,
+        botHasPurchase: !!botPurchase,
+        botCreatedAt: ctx.user.createdAt,
+      });
       await db.user.update({
         where: { id: ctx.user.id },
         data: { metaboxUserId, metaboxReferralCode: referralCode },

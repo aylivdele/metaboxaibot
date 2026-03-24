@@ -9,7 +9,26 @@ import {
 } from "../services/metabox-bridge.service.js";
 import { config } from "@metabox/shared";
 
-type AuthRequest = FastifyRequest & { userId: bigint };
+type AuthRequest = FastifyRequest & {
+  userId: bigint;
+  user: {
+    id: bigint;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    language: string;
+    email: string | null;
+    emailVerified: boolean;
+    passwordHash: string | null;
+    isNew: boolean;
+    isBlocked: boolean;
+    referredById: bigint | null;
+    metaboxUserId: string | null;
+    metaboxReferralCode: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+};
 
 function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
@@ -187,14 +206,26 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
    * Body: { email, password }
    */
   fastify.post("/profile/metabox-login", async (request, reply) => {
-    const { userId } = request as AuthRequest;
+    const { userId, user } = request as AuthRequest;
     const { email, password } = request.body as { email: string; password: string };
     if (!email || !password) {
       return reply.code(400).send({ error: "email and password are required" });
     }
     const { loginAndLink } = await import("../services/metabox-bridge.service.js");
     try {
-      const result = await loginAndLink({ email, password, telegramId: userId });
+      const botPurchase = await db.tokenTransaction.findFirst({
+        where: { userId, type: "credit", reason: "purchase" },
+        select: { id: true },
+      });
+      const result = await loginAndLink({
+        email,
+        password,
+        telegramId: userId,
+        telegramUsername: user.username,
+        referrerTelegramId: user.referredById,
+        botHasPurchase: !!botPurchase,
+        botCreatedAt: user.createdAt,
+      });
       await db.user.update({
         where: { id: userId },
         data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },

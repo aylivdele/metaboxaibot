@@ -73,4 +73,26 @@ export async function telegramAuthHook(
   });
   if (!user) return reply.code(404).send({ error: "User not found" });
   if (user.isBlocked) return reply.code(403).send({ error: "User is blocked" });
+  (
+    request as FastifyRequest & {
+      userId: bigint;
+      user: {
+        id: bigint;
+        username: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        language: string;
+        email: string | null;
+        emailVerified: boolean;
+        passwordHash: string | null;
+        isNew: boolean;
+        isBlocked: boolean;
+        referredById: bigint | null;
+        metaboxUserId: string | null;
+        metaboxReferralCode: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      };
+    }
+  ).user = user;
 }

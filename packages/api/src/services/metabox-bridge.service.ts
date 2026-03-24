@@ -125,10 +125,19 @@ export async function loginAndLink(params: {
   email: string;
   password: string;
   telegramId: bigint;
+  telegramUsername: string | null;
+  referrerTelegramId?: bigint | null;
+  botHasPurchase: boolean;
+  botCreatedAt: Date;
 }): Promise<RegisterFromBotResult> {
   return post<RegisterFromBotResult>("/login-and-link", {
-    ...params,
+    email: params.email,
+    password: params.password,
     telegramId: params.telegramId.toString(),
+    telegramUsername: params.telegramUsername,
+    referrerTelegramId: params.referrerTelegramId?.toString(),
+    botHasPurchase: params.botHasPurchase,
+    botCreatedAt: params.botCreatedAt.toISOString(),
   });
 }
 
@@ -137,13 +146,24 @@ export async function loginAndLink(params: {
 export async function verifyLinkToken(
   token: string,
   telegramId: bigint,
+  botInfo?: {
+    referrerTelegramId?: bigint | null;
+    botHasPurchase: boolean;
+    botCreatedAt: Date;
+  },
 ): Promise<{
   metaboxUserId: string;
   email: string;
   firstName: string;
   referralCode: string;
 }> {
-  return post("/verify-link-token", { token, telegramId: telegramId.toString() });
+  return post("/verify-link-token", {
+    token,
+    telegramId: telegramId.toString(),
+    referrerTelegramId: botInfo?.referrerTelegramId?.toString(),
+    botHasPurchase: botInfo?.botHasPurchase,
+    botCreatedAt: botInfo?.botCreatedAt.toISOString(),
+  });
 }
 
 /** Issue a fresh SSO token for an already-linked user. */

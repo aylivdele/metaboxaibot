@@ -143,6 +143,7 @@ function AppContent() {
             firstName={profile?.firstName}
             username={profile?.username}
             onBack={() => setPage("profile")}
+            onSuccess={() => api.profile.get().then(setProfile).catch(console.error)}
           />
         )}
       </main>

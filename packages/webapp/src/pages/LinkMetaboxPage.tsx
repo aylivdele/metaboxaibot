@@ -7,6 +7,7 @@ interface Props {
   firstName?: string | null;
   username?: string | null;
   onBack: () => void;
+  onSuccess?: () => void;
 }
 
 type Mode = "choose" | "register" | "login";
@@ -39,7 +40,7 @@ const ERROR_MAP: Record<string, TranslationKey> = {
   PASSWORD_TOO_SHORT: "linkMetabox.error.passwordTooShort",
 };
 
-export function LinkMetaboxPage({ firstName, username, onBack }: Props) {
+export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Props) {
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("choose");
   const [email, setEmail] = useState("");
@@ -70,6 +71,7 @@ export function LinkMetaboxPage({ firstName, username, onBack }: Props) {
             )
           : await api.profile.metaboxLogin(email.trim(), password);
       openSso(result.ssoUrl);
+      onSuccess?.();
       onBack();
     } catch (err) {
       const code = (err as Error & { code?: string }).code;
