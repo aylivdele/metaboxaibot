@@ -147,6 +147,9 @@ export const config = {
     didPresenterUrl: opt("DID_PRESENTER_URL"),
     higgsfieldApiKey: opt("HIGGSFIELD_API_KEY"),
     higgsfieldApiSecret: opt("HIGGSFIELD_API_SECRET"),
+    alibaba: opt("ALIBABA_API_KEY"),
+    apipass: opt("APIPASS_API_KEY"),
+    recraft: opt("RECRAFT_API_KEY"),
   },
 } as const;
 

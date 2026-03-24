@@ -6,20 +6,12 @@ import { config } from "@metabox/shared";
 const T2I_ENDPOINTS: Record<string, string> = {
   flux: "fal-ai/flux-2",
   "flux-pro": "fal-ai/flux-2-pro",
-  "recraft-v3": "fal-ai/recraft-v3",
-  "recraft-v4": "fal-ai/recraft/v4/text-to-image",
-  "recraft-v4-pro": "fal-ai/recraft/v4/pro/text-to-image",
-  "recraft-v4-vector": "fal-ai/recraft/v4/text-to-vector",
-  "recraft-v4-pro-vector": "fal-ai/recraft/v4/pro/text-to-vector",
   "stable-diffusion": "fal-ai/stable-diffusion-v3-medium",
   "nano-banana-pro": "fal-ai/nano-banana-pro",
   "seedream-5": "fal-ai/bytedance/seedream/v5/lite/text-to-image",
   "seedream-4.5": "fal-ai/bytedance/seedream/v4.5/text-to-image",
   "gpt-image-1.5": "fal-ai/gpt-image-1.5",
 };
-
-/** Models that output SVG instead of raster images. */
-const SVG_MODELS = new Set(["recraft-v4-vector", "recraft-v4-pro-vector"]);
 
 /** Image-to-image (edit) endpoint. Falls back to the T2I endpoint when absent. */
 const EDIT_ENDPOINTS: Record<string, string> = {
@@ -28,7 +20,6 @@ const EDIT_ENDPOINTS: Record<string, string> = {
   "seedream-4.5": "fal-ai/bytedance/seedream/v4.5/edit",
   "gpt-image-1.5": "fal-ai/gpt-image-1.5/edit",
   "stable-diffusion": "fal-ai/stable-diffusion-v3-medium/image-to-image",
-  "recraft-v3": "fal-ai/recraft/v3/image-to-image",
   flux: "fal-ai/flux-2/edit",
   "flux-pro": "fal-ai/flux-2-pro/edit",
 };
@@ -103,7 +94,7 @@ export class FalAdapter implements ImageAdapter {
     ).images;
     const img = images?.[0];
     if (!img?.url) throw new Error("FAL returned no image URL");
-    const ext = SVG_MODELS.has(this.modelId) ? "svg" : "png";
+    const ext = "png";
     return {
       url: img.url,
       filename: `${this.modelId}.${ext}`,

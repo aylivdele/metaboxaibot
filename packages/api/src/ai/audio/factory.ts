@@ -1,7 +1,7 @@
 import type { AudioAdapter } from "./base.adapter.js";
 import { OpenAiTtsAdapter } from "./openai-tts.adapter.js";
 import { ElevenLabsAdapter } from "./elevenlabs.adapter.js";
-import { SunoAdapter } from "./suno.adapter.js";
+import { ApipassSunoAdapter } from "./apipass-suno.adapter.js";
 
 export function createAudioAdapter(modelId: string): AudioAdapter {
   switch (modelId) {
@@ -12,7 +12,7 @@ export function createAudioAdapter(modelId: string): AudioAdapter {
     case "sounds-el":
       return new ElevenLabsAdapter("sounds-el");
     case "suno":
-      return new SunoAdapter();
+      return new ApipassSunoAdapter();
     default:
       throw new Error(`Unknown audio model: ${modelId}`);
   }

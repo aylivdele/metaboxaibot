@@ -3,6 +3,7 @@ import type { ImageAdapter } from "./base.adapter.js";
 import { DalleAdapter } from "./dalle.adapter.js";
 import { FalAdapter } from "./fal.adapter.js";
 import { ReplicateAdapter } from "./replicate.adapter.js";
+import { RecraftAdapter } from "./recraft.adapter.js";
 
 export function createImageAdapter(modelId: string): ImageAdapter {
   const model = AI_MODELS[modelId];
@@ -13,6 +14,8 @@ export function createImageAdapter(modelId: string): ImageAdapter {
       return new DalleAdapter();
     case "fal":
       return new FalAdapter(modelId);
+    case "recraft":
+      return new RecraftAdapter(modelId);
     case "replicate":
     case "ideogram":
     case "midjourney":

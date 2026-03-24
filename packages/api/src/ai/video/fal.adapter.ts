@@ -9,7 +9,6 @@ const FAL_ENDPOINTS: Record<string, string> = {
   minimax: "fal-ai/minimax/video-01-live",
   pika: "fal-ai/pika-v2/text-to-video",
   hailuo: "fal-ai/hailuo-ai/video-01",
-  wan: "fal-ai/wan/v2.1/text-to-video",
   seedance: "fal-ai/bytedance/seedance/v1.5/pro/text-to-video",
 };
 
