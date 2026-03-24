@@ -8,7 +8,6 @@ import {
 import {
   MODELS_BY_SECTION,
   AI_MODELS,
-  MODEL_FAMILIES,
   MODEL_TO_FAMILY,
   FAMILIES_BY_SECTION,
   config,
