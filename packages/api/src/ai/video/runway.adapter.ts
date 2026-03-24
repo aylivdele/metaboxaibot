@@ -31,6 +31,7 @@ export class RunwayAdapter implements VideoAdapter {
   }
 
   async submit(input: VideoInput): Promise<string> {
+    const ms = input.modelSettings ?? {};
     const body: Record<string, unknown> = {
       promptText: input.prompt,
       model: "gen3a_turbo",
@@ -39,6 +40,18 @@ export class RunwayAdapter implements VideoAdapter {
     };
     if (input.imageUrl) {
       body.promptImage = input.imageUrl;
+    }
+    if (ms.seed != null) body.seed = ms.seed;
+    if (
+      ms.camera_horizontal !== undefined ||
+      ms.camera_vertical !== undefined ||
+      ms.camera_zoom !== undefined
+    ) {
+      body.motion = {
+        ...(ms.camera_horizontal !== undefined ? { camera: { horizontal: ms.camera_horizontal } } : {}),
+        ...(ms.camera_vertical !== undefined ? { camera: { vertical: ms.camera_vertical } } : {}),
+        ...(ms.camera_zoom !== undefined ? { camera: { zoom: ms.camera_zoom } } : {}),
+      };
     }
 
     const res = await fetch(`${RUNWAY_API}/image_to_video`, {

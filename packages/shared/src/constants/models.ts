@@ -1,4 +1,198 @@
-import type { AIModel } from "../types/ai.js";
+import type { AIModel, ModelSettingDef } from "../types/ai.js";
+
+// ── Helper builders ───────────────────────────────────────────────────────────
+
+/** Creates an aspect_ratio select setting from an ordered list of ratio strings. */
+function mkAspectRatio(ratios: string[], labelMap?: Record<string, string>): ModelSettingDef {
+  return {
+    key: "aspect_ratio",
+    label: "Соотношение сторон",
+    description: "Форма итогового изображения: горизонталь, вертикаль или квадрат.",
+    type: "select",
+    options: ratios.map((r) => ({ value: r, label: labelMap?.[r] ?? r })),
+    default: ratios[0],
+  };
+}
+
+/** Creates a duration select setting from a list of discrete second values. */
+function mkDurationSelect(durations: number[]): ModelSettingDef {
+  return {
+    key: "duration",
+    label: "Длительность",
+    description: "Продолжительность видеоклипа в секундах.",
+    type: "select",
+    options: durations.map((d) => ({ value: d, label: `${d} с` })),
+    default: durations[0],
+  };
+}
+
+/** Creates a duration slider setting for a continuous range. */
+function mkDurationSlider(min: number, max: number): ModelSettingDef {
+  return {
+    key: "duration",
+    label: "Длительность (с)",
+    description: `Продолжительность видеоклипа: от ${min} до ${max} секунд.`,
+    type: "slider",
+    min,
+    max,
+    step: 1,
+    default: min,
+  };
+}
+
+// ── Reusable setting blocks ───────────────────────────────────────────────────
+
+/** Standard LLM controls: temperature, max output tokens, system prompt. */
+const LLM_SETTINGS: ModelSettingDef[] = [
+  {
+    key: "temperature",
+    label: "Температура",
+    description:
+      "Степень случайности ответов: ниже — точнее и предсказуемее, выше — разнообразнее и творчески.",
+    type: "slider",
+    min: 0,
+    max: 2,
+    step: 0.05,
+    default: 1.0,
+  },
+  {
+    key: "max_tokens",
+    label: "Макс. длина ответа",
+    description:
+      "Максимальное количество слов, которые ИИ может написать за один ответ. Увеличьте для длинных текстов.",
+    type: "slider",
+    min: 256,
+    max: 8192,
+    step: 256,
+    default: 2048,
+  },
+  {
+    key: "system_prompt",
+    label: "Системный промпт",
+    description:
+      "Скрытая инструкция, которую ИИ всегда соблюдает: задайте роль, стиль или ограничения для всего диалога.",
+    type: "text",
+    default: "",
+  },
+];
+
+/** Extra setting for Perplexity search models. */
+const PERPLEXITY_EXTRA: ModelSettingDef = {
+  key: "search_recency_filter",
+  label: "Период поиска",
+  description: "Ограничьте поиск свежими материалами: только за последний час, день, неделю или месяц.",
+  type: "select",
+  options: [
+    { value: "month", label: "Месяц" },
+    { value: "week", label: "Неделя" },
+    { value: "day", label: "День" },
+    { value: "hour", label: "Час" },
+  ],
+  default: "month",
+};
+
+/** FLUX / FLUX Pro generation controls. */
+const FLUX_SETTINGS: ModelSettingDef[] = [
+  {
+    key: "num_inference_steps",
+    label: "Шаги генерации",
+    description:
+      "Количество итераций обработки: больше шагов — детальнее и качественнее, но медленнее.",
+    type: "slider",
+    min: 1,
+    max: 50,
+    step: 1,
+    default: 28,
+  },
+  {
+    key: "guidance_scale",
+    label: "Следование промпту (CFG)",
+    description:
+      "Насколько строго ИИ следует вашему тексту: высокие значения — буквально, низкие — с творческой интерпретацией.",
+    type: "slider",
+    min: 1,
+    max: 20,
+    step: 0.5,
+    default: 3.5,
+  },
+  {
+    key: "seed",
+    label: "Seed",
+    description:
+      "Число для воспроизведения результата: укажите одно и то же значение, чтобы получить похожий результат снова. Пусто — случайный результат каждый раз.",
+    type: "number",
+    min: 0,
+    max: 2147483647,
+    default: null,
+  },
+  {
+    key: "output_format",
+    label: "Формат файла",
+    description: "JPEG — компактный файл, PNG — без потери качества и с поддержкой прозрачности.",
+    type: "select",
+    options: [
+      { value: "jpeg", label: "JPEG" },
+      { value: "png", label: "PNG" },
+    ],
+    default: "jpeg",
+  },
+];
+
+/** Seedream guidance + seed. */
+const SEEDREAM_SETTINGS: ModelSettingDef[] = [
+  {
+    key: "guidance_scale",
+    label: "Следование промпту (CFG)",
+    description:
+      "Насколько строго ИИ следует вашему тексту: высокие значения — буквально, низкие — с творческой интерпретацией.",
+    type: "slider",
+    min: 1,
+    max: 10,
+    step: 0.5,
+    default: 2.5,
+  },
+  {
+    key: "seed",
+    label: "Seed",
+    description:
+      "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+    type: "number",
+    min: 0,
+    max: 2147483647,
+    default: null,
+  },
+];
+
+/** Kling / Kling Pro video settings. */
+const KLING_SETTINGS: ModelSettingDef[] = [
+  mkAspectRatio(["16:9", "9:16", "1:1"]),
+  mkDurationSelect([5, 10]),
+  {
+    key: "cfg_scale",
+    label: "Следование промпту (CFG)",
+    description:
+      "Насколько точно видео передаёт ваше описание: ближе к 2 — строже по тексту, ближе к 0 — больше свободы.",
+    type: "slider",
+    min: 0,
+    max: 2,
+    step: 0.1,
+    default: 0.5,
+  },
+  {
+    key: "negative_prompt",
+    label: "Негативный промпт",
+    description: "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
+    type: "text",
+    default: "",
+  },
+  {
+    key: "generate_audio",
+    label: "Генерировать аудио",
+    description: "Включить автоматическую генерацию звукового сопровождения к видео.",
+    type: "toggle",
+    default: true,
+  },
+];
 
 export const AI_MODELS: Record<string, AIModel> = {
   // ── GPT / LLM ─────────────────────────────────────────────────────────────
@@ -619,6 +813,33 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      {
+        key: "resolution",
+        label: "Разрешение",
+        description: "Детализация итогового изображения: 1K — стандарт, 4K — максимальные детали.",
+        type: "select",
+        options: [
+          { value: "1K", label: "1K" },
+          { value: "2K", label: "2K" },
+          { value: "4K", label: "4K" },
+        ],
+        default: "1K",
+      },
+      {
+        key: "output_format",
+        label: "Формат файла",
+        description: "PNG — без потери качества, JPEG — компактнее, WebP — баланс качества и размера.",
+        type: "select",
+        options: [
+          { value: "png", label: "PNG" },
+          { value: "jpeg", label: "JPEG" },
+          { value: "webp", label: "WebP" },
+        ],
+        default: "png",
+      },
+    ],
   },
   midjourney: {
     id: "midjourney",
@@ -637,6 +858,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"])],
   },
   "gpt-image-1.5": {
     id: "gpt-image-1.5",
@@ -655,6 +877,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "16:9", "9:16"],
+    settings: [mkAspectRatio(["1:1", "16:9", "9:16"])],
   },
   "stable-diffusion": {
     id: "stable-diffusion",
@@ -674,6 +897,39 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     // Replicate/SDXL accepts arbitrary dimensions — offer extended set
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3"],
+    settings: [
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3"]),
+      {
+        key: "negative_prompt",
+        label: "Негативный промпт",
+        description:
+          "Что НЕ должно быть на картинке: перечислите нежелательные объекты, стили или черты.",
+        type: "text",
+        default: "",
+      },
+      {
+        key: "guidance_scale",
+        label: "Следование промпту (CFG)",
+        description:
+          "Насколько строго ИИ следует вашему тексту: высокие значения — буквально, низкие — с творческой интерпретацией.",
+        type: "slider",
+        min: 1,
+        max: 20,
+        step: 0.5,
+        default: 7,
+      },
+      {
+        key: "num_inference_steps",
+        label: "Шаги генерации",
+        description:
+          "Количество итераций обработки: больше шагов — детальнее и качественнее, но медленнее.",
+        type: "slider",
+        min: 10,
+        max: 50,
+        step: 1,
+        default: 30,
+      },
+    ],
   },
   "dall-e-3": {
     id: "dall-e-3",
@@ -693,6 +949,32 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     // DALL-E 3 only supports exactly 3 sizes
     supportedAspectRatios: ["1:1", "16:9", "9:16"],
+    settings: [
+      mkAspectRatio(["1:1", "16:9", "9:16"]),
+      {
+        key: "quality",
+        label: "Качество",
+        description: "Standard — быстрее и дешевле, HD — более детальная и сложная картинка.",
+        type: "select",
+        options: [
+          { value: "standard", label: "Standard" },
+          { value: "hd", label: "HD" },
+        ],
+        default: "standard",
+      },
+      {
+        key: "style",
+        label: "Стиль",
+        description:
+          "Vivid — насыщенные цвета, яркий и выразительный результат. Natural — более спокойный и реалистичный.",
+        type: "select",
+        options: [
+          { value: "vivid", label: "Vivid" },
+          { value: "natural", label: "Natural" },
+        ],
+        default: "vivid",
+      },
+    ],
   },
   flux: {
     id: "flux",
@@ -701,6 +983,9 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Максимально реалистичные фото за секунды. Лучший выбор, когда нужно быстро и неотличимо от настоящего снимка.",
     section: "design",
     provider: "fal",
+    familyId: "flux",
+    versionLabel: "2",
+    variantLabel: "Standard",
     costUsdPerRequest: 0,
     costUsdPerMPixel: 0.025, // $0.025/MP, billed as ceil(px/1_000_000)
     inputCostUsdPerMToken: 0,
@@ -713,6 +998,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     // FAL image_size categories: square_hd, landscape_4_3, portrait_4_3, landscape_16_9, portrait_16_9
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]), ...FLUX_SETTINGS],
   },
   ideogram: {
     id: "ideogram",
@@ -731,6 +1017,42 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      {
+        key: "style_type",
+        label: "Стиль",
+        description: "Художественное направление изображения: универсальный, фотореализм или дизайн.",
+        type: "select",
+        options: [
+          { value: "AUTO", label: "Auto" },
+          { value: "GENERAL", label: "General" },
+          { value: "REALISTIC", label: "Realistic" },
+          { value: "DESIGN", label: "Design" },
+        ],
+        default: "AUTO",
+      },
+      {
+        key: "negative_prompt",
+        label: "Негативный промпт",
+        description: "Что НЕ должно быть на картинке: перечислите нежелательные объекты или стили.",
+        type: "text",
+        default: "",
+      },
+      {
+        key: "magic_prompt_option",
+        label: "Magic Prompt",
+        description:
+          "Автоматически улучшает ваш запрос для более красивого и детального результата.",
+        type: "select",
+        options: [
+          { value: "AUTO", label: "Auto" },
+          { value: "ON", label: "On" },
+          { value: "OFF", label: "Off" },
+        ],
+        default: "AUTO",
+      },
+    ],
   },
   "imagen-4": {
     id: "imagen-4",
@@ -749,6 +1071,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"])],
   },
   "flux-pro": {
     id: "flux-pro",
@@ -757,6 +1080,9 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Профессиональная версия FLUX.2 — максимальное качество, точнее следует промпту, поддерживает редактирование загруженных изображений.",
     section: "design",
     provider: "fal",
+    familyId: "flux",
+    versionLabel: "2",
+    variantLabel: "Pro",
     costUsdPerRequest: 0,
     costUsdPerMPixel: 0.04, // $0.04/MP, billed as ceil(px/1_000_000)
     inputCostUsdPerMToken: 0,
@@ -768,6 +1094,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]), ...FLUX_SETTINGS],
   },
   "recraft-v3": {
     id: "recraft-v3",
@@ -776,6 +1103,9 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Быстро создаёт иллюстрации, иконки и графику в едином стиле. Отлично подходит для дизайна и презентаций.",
     section: "design",
     provider: "fal",
+    familyId: "recraft",
+    versionLabel: "v3",
+    variantLabel: "Standard",
     costUsdPerRequest: 0.04,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -786,6 +1116,22 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      {
+        key: "style",
+        label: "Стиль",
+        description:
+          "Художественное направление: реалистичные фото, цифровые иллюстрации или векторная графика.",
+        type: "select",
+        options: [
+          { value: "realistic_image", label: "Реализм" },
+          { value: "digital_illustration", label: "Иллюстрация" },
+          { value: "vector_illustration", label: "Вектор" },
+        ],
+        default: "realistic_image",
+      },
+    ],
   },
   "recraft-v4": {
     id: "recraft-v4",
@@ -794,6 +1140,9 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Recraft V4 создан специально для дизайна и маркетинга: чистая композиция, точный рендеринг текста и профессиональная полировка. Результат готов для кампании, презентации или страницы продукта без пост-обработки.",
     section: "design",
     provider: "fal",
+    familyId: "recraft",
+    versionLabel: "v4",
+    variantLabel: "Standard",
     costUsdPerRequest: 0.04,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -804,6 +1153,18 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      {
+        key: "seed",
+        label: "Seed",
+        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        type: "number",
+        min: 0,
+        max: 2147483647,
+        default: null,
+      },
+    ],
   },
   "recraft-v4-pro": {
     id: "recraft-v4-pro",
@@ -812,6 +1173,9 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Расширенная версия Recraft V4 с повышенным разрешением и детализацией. Идеальна для ответственных дизайн-проектов, где требуется максимальная визуальная точность — без правок, прямо в производство.",
     section: "design",
     provider: "fal",
+    familyId: "recraft",
+    versionLabel: "v4",
+    variantLabel: "Pro",
     costUsdPerRequest: 0.25,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -822,6 +1186,18 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      {
+        key: "seed",
+        label: "Seed",
+        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        type: "number",
+        min: 0,
+        max: 2147483647,
+        default: null,
+      },
+    ],
   },
   "recraft-v4-vector": {
     id: "recraft-v4-vector",
@@ -830,6 +1206,9 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Генерирует масштабируемые SVG-векторы — идеально для логотипов, иллюстраций и иконок. Результат масштабируется без потери качества до любого размера и готов к прямому использованию в вёрстке и полиграфии.",
     section: "design",
     provider: "fal",
+    familyId: "recraft",
+    versionLabel: "v4",
+    variantLabel: "Vector",
     costUsdPerRequest: 0.08,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -840,6 +1219,17 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [
+      {
+        key: "seed",
+        label: "Seed",
+        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        type: "number",
+        min: 0,
+        max: 2147483647,
+        default: null,
+      },
+    ],
   },
   "recraft-v4-pro-vector": {
     id: "recraft-v4-pro-vector",
@@ -848,6 +1238,9 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Профессиональная векторная генерация с максимальным качеством SVG. Подходит для сложных иллюстраций, брендинга и любого дизайна, требующего безупречной масштабируемости и детализации.",
     section: "design",
     provider: "fal",
+    familyId: "recraft",
+    versionLabel: "v4",
+    variantLabel: "Pro Vector",
     costUsdPerRequest: 0.3,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -858,6 +1251,17 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [
+      {
+        key: "seed",
+        label: "Seed",
+        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        type: "number",
+        min: 0,
+        max: 2147483647,
+        default: null,
+      },
+    ],
   },
   "seedream-5": {
     id: "seedream-5",
@@ -866,6 +1270,9 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Идеально для товарных фото, одежды и каталогов. Создаёт чистые, профессиональные изображения для продаж.",
     section: "design",
     provider: "fal",
+    familyId: "seedream",
+    versionLabel: "5.0",
+    variantLabel: "Standard",
     costUsdPerRequest: 0.035,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -876,6 +1283,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]), ...SEEDREAM_SETTINGS],
   },
   "seedream-4.5": {
     id: "seedream-4.5",
@@ -884,6 +1292,9 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Предыдущая версия Seedream — чуть проще, но быстрее и дешевле. Подойдёт для массовой генерации товарных фото.",
     section: "design",
     provider: "fal",
+    familyId: "seedream",
+    versionLabel: "4.5",
+    variantLabel: "Standard",
     costUsdPerRequest: 0.04,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -894,6 +1305,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]), ...SEEDREAM_SETTINGS],
   },
 
   // ── Видео ─────────────────────────────────────────────────────────────────
@@ -916,6 +1328,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: [5, 10],
+    settings: [...KLING_SETTINGS],
   },
   "kling-pro": {
     id: "kling-pro",
@@ -936,6 +1349,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: [5, 10],
+    settings: [...KLING_SETTINGS],
   },
   veo: {
     id: "veo",
@@ -955,6 +1369,26 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
     durationRange: { min: 5, max: 8 },
+    settings: [
+      mkAspectRatio(["16:9", "9:16"]),
+      mkDurationSlider(5, 8),
+      {
+        key: "negative_prompt",
+        label: "Негативный промпт",
+        description: "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
+        type: "text",
+        default: "",
+      },
+      {
+        key: "seed",
+        label: "Seed",
+        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        type: "number",
+        min: 0,
+        max: 4294967295,
+        default: null,
+      },
+    ],
   },
   sora: {
     id: "sora",
@@ -974,6 +1408,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: [4, 8, 12],
+    settings: [mkAspectRatio(["16:9", "9:16", "1:1"]), mkDurationSelect([4, 8, 12])],
   },
   runway: {
     id: "runway",
@@ -993,6 +1428,57 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["1280:768", "768:1280", "1104:832", "832:1104"],
     durationRange: { min: 2, max: 10 },
+    settings: [
+      mkAspectRatio(
+        ["1280:768", "768:1280", "1104:832", "832:1104"],
+        {
+          "1280:768": "Горизонталь 16:9",
+          "768:1280": "Вертикаль 9:16",
+          "1104:832": "Горизонталь 4:3",
+          "832:1104": "Вертикаль 3:4",
+        },
+      ),
+      mkDurationSlider(2, 10),
+      {
+        key: "seed",
+        label: "Seed",
+        description: "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        type: "number",
+        min: 0,
+        max: 4294967295,
+        default: null,
+      },
+      {
+        key: "camera_horizontal",
+        label: "Движение камеры: лево/право",
+        description: "Панорамирование камеры по горизонтали: отрицательные значения — влево, положительные — вправо.",
+        type: "slider",
+        min: -10,
+        max: 10,
+        step: 0.5,
+        default: 0,
+      },
+      {
+        key: "camera_vertical",
+        label: "Движение камеры: вверх/вниз",
+        description: "Панорамирование камеры по вертикали: отрицательные значения — вниз, положительные — вверх.",
+        type: "slider",
+        min: -10,
+        max: 10,
+        step: 0.5,
+        default: 0,
+      },
+      {
+        key: "camera_zoom",
+        label: "Зум камеры",
+        description: "Приближение или удаление камеры: положительные значения — наезд, отрицательные — отъезд.",
+        type: "slider",
+        min: -10,
+        max: 10,
+        step: 0.5,
+        default: 0,
+      },
+    ],
   },
   seedance: {
     id: "seedance",
@@ -1015,7 +1501,31 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    supportedDurations: [5, 10],
+    supportedDurations: null,
+    durationRange: { min: 4, max: 12 },
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1"]),
+      mkDurationSlider(4, 12),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        default: "720p",
+      },
+      {
+        key: "generate_audio",
+        label: "Генерировать аудио",
+        description: "Включить автоматическую генерацию звукового сопровождения к видео.",
+        type: "toggle",
+        default: true,
+      },
+    ],
   },
   luma: {
     id: "luma",
@@ -1035,6 +1545,17 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"],
     supportedDurations: [5, 9],
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"]),
+      mkDurationSelect([5, 9]),
+      {
+        key: "loop",
+        label: "Зациклить видео",
+        description: "Последний кадр плавно переходит в первый — идеально для бесконечных анимаций.",
+        type: "toggle",
+        default: false,
+      },
+    ],
   },
   "luma-ray2": {
     id: "luma-ray2",
@@ -1054,6 +1575,17 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "4:3", "3:4", "1:1"],
     supportedDurations: [5, 9],
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "4:3", "3:4", "1:1"]),
+      mkDurationSelect([5, 9]),
+      {
+        key: "loop",
+        label: "Зациклить видео",
+        description: "Последний кадр плавно переходит в первый — идеально для бесконечных анимаций.",
+        type: "toggle",
+        default: false,
+      },
+    ],
   },
   minimax: {
     id: "minimax",
@@ -1073,6 +1605,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: null, // fixed 6s
+    settings: [mkAspectRatio(["16:9", "9:16", "1:1"])],
   },
   pika: {
     id: "pika",
@@ -1091,7 +1624,22 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    supportedDurations: [3, 5, 10],
+    supportedDurations: [5, 10],
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1"]),
+      mkDurationSelect([5, 10]),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "1080p — Full HD с высокой чёткостью, 720p — быстрее и меньше весит.",
+        type: "select",
+        options: [
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        default: "1080p",
+      },
+    ],
   },
   hailuo: {
     id: "hailuo",
@@ -1099,7 +1647,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     description:
       "Видеомодель с акцентом на плавность и кинематографичность. Поддерживает анимацию изображений и генерирует 6-секундные клипы.",
     section: "video",
-    provider: "hailuo",
+    provider: "fal",
     costUsdPerRequest: 0.25, // ~$0.10–$0.40/gen
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -1111,6 +1659,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: null, // fixed 6s
+    settings: [mkAspectRatio(["16:9", "9:16", "1:1"])],
   },
   higgsfield: {
     id: "higgsfield",
@@ -1130,6 +1679,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: [5],
+    settings: [mkAspectRatio(["16:9", "9:16", "1:1"])],
   },
   wan: {
     id: "wan",
@@ -1147,8 +1697,40 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedAspectRatios: ["16:9", "9:16"],
     supportedDurations: [5],
+    settings: [
+      mkAspectRatio(["16:9", "9:16"]),
+      {
+        key: "negative_prompt",
+        label: "Негативный промпт",
+        description: "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
+        type: "text",
+        default: "",
+      },
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        default: "720p",
+      },
+      {
+        key: "motion_strength",
+        label: "Интенсивность движения",
+        description:
+          "Насколько активно движется видео: ниже — плавнее и статичнее, выше — больше динамики.",
+        type: "slider",
+        min: 0.3,
+        max: 0.7,
+        step: 0.05,
+        default: 0.5,
+      },
+    ],
   },
   heygen: {
     id: "heygen",
@@ -1168,6 +1750,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: null, // avatar duration is script-driven
+    settings: [mkAspectRatio(["16:9", "9:16", "1:1"])],
   },
   "d-id": {
     id: "d-id",
@@ -1187,6 +1770,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: null, // script-driven
+    settings: [mkAspectRatio(["16:9", "9:16", "1:1"])],
   },
 
   // ── Аудио ─────────────────────────────────────────────────────────────────
@@ -1206,6 +1790,51 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    settings: [
+      {
+        key: "voice",
+        label: "Голос",
+        description:
+          "Тембр и стиль диктора. Alloy и Echo — нейтральные, Onyx — глубокий мужской, Nova и Shimmer — женские.",
+        type: "select",
+        options: [
+          { value: "alloy", label: "Alloy" },
+          { value: "ash", label: "Ash" },
+          { value: "coral", label: "Coral" },
+          { value: "echo", label: "Echo" },
+          { value: "fable", label: "Fable" },
+          { value: "nova", label: "Nova" },
+          { value: "onyx", label: "Onyx" },
+          { value: "sage", label: "Sage" },
+          { value: "shimmer", label: "Shimmer" },
+        ],
+        default: "onyx",
+      },
+      {
+        key: "speed",
+        label: "Скорость речи",
+        description: "Темп озвучки: 1.0 — нормальная скорость, ниже — медленнее, выше — быстрее.",
+        type: "slider",
+        min: 0.25,
+        max: 4.0,
+        step: 0.05,
+        default: 1.0,
+      },
+      {
+        key: "format",
+        label: "Формат аудио",
+        description: "MP3 — универсальный и компактный, FLAC — без потерь, Opus — для стриминга.",
+        type: "select",
+        options: [
+          { value: "mp3", label: "MP3" },
+          { value: "opus", label: "Opus" },
+          { value: "aac", label: "AAC" },
+          { value: "flac", label: "FLAC" },
+          { value: "wav", label: "WAV" },
+        ],
+        default: "mp3",
+      },
+    ],
   },
   "voice-clone": {
     id: "voice-clone",
@@ -1223,6 +1852,47 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    settings: [
+      {
+        key: "stability",
+        label: "Стабильность",
+        description:
+          "Однородность голоса: высокое значение — ровно и монотонно, низкое — эмоциональнее и разнообразнее.",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.5,
+      },
+      {
+        key: "similarity_boost",
+        label: "Схожесть с оригиналом",
+        description: "Насколько точно воспроизводится оригинальный тембр и интонации голоса-образца.",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.75,
+      },
+      {
+        key: "style",
+        label: "Выразительность стиля",
+        description:
+          "Насколько актёрски и эмоционально звучит речь: 0 — нейтрально, 1 — максимально выразительно.",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.0,
+      },
+      {
+        key: "use_speaker_boost",
+        label: "Speaker Boost",
+        description: "Усиление качества и чёткости голоса. Рекомендуется оставить включённым.",
+        type: "toggle",
+        default: true,
+      },
+    ],
   },
   suno: {
     id: "suno",
@@ -1240,6 +1910,15 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    settings: [
+      {
+        key: "make_instrumental",
+        label: "Только инструментал",
+        description: "Сгенерировать музыку без вокала — только инструментальную дорожку.",
+        type: "toggle",
+        default: false,
+      },
+    ],
   },
   "sounds-el": {
     id: "sounds-el",
@@ -1259,6 +1938,16 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
   },
 };
+
+// ── Apply settings ────────────────────────────────────────────────────────────
+// LLM section — assign base settings; Perplexity models get extra search filter
+for (const [id, model] of Object.entries(AI_MODELS)) {
+  if (model.section === "gpt") {
+    model.settings = id.startsWith("perplexity")
+      ? [...LLM_SETTINGS, PERPLEXITY_EXTRA]
+      : [...LLM_SETTINGS];
+  }
+}
 
 // Модели по секции
 export const MODELS_BY_SECTION = Object.values(AI_MODELS).reduce(

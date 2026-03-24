@@ -26,6 +26,10 @@ export class ReplicateVideoAdapter implements VideoAdapter {
   }
 
   async submit(input: VideoInput): Promise<string> {
+    const ms = input.modelSettings ?? {};
+    const msExtras: Record<string, unknown> = {};
+    if (ms.negative_prompt) msExtras.negative_prompt = ms.negative_prompt;
+    if (ms.seed != null) msExtras.seed = ms.seed;
     const prediction = await this.client.predictions.create({
       model: this.model as `${string}/${string}`,
       input: {
@@ -33,6 +37,7 @@ export class ReplicateVideoAdapter implements VideoAdapter {
         ...(input.imageUrl ? { image: input.imageUrl } : {}),
         ...(input.duration ? { duration: input.duration } : {}),
         ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
+        ...msExtras,
       },
     });
     return prediction.id;

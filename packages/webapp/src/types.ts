@@ -30,12 +30,37 @@ export interface Dialog {
   updatedAt: string;
 }
 
+export interface ModelSettingOption {
+  value: string | number | boolean;
+  label: string;
+}
+
+export interface ModelSettingDef {
+  key: string;
+  label: string;
+  description?: string;
+  type: "select" | "slider" | "toggle" | "text" | "number";
+  options?: ModelSettingOption[];
+  min?: number;
+  max?: number;
+  step?: number;
+  default: string | number | boolean | null;
+}
+
 export interface Model {
   id: string;
   name: string;
   description: string;
   section: string;
   provider: string;
+  /** Family this model belongs to, null for standalone models. */
+  familyId: string | null;
+  /** Version label within the family, e.g. "v3", "v4". */
+  versionLabel: string | null;
+  /** Variant label within the family, e.g. "Standard", "Pro", "Vector". */
+  variantLabel: string | null;
+  /** Per-variant description override shown instead of family description. */
+  descriptionOverride: string | null;
   supportsImages: boolean;
   supportsVoice: boolean;
   supportsWeb: boolean;
@@ -57,6 +82,8 @@ export interface Model {
   supportedAspectRatios?: string[] | null;
   supportedDurations?: number[] | null;
   durationRange?: { min: number; max: number } | null;
+  /** Configurable generation parameters. Empty array if none. */
+  settings: ModelSettingDef[];
 }
 
 export interface UserState {

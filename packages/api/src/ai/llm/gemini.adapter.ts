@@ -48,6 +48,10 @@ export class GeminiAdapter implements LLMAdapter {
     const model = this.genai.getGenerativeModel({
       model: this.apiModel,
       ...(input.systemPrompt ? { systemInstruction: input.systemPrompt } : {}),
+      generationConfig: {
+        ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+        ...(input.maxTokens !== undefined ? { maxOutputTokens: input.maxTokens } : {}),
+      },
     });
 
     const history: Content[] = (input.history ?? []).map((m: MessageRecord) => ({

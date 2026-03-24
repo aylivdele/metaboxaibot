@@ -55,11 +55,17 @@ export class PerplexityAdapter implements LLMAdapter {
       { role: "user", content: input.prompt },
     ];
 
-    const stream = await this.client.chat.completions.create({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const extraParams: Record<string, unknown> = {};
+    if (input.temperature !== undefined) extraParams.temperature = input.temperature;
+    if (input.maxTokens !== undefined) extraParams.max_tokens = input.maxTokens;
+    if (input.searchRecencyFilter) extraParams.search_recency_filter = input.searchRecencyFilter;
+    const stream = await (this.client.chat.completions.create as (p: unknown) => Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk & { usage?: { prompt_tokens: number; completion_tokens: number } }>>)({
       model: this.apiModel,
       messages,
       stream: true,
       stream_options: { include_usage: true },
+      ...extraParams,
     });
 
     let inputTokensUsed = 0;

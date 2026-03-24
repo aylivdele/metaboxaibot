@@ -49,7 +49,8 @@ export class AnthropicAdapter implements LLMAdapter {
     const messages = this.buildMessages(input);
     const stream = this.client.messages.stream({
       model: this.apiModel,
-      max_tokens: 4096,
+      max_tokens: input.maxTokens ?? 4096,
+      ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
       ...(input.systemPrompt ? { system: input.systemPrompt } : {}),
       messages,
     });

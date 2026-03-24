@@ -19,6 +19,8 @@ export interface VideoJobData {
   aspectRatio?: string;
   /** Clip duration in seconds chosen by user. */
   duration?: number;
+  /** Per-model user settings (cfg_scale, resolution, etc.) */
+  modelSettings?: Record<string, unknown>;
 }
 
 let _connection: Redis | undefined;

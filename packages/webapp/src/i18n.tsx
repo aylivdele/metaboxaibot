@@ -219,6 +219,12 @@ const translations = {
     "imageSettings.model": "Model",
     "imageSettings.noSupport": "This model doesn't support custom aspect ratios",
     "imageSettings.saved": "✓ Saved",
+    "imageSettings.active": "Active",
+    "imageSettings.version": "Version",
+    "imageSettings.variant": "Variant",
+    "imageSettings.aspectRatio": "Aspect ratio",
+    "imageSettings.svgNoRatio": "Vector (SVG) — aspect ratio is set via prompt",
+    "imageSettings.otherModels": "Other models",
 
     // Video settings
     "videoSettings.title": "Video Settings",
@@ -448,6 +454,12 @@ const translations = {
     "imageSettings.model": "Модель",
     "imageSettings.noSupport": "Эта модель не поддерживает выбор соотношения сторон",
     "imageSettings.saved": "✓ Сохранено",
+    "imageSettings.active": "Активна",
+    "imageSettings.version": "Версия",
+    "imageSettings.variant": "Вариант",
+    "imageSettings.aspectRatio": "Соотношение сторон",
+    "imageSettings.svgNoRatio": "Вектор (SVG) — соотношение задаётся в промпте",
+    "imageSettings.otherModels": "Другие модели",
 
     // Video settings
     "videoSettings.title": "Настройки видео",

@@ -11,6 +11,14 @@ function serializeModel(m: AIModel) {
   const isPerMPixel = (m.costUsdPerMPixel ?? 0) > 0;
   const isPerMVideoToken = (m.costUsdPerMVideoToken ?? 0) > 0;
   return {
+    /** Family id this model belongs to, null for standalone models. */
+    familyId: m.familyId ?? null,
+    /** Version label within the family, e.g. "v3", "v4". */
+    versionLabel: m.versionLabel ?? null,
+    /** Variant label within the family, e.g. "Standard", "Pro". */
+    variantLabel: m.variantLabel ?? null,
+    /** Per-variant description override (replaces family description when set). */
+    descriptionOverride: m.descriptionOverride ?? null,
     id: m.id,
     name: m.name,
     description: m.description,
@@ -37,6 +45,8 @@ function serializeModel(m: AIModel) {
     /** FPS used in video token calculation (only for per-video-token billing models). */
     videoFps: m.videoFps ?? 0,
     isLLM,
+    /** Configurable generation parameters. Empty array if none. */
+    settings: m.settings ?? [],
   };
 }
 

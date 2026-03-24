@@ -133,4 +133,30 @@ export const userStateService = {
       update: { videoSettings: updated },
     });
   },
+
+  /** Returns all per-model custom settings for a user. */
+  async getModelSettings(
+    userId: bigint,
+  ): Promise<Record<string, Record<string, unknown>>> {
+    const state = await db.userState.findUnique({ where: { userId } });
+    if (!state?.modelSettings) return {};
+    return state.modelSettings as Record<string, Record<string, unknown>>;
+  },
+
+  /** Merges the given key/value pairs into the stored settings for a specific model. */
+  async setModelSettings(
+    userId: bigint,
+    modelId: string,
+    settings: Record<string, unknown>,
+  ): Promise<void> {
+    const current = await this.getModelSettings(userId);
+    const updated = { ...current, [modelId]: { ...(current[modelId] ?? {}), ...settings } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const json = updated as any;
+    await db.userState.upsert({
+      where: { userId },
+      create: { userId, state: "IDLE", modelSettings: json },
+      update: { modelSettings: json },
+    });
+  },
 };

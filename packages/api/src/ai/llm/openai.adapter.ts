@@ -24,6 +24,8 @@ export class OpenAIAdapter implements LLMAdapter {
       model: this.model,
       input: this.buildInput(input),
       ...(input.previousResponseId ? { previous_response_id: input.previousResponseId } : {}),
+      ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+      ...(input.maxTokens !== undefined ? { max_output_tokens: input.maxTokens } : {}),
     });
     const usage = response.usage;
     return {
@@ -38,6 +40,8 @@ export class OpenAIAdapter implements LLMAdapter {
       model: this.model,
       input: this.buildInput(input),
       ...(input.previousResponseId ? { previous_response_id: input.previousResponseId } : {}),
+      ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+      ...(input.maxTokens !== undefined ? { max_output_tokens: input.maxTokens } : {}),
       stream: true,
     });
 

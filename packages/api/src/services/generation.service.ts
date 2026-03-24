@@ -5,6 +5,7 @@ import { AI_MODELS } from "@metabox/shared";
 import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
 import { buildS3Key, sectionMeta, uploadFromUrl } from "./s3.service.js";
 import { dialogService } from "./dialog.service.js";
+import { userStateService } from "./user-state.service.js";
 
 export interface SubmitImageParams {
   userId: bigint;
@@ -61,6 +62,11 @@ export const generationService = {
       },
     });
 
+    const allModelSettings = await userStateService.getModelSettings(userId);
+    const modelSettings = allModelSettings[modelId] ?? {};
+    // Prefer aspect_ratio from modelSettings (set via webapp) over legacy param
+    const effectiveAspectRatio = (modelSettings.aspect_ratio as string | undefined) ?? aspectRatio;
+
     const adapter = createImageAdapter(modelId);
 
     if (!adapter.isAsync && adapter.generate) {
@@ -70,7 +76,8 @@ export const generationService = {
           prompt,
           negativePrompt,
           imageUrl: sourceImageUrl,
-          aspectRatio,
+          aspectRatio: effectiveAspectRatio,
+          modelSettings,
         });
 
         await db.generationJob.update({
@@ -128,7 +135,8 @@ export const generationService = {
         telegramChatId,
         dialogId,
         sendOriginalLabel,
-        aspectRatio,
+        aspectRatio: effectiveAspectRatio,
+        modelSettings,
       },
       { attempts: 3, backoff: { type: "exponential", delay: 5000 } },
     );

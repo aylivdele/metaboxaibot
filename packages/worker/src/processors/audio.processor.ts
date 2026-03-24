@@ -38,6 +38,7 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
     voiceId,
     sourceAudioUrl,
     telegramChatId,
+    modelSettings,
   } = job.data;
 
   logger.info({ dbJobId, modelId }, "Processing audio job");
@@ -54,11 +55,11 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
 
     if (!adapter.isAsync && adapter.generate) {
       // Sync adapter (should not normally end up in queue, but handle gracefully)
-      audioResult = await adapter.generate({ prompt, voiceId, sourceAudioUrl });
+      audioResult = await adapter.generate({ prompt, voiceId, sourceAudioUrl, modelSettings });
     } else {
       // Async adapter (Suno)
       if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
-      const providerJobId = await adapter.submit({ prompt, voiceId, sourceAudioUrl });
+      const providerJobId = await adapter.submit({ prompt, voiceId, sourceAudioUrl, modelSettings });
 
       let polled = null;
       for (let i = 0; i < MAX_POLLS; i++) {

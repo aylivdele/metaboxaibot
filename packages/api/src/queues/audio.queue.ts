@@ -15,6 +15,8 @@ export interface AudioJobData {
   sourceAudioUrl?: string;
   /** Telegram chat id to notify when done */
   telegramChatId: number;
+  /** Per-model user settings (voice, speed, stability, etc.) */
+  modelSettings?: Record<string, unknown>;
 }
 
 let _connection: Redis | undefined;

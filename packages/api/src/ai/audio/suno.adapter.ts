@@ -16,10 +16,11 @@ export class SunoAdapter implements AudioAdapter {
   }
 
   async submit(input: AudioInput): Promise<string> {
+    const ms = input.modelSettings ?? {};
     const { request_id } = await fal.queue.submit(SUNO_ENDPOINT, {
       input: {
         prompt: input.prompt,
-        make_instrumental: false,
+        make_instrumental: (ms.make_instrumental as boolean | undefined) ?? false,
         wait_audio: false,
       },
     });

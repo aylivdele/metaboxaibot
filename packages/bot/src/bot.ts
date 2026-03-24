@@ -14,6 +14,7 @@ import {
 import {
   buildDesignModelKeyboard,
   handleDesignModelSelect,
+  handleDesignFamilySelect,
   handleDesignMessage,
   handleDesignPhoto,
   handleDesignRefSelect,
@@ -65,6 +66,7 @@ export function createBot(token: string): Bot<BotContext> {
 
   // ── Design model selection callback ──────────────────────────────────────
   bot.callbackQuery(/^design_model_/, handleDesignModelSelect);
+  bot.callbackQuery(/^design_family_/, handleDesignFamilySelect);
 
   // ── Design reference (img2img) callback ───────────────────────────────────
   bot.callbackQuery(/^design_ref_/, handleDesignRefSelect);

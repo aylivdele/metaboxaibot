@@ -30,12 +30,14 @@ export class DalleAdapter implements ImageAdapter {
     };
     const size = DALLE_SIZES[input.aspectRatio ?? ""] ?? "1024x1024";
 
+    const ms = input.modelSettings ?? {};
     const response = await this.client.images.generate({
       model: "dall-e-3",
       prompt: input.prompt,
       n: 1,
       size,
-      quality: "standard",
+      quality: (ms.quality as "standard" | "hd" | undefined) ?? "standard",
+      style: (ms.style as "vivid" | "natural" | undefined) ?? "vivid",
       response_format: "url",
     });
 

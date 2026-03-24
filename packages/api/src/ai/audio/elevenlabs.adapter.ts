@@ -35,6 +35,13 @@ export class ElevenLabsAdapter implements AudioAdapter {
 
   private async generateSpeech(input: AudioInput): Promise<AudioResult> {
     const voiceId = input.voiceId ?? DEFAULT_VOICE_ID;
+    const ms = input.modelSettings ?? {};
+    const voiceSettings = {
+      stability: (ms.stability as number | undefined) ?? 0.5,
+      similarity_boost: (ms.similarity_boost as number | undefined) ?? 0.75,
+      style: (ms.style as number | undefined) ?? 0.0,
+      use_speaker_boost: (ms.use_speaker_boost as boolean | undefined) ?? true,
+    };
 
     const res = await fetch(`${ELEVENLABS_API}/text-to-speech/${voiceId}`, {
       method: "POST",
@@ -42,7 +49,7 @@ export class ElevenLabsAdapter implements AudioAdapter {
       body: JSON.stringify({
         text: input.prompt,
         model_id: "eleven_multilingual_v2",
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+        voice_settings: voiceSettings,
       }),
     });
 

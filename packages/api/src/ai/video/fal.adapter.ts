@@ -40,12 +40,20 @@ export class FalVideoAdapter implements VideoAdapter {
 
   async submit(input: VideoInput): Promise<string> {
     const endpoint = this.selectEndpoint(input.imageUrl);
+    const ms = input.modelSettings ?? {};
+    const msExtras: Record<string, unknown> = {};
+    if (ms.cfg_scale !== undefined) msExtras.cfg_scale = ms.cfg_scale;
+    if (ms.negative_prompt) msExtras.negative_prompt = ms.negative_prompt;
+    if (ms.generate_audio !== undefined) msExtras.generate_audio = ms.generate_audio;
+    if (ms.resolution) msExtras.resolution = ms.resolution;
+    if (ms.motion_strength !== undefined) msExtras.motion_strength = ms.motion_strength;
     const { request_id } = await fal.queue.submit(endpoint, {
       input: {
         prompt: input.prompt,
         ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
         ...(input.duration ? { duration: input.duration } : {}),
         ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
+        ...msExtras,
       },
     });
     return `${endpoint}${SEP}${request_id}`;

@@ -202,6 +202,15 @@ export const api = {
       }),
   },
 
+  modelSettings: {
+    get: () => request<Record<string, Record<string, unknown>>>("/model-settings"),
+    set: (modelId: string, settings: Record<string, unknown>) =>
+      request<{ success: boolean }>("/model-settings", {
+        method: "PATCH",
+        body: JSON.stringify({ modelId, settings }),
+      }),
+  },
+
   admin: {
     users: (params: { page?: number; limit?: number; search?: string }) => {
       const qs = new URLSearchParams();

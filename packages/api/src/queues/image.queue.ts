@@ -19,6 +19,8 @@ export interface ImageJobData {
   sendOriginalLabel?: string;
   /** Aspect ratio chosen by user, e.g. "16:9", "1:1". */
   aspectRatio?: string;
+  /** Per-model user settings (inference steps, style, seed, etc.) */
+  modelSettings?: Record<string, unknown>;
 }
 
 let _connection: Redis | undefined;

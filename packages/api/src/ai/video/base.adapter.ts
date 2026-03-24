@@ -6,6 +6,8 @@ export interface VideoInput {
   duration?: number;
   /** e.g. "16:9", "9:16", "1:1" */
   aspectRatio?: string;
+  /** User-configured model settings (from modelSettings storage). Each adapter picks what it supports. */
+  modelSettings?: Record<string, unknown>;
 }
 
 export interface VideoResult {

@@ -16,6 +16,12 @@ export interface LLMInput {
   threadId?: string;
   /** System prompt override */
   systemPrompt?: string;
+  /** Sampling temperature (0–2). Provider default when omitted. */
+  temperature?: number;
+  /** Max output tokens. Provider default when omitted. */
+  maxTokens?: number;
+  /** Perplexity: restrict search results to a time window (month/week/day/hour). */
+  searchRecencyFilter?: string;
 }
 
 export interface LLMOutput {

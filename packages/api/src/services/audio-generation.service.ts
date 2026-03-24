@@ -4,6 +4,7 @@ import { getAudioQueue } from "../queues/audio.queue.js";
 import { AI_MODELS } from "@metabox/shared";
 import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
 import { buildS3Key, uploadBuffer, uploadFromUrl } from "./s3.service.js";
+import { userStateService } from "./user-state.service.js";
 
 export interface SubmitAudioParams {
   userId: bigint;
@@ -32,6 +33,9 @@ export const audioGenerationService = {
 
     await checkBalance(userId);
 
+    const allModelSettings = await userStateService.getModelSettings(userId);
+    const modelSettings = allModelSettings[modelId] ?? {};
+
     const job = await db.generationJob.create({
       data: {
         userId,
@@ -48,7 +52,7 @@ export const audioGenerationService = {
     if (!adapter.isAsync && adapter.generate) {
       // ── Sync generation (TTS, ElevenLabs) ───────────────────────────────
       try {
-        const result = await adapter.generate({ prompt, voiceId, sourceAudioUrl });
+        const result = await adapter.generate({ prompt, voiceId, sourceAudioUrl, modelSettings });
 
         await db.generationJob.update({
           where: { id: job.id },
@@ -100,6 +104,7 @@ export const audioGenerationService = {
         voiceId,
         sourceAudioUrl,
         telegramChatId,
+        modelSettings,
       },
       { attempts: 3, backoff: { type: "exponential", delay: 5000 } },
     );

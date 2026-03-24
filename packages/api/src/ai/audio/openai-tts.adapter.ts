@@ -18,17 +18,24 @@ export class OpenAiTtsAdapter implements AudioAdapter {
   }
 
   async generate(input: AudioInput): Promise<AudioResult> {
-    const voice = (input.voiceId ??
+    const ms = input.modelSettings ?? {};
+    const voice = ((ms.voice as string | undefined) ??
+      input.voiceId ??
       DEFAULT_VOICE) as OpenAI.Audio.Speech.SpeechCreateParams["voice"];
+    const speed = (ms.speed as number | undefined) ?? 1.0;
+    const format = ((ms.format as string | undefined) ??
+      "mp3") as OpenAI.Audio.Speech.SpeechCreateParams["response_format"];
 
     const response = await this.client.audio.speech.create({
       model: "tts-1",
       input: input.prompt,
       voice,
-      response_format: "mp3",
+      speed,
+      response_format: format,
     });
 
+    const ext = format === "opus" ? "ogg" : format === "aac" ? "aac" : format === "flac" ? "flac" : "mp3";
     const buffer = Buffer.from(await response.arrayBuffer());
-    return { buffer, ext: "mp3", contentType: "audio/mpeg" };
+    return { buffer, ext, contentType: `audio/${ext === "mp3" ? "mpeg" : ext}` };
   }
 }

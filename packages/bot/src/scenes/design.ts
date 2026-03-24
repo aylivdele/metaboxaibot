@@ -5,18 +5,47 @@ import {
   userStateService,
   calculateCost,
 } from "@metabox/api/services";
-import { MODELS_BY_SECTION, AI_MODELS, config, generateWebToken } from "@metabox/shared";
+import { MODELS_BY_SECTION, AI_MODELS, MODEL_FAMILIES, MODEL_TO_FAMILY, FAMILIES_BY_SECTION, config, generateWebToken } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 
 // ── Model selection keyboard ──────────────────────────────────────────────────
 
-export function buildDesignModelKeyboard(): InlineKeyboard {
-  const models = MODELS_BY_SECTION["design"] ?? [];
+/**
+ * Builds the design-section keyboard.
+ * Family models are shown as one button per family (uses the saved or default model).
+ * Standalone models (no familyId) are shown individually.
+ */
+export function buildDesignModelKeyboard(savedModelId?: string | null): InlineKeyboard {
+  const allModels = MODELS_BY_SECTION["design"] ?? [];
+  const families = FAMILIES_BY_SECTION["design"] ?? [];
   const kb = new InlineKeyboard();
-  for (let i = 0; i < models.length; i += 2) {
-    kb.text(models[i].name, `design_model_${models[i].id}`);
-    if (models[i + 1]) kb.text(models[i + 1].name, `design_model_${models[i + 1].id}`);
+
+  // Collect all model IDs that belong to a family (skip individual buttons for them)
+  const familyModelIds = new Set(
+    families.flatMap((f) => f.members.map((m) => m.modelId)),
+  );
+
+  // One button per family, using saved model if it's in that family, else defaultModelId
+  const rows: Array<[string, string]> = [];
+  for (const family of families) {
+    const memberIds = new Set(family.members.map((m) => m.modelId));
+    const modelId =
+      savedModelId && memberIds.has(savedModelId) ? savedModelId : family.defaultModelId;
+    rows.push([family.name, `design_family_${family.id}__${modelId}`]);
+  }
+
+  // Standalone models
+  for (const m of allModels) {
+    if (!familyModelIds.has(m.id)) {
+      rows.push([m.name, `design_model_${m.id}`]);
+    }
+  }
+
+  // Layout: 2 per row
+  for (let i = 0; i < rows.length; i += 2) {
+    kb.text(rows[i][0], rows[i][1]);
+    if (rows[i + 1]) kb.text(rows[i + 1][0], rows[i + 1][1]);
     kb.row();
   }
   return kb;
@@ -53,6 +82,24 @@ export async function activateDesignModel(ctx: BotContext, modelId: string): Pro
 export async function handleDesignModelSelect(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   const modelId = ctx.callbackQuery?.data?.replace("design_model_", "") ?? "";
+  await ctx.answerCallbackQuery();
+  await activateDesignModel(ctx, modelId);
+}
+
+/**
+ * Family button tapped: data format is `design_family_{familyId}__{modelId}`
+ * modelId is the resolved (saved or default) model for this family.
+ */
+export async function handleDesignFamilySelect(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const data = ctx.callbackQuery?.data ?? "";
+  // Extract modelId after the __ separator
+  const modelId = data.split("__")[1] ?? "";
+  // Verify it actually belongs to a known family (safety check)
+  if (!modelId || !AI_MODELS[modelId] || !MODEL_TO_FAMILY[modelId]) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
   await ctx.answerCallbackQuery();
   await activateDesignModel(ctx, modelId);
 }
@@ -205,7 +252,8 @@ export async function handleDesignManagement(ctx: BotContext): Promise<void> {
 export async function handleNewDesignDialog(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "DESIGN_SECTION", "design");
+  const state = await userStateService.get(ctx.user.id);
   await ctx.reply(ctx.t.design.sectionTitle, {
-    reply_markup: buildDesignModelKeyboard(),
+    reply_markup: buildDesignModelKeyboard(state?.designModelId),
   });
 }

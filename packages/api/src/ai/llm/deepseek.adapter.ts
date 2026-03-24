@@ -59,6 +59,8 @@ export class DeepSeekAdapter implements LLMAdapter {
       messages,
       stream: true,
       stream_options: { include_usage: true },
+      ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+      ...(input.maxTokens !== undefined ? { max_tokens: input.maxTokens } : {}),
     });
 
     let inputTokensUsed = 0;

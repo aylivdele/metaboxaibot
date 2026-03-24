@@ -79,8 +79,8 @@ export const config = {
    * Override via BILLING_USD_PER_TOKEN / BILLING_TARGET_MARGIN env vars.
    */
   billing: {
-    usdPerToken: optFloat("BILLING_USD_PER_TOKEN", 0.043),
-    targetMargin: optFloat("BILLING_TARGET_MARGIN", 2.0),
+    usdPerToken: optFloat("BILLING_USD_PER_TOKEN", 0.02),
+    targetMargin: optFloat("BILLING_TARGET_MARGIN", 1.0),
   },
 
   /**

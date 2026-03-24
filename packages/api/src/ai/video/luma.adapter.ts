@@ -32,10 +32,11 @@ export class LumaAdapter implements VideoAdapter {
   }
 
   async submit(input: VideoInput): Promise<string> {
+    const ms = input.modelSettings ?? {};
     const body: Record<string, unknown> = {
       prompt: input.prompt,
       aspect_ratio: input.aspectRatio ?? "16:9",
-      loop: false,
+      loop: ms.loop !== undefined ? Boolean(ms.loop) : false,
     };
 
     if (input.imageUrl) {

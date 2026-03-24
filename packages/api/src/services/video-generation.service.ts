@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import { getVideoQueue } from "../queues/video.queue.js";
 import { AI_MODELS } from "@metabox/shared";
 import { checkBalance } from "./token.service.js";
+import { userStateService } from "./user-state.service.js";
 
 export interface SubmitVideoParams {
   userId: bigint;
@@ -40,6 +41,12 @@ export const videoGenerationService = {
 
     await checkBalance(userId);
 
+    const allModelSettings = await userStateService.getModelSettings(userId);
+    const modelSettings = allModelSettings[modelId] ?? {};
+    // Prefer values from modelSettings (set via webapp) over legacy params
+    const effectiveAspectRatio = (modelSettings.aspect_ratio as string | undefined) ?? aspectRatio;
+    const effectiveDuration = (modelSettings.duration as number | undefined) ?? duration;
+
     // Create DB job record
     const job = await db.generationJob.create({
       data: {
@@ -65,8 +72,9 @@ export const videoGenerationService = {
         imageUrl,
         telegramChatId,
         sendOriginalLabel,
-        aspectRatio,
-        duration,
+        aspectRatio: effectiveAspectRatio,
+        duration: effectiveDuration,
+        modelSettings,
       },
       { attempts: 3, backoff: { type: "exponential", delay: 10000 } },
     );

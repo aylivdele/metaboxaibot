@@ -51,12 +51,19 @@ export class ReplicateAdapter implements ImageAdapter {
   async submit(input: ImageInput): Promise<string> {
     const modelStr = MODEL_IDS[this.modelId] ?? this.modelId;
     const { width, height } = this.resolveSize(input);
+    const ms = input.modelSettings ?? {};
+    const msExtras: Record<string, unknown> = {};
+    if (ms.negative_prompt) msExtras.negative_prompt = ms.negative_prompt;
+    else if (input.negativePrompt) msExtras.negative_prompt = input.negativePrompt;
+    if (ms.guidance_scale !== undefined) msExtras.guidance_scale = ms.guidance_scale;
+    if (ms.num_inference_steps !== undefined) msExtras.num_inference_steps = ms.num_inference_steps;
+    if (ms.style_type) msExtras.style_type = ms.style_type;
     const predInput = {
       prompt: input.prompt,
-      negative_prompt: input.negativePrompt,
       width,
       height,
       ...(input.imageUrl ? { image: input.imageUrl } : {}),
+      ...msExtras,
     };
 
     // "owner/name:sha256hash" → pass version hash directly (POST /v1/predictions)

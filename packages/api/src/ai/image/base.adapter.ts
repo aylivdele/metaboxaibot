@@ -7,6 +7,8 @@ export interface ImageInput {
   height?: number;
   /** Aspect ratio in "W:H" format, e.g. "16:9", "1:1". Each adapter converts to its own format. */
   aspectRatio?: string;
+  /** User-configured model settings (from modelSettings storage). Each adapter picks what it supports. */
+  modelSettings?: Record<string, unknown>;
 }
 
 export interface ImageResult {

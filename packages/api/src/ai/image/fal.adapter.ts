@@ -62,12 +62,23 @@ export class FalAdapter implements ImageAdapter {
 
   async submit(input: ImageInput): Promise<string> {
     const endpoint = this.selectEndpoint(input.imageUrl);
+    const ms = input.modelSettings ?? {};
+    const msExtras: Record<string, unknown> = {};
+    if (ms.num_inference_steps !== undefined) msExtras.num_inference_steps = ms.num_inference_steps;
+    if (ms.guidance_scale !== undefined) msExtras.guidance_scale = ms.guidance_scale;
+    if (ms.seed != null) msExtras.seed = ms.seed;
+    if (ms.output_format) msExtras.output_format = ms.output_format;
+    if (ms.style) msExtras.style = ms.style;
+    if (ms.style_type) msExtras.style_type = ms.style_type;
+    if (ms.magic_prompt_option) msExtras.magic_prompt_option = ms.magic_prompt_option;
+    if (ms.resolution) msExtras.resolution = ms.resolution;
     const { request_id } = await fal.queue.submit(endpoint, {
       input: {
         prompt: input.prompt,
-        negative_prompt: input.negativePrompt,
+        negative_prompt: (ms.negative_prompt as string | undefined) || input.negativePrompt,
         image_size: this.resolveSize(input),
         ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
+        ...msExtras,
       },
     });
     // Encode endpoint in the returned ID so poll() uses the correct route.

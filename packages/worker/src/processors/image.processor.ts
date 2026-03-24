@@ -24,6 +24,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     dialogId,
     sendOriginalLabel,
     aspectRatio,
+    modelSettings,
   } = job.data;
 
   logger.info({ dbJobId, modelId }, "Processing image job");
@@ -42,6 +43,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       negativePrompt,
       imageUrl: job.data.sourceImageUrl,
       aspectRatio,
+      modelSettings,
     });
 
     let imageResult = null;

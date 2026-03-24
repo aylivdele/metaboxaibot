@@ -24,6 +24,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     sendOriginalLabel,
     aspectRatio,
     duration,
+    modelSettings,
   } = job.data;
 
   logger.info({ dbJobId, modelId }, "Processing video job");
@@ -36,7 +37,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
   const adapter = createVideoAdapter(modelId);
 
   try {
-    const providerJobId = await adapter.submit({ prompt, imageUrl, aspectRatio, duration });
+    const providerJobId = await adapter.submit({ prompt, imageUrl, aspectRatio, duration, modelSettings });
 
     let videoResult = null;
     for (let i = 0; i < MAX_POLLS; i++) {

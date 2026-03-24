@@ -1,6 +1,64 @@
 import type { Section } from "./user.js";
 import type { ContextStrategy } from "./dialog.js";
 
+// ── Model settings types ──────────────────────────────────────────────────────
+
+export type ModelSettingType = "select" | "slider" | "toggle" | "text" | "number";
+
+export interface ModelSettingOption {
+  value: string | number | boolean;
+  label: string;
+}
+
+/**
+ * Describes a single configurable parameter for a model.
+ * The frontend renders the appropriate control based on `type`.
+ */
+export interface ModelSettingDef {
+  key: string;
+  /** Human-readable label shown in the UI. */
+  label: string;
+  /** Plain-language explanation of what this setting does (shown as hint below the control). */
+  description?: string;
+  type: ModelSettingType;
+  /** Options list — required for "select" type. */
+  options?: ModelSettingOption[];
+  /** Min value — for "slider" and "number" types. */
+  min?: number;
+  /** Max value — for "slider" and "number" types. */
+  max?: number;
+  /** Step — for "slider" type. */
+  step?: number;
+  /** Default value shown when the user has not saved a preference. null = empty/unset. */
+  default: string | number | boolean | null;
+}
+
+/** One specific model variant that belongs to a family (e.g. recraft-v4-pro). */
+export interface ModelFamilyMember {
+  modelId: string;
+  /** Display label for the version dimension, e.g. "v3", "v4", "2". */
+  versionLabel?: string;
+  /** Display label for the variant dimension, e.g. "Standard", "Pro", "Vector". */
+  variantLabel?: string;
+  /** Replaces the base family description for this specific model variant. */
+  descriptionOverride?: string;
+}
+
+/**
+ * A family groups related model variants under one name shown in the bot menu.
+ * Users pick the family in the bot; version/variant/settings are configured in the mini-app.
+ */
+export interface ModelFamily {
+  id: string;
+  name: string;
+  /** Base description shown unless a member provides descriptionOverride. */
+  description: string;
+  section: Section;
+  /** Model ID used when the family is first activated (no saved preference). */
+  defaultModelId: string;
+  members: ModelFamilyMember[];
+}
+
 export interface AIModel {
   id: string;
   name: string;
@@ -8,6 +66,14 @@ export interface AIModel {
   description: string;
   section: Section;
   provider: string;
+  /** If set, this model belongs to the named family (e.g. "recraft", "flux"). */
+  familyId?: string;
+  /** Version label within the family, e.g. "v3", "v4". */
+  versionLabel?: string;
+  /** Variant label within the family, e.g. "Standard", "Pro", "Vector". */
+  variantLabel?: string;
+  /** Replaces the family description in the Management UI for this specific variant. */
+  descriptionOverride?: string;
   /**
    * Provider cost in USD per request (break-even cost).
    * For LLM models this is 0 — cost is driven entirely by per-token pricing below.
@@ -59,6 +125,12 @@ export interface AIModel {
    * When set, a slider is shown instead of preset buttons.
    */
   durationRange?: { min: number; max: number } | null;
+  /**
+   * Configurable generation parameters exposed in the Management mini-app.
+   * The frontend renders controls dynamically based on these definitions.
+   * User-chosen values are stored in UserState.modelSettings and passed to the adapter.
+   */
+  settings?: ModelSettingDef[];
 }
 
 /** Входные данные для LLM-чата (с учётом стратегии контекста) */

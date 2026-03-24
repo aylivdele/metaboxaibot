@@ -4,6 +4,7 @@ import { dialogService } from "./dialog.service.js";
 import { calculateCost } from "./token.service.js";
 import type { LLMInput } from "../ai/llm/base.adapter.js";
 import { AI_MODELS } from "@metabox/shared";
+import { userStateService } from "./user-state.service.js";
 
 export interface SendMessageParams {
   dialogId: string;
@@ -40,8 +41,18 @@ export const chatService = {
 
     const adapter = createLLMAdapter(dialog.modelId);
 
+    const allModelSettings = await userStateService.getModelSettings(userId);
+    const ms = allModelSettings[dialog.modelId] ?? {};
+
     // Build input based on context strategy
-    const input: LLMInput = { prompt: content, imageUrl };
+    const input: LLMInput = {
+      prompt: content,
+      imageUrl,
+      ...(ms.temperature !== undefined ? { temperature: ms.temperature as number } : {}),
+      ...(ms.max_tokens !== undefined ? { maxTokens: ms.max_tokens as number } : {}),
+      ...(ms.system_prompt ? { systemPrompt: ms.system_prompt as string } : {}),
+      ...(ms.search_recency_filter ? { searchRecencyFilter: ms.search_recency_filter as string } : {}),
+    };
 
     if (dialog.contextStrategy === "db_history") {
       input.history = await dialogService.getHistory(dialogId, adapter.contextMaxMessages);

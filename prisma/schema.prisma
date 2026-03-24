@@ -68,6 +68,9 @@ model UserState {
   // Настройки генерации видео: { [modelId]: { aspectRatio?: string; duration?: number } }
   videoSettings Json?
 
+  // Произвольные настройки моделей: { [modelId]: { [key]: string | number | boolean | null } }
+  modelSettings Json?
+
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
