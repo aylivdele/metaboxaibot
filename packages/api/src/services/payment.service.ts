@@ -83,9 +83,17 @@ export const paymentService = {
       stars: userInfo.stars,
       starRate: userInfo.starRate,
       referrerTelegramId: userInfo.referrerTelegramId,
-    }).catch((err: unknown) => {
-      console.error("[payment] recordSale error:", err);
-    });
+    })
+      .then((res) => {
+        console.log("[payment] recordSale ok:", {
+          userId: res.userId,
+          orderId: res.orderId,
+          tgUser: userId.toString(),
+        });
+      })
+      .catch((err: unknown) => {
+        console.error("[payment] recordSale error:", err);
+      });
   },
 
   /** Credit tokens for a dynamic product purchase (from Metabox catalog). */
@@ -128,8 +136,16 @@ export const paymentService = {
       stars: userInfo.stars,
       starRate: userInfo.starRate,
       referrerTelegramId: userInfo.referrerTelegramId,
-    }).catch((err: unknown) => {
-      console.error("[payment] recordSale error:", err);
-    });
+    })
+      .then((res) => {
+        console.log("[payment] recordSale ok:", {
+          userId: res.userId,
+          orderId: res.orderId,
+          tgUser: userId.toString(),
+        });
+      })
+      .catch((err: unknown) => {
+        console.error("[payment] recordSale error:", err);
+      });
   },
 };

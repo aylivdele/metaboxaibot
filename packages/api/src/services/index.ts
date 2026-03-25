@@ -32,6 +32,7 @@ export type {
   CatalogSubscription,
   CatalogProduct,
   RecordSaleResult,
+  MergedAccountInfo,
 } from "./metabox-bridge.service.js";
 export { getRate, calcStars, updateRate, STAR_PRICE_USD } from "./exchange-rate.service.js";
 export { userUploadsService } from "./user-uploads.service.js";

@@ -18,6 +18,8 @@ export default {
     channel: "📢 Канал Metabox Family",
     metaboxLinked: "✅ Аккаунт Metabox успешно привязан!",
     metaboxLinkFailed: "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.",
+    accountsMerged:
+      "✅ Аккаунты объединены! Ваши токены и подписка перенесены на аккаунт meta-box.ru.",
   },
   menu: {
     profile: "👤 Профиль",

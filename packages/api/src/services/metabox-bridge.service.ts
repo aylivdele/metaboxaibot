@@ -97,10 +97,17 @@ async function get<T>(path: string): Promise<T> {
 
 // ── API methods ───────────────────────────────────────────────────────────────
 
+export interface MergedAccountInfo {
+  userId: string;
+  tokensBalance: number;
+  subscriptionDays: number;
+}
+
 export interface RegisterFromBotResult {
   metaboxUserId: string;
   ssoToken: string;
   referralCode: string;
+  mergedFrom?: MergedAccountInfo;
 }
 
 /** Register a new Metabox user from the bot (email + password). */
@@ -156,6 +163,7 @@ export async function verifyLinkToken(
   email: string;
   firstName: string;
   referralCode: string;
+  mergedFrom?: MergedAccountInfo;
 }> {
   return post("/verify-link-token", {
     token,

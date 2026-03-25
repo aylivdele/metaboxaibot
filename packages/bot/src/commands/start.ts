@@ -27,16 +27,26 @@ export async function handleStart(ctx: BotContext): Promise<void> {
         where: { userId: ctx.user.id, type: "credit", reason: "purchase" },
         select: { id: true },
       });
-      const { metaboxUserId, referralCode } = await verifyLinkToken(token, ctx.user.id, {
-        referrerTelegramId: ctx.user.referredById,
-        botHasPurchase: !!botPurchase,
-        botCreatedAt: ctx.user.createdAt,
-      });
+      const { metaboxUserId, referralCode, mergedFrom } = await verifyLinkToken(
+        token,
+        ctx.user.id,
+        {
+          referrerTelegramId: ctx.user.referredById,
+          botHasPurchase: !!botPurchase,
+          botCreatedAt: ctx.user.createdAt,
+        },
+      );
       await db.user.update({
         where: { id: ctx.user.id },
         data: { metaboxUserId, metaboxReferralCode: referralCode },
       });
       await ctx.reply(ctx.t.start.metaboxLinked ?? "✅ Аккаунт Metabox успешно привязан!");
+      if (mergedFrom) {
+        await ctx.reply(
+          ctx.t.start.accountsMerged ??
+            "✅ Аккаунты объединены! Ваши токены и подписка перенесены на аккаунт meta-box.ru.",
+        );
+      }
     } catch {
       await ctx.reply(
         ctx.t.start.metaboxLinkFailed ?? "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.",

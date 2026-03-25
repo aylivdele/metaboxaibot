@@ -16,6 +16,7 @@ export interface Translations {
     channel: string;
     metaboxLinked: string;
     metaboxLinkFailed: string;
+    accountsMerged: string;
   };
   menu: {
     profile: string;

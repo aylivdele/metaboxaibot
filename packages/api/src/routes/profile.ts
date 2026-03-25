@@ -169,7 +169,10 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
         data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
       });
       const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
-      return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
+      return {
+        ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}`,
+        mergedFrom: result.mergedFrom ?? null,
+      };
     } catch (err) {
       if (err instanceof MetaboxApiError) {
         return reply.code(err.status).send({ error: err.body, code: err.code });
