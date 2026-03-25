@@ -191,3 +191,14 @@ model BannerSlide {
   @@index([active, sortOrder])
   @@map("banner_slides")
 }
+
+// ─────────────────────────────────────────────
+// Курс обмена (USDT/RUB)
+// ─────────────────────────────────────────────
+model ExchangeRate {
+  pair      String   @id              // "USDT_RUB"
+  rate      Decimal  @db.Decimal(12, 4)
+  updatedAt DateTime @updatedAt
+
+  @@map("exchange_rates")
+}

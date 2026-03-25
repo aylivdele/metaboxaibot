@@ -199,6 +199,49 @@ export async function getAiBotProducts(): Promise<AiBotProduct[]> {
   return get<AiBotProduct[]>("/aibot/products");
 }
 
+// ── Unified catalog (subscriptions + token packages) ────────────────────────
+
+export interface CatalogSubscription {
+  id: string;
+  name: string;
+  tokens: number;
+  priceMonthly: string;
+  discount3m: string;
+  discount6m: string;
+  discount12m: string;
+}
+
+export interface CatalogProduct {
+  id: string;
+  name: string;
+  tokens: number;
+  priceRub: string;
+  badge: string | null;
+}
+
+export interface AiBotCatalog {
+  subscriptions: CatalogSubscription[];
+  tokenPackages: CatalogProduct[];
+}
+
+/** Fetch unified catalog of subscriptions + token packages from Metabox. */
+export async function getAiBotCatalog(): Promise<AiBotCatalog> {
+  return get<AiBotCatalog>("/aibot/catalog");
+}
+
+/** Create a subscription invoice on Metabox for a linked user. */
+export async function createSubscriptionInvoice(params: {
+  metaboxUserId: string;
+  planId: string;
+  period: string;
+  telegramId: bigint;
+}): Promise<{ paymentUrl: string; subscriptionId: string }> {
+  return post<{ paymentUrl: string; subscriptionId: string }>("/subscription-invoice", {
+    ...params,
+    telegramId: params.telegramId.toString(),
+  });
+}
+
 /** Ask Metabox to create an AiBotOrder + Lava invoice for a linked user. */
 export async function createAiBotInvoice(params: {
   metaboxUserId: string;
