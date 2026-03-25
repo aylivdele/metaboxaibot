@@ -3,6 +3,55 @@ import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { Dialog, Message, Model, ModelSettingDef, UserState } from "../types.js";
 
+// ── Custom slider ─────────────────────────────────────────────────────────────
+
+interface CustomSliderProps {
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (value: number) => void;
+}
+
+function CustomSlider({ min, max, step, value, onChange }: CustomSliderProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const percent = max === min ? 0 : Math.max(0, Math.min(1, (value - min) / (max - min)));
+
+  const valueFromX = (clientX: number): number => {
+    const el = containerRef.current;
+    if (!el) return value;
+    const rect = el.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const raw = min + ratio * (max - min);
+    const snapped = Math.round((raw - min) / step) * step + min;
+    return Math.max(min, Math.min(max, +snapped.toFixed(10)));
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    onChange(valueFromX(e.clientX));
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.buttons === 0) return;
+    onChange(valueFromX(e.clientX));
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="custom-slider"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+    >
+      <div className="custom-slider__track">
+        <div className="custom-slider__fill" style={{ width: `${percent * 100}%` }} />
+      </div>
+      <div className="custom-slider__thumb" style={{ left: `${percent * 100}%` }} />
+    </div>
+  );
+}
+
 // ── SettingsPanel ─────────────────────────────────────────────────────────────
 
 interface SettingsPanelProps {
@@ -36,13 +85,12 @@ function SettingsPanel({ settings, values, onChange }: SettingsPanelProps) {
             )}
             {def.type === "slider" && (
               <div className="settings-panel__slider-row">
-                <input
-                  type="range"
-                  min={def.min}
-                  max={def.max}
-                  step={def.step}
+                <CustomSlider
+                  min={def.min ?? 0}
+                  max={def.max ?? 100}
+                  step={def.step ?? 1}
                   value={Number(val ?? def.min ?? 0)}
-                  onChange={(e) => onChange(def.key, parseFloat(e.target.value))}
+                  onChange={(v) => onChange(def.key, v)}
                 />
                 <span className="settings-panel__slider-value">{Number(val ?? def.min ?? 0)}</span>
               </div>
@@ -93,7 +141,8 @@ function VideoSettingsView() {
   const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>(
     {},
   );
-  const [selectedId, setSelectedId] = useState<string>("");
+  const [activeModelId, setActiveModelId] = useState<string>("");
+  const [pendingStandaloneId, setPendingStandaloneId] = useState<string>("");
   const [savedId, setSavedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -106,11 +155,17 @@ function VideoSettingsView() {
         const fromSection = state.videoModelId ?? undefined;
         const initial =
           fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
-        setSelectedId(initial);
+        setActiveModelId(initial);
+        setPendingStandaloneId(initial);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  const handleModelActivate = async (modelId: string) => {
+    setActiveModelId(modelId);
+    await api.state.activate("video", modelId);
+  };
 
   const handleSettingChange = (modelId: string, key: string, value: unknown) => {
     setAllModelSettings((prev) => ({
@@ -128,7 +183,7 @@ function VideoSettingsView() {
 
   if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 
-  const model = models.find((m) => m.id === selectedId);
+  const { families, standalone } = groupByFamily(models);
 
   return (
     <div className="page">
@@ -137,40 +192,32 @@ function VideoSettingsView() {
         <p className="page-subtitle">{t("videoSettings.subtitle")}</p>
       </div>
 
-      <div className="settings-field">
-        <label className="settings-field__label">{t("videoSettings.model")}</label>
-        <select
-          value={selectedId}
-          onChange={(e) => {
-            setSelectedId(e.target.value);
-            void api.state.patch({ section: "video", sectionModelId: e.target.value });
-          }}
-        >
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {[...families.entries()].map(([fid, members]) => (
+        <FamilyCard
+          key={fid}
+          familyId={fid}
+          members={members}
+          activeModelId={activeModelId}
+          savedId={savedId}
+          allModelSettings={allModelSettings}
+          onModelActivate={handleModelActivate}
+          onSettingChange={(modelId, key, val) => handleSettingChange(modelId, key, val)}
+        />
+      ))}
 
-      {model && (
-        <div className="model-settings-panel">
-          {model.description && <p className="model-settings-panel__desc">{model.description}</p>}
-
-          {model.settings.length > 0 && (
-            <SettingsPanel
-              settings={model.settings}
-              values={allModelSettings[model.id] ?? {}}
-              onChange={(key, val) => handleSettingChange(model.id, key, val)}
-            />
-          )}
-
-          {savedId === model.id && (
-            <div className="model-settings-saved">{t("videoSettings.saved")}</div>
-          )}
-        </div>
-      )}
+      {standalone.map((m) => (
+        <StandaloneCard
+          key={m.id}
+          model={m}
+          isActive={activeModelId === m.id}
+          isPendingLocal={pendingStandaloneId === m.id}
+          savedId={savedId}
+          allModelSettings={allModelSettings}
+          onSelect={() => setPendingStandaloneId(m.id)}
+          onActivate={handleModelActivate}
+          onSettingChange={(key, val) => handleSettingChange(m.id, key, val)}
+        />
+      ))}
     </div>
   );
 }
@@ -208,7 +255,7 @@ interface FamilyCardProps {
   activeModelId: string;
   savedId: string | null;
   allModelSettings: Record<string, Record<string, unknown>>;
-  onModelActivate: (modelId: string) => void;
+  onModelActivate: (modelId: string) => Promise<void>;
   onSettingChange: (modelId: string, key: string, value: unknown) => void;
 }
 
@@ -252,9 +299,10 @@ function FamilyCard({
     : members;
   const hasVariants = variantsForVersion.length > 1;
 
+  const [activating, setActivating] = useState(false);
+
   const selectMember = (modelId: string) => {
     setLocalId(modelId);
-    onModelActivate(modelId);
   };
 
   const selectVersion = (version: string) => {
@@ -263,7 +311,16 @@ function FamilyCard({
     );
     const fallback = members.find((m) => m.versionLabel === version);
     const target = sameVariant ?? fallback;
-    if (target) selectMember(target.id);
+    if (target) setLocalId(target.id);
+  };
+
+  const handleActivate = async () => {
+    setActivating(true);
+    try {
+      await onModelActivate(localId);
+    } finally {
+      setActivating(false);
+    }
   };
 
   const description = selected.descriptionOverride ?? selected.description;
@@ -330,8 +387,94 @@ function FamilyCard({
         </div>
       )}
 
+      <div className="family-card__row">
+        <button
+          className="action-btn action-btn--primary family-card__activate-btn"
+          onClick={() => void handleActivate()}
+          disabled={activating}
+        >
+          {activating ? t("imageSettings.activating") : t("imageSettings.activate")}
+        </button>
+      </div>
+
       {cost && <div className="family-card__cost">{cost}</div>}
       {savedId === selected.id && (
+        <div className="model-settings-saved">{t("imageSettings.saved")}</div>
+      )}
+    </div>
+  );
+}
+
+interface StandaloneCardProps {
+  model: Model;
+  isActive: boolean;
+  isPendingLocal: boolean;
+  savedId: string | null;
+  allModelSettings: Record<string, Record<string, unknown>>;
+  onSelect: () => void;
+  onActivate: (modelId: string) => Promise<void>;
+  onSettingChange: (key: string, value: unknown) => void;
+}
+
+function StandaloneCard({
+  model,
+  isActive,
+  isPendingLocal,
+  savedId,
+  allModelSettings,
+  onSelect,
+  onActivate,
+  onSettingChange,
+}: StandaloneCardProps) {
+  const { t } = useI18n();
+  const [activating, setActivating] = useState(false);
+  const cost = modelCostLabel(model, t("manage.price.perReq"), t("manage.price.perMPixel"));
+
+  const handleActivate = async () => {
+    setActivating(true);
+    try {
+      await onActivate(model.id);
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  return (
+    <div
+      className={`family-card${isActive ? " family-card--active" : ""}`}
+      onClick={() => !isPendingLocal && onSelect()}
+      style={{ cursor: isPendingLocal ? "default" : "pointer" }}
+    >
+      <div className="family-card__header">
+        <span className="family-card__name">{model.name}</span>
+        {isActive && <span className="family-card__badge">{t("imageSettings.active")}</span>}
+      </div>
+      {model.description && <p className="family-card__desc">{model.description}</p>}
+      {isPendingLocal && model.settings.length > 0 && (
+        <div className="family-card__row family-card__row--settings">
+          <SettingsPanel
+            settings={model.settings}
+            values={allModelSettings[model.id] ?? {}}
+            onChange={onSettingChange}
+          />
+        </div>
+      )}
+      {isPendingLocal && (
+        <div className="family-card__row">
+          <button
+            className="action-btn action-btn--primary family-card__activate-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleActivate();
+            }}
+            disabled={activating}
+          >
+            {activating ? t("imageSettings.activating") : t("imageSettings.activate")}
+          </button>
+        </div>
+      )}
+      {cost && <div className="family-card__cost">{cost}</div>}
+      {savedId === model.id && (
         <div className="model-settings-saved">{t("imageSettings.saved")}</div>
       )}
     </div>
@@ -345,6 +488,7 @@ function ImageSettingsView() {
     {},
   );
   const [activeModelId, setActiveModelId] = useState<string>("");
+  const [pendingStandaloneId, setPendingStandaloneId] = useState<string>("");
   const [savedId, setSavedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -358,14 +502,15 @@ function ImageSettingsView() {
         const initial =
           fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
         setActiveModelId(initial);
+        setPendingStandaloneId(initial);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
-  const handleModelActivate = (modelId: string) => {
+  const handleModelActivate = async (modelId: string) => {
     setActiveModelId(modelId);
-    void api.state.patch({ section: "design", sectionModelId: modelId });
+    await api.state.activate("design", modelId);
   };
 
   const handleSettingChange = (modelId: string, key: string, value: unknown) => {
@@ -411,37 +556,19 @@ function ImageSettingsView() {
       {standalone.length > 0 && (
         <>
           <div className="family-section-divider">{t("imageSettings.otherModels")}</div>
-          {standalone.map((m) => {
-            const isActive = activeModelId === m.id;
-            const cost = modelCostLabel(m, t("manage.price.perReq"), t("manage.price.perMPixel"));
-            return (
-              <div
-                key={m.id}
-                className={`family-card${isActive ? " family-card--active" : ""}`}
-                onClick={() => !isActive && handleModelActivate(m.id)}
-                style={{ cursor: isActive ? "default" : "pointer" }}
-              >
-                <div className="family-card__header">
-                  <span className="family-card__name">{m.name}</span>
-                  {isActive && (
-                    <span className="family-card__badge">{t("imageSettings.active")}</span>
-                  )}
-                </div>
-                {m.description && <p className="family-card__desc">{m.description}</p>}
-                {isActive && m.settings.length > 0 && (
-                  <SettingsPanel
-                    settings={m.settings}
-                    values={allModelSettings[m.id] ?? {}}
-                    onChange={(key, val) => handleSettingChange(m.id, key, val)}
-                  />
-                )}
-                {cost && <div className="family-card__cost">{cost}</div>}
-                {savedId === m.id && (
-                  <div className="model-settings-saved">{t("imageSettings.saved")}</div>
-                )}
-              </div>
-            );
-          })}
+          {standalone.map((m) => (
+            <StandaloneCard
+              key={m.id}
+              model={m}
+              isActive={activeModelId === m.id}
+              isPendingLocal={pendingStandaloneId === m.id}
+              savedId={savedId}
+              allModelSettings={allModelSettings}
+              onSelect={() => setPendingStandaloneId(m.id)}
+              onActivate={handleModelActivate}
+              onSettingChange={(key, val) => handleSettingChange(m.id, key, val)}
+            />
+          ))}
         </>
       )}
     </div>
@@ -456,7 +583,9 @@ function AudioSettingsView() {
   const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>(
     {},
   );
-  const [selectedId, setSelectedId] = useState<string>("");
+  const [activeModelId, setActiveModelId] = useState<string>("");
+  const [pendingStandaloneId, setPendingStandaloneId] = useState<string>("");
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -468,17 +597,25 @@ function AudioSettingsView() {
         const fromSection = state.audioModelId ?? undefined;
         const initial =
           fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
-        setSelectedId(initial);
+        setActiveModelId(initial);
+        setPendingStandaloneId(initial);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  const handleModelActivate = async (modelId: string) => {
+    setActiveModelId(modelId);
+    await api.state.activate("audio", modelId);
+  };
 
   const handleSettingChange = (modelId: string, key: string, value: unknown) => {
     setAllModelSettings((prev) => ({
       ...prev,
       [modelId]: { ...(prev[modelId] ?? {}), [key]: value },
     }));
+    setSavedId(modelId);
+    setTimeout(() => setSavedId((id) => (id === modelId ? null : id)), 1500);
     const dKey = `${modelId}__${key}`;
     clearTimeout(debounceRef.current[dKey]);
     debounceRef.current[dKey] = setTimeout(() => {
@@ -488,7 +625,7 @@ function AudioSettingsView() {
 
   if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 
-  const model = models.find((m) => m.id === selectedId);
+  const { families, standalone } = groupByFamily(models);
 
   return (
     <div className="page">
@@ -497,44 +634,32 @@ function AudioSettingsView() {
         <p className="page-subtitle">{t("audioSettings.subtitle")}</p>
       </div>
 
-      <div className="settings-field">
-        <label className="settings-field__label">{t("audioSettings.model")}</label>
-        <select
-          value={selectedId}
-          onChange={(e) => {
-            setSelectedId(e.target.value);
-            void api.state.patch({ section: "audio", sectionModelId: e.target.value });
-          }}
-        >
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {[...families.entries()].map(([fid, members]) => (
+        <FamilyCard
+          key={fid}
+          familyId={fid}
+          members={members}
+          activeModelId={activeModelId}
+          savedId={savedId}
+          allModelSettings={allModelSettings}
+          onModelActivate={handleModelActivate}
+          onSettingChange={(modelId, key, val) => handleSettingChange(modelId, key, val)}
+        />
+      ))}
 
-      {model && (
-        <div className="model-settings-panel">
-          {model.description && <p className="model-settings-panel__desc">{model.description}</p>}
-          <div className="model-settings-panel__cost">
-            {model.tokenCostPerMPixel > 0
-              ? `${model.tokenCostPerMPixel.toFixed(2)} ✦${t("manage.price.perMPixel")}`
-              : model.tokenCostPerRequest > 0
-                ? `${model.tokenCostPerRequest.toFixed(2)} ✦${t("manage.price.perReq")}`
-                : model.tokenCostApproxMsg > 0
-                  ? `~${model.tokenCostApproxMsg.toFixed(2)} ✦${t("manage.price.perMsg")}`
-                  : null}
-          </div>
-          {model.settings.length > 0 && (
-            <SettingsPanel
-              settings={model.settings}
-              values={allModelSettings[model.id] ?? {}}
-              onChange={(key, val) => handleSettingChange(model.id, key, val)}
-            />
-          )}
-        </div>
-      )}
+      {standalone.map((m) => (
+        <StandaloneCard
+          key={m.id}
+          model={m}
+          isActive={activeModelId === m.id}
+          isPendingLocal={pendingStandaloneId === m.id}
+          savedId={savedId}
+          allModelSettings={allModelSettings}
+          onSelect={() => setPendingStandaloneId(m.id)}
+          onActivate={handleModelActivate}
+          onSettingChange={(key, val) => handleSettingChange(m.id, key, val)}
+        />
+      ))}
     </div>
   );
 }

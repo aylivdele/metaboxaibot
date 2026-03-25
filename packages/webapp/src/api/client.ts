@@ -140,6 +140,11 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(body),
       }),
+    activate: (section: string, modelId: string) =>
+      request<{ success: boolean }>("/state/activate", {
+        method: "POST",
+        body: JSON.stringify({ section, modelId }),
+      }),
   },
 
   models: {
