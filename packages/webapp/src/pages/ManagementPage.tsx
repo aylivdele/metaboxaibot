@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { Dialog, Message, Model, ModelSettingDef, UserState } from "../types.js";
+import type { HeyGenVoice } from "../types.js";
 
 // ── Custom slider ─────────────────────────────────────────────────────────────
 
@@ -48,6 +49,119 @@ function CustomSlider({ min, max, step, value, onChange }: CustomSliderProps) {
         <div className="custom-slider__fill" style={{ width: `${percent * 100}%` }} />
       </div>
       <div className="custom-slider__thumb" style={{ left: `${percent * 100}%` }} />
+    </div>
+  );
+}
+
+// ── HeyGenVoicePicker ─────────────────────────────────────────────────────────
+
+interface HeyGenVoicePickerProps {
+  value: string;
+  onChange: (voiceId: string) => void;
+}
+
+function HeyGenVoicePicker({ value, onChange }: HeyGenVoicePickerProps) {
+  const [voices, setVoices] = useState<HeyGenVoice[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [langFilter, setLangFilter] = useState("all");
+  const [genderFilter, setGenderFilter] = useState("all");
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    api.heygenVoices
+      .list()
+      .then((list) => setVoices(list))
+      .catch(() => setVoices([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const languages = ["all", ...Array.from(new Set(voices.map((v) => v.language).filter(Boolean))).sort()];
+
+  const filtered = voices.filter(
+    (v) =>
+      (langFilter === "all" || v.language === langFilter) &&
+      (genderFilter === "all" || v.gender === genderFilter),
+  );
+
+  const playPreview = (voice: HeyGenVoice) => {
+    if (!voice.preview_audio) return;
+    if (playingId === voice.voice_id) {
+      audioRef.current?.pause();
+      setPlayingId(null);
+      return;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const audio = new Audio(voice.preview_audio);
+    audioRef.current = audio;
+    setPlayingId(voice.voice_id);
+    audio.play().catch(() => void 0);
+    audio.onended = () => setPlayingId(null);
+  };
+
+  if (loading) return <div className="voice-picker__loading">Загрузка голосов…</div>;
+
+  return (
+    <div className="voice-picker">
+      <div className="voice-picker__filters">
+        <select
+          className="voice-picker__filter-select"
+          value={langFilter}
+          onChange={(e) => setLangFilter(e.target.value)}
+        >
+          {languages.map((l) => (
+            <option key={l} value={l}>
+              {l === "all" ? "Все языки" : l}
+            </option>
+          ))}
+        </select>
+        <div className="voice-picker__gender-btns">
+          {(["all", "male", "female"] as const).map((g) => (
+            <button
+              key={g}
+              className={`voice-picker__gender-btn${genderFilter === g ? " voice-picker__gender-btn--active" : ""}`}
+              onClick={() => setGenderFilter(g)}
+            >
+              {g === "all" ? "Все" : g === "male" ? "М" : "Ж"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="voice-picker__list">
+        {filtered.map((voice) => (
+          <div
+            key={voice.voice_id}
+            className={`voice-picker__item${value === voice.voice_id ? " voice-picker__item--selected" : ""}`}
+            onClick={() => onChange(voice.voice_id)}
+          >
+            <div className="voice-picker__item-info">
+              <span className="voice-picker__item-name">{voice.name}</span>
+              <span className="voice-picker__item-meta">
+                {voice.language}
+                {voice.gender ? ` · ${voice.gender === "male" ? "М" : voice.gender === "female" ? "Ж" : voice.gender}` : ""}
+              </span>
+            </div>
+            {voice.preview_audio && (
+              <button
+                className={`voice-picker__play-btn${playingId === voice.voice_id ? " voice-picker__play-btn--playing" : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  playPreview(voice);
+                }}
+                title="Прослушать"
+              >
+                {playingId === voice.voice_id ? "⏹" : "▶"}
+              </button>
+            )}
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <div className="voice-picker__empty">Голоса не найдены</div>
+        )}
+      </div>
     </div>
   );
 }
@@ -126,98 +240,15 @@ function SettingsPanel({ settings, values, onChange }: SettingsPanelProps) {
                 onChange={(e) => onChange(def.key, e.target.value ? Number(e.target.value) : null)}
               />
             )}
+            {def.type === "voice-picker" && (
+              <HeyGenVoicePicker
+                value={String(val ?? "")}
+                onChange={(voiceId) => onChange(def.key, voiceId)}
+              />
+            )}
           </div>
         );
       })}
-    </div>
-  );
-}
-
-// ── Video settings view (section=video) ──────────────────────────────────────
-
-function VideoSettingsView() {
-  const { t } = useI18n();
-  const [models, setModels] = useState<Model[]>([]);
-  const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>(
-    {},
-  );
-  const [activeModelId, setActiveModelId] = useState<string>("");
-  const [pendingStandaloneId, setPendingStandaloneId] = useState<string>("");
-  const [savedId, setSavedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-
-  useEffect(() => {
-    Promise.all([api.models.list("video"), api.state.get(), api.modelSettings.get()])
-      .then(([ms, state, ms2]) => {
-        setModels(ms);
-        setAllModelSettings(ms2);
-        const fromSection = state.videoModelId ?? undefined;
-        const initial =
-          fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
-        setActiveModelId(initial);
-        setPendingStandaloneId(initial);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleModelActivate = async (modelId: string) => {
-    setActiveModelId(modelId);
-    await api.state.activate("video", modelId);
-  };
-
-  const handleSettingChange = (modelId: string, key: string, value: unknown) => {
-    setAllModelSettings((prev) => ({
-      ...prev,
-      [modelId]: { ...(prev[modelId] ?? {}), [key]: value },
-    }));
-    setSavedId(modelId);
-    setTimeout(() => setSavedId((id) => (id === modelId ? null : id)), 1500);
-    const dKey = `${modelId}__${key}`;
-    clearTimeout(debounceRef.current[dKey]);
-    debounceRef.current[dKey] = setTimeout(() => {
-      void api.modelSettings.set(modelId, { [key]: value });
-    }, 800);
-  };
-
-  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
-
-  const { families, standalone } = groupByFamily(models);
-
-  return (
-    <div className="page">
-      <div className="page-header">
-        <h2>{t("videoSettings.title")}</h2>
-        <p className="page-subtitle">{t("videoSettings.subtitle")}</p>
-      </div>
-
-      {[...families.entries()].map(([fid, members]) => (
-        <FamilyCard
-          key={fid}
-          familyId={fid}
-          members={members}
-          activeModelId={activeModelId}
-          savedId={savedId}
-          allModelSettings={allModelSettings}
-          onModelActivate={handleModelActivate}
-          onSettingChange={(modelId, key, val) => handleSettingChange(modelId, key, val)}
-        />
-      ))}
-
-      {standalone.map((m) => (
-        <StandaloneCard
-          key={m.id}
-          model={m}
-          isActive={activeModelId === m.id}
-          isPendingLocal={pendingStandaloneId === m.id}
-          savedId={savedId}
-          allModelSettings={allModelSettings}
-          onSelect={() => setPendingStandaloneId(m.id)}
-          onActivate={handleModelActivate}
-          onSettingChange={(key, val) => handleSettingChange(m.id, key, val)}
-        />
-      ))}
     </div>
   );
 }
@@ -257,6 +288,7 @@ interface FamilyCardProps {
   allModelSettings: Record<string, Record<string, unknown>>;
   onModelActivate: (modelId: string) => Promise<void>;
   onSettingChange: (modelId: string, key: string, value: unknown) => void;
+  onReset: (modelId: string) => void;
 }
 
 function FamilyCard({
@@ -267,6 +299,7 @@ function FamilyCard({
   allModelSettings,
   onModelActivate,
   onSettingChange,
+  onReset,
 }: FamilyCardProps) {
   const { t } = useI18n();
 
@@ -387,14 +420,23 @@ function FamilyCard({
         </div>
       )}
 
-      <div className="family-card__row">
+      <div className="family-card__btn-row">
         <button
-          className="action-btn action-btn--primary family-card__activate-btn"
+          className="family-card__activate-btn"
           onClick={() => void handleActivate()}
           disabled={activating}
         >
           {activating ? t("imageSettings.activating") : t("imageSettings.activate")}
         </button>
+        {selected.settings.length > 0 && (
+          <button
+            className="family-card__reset-btn"
+            onClick={() => onReset(selected.id)}
+            title={t("imageSettings.resetTitle")}
+          >
+            {t("imageSettings.reset")}
+          </button>
+        )}
       </div>
 
       {cost && <div className="family-card__cost">{cost}</div>}
@@ -414,6 +456,7 @@ interface StandaloneCardProps {
   onSelect: () => void;
   onActivate: (modelId: string) => Promise<void>;
   onSettingChange: (key: string, value: unknown) => void;
+  onReset: (modelId: string) => void;
 }
 
 function StandaloneCard({
@@ -425,6 +468,7 @@ function StandaloneCard({
   onSelect,
   onActivate,
   onSettingChange,
+  onReset,
 }: StandaloneCardProps) {
   const { t } = useI18n();
   const [activating, setActivating] = useState(false);
@@ -460,9 +504,9 @@ function StandaloneCard({
         </div>
       )}
       {isPendingLocal && (
-        <div className="family-card__row">
+        <div className="family-card__btn-row">
           <button
-            className="action-btn action-btn--primary family-card__activate-btn"
+            className="family-card__activate-btn"
             onClick={(e) => {
               e.stopPropagation();
               void handleActivate();
@@ -471,6 +515,18 @@ function StandaloneCard({
           >
             {activating ? t("imageSettings.activating") : t("imageSettings.activate")}
           </button>
+          {model.settings.length > 0 && (
+            <button
+              className="family-card__reset-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onReset(model.id);
+              }}
+              title={t("imageSettings.resetTitle")}
+            >
+              {t("imageSettings.reset")}
+            </button>
+          )}
         </div>
       )}
       {cost && <div className="family-card__cost">{cost}</div>}
@@ -481,103 +537,59 @@ function StandaloneCard({
   );
 }
 
-function ImageSettingsView() {
-  const { t } = useI18n();
-  const [models, setModels] = useState<Model[]>([]);
-  const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>(
-    {},
-  );
-  const [activeModelId, setActiveModelId] = useState<string>("");
-  const [pendingStandaloneId, setPendingStandaloneId] = useState<string>("");
-  const [savedId, setSavedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+// ── Picker helpers ────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    Promise.all([api.models.list("design"), api.state.get(), api.modelSettings.get()])
-      .then(([ms, state, ms2]) => {
-        setModels(ms);
-        setAllModelSettings(ms2);
-        const fromSection = state.designModelId ?? undefined;
-        const initial =
-          fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
-        setActiveModelId(initial);
-        setPendingStandaloneId(initial);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleModelActivate = async (modelId: string) => {
-    setActiveModelId(modelId);
-    await api.state.activate("design", modelId);
-  };
-
-  const handleSettingChange = (modelId: string, key: string, value: unknown) => {
-    setAllModelSettings((prev) => ({
-      ...prev,
-      [modelId]: { ...(prev[modelId] ?? {}), [key]: value },
-    }));
-    setSavedId(modelId);
-    setTimeout(() => setSavedId((id) => (id === modelId ? null : id)), 1500);
-    const dKey = `${modelId}__${key}`;
-    clearTimeout(debounceRef.current[dKey]);
-    debounceRef.current[dKey] = setTimeout(() => {
-      void api.modelSettings.set(modelId, { [key]: value });
-    }, 800);
-  };
-
-  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
-
-  const { families, standalone } = groupByFamily(models);
-
-  return (
-    <div className="page">
-      <div className="page-header">
-        <h2>{t("imageSettings.title")}</h2>
-        <p className="page-subtitle">{t("imageSettings.subtitle")}</p>
-      </div>
-
-      {/* Family cards */}
-      {[...families.entries()].map(([fid, members]) => (
-        <FamilyCard
-          key={fid}
-          familyId={fid}
-          members={members}
-          activeModelId={activeModelId}
-          savedId={savedId}
-          allModelSettings={allModelSettings}
-          onModelActivate={handleModelActivate}
-          onSettingChange={handleSettingChange}
-        />
-      ))}
-
-      {/* Standalone models */}
-      {standalone.length > 0 && (
-        <>
-          <div className="family-section-divider">{t("imageSettings.otherModels")}</div>
-          {standalone.map((m) => (
-            <StandaloneCard
-              key={m.id}
-              model={m}
-              isActive={activeModelId === m.id}
-              isPendingLocal={pendingStandaloneId === m.id}
-              savedId={savedId}
-              allModelSettings={allModelSettings}
-              onSelect={() => setPendingStandaloneId(m.id)}
-              onActivate={handleModelActivate}
-              onSettingChange={(key, val) => handleSettingChange(m.id, key, val)}
-            />
-          ))}
-        </>
-      )}
-    </div>
-  );
+interface PickerOption {
+  id: string; // "family__<familyId>" | "standalone__<modelId>"
+  label: string;
 }
 
-// ── Audio settings view (section=audio) ──────────────────────────────────────
+function buildPickerOptions(models: Model[]): PickerOption[] {
+  const { families, standalone } = groupByFamily(models);
+  const opts: PickerOption[] = [];
+  for (const [fid] of families.entries()) {
+    opts.push({ id: `family__${fid}`, label: fid.charAt(0).toUpperCase() + fid.slice(1) });
+  }
+  for (const m of standalone) {
+    opts.push({ id: `standalone__${m.id}`, label: m.name });
+  }
+  return opts;
+}
 
-function AudioSettingsView() {
+function getPickerIdForModel(modelId: string, models: Model[]): string {
+  const m = models.find((x) => x.id === modelId);
+  if (!m) {
+    const first = models[0];
+    if (!first) return "";
+    return first.familyId ? `family__${first.familyId}` : `standalone__${first.id}`;
+  }
+  return m.familyId ? `family__${m.familyId}` : `standalone__${m.id}`;
+}
+
+// ── Unified MediaSettingsView ─────────────────────────────────────────────────
+
+type MediaSection = "design" | "video" | "audio";
+
+const SECTION_ACTIVE_KEY: Record<MediaSection, keyof UserState> = {
+  design: "designModelId",
+  video: "videoModelId",
+  audio: "audioModelId",
+};
+
+const SECTION_TITLE_KEY: Record<MediaSection, Parameters<ReturnType<typeof useI18n>["t"]>[0]> = {
+  design: "imageSettings.title",
+  video: "videoSettings.title",
+  audio: "audioSettings.title",
+};
+
+const SECTION_SUBTITLE_KEY: Record<MediaSection, Parameters<ReturnType<typeof useI18n>["t"]>[0]> =
+  {
+    design: "imageSettings.subtitle",
+    video: "videoSettings.subtitle",
+    audio: "audioSettings.subtitle",
+  };
+
+function MediaSettingsView({ section }: { section: MediaSection }) {
   const { t } = useI18n();
   const [models, setModels] = useState<Model[]>([]);
   const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>(
@@ -585,28 +597,30 @@ function AudioSettingsView() {
   );
   const [activeModelId, setActiveModelId] = useState<string>("");
   const [pendingStandaloneId, setPendingStandaloneId] = useState<string>("");
+  const [selectedPickerId, setSelectedPickerId] = useState<string>("");
   const [savedId, setSavedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
-    Promise.all([api.models.list("audio"), api.state.get(), api.modelSettings.get()])
+    Promise.all([api.models.list(section), api.state.get(), api.modelSettings.get()])
       .then(([ms, state, ms2]) => {
         setModels(ms);
         setAllModelSettings(ms2);
-        const fromSection = state.audioModelId ?? undefined;
+        const fromSection = (state[SECTION_ACTIVE_KEY[section]] as string | null) ?? undefined;
         const initial =
           fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
         setActiveModelId(initial);
         setPendingStandaloneId(initial);
+        setSelectedPickerId(getPickerIdForModel(initial, ms));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [section]);
 
   const handleModelActivate = async (modelId: string) => {
     setActiveModelId(modelId);
-    await api.state.activate("audio", modelId);
+    await api.state.activate(section, modelId);
   };
 
   const handleSettingChange = (modelId: string, key: string, value: unknown) => {
@@ -623,43 +637,76 @@ function AudioSettingsView() {
     }, 800);
   };
 
+  const handleReset = (modelId: string) => {
+    const model = models.find((m) => m.id === modelId);
+    if (!model) return;
+    const defaults: Record<string, unknown> = {};
+    for (const def of model.settings) {
+      defaults[def.key] = def.default ?? null;
+    }
+    setAllModelSettings((prev) => ({ ...prev, [modelId]: defaults }));
+    void api.modelSettings.set(modelId, defaults);
+  };
+
   if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 
   const { families, standalone } = groupByFamily(models);
+  const pickerOptions = buildPickerOptions(models);
+
+  // Resolve which card to render
+  const [pickerType, pickerId] = selectedPickerId.split("__");
+  const familyMembers = pickerType === "family" ? (families.get(pickerId) ?? []) : null;
+  const standaloneModel = pickerType === "standalone" ? standalone.find((m) => m.id === pickerId) : null;
 
   return (
     <div className="page">
       <div className="page-header">
-        <h2>{t("audioSettings.title")}</h2>
-        <p className="page-subtitle">{t("audioSettings.subtitle")}</p>
+        <h2>{t(SECTION_TITLE_KEY[section])}</h2>
+        <p className="page-subtitle">{t(SECTION_SUBTITLE_KEY[section])}</p>
       </div>
 
-      {[...families.entries()].map(([fid, members]) => (
+      {pickerOptions.length > 1 && (
+        <div className="model-selector-wrap">
+          <select
+            className="model-selector-select"
+            value={selectedPickerId}
+            onChange={(e) => setSelectedPickerId(e.target.value)}
+          >
+            {pickerOptions.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {familyMembers && (
         <FamilyCard
-          key={fid}
-          familyId={fid}
-          members={members}
+          familyId={pickerId}
+          members={familyMembers}
           activeModelId={activeModelId}
           savedId={savedId}
           allModelSettings={allModelSettings}
           onModelActivate={handleModelActivate}
           onSettingChange={(modelId, key, val) => handleSettingChange(modelId, key, val)}
+          onReset={handleReset}
         />
-      ))}
+      )}
 
-      {standalone.map((m) => (
+      {standaloneModel && (
         <StandaloneCard
-          key={m.id}
-          model={m}
-          isActive={activeModelId === m.id}
-          isPendingLocal={pendingStandaloneId === m.id}
+          model={standaloneModel}
+          isActive={activeModelId === standaloneModel.id}
+          isPendingLocal={pendingStandaloneId === standaloneModel.id}
           savedId={savedId}
           allModelSettings={allModelSettings}
-          onSelect={() => setPendingStandaloneId(m.id)}
+          onSelect={() => setPendingStandaloneId(standaloneModel.id)}
           onActivate={handleModelActivate}
-          onSettingChange={(key, val) => handleSettingChange(m.id, key, val)}
+          onSettingChange={(key, val) => handleSettingChange(standaloneModel.id, key, val)}
+          onReset={handleReset}
         />
-      ))}
+      )}
     </div>
   );
 }
@@ -695,9 +742,9 @@ export function ManagementPage({ initialSection }: { initialSection?: string }) 
       </div>
       <div className="manage-content">
         {tab === "gpt" && <GptManagementView />}
-        {tab === "design" && <ImageSettingsView />}
-        {tab === "video" && <VideoSettingsView />}
-        {tab === "audio" && <AudioSettingsView />}
+        {tab === "design" && <MediaSettingsView section="design" />}
+        {tab === "video" && <MediaSettingsView section="video" />}
+        {tab === "audio" && <MediaSettingsView section="audio" />}
       </div>
     </div>
   );

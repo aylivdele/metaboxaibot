@@ -22,6 +22,9 @@ import {
 import {
   handleVideoModelSelect,
   handleVideoMessage,
+  handleVideoPhoto,
+  handleVideoVideo,
+  handleVideoVoice,
   handleNewVideoDialog,
   handleVideoAvatars,
   handleVideoLipSync,
@@ -138,7 +141,12 @@ export function createBot(token: string): Bot<BotContext> {
       if (ctx.message?.photo) return handleDesignPhoto(ctx);
       return handleDesignMessage(ctx);
     }
-    if (state?.state === "VIDEO_ACTIVE") return handleVideoMessage(ctx);
+    if (state?.state === "VIDEO_ACTIVE") {
+      if (ctx.message?.photo) return handleVideoPhoto(ctx);
+      if (ctx.message?.video) return handleVideoVideo(ctx);
+      if (ctx.message?.voice) return handleVideoVoice(ctx);
+      return handleVideoMessage(ctx);
+    }
     if (state?.state === "AUDIO_ACTIVE") return handleAudioMessage(ctx);
 
     return next();

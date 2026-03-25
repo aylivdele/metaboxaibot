@@ -62,6 +62,15 @@ model UserState {
   // Референс для img2img: Message.id выбранного изображения (one-shot, сбрасывается после использования)
   designRefMessageId String?
 
+  // Референс-фото для D-ID lip-sync: Telegram file URL (one-shot, сбрасывается после использования)
+  videoRefImageUrl String?
+
+  // Референс-видео для D-ID driver_url: Telegram file URL (one-shot, сбрасывается после использования)
+  videoRefDriverUrl String?
+
+  // Голосовое сообщение для HeyGen audio voice: Telegram file URL (one-shot, сбрасывается после использования)
+  videoRefVoiceUrl String?
+
   // Настройки генерации изображений: { [modelId]: { aspectRatio: string } }
   imageSettings Json?
 

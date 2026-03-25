@@ -2377,6 +2377,223 @@ input::placeholder {
   gap: 0;
 }
 
+/* ── Model selector dropdown ────────────────────────────────────────────── */
+.model-selector-wrap {
+  margin-bottom: 14px;
+}
+
+.model-selector-select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  cursor: pointer;
+}
+
+.model-selector-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── Activate + Reset button row ────────────────────────────────────────── */
+.family-card__btn-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.family-card__activate-btn {
+  flex: 1;
+  padding: 9px 14px;
+  background: var(--accent-gradient);
+  color: var(--text-on-accent);
+  box-shadow: var(--shadow-accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.2s var(--ease);
+}
+
+.family-card__activate-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.family-card__reset-btn {
+  padding: 9px 12px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s var(--ease);
+}
+
+.family-card__reset-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+/* ── HeyGen Voice Picker ────────────────────────────────────────────────── */
+.voice-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.voice-picker__loading,
+.voice-picker__empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 8px 0;
+}
+
+.voice-picker__filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.voice-picker__filter-select {
+  flex: 1;
+  padding: 7px 10px;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+
+.voice-picker__filter-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.voice-picker__gender-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.voice-picker__gender-btn {
+  padding: 7px 10px;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+
+.voice-picker__gender-btn--active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.voice-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+}
+
+.voice-picker__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+
+.voice-picker__item:hover {
+  background: var(--bg-secondary);
+}
+
+.voice-picker__item--selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  outline: 1.5px solid var(--accent);
+}
+
+.voice-picker__item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.voice-picker__item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voice-picker__item-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.voice-picker__play-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+
+.voice-picker__play-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.voice-picker__play-btn--playing {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
 /* ── Period selector ────────────────────────────────────────────────────── */
 .period-selector {
   display: flex;

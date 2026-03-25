@@ -39,12 +39,20 @@ export interface ModelSettingDef {
   key: string;
   label: string;
   description?: string;
-  type: "select" | "slider" | "toggle" | "text" | "number";
+  type: "select" | "slider" | "toggle" | "text" | "number" | "voice-picker";
   options?: ModelSettingOption[];
   min?: number;
   max?: number;
   step?: number;
   default: string | number | boolean | null;
+}
+
+export interface HeyGenVoice {
+  voice_id: string;
+  name: string;
+  language: string;
+  gender: string;
+  preview_audio: string | null;
 }
 
 export interface Model {

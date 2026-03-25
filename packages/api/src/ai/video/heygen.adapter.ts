@@ -37,7 +37,22 @@ export class HeyGenAdapter implements VideoAdapter {
     };
   }
 
+  private static readonly DIMS: Record<string, { width: number; height: number }> = {
+    "16:9": { width: 1280, height: 720 },
+    "9:16": { width: 720, height: 1280 },
+    "1:1":  { width: 720, height: 720 },
+  };
+
   async submit(input: VideoInput): Promise<string> {
+    const voiceUrl = input.modelSettings?.voice_url as string | undefined;
+    const voiceId = (input.modelSettings?.voice_id as string | undefined) ?? "en-US-JennyNeural";
+    const bgColor = (input.modelSettings?.background_color as string | undefined) ?? "#FFFFFF";
+    const dimension = HeyGenAdapter.DIMS[input.aspectRatio ?? "16:9"] ?? HeyGenAdapter.DIMS["16:9"];
+
+    const voice = voiceUrl
+      ? { type: "audio", audio_url: voiceUrl }
+      : { type: "text", input_text: input.prompt, voice_id: voiceId };
+
     const body = {
       video_inputs: [
         {
@@ -46,15 +61,11 @@ export class HeyGenAdapter implements VideoAdapter {
             avatar_id: this.avatarId,
             avatar_style: "normal",
           },
-          voice: {
-            type: "text",
-            input_text: input.prompt,
-            voice_id: "en-US-JennyNeural",
-          },
-          background: { type: "color", value: "#FFFFFF" },
+          voice,
+          background: { type: "color", value: bgColor },
         },
       ],
-      dimension: { width: 1280, height: 720 },
+      dimension,
     };
 
     const res = await fetch(`${HEYGEN_API}/video/generate`, {

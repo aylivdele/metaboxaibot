@@ -40,7 +40,10 @@ export class DIDAdapter implements VideoAdapter {
   }
 
   async submit(input: VideoInput): Promise<string> {
-    const body = {
+    const sentiment = (input.modelSettings?.sentiment as string | undefined) ?? "neutral";
+    const driverUrl = input.modelSettings?.driver_url as string | undefined;
+
+    const body: Record<string, unknown> = {
       source_url: input.imageUrl ?? this.defaultPresenterUrl,
       script: {
         type: "text",
@@ -50,7 +53,14 @@ export class DIDAdapter implements VideoAdapter {
           voice_id: "en-US-JennyNeural",
         },
       },
-      config: { fluent: true, pad_audio: 0 },
+      config: {
+        fluent: true,
+        pad_audio: 0,
+        ...(sentiment !== "neutral" && {
+          expressions: [{ start_frame: 0, expression: sentiment, intensity: 1.0 }],
+        }),
+      },
+      ...(driverUrl ? { driver_url: driverUrl } : {}),
     };
 
     const res = await fetch(`${DID_API}/talks`, {

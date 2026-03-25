@@ -16,6 +16,8 @@ export interface SubmitVideoParams {
   aspectRatio?: string;
   /** Clip duration in seconds chosen by user. */
   duration?: number;
+  /** One-shot overrides merged on top of saved modelSettings (e.g. driver_url from uploaded video). */
+  extraModelSettings?: Record<string, unknown>;
 }
 
 export interface SubmitVideoResult {
@@ -34,6 +36,7 @@ export const videoGenerationService = {
       sendOriginalLabel,
       aspectRatio,
       duration,
+      extraModelSettings,
     } = params;
 
     const model = AI_MODELS[modelId];
@@ -42,7 +45,7 @@ export const videoGenerationService = {
     await checkBalance(userId);
 
     const allModelSettings = await userStateService.getModelSettings(userId);
-    const modelSettings = allModelSettings[modelId] ?? {};
+    const modelSettings = { ...(allModelSettings[modelId] ?? {}), ...extraModelSettings };
     // Prefer values from modelSettings (set via webapp) over legacy params
     const effectiveAspectRatio = (modelSettings.aspect_ratio as string | undefined) ?? aspectRatio;
     const effectiveDuration = (modelSettings.duration as number | undefined) ?? duration;

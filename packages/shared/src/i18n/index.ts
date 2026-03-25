@@ -81,6 +81,11 @@ export interface Translations {
     asyncPending: string;
     generationFailed: string;
     management: string;
+    avatarActivated: string;
+    lipSyncActivated: string;
+    videoPhotoSaved: string;
+    videoDriverSaved: string;
+    videoVoiceSaved: string;
   };
   errors: {
     noTool: string;

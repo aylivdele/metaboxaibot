@@ -237,6 +237,9 @@ const translations = {
     "imageSettings.aspectRatio": "Aspect ratio",
     "imageSettings.svgNoRatio": "Vector (SVG) — aspect ratio is set via prompt",
     "imageSettings.otherModels": "Other models",
+    "imageSettings.reset": "Reset",
+    "imageSettings.resetTitle": "Reset settings to defaults",
+    "imageSettings.selectModel": "Select model",
 
     // Video settings
     "videoSettings.title": "Video Settings",
@@ -484,6 +487,9 @@ const translations = {
     "imageSettings.aspectRatio": "Соотношение сторон",
     "imageSettings.svgNoRatio": "Вектор (SVG) — соотношение задаётся в промпте",
     "imageSettings.otherModels": "Другие модели",
+    "imageSettings.reset": "Сбросить",
+    "imageSettings.resetTitle": "Сбрасывает настройки до значений по умолчанию.",
+    "imageSettings.selectModel": "Выберите модель",
 
     // Video settings
     "videoSettings.title": "Настройки видео",

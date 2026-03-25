@@ -1112,7 +1112,7 @@ export const AI_MODELS: Record<string, AIModel> = {
         key: "quality",
         label: "Качество",
         description:
-          "low — очень быстро и дёшево ($0.009), medium — баланс ($0.034), high — максимальная детализация ($0.133).",
+          "low — очень быстро и дёшево, medium — баланс, high — максимальная детализация. Влияет на цену.",
         type: "select",
         options: [
           { value: "low", label: "Low" },
@@ -1292,7 +1292,7 @@ export const AI_MODELS: Record<string, AIModel> = {
         key: "rendering_speed",
         label: "Качество / скорость",
         description:
-          "turbo — быстро и дёшево ($0.03), balanced — баланс ($0.06), quality — максимальное качество ($0.09).",
+          "turbo — быстро и дёшево, balanced — баланс, quality — максимальное качество. Влияет на цену.",
         type: "select",
         options: [
           { value: "turbo", label: "Turbo" },
@@ -1340,7 +1340,7 @@ export const AI_MODELS: Record<string, AIModel> = {
         key: "mode",
         label: "Качество / скорость",
         description:
-          "fast — быстро и дёшево ($0.02), standard — стандарт ($0.04), ultra — максимальное разрешение до 2.8K ($0.06).",
+          "fast — быстро и дёшево, standard — стандарт, ultra — максимальное разрешение до 2.8K. Влияет на цену.",
         type: "select",
         options: [
           { value: "fast", label: "Fast" },
@@ -1755,7 +1755,7 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "quality",
         label: "Тир качества",
-        description: "standard — $0.10/сек (720p), pro — $0.30/сек (720p) — выше детализация.",
+        description: "standard — 720p, pro — 720p с более высокой детализацией. Влияет на цену.",
         type: "select",
         options: [
           { value: "standard", label: "Standard" },
@@ -2036,7 +2036,7 @@ export const AI_MODELS: Record<string, AIModel> = {
         key: "resolution",
         label: "Разрешение видео",
         description:
-          "1080p — Full HD с высокой чёткостью ($0.09/с), 720p — быстрее и дешевле ($0.04/с).",
+          "1080p — Full HD с высокой чёткостью, 720p — быстрее и дешевле. Влияет на цену.",
         type: "select",
         options: [
           { value: "720p", label: "720p" },
@@ -2139,7 +2139,7 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "resolution",
         label: "Разрешение видео",
-        description: "720p — чёткое HD-видео ($0.07/с), 480p — быстрее генерируется ($0.036/с).",
+        description: "720p — чёткое HD-видео, 480p — быстрее генерируется. Влияет на цену.",
         type: "select",
         options: [
           { value: "480p", label: "480p" },
@@ -2183,8 +2183,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "voice_id",
         label: "Голос",
-        description: "ID голоса HeyGen для озвучки аватара.",
-        type: "text",
+        description: "Выберите голос аватара из списка официальных голосов HeyGen.",
+        type: "voice-picker",
         default: "",
       },
       {
@@ -2203,7 +2203,7 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Оживляет фотографии и аватары. Синхронизирует речь с движением губ для создания реалистичных говорящих персонажей.",
     section: "video",
     provider: "d-id",
-    costUsdPerRequest: 0.3, // ~$0.10–$0.50/clip
+    costUsdPerRequest: 1.13, // 1.13/min
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -2219,15 +2219,15 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "sentiment",
         label: "Настроение аватара",
-        description: "Эмоциональный тон выступления аватара.",
+        description: "Эмоциональный тон выступления аватара (выражение лица).",
         type: "select",
         options: [
-          { value: "Friendly", label: "Friendly" },
-          { value: "Professional", label: "Professional" },
-          { value: "Empathetic", label: "Empathetic" },
-          { value: "Excited", label: "Excited" },
+          { value: "neutral",  label: "Нейтральное" },
+          { value: "happy",    label: "Радостное" },
+          { value: "surprise", label: "Удивлённое" },
+          { value: "serious",  label: "Серьёзное" },
         ],
-        default: "Professional",
+        default: "neutral",
       },
       {
         key: "driver_url",
@@ -2270,7 +2270,7 @@ export const AI_MODELS: Record<string, AIModel> = {
         key: "model",
         label: "Модель TTS",
         description:
-          "tts-1 — стандартное качество ($0.015/1K chars), tts-1-hd — высокое качество ($0.030/1K chars), gpt-4o-mini-tts — управляемый стиль речи через инструкции.",
+          "tts-1 — стандартное качество, tts-1-hd — высокое качество, gpt-4o-mini-tts — управляемый стиль речи через инструкции. Влияет на цену.",
         type: "select",
         options: [
           { value: "tts-1", label: "TTS-1 (Standard)" },

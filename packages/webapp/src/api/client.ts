@@ -8,6 +8,7 @@ import type {
   BannerSlide,
   GalleryResponse,
   CatalogResponse,
+  HeyGenVoice,
 } from "../types.js";
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
@@ -215,6 +216,10 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ modelId, ...patch }),
       }),
+  },
+
+  heygenVoices: {
+    list: () => request<HeyGenVoice[]>("/heygen-voices"),
   },
 
   modelSettings: {

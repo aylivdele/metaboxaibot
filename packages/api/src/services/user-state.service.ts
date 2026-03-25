@@ -91,6 +91,57 @@ export const userStateService = {
     });
   },
 
+  /** Save a Telegram photo URL as the D-ID lip-sync reference (one-shot). */
+  async setVideoRefImageUrl(userId: bigint, url: string): Promise<void> {
+    await db.userState.upsert({
+      where: { userId },
+      create: { userId, state: "IDLE", videoRefImageUrl: url },
+      update: { videoRefImageUrl: url },
+    });
+  },
+
+  /** Retrieve and clear the saved video ref image URL (one-shot). Returns null if not set. */
+  async getAndClearVideoRefImageUrl(userId: bigint): Promise<string | null> {
+    const state = await db.userState.findUnique({ where: { userId } });
+    if (!state?.videoRefImageUrl) return null;
+    await db.userState.update({ where: { userId }, data: { videoRefImageUrl: null } });
+    return state.videoRefImageUrl;
+  },
+
+  /** Save a Telegram video URL as the D-ID driver_url reference (one-shot). */
+  async setVideoRefDriverUrl(userId: bigint, url: string): Promise<void> {
+    await db.userState.upsert({
+      where: { userId },
+      create: { userId, state: "IDLE", videoRefDriverUrl: url },
+      update: { videoRefDriverUrl: url },
+    });
+  },
+
+  /** Retrieve and clear the saved driver video URL (one-shot). Returns null if not set. */
+  async getAndClearVideoRefDriverUrl(userId: bigint): Promise<string | null> {
+    const state = await db.userState.findUnique({ where: { userId } });
+    if (!state?.videoRefDriverUrl) return null;
+    await db.userState.update({ where: { userId }, data: { videoRefDriverUrl: null } });
+    return state.videoRefDriverUrl;
+  },
+
+  /** Save a Telegram voice message URL as the HeyGen audio voice source (one-shot). */
+  async setVideoRefVoiceUrl(userId: bigint, url: string): Promise<void> {
+    await db.userState.upsert({
+      where: { userId },
+      create: { userId, state: "IDLE", videoRefVoiceUrl: url },
+      update: { videoRefVoiceUrl: url },
+    });
+  },
+
+  /** Retrieve and clear the saved voice URL (one-shot). Returns null if not set. */
+  async getAndClearVideoRefVoiceUrl(userId: bigint): Promise<string | null> {
+    const state = await db.userState.findUnique({ where: { userId } });
+    if (!state?.videoRefVoiceUrl) return null;
+    await db.userState.update({ where: { userId }, data: { videoRefVoiceUrl: null } });
+    return state.videoRefVoiceUrl;
+  },
+
   /** Returns per-model image settings: { [modelId]: { aspectRatio: string } } */
   async getImageSettings(userId: bigint): Promise<Record<string, { aspectRatio: string }>> {
     const state = await db.userState.findUnique({ where: { userId } });

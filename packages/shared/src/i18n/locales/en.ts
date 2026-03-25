@@ -91,6 +91,13 @@ export default {
       "⏳ Your video is being generated. This may take several minutes — you will receive it when it's ready.",
     generationFailed: "❌ Failed to queue video generation. Please try again.",
     management: "⚙ Management",
+    avatarActivated:
+      "Send the text you want the avatar to speak.\nCustomize the voice and background via the Management button.",
+    lipSyncActivated:
+      "Optionally send a photo with a face first, then send the text to be spoken.\nWithout a photo, the default avatar will be used.",
+    videoPhotoSaved: "📸 Photo saved. Now send the text for voice-over.",
+    videoDriverSaved: "🎬 Driver video saved. Now send the text for voice-over.",
+    videoVoiceSaved: "🎙 Voice sample saved. Now send the text for the avatar to speak.",
   },
   errors: {
     unexpected: "Unexpected error. Please, try again later.",
