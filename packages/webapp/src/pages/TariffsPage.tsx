@@ -207,7 +207,9 @@ export function TariffsPage() {
               return (
                 <div key={sub.id} className="plan-card">
                   <div className="plan-card__label">{sub.name}</div>
-                  <div className="plan-card__tokens">{"⚡"} {(sub.tokens * months).toLocaleString("ru-RU")} токенов</div>
+                  <div className="plan-card__tokens">
+                    {"⚡"} {(sub.tokens * months).toLocaleString("ru-RU")} токенов
+                  </div>
                   <div className="plan-card__price">
                     {Number(p.priceRub).toLocaleString("ru-RU")} {"₽"}
                   </div>
@@ -233,7 +235,9 @@ export function TariffsPage() {
                   <div className="plan-card__badge">{BADGE_LABELS[pkg.badge] ?? pkg.badge}</div>
                 )}
                 <div className="plan-card__label">{pkg.name}</div>
-                <div className="plan-card__tokens">{"⚡"} {pkg.tokens.toLocaleString("ru-RU")} токенов</div>
+                <div className="plan-card__tokens">
+                  {"⚡"} {pkg.tokens.toLocaleString("ru-RU")} токенов
+                </div>
                 <div className="plan-card__price">
                   {Number(pkg.priceRub).toLocaleString("ru-RU")} {"₽"}
                 </div>
@@ -264,7 +268,9 @@ export function TariffsPage() {
 
             <div className="payment-modal__product">
               <span className="payment-modal__product-name">{modal.name}</span>
-              <span className="payment-modal__product-tokens">{"⚡"} {modal.tokens}</span>
+              <span className="payment-modal__product-tokens">
+                {"⚡"} {modal.tokens}
+              </span>
               <span className="payment-modal__product-price">
                 {Number(modal.priceRub).toLocaleString("ru-RU")} {"₽"}
               </span>
