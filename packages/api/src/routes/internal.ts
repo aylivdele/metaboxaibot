@@ -109,6 +109,26 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * GET /internal/user-balance?telegramId=<id>
+   * Called by Metabox to get the current token balance of a bot user.
+   * Returns { tokens: number } or 404 if user not found.
+   */
+  fastify.get<{ Querystring: { telegramId?: string } }>("/user-balance", async (request, reply) => {
+    const { telegramId } = request.query;
+    if (!telegramId) {
+      return reply.code(400).send({ error: "telegramId is required" });
+    }
+    const user = await db.user.findUnique({
+      where: { id: BigInt(telegramId) },
+      select: { tokenBalance: true },
+    });
+    if (!user) {
+      return reply.code(404).send({ error: "User not found" });
+    }
+    return { tokens: Number(user.tokenBalance) };
+  });
+
+  /**
    * GET /internal/check-bot-user?telegramId=<id>
    * Called by Metabox to check whether a user has ever started the AI Box bot.
    * Returns { activated: true } if the user exists in the bot DB, { activated: false } otherwise.

@@ -86,8 +86,10 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function get<T>(path: string): Promise<T> {
-  const { url } = base();
-  const res = await fetch(`${url}/api${path}`);
+  const { url, key } = base();
+  const res = await fetch(`${url}/api${path}`, {
+    headers: { "X-Internal-Key": key },
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Metabox API GET ${path} → ${res.status}: ${text}`);
