@@ -237,16 +237,6 @@ export function TariffsPage() {
             </div>
 
             <div className="payment-modal__options">
-              <button
-                className="payment-modal__option payment-modal__option--stars"
-                onClick={handleStarsPay}
-                disabled={buying}
-              >
-                <span className="payment-modal__option-icon">⭐</span>
-                <span className="payment-modal__option-label">{t("tariffs.payByStars")}</span>
-                <span className="payment-modal__option-price">{modal.stars} Stars</span>
-              </button>
-
               {catalog.canPayByCard ? (
                 <button
                   className="payment-modal__option payment-modal__option--card"
@@ -264,6 +254,16 @@ export function TariffsPage() {
                   <p>{t("tariffs.linkRequired")}</p>
                 </div>
               )}
+
+              <button
+                className="payment-modal__option payment-modal__option--stars"
+                onClick={handleStarsPay}
+                disabled={buying}
+              >
+                <span className="payment-modal__option-icon">⭐</span>
+                <span className="payment-modal__option-label">{t("tariffs.payByStars")}</span>
+                <span className="payment-modal__option-price">{modal.stars} Stars</span>
+              </button>
             </div>
           </div>
         </div>

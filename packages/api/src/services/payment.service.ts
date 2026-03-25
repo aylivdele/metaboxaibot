@@ -2,6 +2,15 @@ import { db } from "../db.js";
 import { config, PLANS } from "@metabox/shared";
 import { recordSale } from "./metabox-bridge.service.js";
 
+export interface SaleUserInfo {
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  referrerTelegramId?: bigint;
+  stars: number;
+  starRate: number;
+}
+
 export const paymentService = {
   /** Create a Telegram Stars invoice link via Bot API (legacy — from hardcoded PLANS). */
   async createInvoiceLink(planId: string): Promise<string> {
@@ -40,8 +49,8 @@ export const paymentService = {
     return data.result!;
   },
 
-  /** Credit tokens to user after successful Stars payment. */
-  async creditPurchase(userId: bigint, planId: string): Promise<void> {
+  /** Credit tokens to user after successful Stars payment (legacy hardcoded plans). */
+  async creditPurchase(userId: bigint, planId: string, userInfo: SaleUserInfo): Promise<void> {
     const plan = PLANS.find((p) => p.id === planId);
     if (!plan) throw new Error(`Unknown plan: ${planId}`);
 
@@ -61,22 +70,22 @@ export const paymentService = {
       }),
     ]);
 
-    // Notify Metabox for MLM bonus calculation (non-fatal: user is linked only if metaboxUserId is set)
-    const user = await db.user.findUnique({
-      where: { id: userId },
-      select: { metaboxUserId: true },
+    // Notify Metabox for MLM bonus + order tracking (always, even for unlinked users)
+    recordSale({
+      telegramId: userId,
+      firstName: userInfo.firstName,
+      lastName: userInfo.lastName,
+      username: userInfo.username,
+      productType: "product",
+      productId: plan.id,
+      tokens: plan.tokens,
+      priceRub: plan.priceRub,
+      stars: userInfo.stars,
+      starRate: userInfo.starRate,
+      referrerTelegramId: userInfo.referrerTelegramId,
+    }).catch((err: unknown) => {
+      console.error("[payment] recordSale error:", err);
     });
-    if (user?.metaboxUserId) {
-      recordSale({
-        telegramId: userId,
-        tokens: plan.tokens,
-        priceRub: plan.priceRub,
-        marginRub: plan.marginRub,
-      }).catch((err: unknown) => {
-        // Non-fatal: log but don't fail the payment
-        console.error("[payment] recordSale error:", err);
-      });
-    }
   },
 
   /** Credit tokens for a dynamic product purchase (from Metabox catalog). */
@@ -85,6 +94,9 @@ export const paymentService = {
     tokens: number,
     productId: string,
     priceRub: number,
+    productType: "product" | "subscription",
+    period: string | undefined,
+    userInfo: SaleUserInfo,
   ): Promise<void> {
     await db.$transaction([
       db.user.update({
@@ -102,19 +114,22 @@ export const paymentService = {
       }),
     ]);
 
-    const user = await db.user.findUnique({
-      where: { id: userId },
-      select: { metaboxUserId: true },
+    // Notify Metabox for MLM bonus + order tracking (always, even for unlinked users)
+    recordSale({
+      telegramId: userId,
+      firstName: userInfo.firstName,
+      lastName: userInfo.lastName,
+      username: userInfo.username,
+      productType,
+      productId,
+      period: period as "M1" | "M3" | "M6" | "M12" | undefined,
+      tokens,
+      priceRub,
+      stars: userInfo.stars,
+      starRate: userInfo.starRate,
+      referrerTelegramId: userInfo.referrerTelegramId,
+    }).catch((err: unknown) => {
+      console.error("[payment] recordSale error:", err);
     });
-    if (user?.metaboxUserId) {
-      recordSale({
-        telegramId: userId,
-        tokens,
-        priceRub,
-        marginRub: priceRub * 0.4, // approximate margin
-      }).catch((err: unknown) => {
-        console.error("[payment] recordSale error:", err);
-      });
-    }
   },
 };
