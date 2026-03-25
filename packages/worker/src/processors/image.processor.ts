@@ -78,7 +78,11 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         model.costUsdPerMPixel && imageResult.width && imageResult.height
           ? (imageResult.width * imageResult.height) / 1_000_000
           : undefined;
-      await deductTokens(BigInt(userIdStr), calculateCost(model, 0, 0, megapixels), modelId);
+      await deductTokens(
+        BigInt(userIdStr),
+        calculateCost(model, 0, 0, megapixels, undefined, modelSettings),
+        modelId,
+      );
     }
 
     // Save messages to dialog and get assistantMessageId for Refine button

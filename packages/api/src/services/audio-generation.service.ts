@@ -59,7 +59,11 @@ export const audioGenerationService = {
           data: { status: "done", outputUrl: result.url ?? null, completedAt: new Date() },
         });
 
-        await deductTokens(userId, calculateCost(model), modelId);
+        await deductTokens(
+          userId,
+          calculateCost(model, 0, 0, undefined, undefined, modelSettings, undefined, prompt.length),
+          modelId,
+        );
 
         // Upload to S3 in background
         const audioKey = buildS3Key("audio", userId.toString(), job.id, result.ext ?? "mp3");

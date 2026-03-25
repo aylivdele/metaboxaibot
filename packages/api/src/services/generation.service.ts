@@ -85,7 +85,11 @@ export const generationService = {
           data: { status: "done", outputUrl: result.url, completedAt: new Date() },
         });
 
-        await deductTokens(userId, calculateCost(model), modelId);
+        await deductTokens(
+          userId,
+          calculateCost(model, 0, 0, undefined, undefined, modelSettings),
+          modelId,
+        );
 
         // Save messages to dialog for img2img context
         let assistantMessageId: string | undefined;

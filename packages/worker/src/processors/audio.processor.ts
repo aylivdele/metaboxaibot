@@ -93,7 +93,11 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
 
     const model = AI_MODELS[modelId];
     if (model) {
-      await deductTokens(BigInt(userIdStr), calculateCost(model), modelId);
+      await deductTokens(
+        BigInt(userIdStr),
+        calculateCost(model, 0, 0, undefined, undefined, modelSettings, undefined, prompt.length),
+        modelId,
+      );
     }
 
     await sendAudio(telegramChatId, audioResult, `✅ ${modelId}: ${prompt.slice(0, 200)}`);

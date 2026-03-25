@@ -66,17 +66,55 @@ export function calculateCost(
   outputTokens = 0,
   megapixels?: number,
   videoTokens?: number,
+  modelSettings?: Record<string, unknown>,
+  durationSeconds?: number,
+  charCount?: number,
 ): number {
+  // Resolve cost overrides from costVariants based on user's current settings
+  let baseRequest = model.costUsdPerRequest;
+  let outputCostPerMToken = model.outputCostUsdPerMToken;
+  let costPerSecond = model.costUsdPerSecond;
+  let costPerMVideoToken = model.costUsdPerMVideoToken;
+  let costPerKChar = model.costUsdPerKChar;
+
+  if (model.costVariants && modelSettings) {
+    const settingVal = modelSettings[model.costVariants.settingKey];
+    const variant = model.costVariants.map[String(settingVal)];
+    if (typeof variant === "number") {
+      baseRequest = variant;
+    } else if (variant) {
+      if (variant.costUsdPerRequest !== undefined) baseRequest = variant.costUsdPerRequest;
+      if (variant.outputCostUsdPerMToken !== undefined)
+        outputCostPerMToken = variant.outputCostUsdPerMToken;
+      if (variant.costUsdPerSecond !== undefined) costPerSecond = variant.costUsdPerSecond;
+      if (variant.costUsdPerMVideoToken !== undefined)
+        costPerMVideoToken = variant.costUsdPerMVideoToken;
+      if (variant.costUsdPerKChar !== undefined) costPerKChar = variant.costUsdPerKChar;
+    }
+  }
+
+  // For audio SFX: if costUsdPerSecond is set but no explicit durationSeconds,
+  // extract it from modelSettings.duration_seconds (null → AI mode → fall back to baseRequest).
+  const effectiveDuration =
+    durationSeconds ??
+    (costPerSecond !== undefined && typeof modelSettings?.duration_seconds === "number"
+      ? modelSettings.duration_seconds
+      : undefined);
+
   const perRequestCost =
-    model.costUsdPerMVideoToken && videoTokens
-      ? (videoTokens / 1_000_000) * model.costUsdPerMVideoToken
+    costPerMVideoToken && videoTokens
+      ? (videoTokens / 1_000_000) * costPerMVideoToken
       : model.costUsdPerMPixel && megapixels
         ? Math.ceil(megapixels) * model.costUsdPerMPixel
-        : model.costUsdPerRequest;
+        : costPerSecond !== undefined && effectiveDuration !== undefined
+          ? costPerSecond * effectiveDuration
+          : costPerKChar !== undefined && charCount !== undefined
+            ? (charCount / 1000) * costPerKChar
+            : baseRequest;
   const providerUsdCost =
     perRequestCost +
     (inputTokens * model.inputCostUsdPerMToken) / 1_000_000 +
-    (outputTokens * model.outputCostUsdPerMToken) / 1_000_000;
+    (outputTokens * outputCostPerMToken) / 1_000_000;
   return (providerUsdCost / config.billing.usdPerToken) * config.billing.targetMargin;
 }
 

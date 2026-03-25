@@ -65,7 +65,9 @@ export async function activateDesignModel(ctx: BotContext, modelId: string): Pro
 
   const model = AI_MODELS[modelId];
   if (model) {
-    const cost = calculateCost(model);
+    const allSettings = await userStateService.getModelSettings(ctx.user.id);
+    const modelSettings = allSettings[modelId] ?? {};
+    const cost = calculateCost(model, 0, 0, undefined, undefined, modelSettings);
     const costLine = ctx.t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
     const webappUrl = config.bot.webappUrl;
     const kb = webappUrl

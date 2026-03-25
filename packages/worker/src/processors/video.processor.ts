@@ -70,12 +70,13 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     const model = AI_MODELS[modelId];
     if (model) {
+      const effectiveDuration = duration ?? 5;
       const videoTokens = model.costUsdPerMVideoToken
-        ? computeVideoTokens(model, aspectRatio, duration ?? 5)
+        ? computeVideoTokens(model, aspectRatio, effectiveDuration)
         : undefined;
       await deductTokens(
         BigInt(userIdStr),
-        calculateCost(model, 0, 0, undefined, videoTokens),
+        calculateCost(model, 0, 0, undefined, videoTokens, modelSettings, effectiveDuration),
         modelId,
       );
     }

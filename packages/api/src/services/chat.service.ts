@@ -99,7 +99,7 @@ export const chatService = {
     const model = AI_MODELS[dialog.modelId];
     const tokensUsed =
       model && inputTokensUsed !== undefined && outputTokensUsed !== undefined
-        ? calculateCost(model, inputTokensUsed, outputTokensUsed)
+        ? calculateCost(model, inputTokensUsed, outputTokensUsed, undefined, undefined, ms)
         : estimateTokens(content, responseText);
 
     // Save assistant message

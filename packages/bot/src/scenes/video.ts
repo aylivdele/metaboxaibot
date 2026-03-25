@@ -29,7 +29,14 @@ export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
 
   const model = AI_MODELS[modelId];
   if (model) {
-    const cost = calculateCost(model);
+    const allSettings = await userStateService.getModelSettings(ctx.user.id);
+    const modelSettings = allSettings[modelId] ?? {};
+    const defaultDuration =
+      (modelSettings.duration as number | undefined) ??
+      model.supportedDurations?.[0] ??
+      model.durationRange?.min ??
+      5;
+    const cost = calculateCost(model, 0, 0, undefined, undefined, modelSettings, defaultDuration);
     const costLine = ctx.t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
     const webappUrl = config.bot.webappUrl;
     const kb = webappUrl

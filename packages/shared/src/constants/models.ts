@@ -96,8 +96,7 @@ const PERPLEXITY_EXTRA: ModelSettingDef = {
 const PERPLEXITY_SEARCH_CONTEXT: ModelSettingDef = {
   key: "search_context_size",
   label: "Глубина поиска",
-  description:
-    "low — быстрее и дешевле, high — больше источников и точнее, но дороже.",
+  description: "low — быстрее и дешевле, high — больше источников и точнее, но дороже.",
   type: "select",
   options: [
     { value: "low", label: "Низкая" },
@@ -156,8 +155,7 @@ const ENABLE_THINKING: ModelSettingDef = {
 const THINKING_BUDGET: ModelSettingDef = {
   key: "thinking_budget",
   label: "Бюджет рассуждений",
-  description:
-    "Сколько токенов модель может потратить на внутренние рассуждения (0 = выключено).",
+  description: "Сколько токенов модель может потратить на внутренние рассуждения (0 = выключено).",
   type: "slider",
   min: 0,
   max: 24576,
@@ -165,12 +163,24 @@ const THINKING_BUDGET: ModelSettingDef = {
   default: 0,
 };
 
+/** Reasoning effort for Grok 3 Mini — only supports low/high (no medium). */
+const GROK_MINI_REASONING: ModelSettingDef = {
+  key: "reasoning_effort",
+  label: "Режим рассуждений",
+  description: "low — быстро и дёшево, high — точнее для сложных задач.",
+  type: "select",
+  options: [
+    { value: "low", label: "Низкая" },
+    { value: "high", label: "Высокая" },
+  ],
+  default: "low",
+};
+
 /** Seed for reproducible results in OpenAI chat models. */
 const SEED_SETTING: ModelSettingDef = {
   key: "seed",
   label: "Seed",
-  description:
-    "Число для воспроизводимых результатов. Пусто — случайно каждый раз.",
+  description: "Число для воспроизводимых результатов. Пусто — случайно каждый раз.",
   type: "number",
   min: 0,
   max: 2147483647,
@@ -382,7 +392,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
   },
-  "o3": {
+  o3: {
     id: "o3",
     name: "GPT-o3",
     description: "Мощная reasoning-модель OpenAI, глубокие рассуждения для самых сложных задач.",
@@ -764,7 +774,11 @@ export const AI_MODELS: Record<string, AIModel> = {
     provider: "alibaba",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0.7,
-    outputCostUsdPerMToken: 2.8,
+    outputCostUsdPerMToken: 8.4, // thinking on (default); off=$2.80
+    costVariants: {
+      settingKey: "enable_thinking",
+      map: { true: { outputCostUsdPerMToken: 8.4 }, false: { outputCostUsdPerMToken: 2.8 } },
+    },
     supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
@@ -780,7 +794,11 @@ export const AI_MODELS: Record<string, AIModel> = {
     provider: "alibaba",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0.2,
-    outputCostUsdPerMToken: 0.8,
+    outputCostUsdPerMToken: 2.4, // thinking on (default); off=$0.80
+    costVariants: {
+      settingKey: "enable_thinking",
+      map: { true: { outputCostUsdPerMToken: 2.4 }, false: { outputCostUsdPerMToken: 0.8 } },
+    },
     supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
@@ -796,7 +814,11 @@ export const AI_MODELS: Record<string, AIModel> = {
     provider: "alibaba",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0.18,
-    outputCostUsdPerMToken: 0.7,
+    outputCostUsdPerMToken: 2.1, // thinking on (default); off=$0.70
+    costVariants: {
+      settingKey: "enable_thinking",
+      map: { true: { outputCostUsdPerMToken: 2.1 }, false: { outputCostUsdPerMToken: 0.7 } },
+    },
     supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
@@ -963,8 +985,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "qwen3.5-flash": {
     id: "qwen3.5-flash",
     name: "Qwen 3.5 Flash",
-    description:
-      "Самая быстрая и дешёвая модель Alibaba нового поколения с контекстом 1M токенов.",
+    description: "Самая быстрая и дешёвая модель Alibaba нового поколения с контекстом 1M токенов.",
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,
@@ -997,9 +1018,30 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    supportedAspectRatios: [
+      "21:9",
+      "16:9",
+      "3:2",
+      "4:3",
+      "5:4",
+      "1:1",
+      "4:5",
+      "3:4",
+      "2:3",
+      "9:16",
+    ],
     settings: [
-      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      mkAspectRatio(["21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"]),
+      {
+        key: "safety_tolerance",
+        label: "Допустимый контент",
+        description: "1 — строгая фильтрация, 6 — минимальная. По умолчанию 4.",
+        type: "slider",
+        min: 1,
+        max: 6,
+        step: 1,
+        default: 4,
+      },
       {
         key: "resolution",
         label: "Разрешение",
@@ -1034,7 +1076,7 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Создаёт самые красивые и стильные изображения. Лучший выбор для арта, иллюстраций и эффектных визуалов.",
     section: "design",
     provider: "midjourney",
-    costUsdPerRequest: 0.03,
+    costUsdPerRequest: 0.089,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1053,7 +1095,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Лучше всех понимает сложные текстовые запросы. Точно рисует то, что вы описали, включая текст на картинках.",
     section: "design",
     provider: "fal",
-    costUsdPerRequest: 0.04,
+    costUsdPerRequest: 0.034, // default: medium quality 1024×1024; low=$0.009, high=$0.133
+    costVariants: { settingKey: "quality", map: { low: 0.009, medium: 0.034, high: 0.133 } },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1063,7 +1106,22 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "16:9", "9:16"],
-    settings: [mkAspectRatio(["1:1", "16:9", "9:16"])],
+    settings: [
+      mkAspectRatio(["1:1", "16:9", "9:16"]),
+      {
+        key: "quality",
+        label: "Качество",
+        description:
+          "low — очень быстро и дёшево ($0.009), medium — баланс ($0.034), high — максимальная детализация ($0.133).",
+        type: "select",
+        options: [
+          { value: "low", label: "Low" },
+          { value: "medium", label: "Medium" },
+          { value: "high", label: "High" },
+        ],
+        default: "medium",
+      },
+    ],
   },
   "stable-diffusion": {
     id: "stable-diffusion",
@@ -1072,7 +1130,7 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Генерирует детальные изображения в любом стиле: от фотореализма до аниме и фэнтези. Отличается гибкостью.",
     section: "design",
     provider: "replicate",
-    costUsdPerRequest: 0.003,
+    costUsdPerRequest: 0.0045,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1173,7 +1231,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     versionLabel: "2",
     variantLabel: "Standard",
     costUsdPerRequest: 0,
-    costUsdPerMPixel: 0.025, // $0.025/MP, billed as ceil(px/1_000_000)
+    costUsdPerMPixel: 0.012, // $0.012/MP, billed as ceil(px/1_000_000)
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1193,7 +1251,11 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров, обложек и рекламы.",
     section: "design",
     provider: "ideogram",
-    costUsdPerRequest: 0.04,
+    costUsdPerRequest: 0.06, // default: balanced tier; turbo=$0.03, quality=$0.09
+    costVariants: {
+      settingKey: "rendering_speed",
+      map: { turbo: 0.03, balanced: 0.06, quality: 0.09 },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
@@ -1227,6 +1289,19 @@ export const AI_MODELS: Record<string, AIModel> = {
         default: "",
       },
       {
+        key: "rendering_speed",
+        label: "Качество / скорость",
+        description:
+          "turbo — быстро и дёшево ($0.03), balanced — баланс ($0.06), quality — максимальное качество ($0.09).",
+        type: "select",
+        options: [
+          { value: "turbo", label: "Turbo" },
+          { value: "balanced", label: "Balanced" },
+          { value: "quality", label: "Quality" },
+        ],
+        default: "balanced",
+      },
+      {
         key: "magic_prompt_option",
         label: "Magic Prompt",
         description:
@@ -1248,7 +1323,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Новая модель генерации изображений от Google. Высокая фотореалистичность и точное следование текстовым описаниям.",
     section: "design",
     provider: "google",
-    costUsdPerRequest: 0.03,
+    costUsdPerRequest: 0.04, // default: standard tier; fast=$0.02, ultra=$0.06
+    costVariants: { settingKey: "mode", map: { fast: 0.02, standard: 0.04, ultra: 0.06 } },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
@@ -1258,7 +1334,22 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
-    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"])],
+    settings: [
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      {
+        key: "mode",
+        label: "Качество / скорость",
+        description:
+          "fast — быстро и дёшево ($0.02), standard — стандарт ($0.04), ultra — максимальное разрешение до 2.8K ($0.06).",
+        type: "select",
+        options: [
+          { value: "fast", label: "Fast" },
+          { value: "standard", label: "Standard" },
+          { value: "ultra", label: "Ultra" },
+        ],
+        default: "standard",
+      },
+    ],
   },
   "flux-pro": {
     id: "flux-pro",
@@ -1271,7 +1362,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     versionLabel: "2",
     variantLabel: "Pro",
     costUsdPerRequest: 0,
-    costUsdPerMPixel: 0.04, // $0.04/MP, billed as ceil(px/1_000_000)
+    costUsdPerMPixel: 0.03, // $0.030/MP, billed as ceil(px/1_000_000)
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1318,6 +1409,31 @@ export const AI_MODELS: Record<string, AIModel> = {
         ],
         default: "realistic_image",
       },
+      {
+        key: "substyle",
+        label: "Под-стиль",
+        description:
+          "Уточняет художественный стиль: b_and_w, hard_flash, pixel_art, grain и другие. Зависит от выбранного стиля.",
+        type: "text",
+        default: "",
+      },
+      {
+        key: "no_text",
+        label: "Без текста",
+        description: "Запретить модели добавлять текст, надписи и леттеринг в изображение.",
+        type: "toggle",
+        default: false,
+      },
+      {
+        key: "artistic_level",
+        label: "Художественность",
+        description: "0 — близко к реальности, 5 — максимально стилизованно и художественно.",
+        type: "slider",
+        min: 0,
+        max: 5,
+        step: 1,
+        default: 2,
+      },
     ],
   },
   "recraft-v4": {
@@ -1342,6 +1458,13 @@ export const AI_MODELS: Record<string, AIModel> = {
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
       mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      {
+        key: "no_text",
+        label: "Без текста",
+        description: "Запретить модели добавлять текст, надписи и леттеринг в изображение.",
+        type: "toggle",
+        default: false,
+      },
       {
         key: "seed",
         label: "Seed",
@@ -1376,6 +1499,13 @@ export const AI_MODELS: Record<string, AIModel> = {
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
       mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      {
+        key: "no_text",
+        label: "Без текста",
+        description: "Запретить модели добавлять текст, надписи и леттеринг в изображение.",
+        type: "toggle",
+        default: false,
+      },
       {
         key: "seed",
         label: "Seed",
@@ -1507,8 +1637,13 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Генерирует самые длинные видео — до 2 минут сразу, со звуком. Лучше всех передаёт движения людей.",
     section: "video",
     provider: "fal",
-    //For every second of video you generated, you will be charged $0.084 (audio off) or $0.126 (audio on), if voice control is used while generating audio you will be charged $0.154. For example, a 5s video with audio on and voice control will cost $0.77
-    costUsdPerRequest: 0.525, // recalc
+    // $0.126/s with audio (default), $0.084/s without audio
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.126,
+    costVariants: {
+      settingKey: "generate_audio",
+      map: { true: { costUsdPerSecond: 0.126 }, false: { costUsdPerSecond: 0.084 } },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1528,8 +1663,13 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Генерирует самые длинные видео — до 2 минут сразу, со звуком. Лучше всех передаёт движения людей.",
     section: "video",
     provider: "fal",
-    // For every second of video you generated, you will be charged $0.112 (audio off) or $0.168 (audio on), if voice control is used while generating audio you will be charged $0.196. For example, a 5s video with audio on and voice control will cost $0.98
-    costUsdPerRequest: 0.525, // recalc
+    // $0.168/s with audio (default), $0.112/s without audio
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.168,
+    costVariants: {
+      settingKey: "generate_audio",
+      map: { true: { costUsdPerSecond: 0.168 }, false: { costUsdPerSecond: 0.112 } },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1544,12 +1684,14 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   veo: {
     id: "veo",
-    name: "Veo 3.1",
+    name: "Veo 3",
     description:
       "Видео от Google в качестве 4K со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts.",
     section: "video",
     provider: "google",
-    costUsdPerRequest: 0.75, // 5s @ $0.15/s
+    // $0.35/s (Veo 2, Gemini API)
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.35,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
@@ -1590,7 +1732,13 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Самое реалистичное видео от OpenAI. Объекты двигаются как в реальности, со звуком и правильной физикой.",
     section: "video",
     provider: "openai",
-    costUsdPerRequest: 0.5, // 5s @ $0.10/s
+    // $0.10/s standard (default), $0.30/s pro
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.1,
+    costVariants: {
+      settingKey: "quality",
+      map: { standard: { costUsdPerSecond: 0.1 }, pro: { costUsdPerSecond: 0.3 } },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1601,7 +1749,21 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: [4, 8, 12],
-    settings: [mkAspectRatio(["16:9", "9:16", "1:1"]), mkDurationSelect([4, 8, 12])],
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1"]),
+      mkDurationSelect([4, 8, 12]),
+      {
+        key: "quality",
+        label: "Тир качества",
+        description: "standard — $0.10/сек (720p), pro — $0.30/сек (720p) — выше детализация.",
+        type: "select",
+        options: [
+          { value: "standard", label: "Standard" },
+          { value: "pro", label: "Pro" },
+        ],
+        default: "standard",
+      },
+    ],
   },
   runway: {
     id: "runway",
@@ -1610,7 +1772,9 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Полный контроль над видео: указывайте, что и как должно двигаться, управляйте камерой. Выбор профессионалов.",
     section: "video",
     provider: "runway",
-    costUsdPerRequest: 0.75, // 5s clip ~$0.50–$1.00
+    // $0.12/s (Gen-4.5); 5s=$0.60, 8s=$0.96, 10s=$1.20
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.12,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1619,16 +1783,17 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    supportedAspectRatios: ["1280:768", "768:1280", "1104:832", "832:1104"],
-    durationRange: { min: 2, max: 10 },
+    supportedAspectRatios: ["1280:768", "768:1280", "1104:832", "832:1104", "960:960"],
+    supportedDurations: [5, 8, 10],
     settings: [
-      mkAspectRatio(["1280:768", "768:1280", "1104:832", "832:1104"], {
+      mkAspectRatio(["1280:768", "768:1280", "1104:832", "832:1104", "960:960"], {
         "1280:768": "Горизонталь 16:9",
         "768:1280": "Вертикаль 9:16",
         "1104:832": "Горизонталь 4:3",
         "832:1104": "Вертикаль 3:4",
+        "960:960": "Квадрат 1:1",
       }),
-      mkDurationSlider(2, 10),
+      mkDurationSelect([5, 8, 10]),
       {
         key: "seed",
         label: "Seed",
@@ -1681,10 +1846,14 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Создаёт видео с выразительным и необычным движением. Хорош для креативных и стилизованных роликов.",
     section: "video",
     provider: "fal",
-    // Per-video-token billing: $2.4/M tokens with audio.
-    // tokens = (w × h × fps × duration) / 1024; 720p 5s ≈ $0.26
+    // Per-video-token billing: $2.4/M tokens with audio (default), $1.2/M without audio.
+    // tokens = (w × h × fps × duration) / 1024; 720p 5s ≈ $0.26 with audio
     costUsdPerRequest: 0,
     costUsdPerMVideoToken: 2.4,
+    costVariants: {
+      settingKey: "generate_audio",
+      map: { true: { costUsdPerMVideoToken: 2.4 }, false: { costUsdPerMVideoToken: 1.2 } },
+    },
     videoFps: 24,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -1738,10 +1907,22 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"],
-    supportedDurations: [5, 9],
+    supportedDurations: [5, 10],
     settings: [
       mkAspectRatio(["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"]),
-      mkDurationSelect([5, 9]),
+      mkDurationSelect([5, 10]),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "540p — быстро и дёшево, 720p — стандарт, 1080p — Full HD (в 4× дороже 720p).",
+        type: "select",
+        options: [
+          { value: "540p", label: "540p" },
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        default: "720p",
+      },
       {
         key: "loop",
         label: "Зациклить видео",
@@ -1769,10 +1950,22 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "4:3", "3:4", "1:1"],
-    supportedDurations: [5, 9],
+    supportedDurations: [5, 10],
     settings: [
       mkAspectRatio(["16:9", "9:16", "4:3", "3:4", "1:1"]),
-      mkDurationSelect([5, 9]),
+      mkDurationSelect([5, 10]),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "540p — быстро и дёшево, 720p — стандарт, 1080p — Full HD (в 4× дороже 720p).",
+        type: "select",
+        options: [
+          { value: "540p", label: "540p" },
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        default: "720p",
+      },
       {
         key: "loop",
         label: "Зациклить видео",
@@ -1819,7 +2012,13 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Быстрые и дешёвые видео с крутыми спецэффектами: взрывы, плавление, сжатие. Идеально для TikTok и Reels.",
     section: "video",
     provider: "pika",
-    costUsdPerRequest: 0.25, // ~$0.10–$0.40/gen
+    // $0.09/s at 1080p (default), $0.04/s at 720p
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.09,
+    costVariants: {
+      settingKey: "resolution",
+      map: { "720p": { costUsdPerSecond: 0.04 }, "1080p": { costUsdPerSecond: 0.09 } },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1836,7 +2035,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "resolution",
         label: "Разрешение видео",
-        description: "1080p — Full HD с высокой чёткостью, 720p — быстрее и меньше весит.",
+        description:
+          "1080p — Full HD с высокой чёткостью ($0.09/с), 720p — быстрее и дешевле ($0.04/с).",
         type: "select",
         options: [
           { value: "720p", label: "720p" },
@@ -1902,12 +2102,18 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   wan: {
     id: "wan",
-    name: "Wan 2.2 (Alibaba)",
+    name: "Wan 2.5 (Alibaba)",
     description:
       "Создаёт качественные видео с плавным естественным движением. Хорошо справляется со сложными сценами и динамичными действиями.",
     section: "video",
     provider: "alibaba",
-    costUsdPerRequest: 0.06,
+    // $0.07/s at 720p (default), $0.036/s at 480p
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.07,
+    costVariants: {
+      settingKey: "resolution",
+      map: { "480p": { costUsdPerSecond: 0.036 }, "720p": { costUsdPerSecond: 0.07 } },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1917,9 +2123,11 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
-    supportedDurations: [5],
+    supportedDurations: null,
+    durationRange: { min: 5, max: 15 },
     settings: [
       mkAspectRatio(["16:9", "9:16"]),
+      mkDurationSlider(5, 15),
       {
         key: "negative_prompt",
         label: "Негативный промпт",
@@ -1931,7 +2139,7 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "resolution",
         label: "Разрешение видео",
-        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
+        description: "720p — чёткое HD-видео ($0.07/с), 480p — быстрее генерируется ($0.036/с).",
         type: "select",
         options: [
           { value: "480p", label: "480p" },
@@ -1970,7 +2178,23 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: null, // avatar duration is script-driven
-    settings: [mkAspectRatio(["16:9", "9:16", "1:1"])],
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1"]),
+      {
+        key: "voice_id",
+        label: "Голос",
+        description: "ID голоса HeyGen для озвучки аватара.",
+        type: "text",
+        default: "",
+      },
+      {
+        key: "background_color",
+        label: "Цвет фона",
+        description: "HEX-цвет фона видео, напр. #FFFFFF.",
+        type: "text",
+        default: "#FFFFFF",
+      },
+    ],
   },
   "d-id": {
     id: "d-id",
@@ -1990,7 +2214,29 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: null, // script-driven
-    settings: [mkAspectRatio(["16:9", "9:16", "1:1"])],
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1"]),
+      {
+        key: "sentiment",
+        label: "Настроение аватара",
+        description: "Эмоциональный тон выступления аватара.",
+        type: "select",
+        options: [
+          { value: "Friendly", label: "Friendly" },
+          { value: "Professional", label: "Professional" },
+          { value: "Empathetic", label: "Empathetic" },
+          { value: "Excited", label: "Excited" },
+        ],
+        default: "Professional",
+      },
+      {
+        key: "driver_url",
+        label: "URL видео-драйвера",
+        description: "URL видео, задающего движения лица/головы аватара.",
+        type: "text",
+        default: "",
+      },
+    ],
   },
 
   // ── Аудио ─────────────────────────────────────────────────────────────────
@@ -2001,9 +2247,18 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Синтез речи от OpenAI. Несколько голосов, естественная интонация и быстрая генерация для любого текста.",
     section: "audio",
     provider: "openai",
-    costUsdPerRequest: 0.0045, // $0.015/1K chars, ~300 chars typical
+    costUsdPerRequest: 0,
+    costUsdPerKChar: 0.015, // tts-1: $0.015/1K chars (default)
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
+    costVariants: {
+      settingKey: "model",
+      map: {
+        "tts-1": { costUsdPerKChar: 0.015 },
+        "tts-1-hd": { costUsdPerKChar: 0.03 },
+        "gpt-4o-mini-tts": { costUsdPerKChar: 0.015 },
+      },
+    },
     supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
@@ -2011,6 +2266,19 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     settings: [
+      {
+        key: "model",
+        label: "Модель TTS",
+        description:
+          "tts-1 — стандартное качество ($0.015/1K chars), tts-1-hd — высокое качество ($0.030/1K chars), gpt-4o-mini-tts — управляемый стиль речи через инструкции.",
+        type: "select",
+        options: [
+          { value: "tts-1", label: "TTS-1 (Standard)" },
+          { value: "tts-1-hd", label: "TTS-1 HD" },
+          { value: "gpt-4o-mini-tts", label: "GPT-4o Mini TTS" },
+        ],
+        default: "tts-1",
+      },
       {
         key: "voice",
         label: "Голос",
@@ -2020,6 +2288,7 @@ export const AI_MODELS: Record<string, AIModel> = {
         options: [
           { value: "alloy", label: "Alloy" },
           { value: "ash", label: "Ash" },
+          { value: "ballad", label: "Ballad" },
           { value: "coral", label: "Coral" },
           { value: "echo", label: "Echo" },
           { value: "fable", label: "Fable" },
@@ -2027,6 +2296,7 @@ export const AI_MODELS: Record<string, AIModel> = {
           { value: "onyx", label: "Onyx" },
           { value: "sage", label: "Sage" },
           { value: "shimmer", label: "Shimmer" },
+          { value: "verse", label: "Verse" },
         ],
         default: "onyx",
       },
@@ -2054,6 +2324,14 @@ export const AI_MODELS: Record<string, AIModel> = {
         ],
         default: "mp3",
       },
+      {
+        key: "instructions",
+        label: "Инструкции к голосу",
+        description:
+          "Только для gpt-4o-mini-tts: укажите тон, эмоцию и стиль речи. Например: 'Говори медленно и торжественно' или 'Эмоциональный диктор новостей'.",
+        type: "text",
+        default: "",
+      },
     ],
   },
   "voice-clone": {
@@ -2063,9 +2341,17 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Клонирование голоса с высокой точностью. Воспроизводит тембр и интонации исходного голоса по короткому аудиообразцу.",
     section: "audio",
     provider: "elevenlabs",
-    costUsdPerRequest: 0.072, // ElevenLabs ~$0.054–$0.090 per ~300 chars
+    costUsdPerRequest: 0,
+    costUsdPerKChar: 0.24, // eleven_multilingual_v2: $0.24/1K chars (Pro-тир)
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
+    costVariants: {
+      settingKey: "model_id",
+      map: {
+        eleven_multilingual_v2: { costUsdPerKChar: 0.24 },
+        eleven_turbo_v2_5: { costUsdPerKChar: 0.12 }, // 0.5 кредита/символ — в 2× дешевле
+      },
+    },
     supportsImages: false,
     supportsVoice: true,
     supportsWeb: false,
@@ -2073,6 +2359,18 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     settings: [
+      {
+        key: "model_id",
+        label: "Модель синтеза",
+        description:
+          "multilingual_v2 — максимальное качество (дороже), turbo_v2_5 — быстрее и в 2× дешевле, 32 языка.",
+        type: "select",
+        options: [
+          { value: "eleven_multilingual_v2", label: "Multilingual v2 (макс. качество)" },
+          { value: "eleven_turbo_v2_5", label: "Turbo v2.5 (быстрее, дешевле)" },
+        ],
+        default: "eleven_multilingual_v2",
+      },
       {
         key: "stability",
         label: "Стабильность",
@@ -2122,7 +2420,7 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Генерирует полноценные музыкальные треки с вокалом и аранжировкой по текстовому описанию стиля и настроения.",
     section: "audio",
     provider: "suno",
-    costUsdPerRequest: 0.035, // ~$0.030–$0.040/track
+    costUsdPerRequest: 0.035, // ~$0.030–$0.040/track (apipass.net proxy)
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
@@ -2133,11 +2431,31 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     settings: [
       {
+        key: "model_version",
+        label: "Версия модели",
+        description:
+          "chirp-v4 — стандарт, chirp-v4.5 — улучшенное качество (до 8 мин), v5 — последняя версия.",
+        type: "select",
+        options: [
+          { value: "chirp-v4", label: "Chirp v4" },
+          { value: "chirp-v4.5", label: "Chirp v4.5 (рекомендуется)" },
+          { value: "v5", label: "v5 (последняя)" },
+        ],
+        default: "chirp-v4.5",
+      },
+      {
         key: "make_instrumental",
         label: "Только инструментал",
         description: "Сгенерировать музыку без вокала — только инструментальную дорожку.",
         type: "toggle",
         default: false,
+      },
+      {
+        key: "lyrics",
+        label: "Текст песни",
+        description: "Готовый текст для пения. Если указан — модель не генерирует текст сама.",
+        type: "text",
+        default: "",
       },
     ],
   },
@@ -2148,7 +2466,8 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Генерирует оригинальные звуковые эффекты по описанию. Подходит для видеопроизводства, игр и подкастов.",
     section: "audio",
     provider: "elevenlabs",
-    costUsdPerRequest: 0.048, // ElevenLabs ~$0.036–$0.060 per ~200 chars
+    costUsdPerRequest: 0.048, // fallback: AI-determines duration (100 credits)
+    costUsdPerSecond: 0.0096, // manual duration: 20 credits/sec × $0.00048/credit
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
@@ -2157,6 +2476,19 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    settings: [
+      {
+        key: "duration_seconds",
+        label: "Длительность (сек)",
+        description:
+          "Конкретная длительность в секундах (1–30). Оставьте пустым — модель выберет сама (дешевле: 100 кредитов вместо 20/сек).",
+        type: "slider",
+        min: 1,
+        max: 30,
+        step: 1,
+        default: null,
+      },
+    ],
   },
 };
 
@@ -2164,11 +2496,26 @@ export const AI_MODELS: Record<string, AIModel> = {
 // LLM section — assign base settings plus model-specific extras
 const OPENAI_REASONING_IDS = new Set(["o4-mini", "o3", "o3-mini"]);
 const OPENAI_CHAT_IDS = new Set([
-  "gpt-5.4-pro", "gpt-5.4", "gpt-5.3", "gpt-5-mini", "gpt-5-nano",
-  "o4-mini", "o3", "o3-mini",
-  "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+  "gpt-5.4-pro",
+  "gpt-5.4",
+  "gpt-5.3",
+  "gpt-5-mini",
+  "gpt-5-nano",
+  "o4-mini",
+  "o3",
+  "o3-mini",
+  "gpt-4o",
+  "gpt-4o-mini",
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4.1-nano",
 ]);
-const ANTHROPIC_THINKING_IDS = new Set(["claude-opus", "claude-opus-4-5", "claude-sonnet", "claude-sonnet-4-5"]);
+const ANTHROPIC_THINKING_IDS = new Set([
+  "claude-opus",
+  "claude-opus-4-5",
+  "claude-sonnet",
+  "claude-sonnet-4-5",
+]);
 const QWEN_THINKING_IDS = new Set(["qwen-3-max-thinking", "qwen-3-thinking", "qwen-3"]);
 const GEMINI_THINKING_IDS = new Set(["gemini-2-pro", "gemini-3.1-pro"]);
 
@@ -2180,8 +2527,11 @@ for (const [id, model] of Object.entries(AI_MODELS)) {
   if (id.startsWith("perplexity")) {
     extras.push(PERPLEXITY_EXTRA, PERPLEXITY_SEARCH_CONTEXT, PERPLEXITY_DOMAIN_FILTER);
   }
-  if (OPENAI_REASONING_IDS.has(id) || id === "grok-3-mini") {
+  if (OPENAI_REASONING_IDS.has(id)) {
     extras.push(REASONING_EFFORT);
+  }
+  if (id === "grok-3-mini") {
+    extras.push(GROK_MINI_REASONING);
   }
   if (ANTHROPIC_THINKING_IDS.has(id)) {
     extras.push(EXTENDED_THINKING);

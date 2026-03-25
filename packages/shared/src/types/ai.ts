@@ -106,6 +106,24 @@ export interface AIModel {
    * videoTokens = (width × height × fps × duration) / 1024
    */
   costUsdPerMVideoToken?: number;
+  /**
+   * USD per second for models with per-duration billing (e.g. Kling, Pika, Sora, Veo, Runway, Wan).
+   * When set, costUsdPerRequest must be 0; actual cost = durationSeconds × this rate.
+   * Use costVariants to adjust the rate based on settings (quality, audio, resolution).
+   * The base value must match the DEFAULT settings combination.
+   *
+   * For audio SFX (sounds-el): when costUsdPerSecond is set but durationSeconds is not passed
+   * to calculateCost, the duration is automatically read from modelSettings.duration_seconds.
+   * If duration_seconds is null/absent, costUsdPerRequest is used (AI-determines-duration mode).
+   */
+  costUsdPerSecond?: number;
+  /**
+   * USD per 1000 characters of input text, for character-based billing (TTS, voice clone).
+   * When set, costUsdPerRequest must be 0; actual cost = charCount / 1000 × this rate.
+   * Use costVariants to adjust the rate based on model setting (tts-1 vs tts-1-hd, etc.).
+   * The base value must match the DEFAULT model setting.
+   */
+  costUsdPerKChar?: number;
   /** FPS assumed for video token billing. Required when costUsdPerMVideoToken is set. */
   videoFps?: number;
   /**
@@ -125,6 +143,37 @@ export interface AIModel {
    * When set, a slider is shown instead of preset buttons.
    */
   durationRange?: { min: number; max: number } | null;
+  /**
+   * When the cost depends on a user-chosen setting value, maps each possible value to a cost
+   * override applied at billing time.
+   *
+   * For media models (fixed per-request cost, e.g. "quality", "mode"):
+   *   map values are plain numbers → override costUsdPerRequest.
+   *   Example: { settingKey: "quality", map: { low: 0.009, medium: 0.034, high: 0.133 } }
+   *
+   * For LLM models (per-token cost, e.g. "enable_thinking" on Qwen):
+   *   map values are { outputCostUsdPerMToken? } → override the per-token price.
+   *   Example: { settingKey: "enable_thinking", map: { "true": { outputCostUsdPerMToken: 8.4 }, "false": { outputCostUsdPerMToken: 2.8 } } }
+   *
+   * The base costUsdPerRequest / outputCostUsdPerMToken should match the DEFAULT setting value.
+   */
+  costVariants?: {
+    settingKey: string;
+    map: Record<
+      string,
+      | number
+      | {
+          costUsdPerRequest?: number;
+          outputCostUsdPerMToken?: number;
+          /** Override per-second rate for per-duration billing models. */
+          costUsdPerSecond?: number;
+          /** Override per-video-token rate (e.g. Seedance audio toggle). */
+          costUsdPerMVideoToken?: number;
+          /** Override per-1K-characters rate (e.g. TTS model tier, ElevenLabs model). */
+          costUsdPerKChar?: number;
+        }
+    >;
+  };
   /**
    * Configurable generation parameters exposed in the Management mini-app.
    * The frontend renders controls dynamically based on these definitions.
