@@ -151,4 +151,37 @@ export interface GalleryResponse {
   limit: number;
 }
 
+export interface CatalogPeriod {
+  priceRub: string;
+  stars: number;
+}
+
+export interface CatalogSubscription {
+  id: string;
+  name: string;
+  tokens: number;
+  periods: {
+    M1: CatalogPeriod;
+    M3: CatalogPeriod;
+    M6: CatalogPeriod;
+    M12: CatalogPeriod;
+  };
+}
+
+export interface CatalogTokenPackage {
+  id: string;
+  name: string;
+  tokens: number;
+  priceRub: string;
+  stars: number;
+  badge: string | null;
+}
+
+export interface CatalogResponse {
+  subscriptions: CatalogSubscription[];
+  tokenPackages: CatalogTokenPackage[];
+  canPayByCard: boolean;
+  usdtRubRate: number;
+}
+
 export type Page = "profile" | "management" | "tariffs" | "referral" | "admin" | "linkMetabox";

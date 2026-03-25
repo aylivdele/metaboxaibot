@@ -22,5 +22,13 @@ export {
   getAiBotProducts,
   createAiBotInvoice,
   lookupByTelegramId,
+  getAiBotCatalog,
+  createSubscriptionInvoice,
 } from "./metabox-bridge.service.js";
-export type { AiBotProduct } from "./metabox-bridge.service.js";
+export type {
+  AiBotProduct,
+  AiBotCatalog,
+  CatalogSubscription,
+  CatalogProduct,
+} from "./metabox-bridge.service.js";
+export { getRate, calcStars, updateRate, STAR_PRICE_USD } from "./exchange-rate.service.js";

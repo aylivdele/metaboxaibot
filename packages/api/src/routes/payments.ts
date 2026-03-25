@@ -1,21 +1,133 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { paymentService } from "../services/payment.service.js";
+import { db } from "../db.js";
+import {
+  getAiBotCatalog,
+  createAiBotInvoice,
+  createSubscriptionInvoice,
+} from "../services/metabox-bridge.service.js";
+import { getRate, calcStars } from "../services/exchange-rate.service.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
 export const paymentsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", telegramAuthHook);
 
-  /** POST /payments/invoice — create Telegram Stars invoice link for a plan */
-  fastify.post<{ Body: { planId: string } }>("/payments/invoice", async (request, reply) => {
-    const { planId } = request.body;
-    if (!planId) return reply.code(400).send({ error: "planId is required" });
+  /** POST /payments/invoice — create Telegram Stars invoice for a product or subscription */
+  fastify.post<{
+    Body: { type: "product" | "subscription"; id: string; period?: string; planId?: string };
+  }>("/payments/invoice", async (request, reply) => {
+    const { type, id, period, planId: legacyPlanId } = request.body;
 
-    // userId is verified by telegramAuthHook but not needed for invoice creation
-    void (request as AuthRequest).userId;
+    // Legacy support: old format with planId
+    if (legacyPlanId && !type) {
+      const invoiceUrl = await paymentService.createInvoiceLink(legacyPlanId);
+      return { invoiceUrl };
+    }
 
-    const invoiceUrl = await paymentService.createInvoiceLink(planId);
-    return { invoiceUrl };
+    if (!type || !id) {
+      return reply.code(400).send({ error: "type and id are required" });
+    }
+
+    const catalog = await getAiBotCatalog();
+    const rate = await getRate();
+
+    if (type === "product") {
+      const product = catalog.tokenPackages.find((p) => p.id === id);
+      if (!product) return reply.code(404).send({ error: "Product not found" });
+
+      const stars = calcStars(Number(product.priceRub), rate);
+      const invoiceUrl = await paymentService.createDynamicInvoice({
+        title: `${product.name} — ${product.tokens} tokens`,
+        description: `${product.tokens} AI tokens for use in Metabox`,
+        payload: `product:${product.id}:${product.tokens}:${product.priceRub}`,
+        stars,
+      });
+      return { invoiceUrl };
+    }
+
+    if (type === "subscription") {
+      if (!period || !["M1", "M3", "M6", "M12"].includes(period)) {
+        return reply.code(400).send({ error: "Valid period is required (M1/M3/M6/M12)" });
+      }
+
+      const sub = catalog.subscriptions.find((s) => s.id === id);
+      if (!sub) return reply.code(404).send({ error: "Subscription plan not found" });
+
+      const monthly = Number(sub.priceMonthly);
+      const months = period === "M1" ? 1 : period === "M3" ? 3 : period === "M6" ? 6 : 12;
+      const discountField =
+        period === "M3"
+          ? sub.discount3m
+          : period === "M6"
+            ? sub.discount6m
+            : period === "M12"
+              ? sub.discount12m
+              : "0";
+      const totalPrice = monthly * months * (1 - Number(discountField) / 100);
+      const tokens = sub.tokens * months;
+      const stars = calcStars(totalPrice, rate);
+
+      const invoiceUrl = await paymentService.createDynamicInvoice({
+        title: `${sub.name} — ${period} (${tokens} tokens)`,
+        description: `AI subscription: ${tokens} tokens`,
+        payload: `subscription:${sub.id}:${period}:${tokens}:${totalPrice.toFixed(2)}`,
+        stars,
+      });
+      return { invoiceUrl };
+    }
+
+    return reply.code(400).send({ error: "Invalid type" });
+  });
+
+  /** POST /payments/card-invoice — create card payment invoice via Metabox/Lava */
+  fastify.post<{
+    Body: { type: "product" | "subscription"; id: string; period?: string };
+  }>("/payments/card-invoice", async (request, reply) => {
+    const { userId } = request as AuthRequest;
+    const { type, id, period } = request.body;
+
+    if (!type || !id) {
+      return reply.code(400).send({ error: "type and id are required" });
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { metaboxUserId: true },
+    });
+
+    if (!user?.metaboxUserId) {
+      return reply.code(409).send({ error: "Metabox account not linked" });
+    }
+
+    try {
+      if (type === "product") {
+        const result = await createAiBotInvoice({
+          metaboxUserId: user.metaboxUserId,
+          productId: id,
+          telegramId: userId,
+        });
+        return { paymentUrl: result.paymentUrl };
+      }
+
+      if (type === "subscription") {
+        if (!period || !["M1", "M3", "M6", "M12"].includes(period)) {
+          return reply.code(400).send({ error: "Valid period is required" });
+        }
+        const result = await createSubscriptionInvoice({
+          metaboxUserId: user.metaboxUserId,
+          planId: id,
+          period,
+          telegramId: userId,
+        });
+        return { paymentUrl: result.paymentUrl };
+      }
+
+      return reply.code(400).send({ error: "Invalid type" });
+    } catch (e) {
+      fastify.log.error(e, "[payments/card-invoice]");
+      return reply.code(502).send({ error: "Failed to create payment invoice" });
+    }
   });
 };

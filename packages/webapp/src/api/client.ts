@@ -7,6 +7,7 @@ import type {
   AdminUsersResponse,
   BannerSlide,
   GalleryResponse,
+  CatalogResponse,
 } from "../types.js";
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
@@ -152,11 +153,20 @@ export const api = {
       request<Model[]>(section ? `/models?section=${section}` : "/models"),
   },
 
+  tariffs: {
+    catalog: () => request<CatalogResponse>("/tariffs/catalog"),
+  },
+
   payments: {
-    createInvoice: (planId: string) =>
+    createInvoice: (type: string, id: string, period?: string) =>
       request<{ invoiceUrl: string }>("/payments/invoice", {
         method: "POST",
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ type, id, period }),
+      }),
+    createCardInvoice: (type: string, id: string, period?: string) =>
+      request<{ paymentUrl: string }>("/payments/card-invoice", {
+        method: "POST",
+        body: JSON.stringify({ type, id, period }),
       }),
   },
 
