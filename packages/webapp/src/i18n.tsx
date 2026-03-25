@@ -44,6 +44,7 @@ const translations = {
     "manage.tab.design": "Design",
     "manage.tab.video": "Video",
     "manage.tab.audio": "Audio",
+    "manage.tab.uploads": "Uploads",
     "audioSettings.title": "Audio Settings",
     "audioSettings.subtitle": "Select a model for audio generation",
     "audioSettings.model": "Model",
@@ -252,6 +253,18 @@ const translations = {
     "videoSettings.noDurationSupport": "Fixed duration",
     "videoSettings.saved": "✓ Saved",
 
+    // Uploads
+    "uploads.title": "My Uploads",
+    "uploads.subtitle": "Voice recordings and audio files you've shared with the bot",
+    "uploads.empty": "No uploads yet. Send a voice message to the bot while in HeyGen mode.",
+    "uploads.delete": "Delete",
+    "uploads.confirmDelete": "Delete this upload?",
+    "uploads.rename": "Rename",
+    "uploads.officialVoices": "Official voices",
+    "uploads.myVoices": "My recordings",
+    "uploads.useVoice": "Use",
+    "uploads.voiceActive": "Active",
+
     // Auth errors
     "auth.tokenExpired": "Link expired. Press the «Profile» button in the bot menu again.",
     "auth.openFromTelegram": "Please open this app from Telegram",
@@ -297,6 +310,7 @@ const translations = {
     "manage.tab.design": "Дизайн",
     "manage.tab.video": "Видео",
     "manage.tab.audio": "Аудио",
+    "manage.tab.uploads": "Загрузки",
     "audioSettings.title": "Настройки аудио",
     "audioSettings.subtitle": "Выберите модель для генерации аудио",
     "audioSettings.model": "Модель",
@@ -501,6 +515,18 @@ const translations = {
     "videoSettings.noAspectSupport": "Фиксированное соотношение",
     "videoSettings.noDurationSupport": "Фиксированная длительность",
     "videoSettings.saved": "✓ Сохранено",
+
+    // Uploads
+    "uploads.title": "Мои загрузки",
+    "uploads.subtitle": "Голосовые записи и аудиофайлы, отправленные в бота",
+    "uploads.empty": "Загрузок пока нет. Отправьте голосовое сообщение боту в режиме HeyGen.",
+    "uploads.delete": "Удалить",
+    "uploads.confirmDelete": "Удалить эту запись?",
+    "uploads.rename": "Переименовать",
+    "uploads.officialVoices": "Официальные",
+    "uploads.myVoices": "Мои записи",
+    "uploads.useVoice": "Использовать",
+    "uploads.voiceActive": "Активен",
 
     // Auth errors
     "auth.tokenExpired":

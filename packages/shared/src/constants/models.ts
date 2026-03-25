@@ -2190,8 +2190,7 @@ export const AI_MODELS: Record<string, AIModel> = {
       {
         key: "background_color",
         label: "Цвет фона",
-        description: "HEX-цвет фона видео, напр. #FFFFFF.",
-        type: "text",
+        type: "color",
         default: "#FFFFFF",
       },
     ],

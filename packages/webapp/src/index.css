@@ -2372,6 +2372,33 @@ input::placeholder {
   border-color: var(--accent);
 }
 
+.settings-panel__color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-panel__color-input {
+  width: 44px;
+  height: 36px;
+  padding: 2px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  cursor: pointer;
+}
+
+.settings-panel__color-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.settings-panel__color-hex {
+  font-size: 13px;
+  font-family: monospace;
+  color: var(--text-secondary);
+}
+
 .family-card__row--settings {
   flex-direction: column;
   gap: 0;
@@ -2592,6 +2619,131 @@ input::placeholder {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent);
+}
+
+/* Voice picker tab toggle */
+.voice-picker__tabs {
+  display: flex;
+  gap: 0;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+}
+
+.voice-picker__tab {
+  flex: 1;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+
+.voice-picker__tab--active {
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+/* ── Uploads list ────────────────────────────────────────────────────────── */
+.uploads-empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 16px 0;
+}
+
+.uploads-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.uploads-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.uploads-item__info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.uploads-item__name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.uploads-item__name:hover {
+  color: var(--accent);
+}
+
+.uploads-item__name-input {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  width: 100%;
+  font-family: inherit;
+}
+
+.uploads-item__name-input:focus {
+  outline: none;
+}
+
+.uploads-item__meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.uploads-item__actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.uploads-item__btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+
+.uploads-item__btn--rename:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.uploads-item__btn--delete:hover {
+  border-color: #e55;
+  color: #e55;
 }
 
 /* ── Period selector ────────────────────────────────────────────────────── */

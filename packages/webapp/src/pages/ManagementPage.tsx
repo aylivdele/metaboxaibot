@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
-import type { Dialog, Message, Model, ModelSettingDef, UserState } from "../types.js";
-import type { HeyGenVoice } from "../types.js";
+import type { Dialog, HeyGenVoice, Message, Model, ModelSettingDef, UserState, UserUpload } from "../types.js";
 
 // ── Custom slider ─────────────────────────────────────────────────────────────
 
@@ -56,112 +55,191 @@ function CustomSlider({ min, max, step, value, onChange }: CustomSliderProps) {
 // ── HeyGenVoicePicker ─────────────────────────────────────────────────────────
 
 interface HeyGenVoicePickerProps {
-  value: string;
-  onChange: (voiceId: string) => void;
+  /** Currently selected official voice_id (empty string = none) */
+  voiceId: string;
+  /** Currently selected user upload URL stored as voice_url (empty string = none) */
+  voiceUrl: string;
+  /** Called when user picks an official voice: sets voice_id, clears voice_url */
+  onChange: (key: string, value: unknown) => void;
 }
 
-function HeyGenVoicePicker({ value, onChange }: HeyGenVoicePickerProps) {
+function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePickerProps) {
+  const { t } = useI18n();
+  // "official" | "uploads"
+  const [tab, setTab] = useState<"official" | "uploads">(voiceUrl ? "uploads" : "official");
+
+  // Official voices state
   const [voices, setVoices] = useState<HeyGenVoice[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [voicesLoading, setVoicesLoading] = useState(false);
   const [langFilter, setLangFilter] = useState("all");
   const [genderFilter, setGenderFilter] = useState("all");
+
+  // User uploads state
+  const [uploads, setUploads] = useState<UserUpload[]>([]);
+  const [uploadsLoading, setUploadsLoading] = useState(false);
+
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    api.heygenVoices
-      .list()
-      .then((list) => setVoices(list))
-      .catch(() => setVoices([]))
-      .finally(() => setLoading(false));
-  }, []);
+    if (tab === "official" && voices.length === 0) {
+      setVoicesLoading(true);
+      api.heygenVoices
+        .list()
+        .then(setVoices)
+        .catch(() => setVoices([]))
+        .finally(() => setVoicesLoading(false));
+    }
+    if (tab === "uploads") {
+      setUploadsLoading(true);
+      api.uploads
+        .list("voice")
+        .then(setUploads)
+        .catch(() => setUploads([]))
+        .finally(() => setUploadsLoading(false));
+    }
+  }, [tab, voices.length]);
+
+  const stopAudio = () => {
+    audioRef.current?.pause();
+    setPlayingId(null);
+  };
+
+  const playPreview = (id: string, url: string) => {
+    if (playingId === id) { stopAudio(); return; }
+    stopAudio();
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    setPlayingId(id);
+    audio.play().catch(() => void 0);
+    audio.onended = () => setPlayingId(null);
+  };
+
+  const selectOfficial = (id: string) => {
+    onChange("voice_id", id);
+    onChange("voice_url", "");
+  };
+
+  const selectUpload = (url: string) => {
+    onChange("voice_url", url);
+    onChange("voice_id", "");
+  };
 
   const languages = ["all", ...Array.from(new Set(voices.map((v) => v.language).filter(Boolean))).sort()];
-
-  const filtered = voices.filter(
+  const filteredVoices = voices.filter(
     (v) =>
       (langFilter === "all" || v.language === langFilter) &&
       (genderFilter === "all" || v.gender === genderFilter),
   );
 
-  const playPreview = (voice: HeyGenVoice) => {
-    if (!voice.preview_audio) return;
-    if (playingId === voice.voice_id) {
-      audioRef.current?.pause();
-      setPlayingId(null);
-      return;
-    }
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    const audio = new Audio(voice.preview_audio);
-    audioRef.current = audio;
-    setPlayingId(voice.voice_id);
-    audio.play().catch(() => void 0);
-    audio.onended = () => setPlayingId(null);
-  };
-
-  if (loading) return <div className="voice-picker__loading">Загрузка голосов…</div>;
-
   return (
     <div className="voice-picker">
-      <div className="voice-picker__filters">
-        <select
-          className="voice-picker__filter-select"
-          value={langFilter}
-          onChange={(e) => setLangFilter(e.target.value)}
+      {/* Tab toggle */}
+      <div className="voice-picker__tabs">
+        <button
+          className={`voice-picker__tab${tab === "official" ? " voice-picker__tab--active" : ""}`}
+          onClick={() => setTab("official")}
         >
-          {languages.map((l) => (
-            <option key={l} value={l}>
-              {l === "all" ? "Все языки" : l}
-            </option>
-          ))}
-        </select>
-        <div className="voice-picker__gender-btns">
-          {(["all", "male", "female"] as const).map((g) => (
-            <button
-              key={g}
-              className={`voice-picker__gender-btn${genderFilter === g ? " voice-picker__gender-btn--active" : ""}`}
-              onClick={() => setGenderFilter(g)}
-            >
-              {g === "all" ? "Все" : g === "male" ? "М" : "Ж"}
-            </button>
-          ))}
-        </div>
+          {t("uploads.officialVoices")}
+        </button>
+        <button
+          className={`voice-picker__tab${tab === "uploads" ? " voice-picker__tab--active" : ""}`}
+          onClick={() => setTab("uploads")}
+        >
+          {t("uploads.myVoices")}
+        </button>
       </div>
-      <div className="voice-picker__list">
-        {filtered.map((voice) => (
-          <div
-            key={voice.voice_id}
-            className={`voice-picker__item${value === voice.voice_id ? " voice-picker__item--selected" : ""}`}
-            onClick={() => onChange(voice.voice_id)}
-          >
-            <div className="voice-picker__item-info">
-              <span className="voice-picker__item-name">{voice.name}</span>
-              <span className="voice-picker__item-meta">
-                {voice.language}
-                {voice.gender ? ` · ${voice.gender === "male" ? "М" : voice.gender === "female" ? "Ж" : voice.gender}` : ""}
-              </span>
-            </div>
-            {voice.preview_audio && (
-              <button
-                className={`voice-picker__play-btn${playingId === voice.voice_id ? " voice-picker__play-btn--playing" : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  playPreview(voice);
-                }}
-                title="Прослушать"
+
+      {/* Official voices */}
+      {tab === "official" && (
+        voicesLoading ? (
+          <div className="voice-picker__loading">Загрузка голосов…</div>
+        ) : (
+          <>
+            <div className="voice-picker__filters">
+              <select
+                className="voice-picker__filter-select"
+                value={langFilter}
+                onChange={(e) => setLangFilter(e.target.value)}
               >
-                {playingId === voice.voice_id ? "⏹" : "▶"}
-              </button>
-            )}
+                {languages.map((l) => (
+                  <option key={l} value={l}>{l === "all" ? "Все языки" : l}</option>
+                ))}
+              </select>
+              <div className="voice-picker__gender-btns">
+                {(["all", "male", "female"] as const).map((g) => (
+                  <button
+                    key={g}
+                    className={`voice-picker__gender-btn${genderFilter === g ? " voice-picker__gender-btn--active" : ""}`}
+                    onClick={() => setGenderFilter(g)}
+                  >
+                    {g === "all" ? "Все" : g === "male" ? "М" : "Ж"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="voice-picker__list">
+              {filteredVoices.map((voice) => (
+                <div
+                  key={voice.voice_id}
+                  className={`voice-picker__item${voiceId === voice.voice_id && !voiceUrl ? " voice-picker__item--selected" : ""}`}
+                  onClick={() => selectOfficial(voice.voice_id)}
+                >
+                  <div className="voice-picker__item-info">
+                    <span className="voice-picker__item-name">{voice.name}</span>
+                    <span className="voice-picker__item-meta">
+                      {voice.language}{voice.gender ? ` · ${voice.gender === "male" ? "М" : voice.gender === "female" ? "Ж" : voice.gender}` : ""}
+                    </span>
+                  </div>
+                  {voice.preview_audio && (
+                    <button
+                      className={`voice-picker__play-btn${playingId === voice.voice_id ? " voice-picker__play-btn--playing" : ""}`}
+                      onClick={(e) => { e.stopPropagation(); playPreview(voice.voice_id, voice.preview_audio!); }}
+                      title="Прослушать"
+                    >
+                      {playingId === voice.voice_id ? "⏹" : "▶"}
+                    </button>
+                  )}
+                </div>
+              ))}
+              {filteredVoices.length === 0 && <div className="voice-picker__empty">Голоса не найдены</div>}
+            </div>
+          </>
+        )
+      )}
+
+      {/* My recordings */}
+      {tab === "uploads" && (
+        uploadsLoading ? (
+          <div className="voice-picker__loading">Загрузка…</div>
+        ) : uploads.length === 0 ? (
+          <div className="voice-picker__empty">{t("uploads.empty")}</div>
+        ) : (
+          <div className="voice-picker__list">
+            {uploads.map((upload) => (
+              <div
+                key={upload.id}
+                className={`voice-picker__item${voiceUrl === upload.url ? " voice-picker__item--selected" : ""}`}
+                onClick={() => selectUpload(upload.url)}
+              >
+                <div className="voice-picker__item-info">
+                  <span className="voice-picker__item-name">{upload.name}</span>
+                  <span className="voice-picker__item-meta">
+                    {new Date(upload.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <button
+                  className={`voice-picker__play-btn${playingId === upload.id ? " voice-picker__play-btn--playing" : ""}`}
+                  onClick={(e) => { e.stopPropagation(); playPreview(upload.id, upload.url); }}
+                  title="Прослушать"
+                >
+                  {playingId === upload.id ? "⏹" : "▶"}
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
-        {filtered.length === 0 && (
-          <div className="voice-picker__empty">Голоса не найдены</div>
-        )}
-      </div>
+        )
+      )}
     </div>
   );
 }
@@ -240,10 +318,22 @@ function SettingsPanel({ settings, values, onChange }: SettingsPanelProps) {
                 onChange={(e) => onChange(def.key, e.target.value ? Number(e.target.value) : null)}
               />
             )}
+            {def.type === "color" && (
+              <div className="settings-panel__color-row">
+                <input
+                  type="color"
+                  className="settings-panel__color-input"
+                  value={String(val ?? "#FFFFFF")}
+                  onChange={(e) => onChange(def.key, e.target.value)}
+                />
+                <span className="settings-panel__color-hex">{String(val ?? "#FFFFFF")}</span>
+              </div>
+            )}
             {def.type === "voice-picker" && (
               <HeyGenVoicePicker
-                value={String(val ?? "")}
-                onChange={(voiceId) => onChange(def.key, voiceId)}
+                voiceId={String(values["voice_id"] ?? "")}
+                voiceUrl={String(values["voice_url"] ?? "")}
+                onChange={onChange}
               />
             )}
           </div>
@@ -711,9 +801,130 @@ function MediaSettingsView({ section }: { section: MediaSection }) {
   );
 }
 
+// ── UploadsView ───────────────────────────────────────────────────────────────
+
+function UploadsView() {
+  const { t } = useI18n();
+  const [uploads, setUploads] = useState<UserUpload[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    api.uploads
+      .list()
+      .then(setUploads)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const stopAudio = () => { audioRef.current?.pause(); setPlayingId(null); };
+
+  const playPreview = (id: string, url: string) => {
+    if (playingId === id) { stopAudio(); return; }
+    stopAudio();
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    setPlayingId(id);
+    audio.play().catch(() => void 0);
+    audio.onended = () => setPlayingId(null);
+  };
+
+  const startEdit = (upload: UserUpload) => {
+    setEditingId(upload.id);
+    setEditName(upload.name);
+  };
+
+  const saveEdit = async (id: string) => {
+    if (!editName.trim()) return;
+    const updated = await api.uploads.rename(id, editName.trim()).catch(() => null);
+    if (updated) {
+      setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, name: editName.trim() } : u)));
+    }
+    setEditingId(null);
+  };
+
+  const deleteUpload = async (id: string) => {
+    if (!confirm(t("uploads.confirmDelete"))) return;
+    await api.uploads.delete(id).catch(console.error);
+    setUploads((prev) => prev.filter((u) => u.id !== id));
+    if (playingId === id) stopAudio();
+  };
+
+  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h2>{t("uploads.title")}</h2>
+        <p className="page-subtitle">{t("uploads.subtitle")}</p>
+      </div>
+      {uploads.length === 0 ? (
+        <p className="uploads-empty">{t("uploads.empty")}</p>
+      ) : (
+        <div className="uploads-list">
+          {uploads.map((upload) => (
+            <div key={upload.id} className="uploads-item">
+              <button
+                className={`voice-picker__play-btn${playingId === upload.id ? " voice-picker__play-btn--playing" : ""}`}
+                onClick={() => playPreview(upload.id, upload.url)}
+                title="Прослушать"
+              >
+                {playingId === upload.id ? "⏹" : "▶"}
+              </button>
+
+              <div className="uploads-item__info">
+                {editingId === upload.id ? (
+                  <input
+                    className="uploads-item__name-input"
+                    value={editName}
+                    autoFocus
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void saveEdit(upload.id);
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                    onBlur={() => void saveEdit(upload.id)}
+                  />
+                ) : (
+                  <span className="uploads-item__name" onClick={() => startEdit(upload)}>
+                    {upload.name}
+                  </span>
+                )}
+                <span className="uploads-item__meta">
+                  {upload.type} · {new Date(upload.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+
+              <div className="uploads-item__actions">
+                <button
+                  className="uploads-item__btn uploads-item__btn--rename"
+                  onClick={() => startEdit(upload)}
+                  title={t("uploads.rename")}
+                >
+                  ✏
+                </button>
+                <button
+                  className="uploads-item__btn uploads-item__btn--delete"
+                  onClick={() => void deleteUpload(upload.id)}
+                  title={t("uploads.delete")}
+                >
+                  🗑
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Dispatcher with tab bar ───────────────────────────────────────────────────
 
-type ManageTab = "gpt" | "design" | "video" | "audio";
+type ManageTab = "gpt" | "design" | "video" | "audio" | "uploads";
 
 export function ManagementPage({ initialSection }: { initialSection?: string }) {
   const { t } = useI18n();
@@ -730,7 +941,7 @@ export function ManagementPage({ initialSection }: { initialSection?: string }) 
   return (
     <div className="manage-root">
       <div className="manage-tabs">
-        {(["gpt", "design", "video", "audio"] as ManageTab[]).map((s) => (
+        {(["gpt", "design", "video", "audio", "uploads"] as ManageTab[]).map((s) => (
           <button
             key={s}
             className={`manage-tab${tab === s ? " manage-tab--active" : ""}`}
@@ -745,6 +956,7 @@ export function ManagementPage({ initialSection }: { initialSection?: string }) 
         {tab === "design" && <MediaSettingsView section="design" />}
         {tab === "video" && <MediaSettingsView section="video" />}
         {tab === "audio" && <MediaSettingsView section="audio" />}
+        {tab === "uploads" && <UploadsView />}
       </div>
     </div>
   );

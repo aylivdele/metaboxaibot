@@ -37,6 +37,7 @@ model User {
   dialogs      Dialog[]
   transactions TokenTransaction[]
   userState    UserState?
+  uploads      UserUpload[]
 
   @@map("users")
 }
@@ -181,6 +182,25 @@ model GenerationJob {
   @@index([userId])
   @@index([status])
   @@map("generation_jobs")
+}
+
+// ─────────────────────────────────────────────
+// Загрузки пользователей (голоса, аудио)
+// ─────────────────────────────────────────────
+model UserUpload {
+  id        String   @id @default(cuid())
+  userId    BigInt
+  type      String   // "voice" | "audio"
+  name      String
+  url       String   // публичный URL (S3 или Telegram)
+  s3Key     String?  // ключ в S3, если файл загружен
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_uploads")
 }
 
 // ─────────────────────────────────────────────

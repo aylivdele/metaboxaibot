@@ -1,5 +1,11 @@
 import type { BotContext } from "../types/context.js";
-import { videoGenerationService, userStateService, calculateCost } from "@metabox/api/services";
+import {
+  videoGenerationService,
+  userStateService,
+  userUploadsService,
+  s3Service,
+  calculateCost,
+} from "@metabox/api/services";
 import { MODELS_BY_SECTION, AI_MODELS, config } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -196,7 +202,25 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
 export async function handleVideoVoice(ctx: BotContext): Promise<void> {
   if (!ctx.user || !ctx.message?.voice) return;
   const file = await ctx.api.getFile(ctx.message.voice.file_id);
-  const fileUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
-  await userStateService.setVideoRefVoiceUrl(ctx.user.id, fileUrl);
+  const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+
+  // Upload to S3 for permanent storage; fall back to Telegram URL if S3 not configured
+  const userId = ctx.user.id;
+  const s3Key = `voice/${userId.toString()}/${file.file_id}.ogg`;
+  const uploadedKey = await s3Service.uploadFromUrl(s3Key, tgUrl, "audio/ogg").catch(() => null);
+  const publicUrl = uploadedKey
+    ? ((await s3Service.getFileUrl(uploadedKey).catch(() => null)) ?? tgUrl)
+    : tgUrl;
+
+  // Save to DB as a named upload
+  await userUploadsService.create(userId, {
+    type: "voice",
+    name: ctx.t.video.myVoiceDefaultName,
+    url: publicUrl,
+    s3Key: uploadedKey ?? undefined,
+  });
+
+  // Also set as one-shot override for the next generation
+  await userStateService.setVideoRefVoiceUrl(userId, publicUrl);
   await ctx.reply(ctx.t.video.videoVoiceSaved);
 }

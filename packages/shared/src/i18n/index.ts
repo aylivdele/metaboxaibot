@@ -86,6 +86,7 @@ export interface Translations {
     videoPhotoSaved: string;
     videoDriverSaved: string;
     videoVoiceSaved: string;
+    myVoiceDefaultName: string;
   };
   errors: {
     noTool: string;

@@ -98,6 +98,7 @@ export default {
     videoPhotoSaved: "📸 Photo saved. Now send the text for voice-over.",
     videoDriverSaved: "🎬 Driver video saved. Now send the text for voice-over.",
     videoVoiceSaved: "🎙 Voice sample saved. Now send the text for the avatar to speak.",
+    myVoiceDefaultName: "My voice",
   },
   errors: {
     unexpected: "Unexpected error. Please, try again later.",

@@ -39,7 +39,7 @@ export interface ModelSettingDef {
   key: string;
   label: string;
   description?: string;
-  type: "select" | "slider" | "toggle" | "text" | "number" | "voice-picker";
+  type: "select" | "slider" | "toggle" | "text" | "number" | "voice-picker" | "color";
   options?: ModelSettingOption[];
   min?: number;
   max?: number;
@@ -53,6 +53,15 @@ export interface HeyGenVoice {
   language: string;
   gender: string;
   preview_audio: string | null;
+}
+
+export interface UserUpload {
+  id: string;
+  type: string;
+  name: string;
+  url: string;
+  s3Key: string | null;
+  createdAt: string;
 }
 
 export interface Model {

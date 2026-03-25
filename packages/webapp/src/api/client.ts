@@ -9,6 +9,7 @@ import type {
   GalleryResponse,
   CatalogResponse,
   HeyGenVoice,
+  UserUpload,
 } from "../types.js";
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
@@ -220,6 +221,18 @@ export const api = {
 
   heygenVoices: {
     list: () => request<HeyGenVoice[]>("/heygen-voices"),
+  },
+
+  uploads: {
+    list: (type?: string) =>
+      request<UserUpload[]>(type ? `/uploads?type=${type}` : "/uploads"),
+    rename: (id: string, name: string) =>
+      request<UserUpload>(`/uploads/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/uploads/${id}`, { method: "DELETE" }),
   },
 
   modelSettings: {
