@@ -65,6 +65,7 @@ export const paymentService = {
           amount: plan.tokens,
           type: "credit",
           reason: "purchase",
+          description: `Пакет токенов ${plan.name}`,
           modelId: plan.id,
         },
       }),
@@ -105,7 +106,13 @@ export const paymentService = {
     productType: "product" | "subscription",
     period: string | undefined,
     userInfo: SaleUserInfo,
+    productName?: string,
   ): Promise<void> {
+    const desc =
+      productType === "subscription"
+        ? `Подписка ${productName || productId} (${period || "M1"})`
+        : `Пакет токенов ${productName || productId}`;
+
     await db.$transaction([
       db.user.update({
         where: { id: userId },
@@ -117,6 +124,7 @@ export const paymentService = {
           amount: tokens,
           type: "credit",
           reason: "purchase",
+          description: desc,
           modelId: productId,
         },
       }),

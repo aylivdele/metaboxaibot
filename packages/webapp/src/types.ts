@@ -9,6 +9,13 @@ export interface UserProfile {
   createdAt: string;
   metaboxUserId: string | null;
   metaboxReferralCode: string | null;
+  subscription: {
+    planName: string;
+    period: string;
+    daysLeft: number;
+    totalDays: number;
+    endDate: string;
+  } | null;
   transactions: Transaction[];
 }
 
@@ -17,6 +24,7 @@ export interface Transaction {
   amount: string;
   type: "credit" | "debit";
   reason: string;
+  description: string | null;
   modelId: string | null;
   createdAt: string;
 }
@@ -223,6 +231,7 @@ export interface CatalogResponse {
   tokenPackages: CatalogTokenPackage[];
   canPayByCard: boolean;
   usdtRubRate: number;
+  metaboxUrl: string;
 }
 
 export type Page = "profile" | "management" | "tariffs" | "referral" | "admin" | "linkMetabox";

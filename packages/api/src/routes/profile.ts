@@ -45,6 +45,30 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (!user) throw new Error("User not found");
 
+    // Fetch subscription status from Metabox
+    let subscription: {
+      planName: string;
+      period: string;
+      daysLeft: number;
+      totalDays: number;
+      endDate: string;
+    } | null = null;
+    try {
+      const { get } = await import("../services/metabox-bridge.service.js");
+      const subData = await get<{
+        subscription: {
+          planName: string;
+          period: string;
+          daysLeft: number;
+          totalDays: number;
+          endDate: string;
+        } | null;
+      }>(`/internal/subscription-status?telegramId=${userId.toString()}`);
+      subscription = subData.subscription;
+    } catch {
+      // Non-fatal: subscription info unavailable
+    }
+
     return {
       id: user.id.toString(),
       username: user.username ?? null,
@@ -56,11 +80,13 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       tokenBalance: user.tokenBalance.toString(),
       referralCount,
       createdAt: user.createdAt.toISOString(),
+      subscription,
       transactions: transactions.map((t) => ({
         id: t.id,
         amount: t.amount.toString(),
         type: t.type,
         reason: t.reason,
+        description: t.description ?? null,
         modelId: t.modelId ?? null,
         createdAt: t.createdAt.toISOString(),
       })),

@@ -164,10 +164,10 @@ export const api = {
   },
 
   payments: {
-    createInvoice: (type: string, id: string, period?: string) =>
+    createInvoice: (type: string, id: string, period?: string, name?: string) =>
       request<{ invoiceUrl: string }>("/payments/invoice", {
         method: "POST",
-        body: JSON.stringify({ type, id, period }),
+        body: JSON.stringify({ type, id, period, name }),
       }),
     createCardInvoice: (type: string, id: string, period?: string) =>
       request<{ paymentUrl: string }>("/payments/card-invoice", {

@@ -25,6 +25,7 @@ const REASON_KEYS: Record<string, string> = {
   welcome_bonus: "profile.reason.welcome_bonus",
   ai_usage: "profile.reason.ai_usage",
   purchase: "profile.reason.purchase",
+  metabox_purchase: "profile.reason.metabox_purchase",
   referral_bonus: "profile.reason.referral_bonus",
   admin: "profile.reason.admin",
 };
@@ -85,6 +86,8 @@ export function ProfilePage({ initialSection }: { initialSection?: ProfileTab })
 
 function OverviewTab({ profile }: { profile: UserProfile }) {
   const { t } = useI18n();
+  const sub = profile.subscription;
+  const progressPct = sub ? Math.max(0, Math.min(100, (sub.daysLeft / sub.totalDays) * 100)) : 0;
 
   return (
     <>
@@ -96,6 +99,26 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
         </div>
       </div>
 
+      {sub && (
+        <div className="sub-card">
+          <div className="sub-card__header">
+            <span className="sub-card__plan">{sub.planName}</span>
+            <span className="sub-card__period">{sub.period}</span>
+          </div>
+          <div className="sub-card__days">
+            <span className="sub-card__days-left">
+              {sub.daysLeft} {sub.daysLeft === 1 ? "день" : sub.daysLeft < 5 ? "дня" : "дней"}
+            </span>
+            <span className="sub-card__end-date">
+              до {new Date(sub.endDate).toLocaleDateString("ru-RU")}
+            </span>
+          </div>
+          <div className="sub-card__bar">
+            <div className="sub-card__bar-fill" style={{ width: `${progressPct}%` }} />
+          </div>
+        </div>
+      )}
+
       <div className="section-title">{t("profile.txHistory")}</div>
       {profile.transactions.length === 0 ? (
         <div className="empty-state">{t("profile.noTx")}</div>
@@ -105,7 +128,10 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
             <li key={tx.id} className="tx-item">
               <div className="tx-item__info">
                 <span className="tx-item__reason">
-                  {REASON_KEYS[tx.reason] ? t(REASON_KEYS[tx.reason] as TranslationKey) : tx.reason}
+                  {tx.description ||
+                    (REASON_KEYS[tx.reason]
+                      ? t(REASON_KEYS[tx.reason] as TranslationKey)
+                      : tx.reason)}
                 </span>
                 {tx.modelId && <span className="tx-item__model">{tx.modelId}</span>}
                 <span className="tx-item__date">{new Date(tx.createdAt).toLocaleDateString()}</span>

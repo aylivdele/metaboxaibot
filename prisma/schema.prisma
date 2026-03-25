@@ -144,7 +144,8 @@ model TokenTransaction {
   userId BigInt
   amount Decimal @db.Decimal(12, 4)           // положительное = пополнение, отрицательное = списание
   type   String  // credit | debit
-  reason String  // welcome_bonus | ai_usage | purchase | referral_bonus | admin
+  reason      String  // welcome_bonus | ai_usage | purchase | referral_bonus | admin | metabox_purchase
+  description String? // Человекочитаемое описание (напр. "Подписка PRO (M3)")
 
   // Метаданные для разных типов
   modelId  String? // при ai_usage

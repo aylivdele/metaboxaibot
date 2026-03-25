@@ -80,7 +80,12 @@ export function TariffsPage() {
     setNotice(null);
 
     try {
-      const { invoiceUrl } = await api.payments.createInvoice(modal.type, modal.id, modal.period);
+      const { invoiceUrl } = await api.payments.createInvoice(
+        modal.type,
+        modal.id,
+        modal.period,
+        modal.name,
+      );
       const tg = getTgWebApp();
       if (!tg?.openInvoice) {
         setNotice({ text: t("tariffs.openInTg"), ok: false });
@@ -106,8 +111,8 @@ export function TariffsPage() {
   };
 
   const handleCardPay = () => {
-    // Redirect to Metabox site shop subscriptions tab
-    const metaboxUrl = (import.meta as any).env?.VITE_METABOX_URL || "https://app.meta-box.ru";
+    // Redirect to Metabox site shop subscriptions tab (URL from server config)
+    const metaboxUrl = catalog?.metaboxUrl || "https://app.meta-box.ru";
     const shopUrl = `${metaboxUrl}/shop?tab=subscriptions`;
     const tg = getTgWebApp();
     if (tg?.openLink) {
