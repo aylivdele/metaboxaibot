@@ -46,28 +46,37 @@ export const tariffsRoutes: FastifyPluginAsync = async (fastify) => {
       }),
     ]);
 
-    // Enrich subscriptions with Stars prices for each period
+    // Enrich subscriptions with Stars prices — only include available periods
     const subscriptions = catalog.subscriptions.map((sub) => {
       const monthly = Number(sub.priceMonthly);
       const d3 = Number(sub.discount3m);
       const d6 = Number(sub.discount6m);
       const d12 = Number(sub.discount12m);
 
+      // M1 is always available; other periods only if discount > 0
+      const periods: Record<string, { priceRub: string; stars: number }> = {};
+
       const priceM1 = monthly;
-      const priceM3 = monthly * 3 * (1 - d3 / 100);
-      const priceM6 = monthly * 6 * (1 - d6 / 100);
-      const priceM12 = monthly * 12 * (1 - d12 / 100);
+      periods.M1 = { priceRub: priceM1.toFixed(2), stars: calcStars(priceM1, usdtRubRate) };
+
+      if (d3 > 0) {
+        const priceM3 = monthly * 3 * (1 - d3 / 100);
+        periods.M3 = { priceRub: priceM3.toFixed(2), stars: calcStars(priceM3, usdtRubRate) };
+      }
+      if (d6 > 0) {
+        const priceM6 = monthly * 6 * (1 - d6 / 100);
+        periods.M6 = { priceRub: priceM6.toFixed(2), stars: calcStars(priceM6, usdtRubRate) };
+      }
+      if (d12 > 0) {
+        const priceM12 = monthly * 12 * (1 - d12 / 100);
+        periods.M12 = { priceRub: priceM12.toFixed(2), stars: calcStars(priceM12, usdtRubRate) };
+      }
 
       return {
         id: sub.id,
         name: sub.name,
         tokens: sub.tokens,
-        periods: {
-          M1: { priceRub: priceM1.toFixed(2), stars: calcStars(priceM1, usdtRubRate) },
-          M3: { priceRub: priceM3.toFixed(2), stars: calcStars(priceM3, usdtRubRate) },
-          M6: { priceRub: priceM6.toFixed(2), stars: calcStars(priceM6, usdtRubRate) },
-          M12: { priceRub: priceM12.toFixed(2), stars: calcStars(priceM12, usdtRubRate) },
-        },
+        periods,
       };
     });
 

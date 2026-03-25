@@ -203,12 +203,8 @@ export interface CatalogSubscription {
   id: string;
   name: string;
   tokens: number;
-  periods: {
-    M1: CatalogPeriod;
-    M3: CatalogPeriod;
-    M6: CatalogPeriod;
-    M12: CatalogPeriod;
-  };
+  /** Only available periods are included (M1 always present; M3/M6/M12 only if discount > 0). */
+  periods: Partial<Record<"M1" | "M3" | "M6" | "M12", CatalogPeriod>>;
 }
 
 export interface CatalogTokenPackage {

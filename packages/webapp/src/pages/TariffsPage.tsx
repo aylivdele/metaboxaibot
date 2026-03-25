@@ -1,11 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { CatalogResponse, CatalogSubscription, CatalogTokenPackage } from "../types.js";
 
 type Period = "M1" | "M3" | "M6" | "M12";
-const PERIODS: Period[] = ["M1", "M3", "M6", "M12"];
+const ALL_PERIODS: Period[] = ["M1", "M3", "M6", "M12"];
 const PERIOD_MONTHS: Record<Period, number> = { M1: 1, M3: 3, M6: 6, M12: 12 };
+
+const BADGE_LABELS: Record<string, string> = {
+  top: "\uD83D\uDD25 \u0422\u043E\u043F",
+  profitable: "\uD83D\uDC8E \u0412\u044B\u0433\u043E\u0434\u043D\u043E",
+};
 
 type TgWebApp = {
   openInvoice?: (url: string, cb?: (status: string) => void) => void;
@@ -44,6 +49,25 @@ export function TariffsPage() {
       .catch(() => void 0);
   }, []);
 
+  // Compute available periods from subscriptions (union of all available periods)
+  const availablePeriods = useMemo<Period[]>(() => {
+    if (!catalog || catalog.subscriptions.length === 0) return ["M1"];
+    const set = new Set<Period>();
+    for (const sub of catalog.subscriptions) {
+      for (const p of ALL_PERIODS) {
+        if (sub.periods[p]) set.add(p);
+      }
+    }
+    return ALL_PERIODS.filter((p) => set.has(p));
+  }, [catalog]);
+
+  // Reset period to M1 if the current selection is no longer available
+  useEffect(() => {
+    if (!availablePeriods.includes(period)) {
+      setPeriod("M1");
+    }
+  }, [availablePeriods, period]);
+
   const openModal = (state: ModalState) => {
     setModal(state);
     setNotice(null);
@@ -63,7 +87,7 @@ export function TariffsPage() {
       }
       tg.openInvoice(invoiceUrl, (status) => {
         if (status === "paid") {
-          setNotice({ text: `✅ ${modal.tokens} ${t("tariffs.success")}`, ok: true });
+          setNotice({ text: `\u2705 ${modal.tokens} ${t("tariffs.success")}`, ok: true });
           setModal(null);
           api.profile
             .get()
@@ -107,6 +131,7 @@ export function TariffsPage() {
 
   const openSubModal = (sub: CatalogSubscription) => {
     const p = sub.periods[period];
+    if (!p) return;
     const months = PERIOD_MONTHS[period];
     openModal({
       type: "subscription",
@@ -140,7 +165,7 @@ export function TariffsPage() {
         <h2>{t("tariffs.title")}</h2>
         {balance !== null && (
           <p className="page-subtitle">
-            {t("tariffs.currentBalance")}: ✦ {Number(balance).toFixed(2)} {t("tariffs.tokens")}
+            {t("tariffs.currentBalance")}: \u2726 {Number(balance).toFixed(2)} {t("tariffs.tokens")}
           </p>
         )}
         <p className="page-subtitle">{t("tariffs.description")}</p>
@@ -159,28 +184,31 @@ export function TariffsPage() {
         <>
           <h3 className="section-title">{t("tariffs.subscriptions")}</h3>
 
-          <div className="period-selector">
-            {PERIODS.map((p) => (
-              <button
-                key={p}
-                className={`period-selector__btn${p === period ? " period-selector__btn--active" : ""}`}
-                onClick={() => setPeriod(p)}
-              >
-                {t(`tariffs.period.${p}`)}
-              </button>
-            ))}
-          </div>
+          {availablePeriods.length > 1 && (
+            <div className="period-selector">
+              {availablePeriods.map((p) => (
+                <button
+                  key={p}
+                  className={`period-selector__btn${p === period ? " period-selector__btn--active" : ""}`}
+                  onClick={() => setPeriod(p)}
+                >
+                  {t(`tariffs.period.${p}`)}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="plans-grid">
             {catalog.subscriptions.map((sub) => {
               const p = sub.periods[period];
+              if (!p) return null;
               const months = PERIOD_MONTHS[period];
               return (
                 <div key={sub.id} className="plan-card">
                   <div className="plan-card__label">{sub.name}</div>
-                  <div className="plan-card__tokens">✦ {sub.tokens * months}</div>
+                  <div className="plan-card__tokens">\u2726 {sub.tokens * months}</div>
                   <div className="plan-card__price">
-                    {Number(p.priceRub).toLocaleString("ru-RU")} ₽
+                    {Number(p.priceRub).toLocaleString("ru-RU")} \u20BD
                   </div>
                   <button className="plan-card__btn" onClick={() => openSubModal(sub)}>
                     {t("tariffs.buy")}
@@ -200,11 +228,13 @@ export function TariffsPage() {
           <div className="plans-grid">
             {catalog.tokenPackages.map((pkg) => (
               <div key={pkg.id} className={`plan-card${pkg.badge ? " plan-card--popular" : ""}`}>
-                {pkg.badge && <div className="plan-card__badge">{pkg.badge}</div>}
+                {pkg.badge && (
+                  <div className="plan-card__badge">{BADGE_LABELS[pkg.badge] ?? pkg.badge}</div>
+                )}
                 <div className="plan-card__label">{pkg.name}</div>
-                <div className="plan-card__tokens">✦ {pkg.tokens}</div>
+                <div className="plan-card__tokens">\u2726 {pkg.tokens}</div>
                 <div className="plan-card__price">
-                  {Number(pkg.priceRub).toLocaleString("ru-RU")} ₽
+                  {Number(pkg.priceRub).toLocaleString("ru-RU")} \u20BD
                 </div>
                 <button className="plan-card__btn" onClick={() => openPkgModal(pkg)}>
                   {t("tariffs.buy")}
@@ -226,14 +256,17 @@ export function TariffsPage() {
         <div className="payment-modal" onClick={() => !buying && setModal(null)}>
           <div className="payment-modal__card" onClick={(e) => e.stopPropagation()}>
             <button className="payment-modal__close" onClick={() => !buying && setModal(null)}>
-              ✕
+              \u2715
             </button>
 
             <h3 className="payment-modal__title">{t("tariffs.choosePayment")}</h3>
 
             <div className="payment-modal__product">
               <span className="payment-modal__product-name">{modal.name}</span>
-              <span className="payment-modal__product-tokens">✦ {modal.tokens}</span>
+              <span className="payment-modal__product-tokens">\u2726 {modal.tokens}</span>
+              <span className="payment-modal__product-price">
+                {Number(modal.priceRub).toLocaleString("ru-RU")} \u20BD
+              </span>
             </div>
 
             <div className="payment-modal__options">
@@ -243,10 +276,10 @@ export function TariffsPage() {
                   onClick={handleCardPay}
                   disabled={buying}
                 >
-                  <span className="payment-modal__option-icon">💳</span>
+                  <span className="payment-modal__option-icon">\uD83D\uDCB3</span>
                   <span className="payment-modal__option-label">{t("tariffs.payByCard")}</span>
                   <span className="payment-modal__option-price">
-                    {Number(modal.priceRub).toLocaleString("ru-RU")} ₽
+                    {Number(modal.priceRub).toLocaleString("ru-RU")} \u20BD
                   </span>
                 </button>
               ) : (
@@ -260,7 +293,7 @@ export function TariffsPage() {
                 onClick={handleStarsPay}
                 disabled={buying}
               >
-                <span className="payment-modal__option-icon">⭐</span>
+                <span className="payment-modal__option-icon">\u2B50</span>
                 <span className="payment-modal__option-label">{t("tariffs.payByStars")}</span>
                 <span className="payment-modal__option-price">{modal.stars} Stars</span>
               </button>
