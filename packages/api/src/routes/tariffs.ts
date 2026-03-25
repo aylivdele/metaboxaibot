@@ -1,25 +1,15 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
-import { PLANS } from "@metabox/shared";
 import { getAiBotCatalog } from "../services/metabox-bridge.service.js";
 import { getRate, calcStars } from "../services/exchange-rate.service.js";
 import type { AiBotCatalog } from "../services/metabox-bridge.service.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
-/** Fallback catalog built from hardcoded PLANS when Metabox API is unavailable. */
-function fallbackCatalog(): AiBotCatalog {
-  return {
-    subscriptions: [],
-    tokenPackages: PLANS.map((p) => ({
-      id: p.id,
-      name: p.label,
-      tokens: p.tokens,
-      priceRub: p.priceRub.toFixed(2),
-      badge: p.popular ? "Популярный" : null,
-    })),
-  };
+/** Empty catalog when Metabox API is unavailable — no fallback to hardcoded plans */
+function emptyCatalog(): AiBotCatalog {
+  return { subscriptions: [], tokenPackages: [] };
 }
 
 export const tariffsRoutes: FastifyPluginAsync = async (fastify) => {
@@ -28,7 +18,7 @@ export const tariffsRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /tariffs/catalog
    * Returns unified catalog of subscriptions + token packages with Stars prices.
-   * Falls back to hardcoded PLANS if Metabox catalog API is unavailable.
+   * Returns empty catalog if Metabox API is unavailable.
    */
   fastify.get("/tariffs/catalog", async (request) => {
     const { userId } = request as AuthRequest;
@@ -36,8 +26,8 @@ export const tariffsRoutes: FastifyPluginAsync = async (fastify) => {
     // Fetch catalog from Metabox (with fallback) + exchange rate in parallel
     const [catalog, usdtRubRate, user] = await Promise.all([
       getAiBotCatalog().catch((err) => {
-        console.warn("[tariffs/catalog] Metabox catalog unavailable, using fallback:", err.message);
-        return fallbackCatalog();
+        console.error("[tariffs/catalog] Metabox catalog unavailable:", err.message);
+        return emptyCatalog();
       }),
       getRate(),
       db.user.findUnique({
@@ -56,19 +46,19 @@ export const tariffsRoutes: FastifyPluginAsync = async (fastify) => {
       // M1 is always available; other periods only if discount > 0
       const periods: Record<string, { priceRub: string; stars: number }> = {};
 
-      const priceM1 = monthly;
+      const priceM1 = Math.round(monthly);
       periods.M1 = { priceRub: priceM1.toFixed(2), stars: calcStars(priceM1, usdtRubRate) };
 
       if (d3 > 0) {
-        const priceM3 = monthly * 3 * (1 - d3 / 100);
+        const priceM3 = Math.round(monthly * 3 * (1 - d3 / 100));
         periods.M3 = { priceRub: priceM3.toFixed(2), stars: calcStars(priceM3, usdtRubRate) };
       }
       if (d6 > 0) {
-        const priceM6 = monthly * 6 * (1 - d6 / 100);
+        const priceM6 = Math.round(monthly * 6 * (1 - d6 / 100));
         periods.M6 = { priceRub: priceM6.toFixed(2), stars: calcStars(priceM6, usdtRubRate) };
       }
       if (d12 > 0) {
-        const priceM12 = monthly * 12 * (1 - d12 / 100);
+        const priceM12 = Math.round(monthly * 12 * (1 - d12 / 100));
         periods.M12 = { priceRub: priceM12.toFixed(2), stars: calcStars(priceM12, usdtRubRate) };
       }
 

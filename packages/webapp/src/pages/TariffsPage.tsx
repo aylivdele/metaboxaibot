@@ -8,8 +8,9 @@ const ALL_PERIODS: Period[] = ["M1", "M3", "M6", "M12"];
 const PERIOD_MONTHS: Record<Period, number> = { M1: 1, M3: 3, M6: 6, M12: 12 };
 
 const BADGE_LABELS: Record<string, string> = {
-  top: "\uD83D\uDD25 \u0422\u043E\u043F",
-  profitable: "\uD83D\uDC8E \u0412\u044B\u0433\u043E\u0434\u043D\u043E",
+  top: "🔥 Топ",
+  profitable: "💎 Выгодно",
+  best_value: "💎 Выгодно",
 };
 
 type TgWebApp = {
@@ -87,7 +88,7 @@ export function TariffsPage() {
       }
       tg.openInvoice(invoiceUrl, (status) => {
         if (status === "paid") {
-          setNotice({ text: `\u2705 ${modal.tokens} ${t("tariffs.success")}`, ok: true });
+          setNotice({ text: `✅ ${modal.tokens} ${t("tariffs.success")}`, ok: true });
           setModal(null);
           api.profile
             .get()
@@ -165,7 +166,7 @@ export function TariffsPage() {
         <h2>{t("tariffs.title")}</h2>
         {balance !== null && (
           <p className="page-subtitle">
-            {t("tariffs.currentBalance")}: \u2726 {Number(balance).toFixed(2)} {t("tariffs.tokens")}
+            {t("tariffs.currentBalance")}: {"⚡"} {Number(balance).toFixed(2)} {t("tariffs.tokens")}
           </p>
         )}
         <p className="page-subtitle">{t("tariffs.description")}</p>
@@ -205,10 +206,14 @@ export function TariffsPage() {
               const months = PERIOD_MONTHS[period];
               return (
                 <div key={sub.id} className="plan-card">
-                  <div className="plan-card__label">{sub.name}</div>
-                  <div className="plan-card__tokens">\u2726 {sub.tokens * months}</div>
+                  <div className="plan-card__info">
+                    <div className="plan-card__label">{sub.name}</div>
+                    <div className="plan-card__tokens">
+                      {"⚡"} {(sub.tokens * months).toLocaleString("ru-RU")} токенов
+                    </div>
+                  </div>
                   <div className="plan-card__price">
-                    {Number(p.priceRub).toLocaleString("ru-RU")} \u20BD
+                    {Number(p.priceRub).toLocaleString("ru-RU")} {"₽"}
                   </div>
                   <button className="plan-card__btn" onClick={() => openSubModal(sub)}>
                     {t("tariffs.buy")}
@@ -231,10 +236,14 @@ export function TariffsPage() {
                 {pkg.badge && (
                   <div className="plan-card__badge">{BADGE_LABELS[pkg.badge] ?? pkg.badge}</div>
                 )}
-                <div className="plan-card__label">{pkg.name}</div>
-                <div className="plan-card__tokens">\u2726 {pkg.tokens}</div>
+                <div className="plan-card__info">
+                  <div className="plan-card__label">{pkg.name}</div>
+                  <div className="plan-card__tokens">
+                    {"⚡"} {pkg.tokens.toLocaleString("ru-RU")} токенов
+                  </div>
+                </div>
                 <div className="plan-card__price">
-                  {Number(pkg.priceRub).toLocaleString("ru-RU")} \u20BD
+                  {Number(pkg.priceRub).toLocaleString("ru-RU")} {"₽"}
                 </div>
                 <button className="plan-card__btn" onClick={() => openPkgModal(pkg)}>
                   {t("tariffs.buy")}
@@ -256,16 +265,18 @@ export function TariffsPage() {
         <div className="payment-modal" onClick={() => !buying && setModal(null)}>
           <div className="payment-modal__card" onClick={(e) => e.stopPropagation()}>
             <button className="payment-modal__close" onClick={() => !buying && setModal(null)}>
-              \u2715
+              {"✕"}
             </button>
 
             <h3 className="payment-modal__title">{t("tariffs.choosePayment")}</h3>
 
             <div className="payment-modal__product">
               <span className="payment-modal__product-name">{modal.name}</span>
-              <span className="payment-modal__product-tokens">\u2726 {modal.tokens}</span>
+              <span className="payment-modal__product-tokens">
+                {"⚡"} {modal.tokens}
+              </span>
               <span className="payment-modal__product-price">
-                {Number(modal.priceRub).toLocaleString("ru-RU")} \u20BD
+                {Number(modal.priceRub).toLocaleString("ru-RU")} {"₽"}
               </span>
             </div>
 
@@ -276,10 +287,10 @@ export function TariffsPage() {
                   onClick={handleCardPay}
                   disabled={buying}
                 >
-                  <span className="payment-modal__option-icon">\uD83D\uDCB3</span>
+                  <span className="payment-modal__option-icon">{"💳"}</span>
                   <span className="payment-modal__option-label">{t("tariffs.payByCard")}</span>
                   <span className="payment-modal__option-price">
-                    {Number(modal.priceRub).toLocaleString("ru-RU")} \u20BD
+                    {Number(modal.priceRub).toLocaleString("ru-RU")} {"₽"}
                   </span>
                 </button>
               ) : (
@@ -293,7 +304,7 @@ export function TariffsPage() {
                 onClick={handleStarsPay}
                 disabled={buying}
               >
-                <span className="payment-modal__option-icon">\u2B50</span>
+                <span className="payment-modal__option-icon">{"⭐"}</span>
                 <span className="payment-modal__option-label">{t("tariffs.payByStars")}</span>
                 <span className="payment-modal__option-price">{modal.stars} Stars</span>
               </button>
