@@ -175,7 +175,14 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       };
     } catch (err) {
       if (err instanceof MetaboxApiError) {
-        return reply.code(err.status).send({ error: err.body, code: err.code });
+        // Parse JSON body for rich error info (e.g. TELEGRAM_LINKED with linkedTo)
+        let parsed: Record<string, unknown> = {};
+        try {
+          parsed = JSON.parse(err.body);
+        } catch {
+          parsed = { error: err.body };
+        }
+        return reply.code(err.status).send({ ...parsed, code: err.code ?? parsed.code });
       }
       throw err;
     }

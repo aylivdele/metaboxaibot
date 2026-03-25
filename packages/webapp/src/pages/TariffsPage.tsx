@@ -105,29 +105,17 @@ export function TariffsPage() {
     }
   };
 
-  const handleCardPay = async () => {
-    if (!modal || buying) return;
-    setBuying(true);
-    setNotice(null);
-
-    try {
-      const { paymentUrl } = await api.payments.createCardInvoice(
-        modal.type,
-        modal.id,
-        modal.period,
-      );
-      const tg = getTgWebApp();
-      if (tg?.openLink) {
-        tg.openLink(paymentUrl);
-      } else {
-        window.open(paymentUrl, "_blank");
-      }
-      setModal(null);
-    } catch {
-      setNotice({ text: t("tariffs.invoiceError"), ok: false });
-    } finally {
-      setBuying(false);
+  const handleCardPay = () => {
+    // Redirect to Metabox site shop subscriptions tab
+    const metaboxUrl = (import.meta as any).env?.VITE_METABOX_URL || "https://app.meta-box.ru";
+    const shopUrl = `${metaboxUrl}/shop?tab=subscriptions`;
+    const tg = getTgWebApp();
+    if (tg?.openLink) {
+      tg.openLink(shopUrl);
+    } else {
+      window.open(shopUrl, "_blank");
     }
+    setModal(null);
   };
 
   const openSubModal = (sub: CatalogSubscription) => {

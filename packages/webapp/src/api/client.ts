@@ -45,12 +45,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!res.ok) {
-    const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
-      error?: string;
-      code?: string;
-    };
-    const error = new Error(err.error ?? `HTTP ${res.status}`) as Error & { code?: string };
+    const err = (await res.json().catch(() => ({ error: res.statusText }))) as Record<
+      string,
+      unknown
+    >;
+    const error = new Error((err.error as string) ?? `HTTP ${res.status}`) as Error &
+      Record<string, unknown>;
     if (err.code) error.code = err.code;
+    if (err.linkedTo) error.linkedTo = err.linkedTo;
     throw error;
   }
 
