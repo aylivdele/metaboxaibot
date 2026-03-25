@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { paymentService } from "../services/payment.service.js";
-import { PLANS } from "@metabox/shared";
 import { db } from "../db.js";
 import {
   getAiBotCatalog,
@@ -32,18 +31,10 @@ export const paymentsRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(400).send({ error: "type and id are required" });
     }
 
-    const catalog = await getAiBotCatalog().catch(
-      (): AiBotCatalog => ({
-        subscriptions: [],
-        tokenPackages: PLANS.map((p) => ({
-          id: p.id,
-          name: p.label,
-          tokens: p.tokens,
-          priceRub: p.priceRub.toFixed(2),
-          badge: p.popular ? "Популярный" : null,
-        })),
-      }),
-    );
+    const catalog = await getAiBotCatalog().catch((err): AiBotCatalog => {
+      console.error("[payments/invoice] Metabox catalog unavailable:", err.message);
+      return { subscriptions: [], tokenPackages: [] };
+    });
     const rate = await getRate();
 
     if (type === "product") {
