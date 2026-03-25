@@ -171,17 +171,31 @@ export async function issueSsoTokenRemote(metaboxUserId: string): Promise<{ ssoT
   return post("/issue-sso-token", { metaboxUserId });
 }
 
-/** Notify Metabox of a token purchase made inside the bot (for MLM bonus calculation). */
+export interface RecordSaleResult {
+  ok: boolean;
+  userId?: string;
+  orderId?: string;
+}
+
+/** Notify Metabox of a purchase made inside the bot (for MLM bonus calculation + order tracking). */
 export async function recordSale(params: {
   telegramId: bigint;
-  productId?: string;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  productType: "product" | "subscription";
+  productId: string;
+  period?: "M1" | "M3" | "M6" | "M12";
   tokens: number;
   priceRub: number;
-  marginRub: number;
-}): Promise<void> {
-  await post("/record-sale", {
+  stars: number;
+  starRate: number;
+  referrerTelegramId?: bigint;
+}): Promise<RecordSaleResult> {
+  return post<RecordSaleResult>("/record-sale", {
     ...params,
     telegramId: params.telegramId.toString(),
+    referrerTelegramId: params.referrerTelegramId?.toString(),
   });
 }
 

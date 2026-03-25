@@ -10,6 +10,7 @@ export type { SubmitVideoParams, SubmitVideoResult } from "./video-generation.se
 export { audioGenerationService } from "./audio-generation.service.js";
 export type { SubmitAudioParams, SubmitAudioResult } from "./audio-generation.service.js";
 export { paymentService } from "./payment.service.js";
+export type { SaleUserInfo } from "./payment.service.js";
 export { deductTokens, checkBalance, calculateCost, computeVideoTokens } from "./token.service.js";
 export { s3Service, getFileUrl } from "./s3.service.js";
 export {
@@ -30,6 +31,7 @@ export type {
   AiBotCatalog,
   CatalogSubscription,
   CatalogProduct,
+  RecordSaleResult,
 } from "./metabox-bridge.service.js";
 export { getRate, calcStars, updateRate, STAR_PRICE_USD } from "./exchange-rate.service.js";
 export { userUploadsService } from "./user-uploads.service.js";
