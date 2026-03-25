@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
-import type { Dialog, HeyGenVoice, Message, Model, ModelSettingDef, UserState, UserUpload } from "../types.js";
+import type {
+  Dialog,
+  HeyGenVoice,
+  Message,
+  Model,
+  ModelSettingDef,
+  UserState,
+  UserUpload,
+} from "../types.js";
 
 // ── Custom slider ─────────────────────────────────────────────────────────────
 
@@ -106,7 +114,10 @@ function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePickerPro
   };
 
   const playPreview = (id: string, url: string) => {
-    if (playingId === id) { stopAudio(); return; }
+    if (playingId === id) {
+      stopAudio();
+      return;
+    }
     stopAudio();
     const audio = new Audio(url);
     audioRef.current = audio;
@@ -125,7 +136,10 @@ function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePickerPro
     onChange("voice_id", "");
   };
 
-  const languages = ["all", ...Array.from(new Set(voices.map((v) => v.language).filter(Boolean))).sort()];
+  const languages = [
+    "all",
+    ...Array.from(new Set(voices.map((v) => v.language).filter(Boolean))).sort(),
+  ];
   const filteredVoices = voices.filter(
     (v) =>
       (langFilter === "all" || v.language === langFilter) &&
@@ -151,8 +165,8 @@ function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePickerPro
       </div>
 
       {/* Official voices */}
-      {tab === "official" && (
-        voicesLoading ? (
+      {tab === "official" &&
+        (voicesLoading ? (
           <div className="voice-picker__loading">Загрузка голосов…</div>
         ) : (
           <>
@@ -163,7 +177,9 @@ function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePickerPro
                 onChange={(e) => setLangFilter(e.target.value)}
               >
                 {languages.map((l) => (
-                  <option key={l} value={l}>{l === "all" ? "Все языки" : l}</option>
+                  <option key={l} value={l}>
+                    {l === "all" ? "Все языки" : l}
+                  </option>
                 ))}
               </select>
               <div className="voice-picker__gender-btns">
@@ -188,13 +204,19 @@ function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePickerPro
                   <div className="voice-picker__item-info">
                     <span className="voice-picker__item-name">{voice.name}</span>
                     <span className="voice-picker__item-meta">
-                      {voice.language}{voice.gender ? ` · ${voice.gender === "male" ? "М" : voice.gender === "female" ? "Ж" : voice.gender}` : ""}
+                      {voice.language}
+                      {voice.gender
+                        ? ` · ${voice.gender === "male" ? "М" : voice.gender === "female" ? "Ж" : voice.gender}`
+                        : ""}
                     </span>
                   </div>
                   {voice.preview_audio && (
                     <button
                       className={`voice-picker__play-btn${playingId === voice.voice_id ? " voice-picker__play-btn--playing" : ""}`}
-                      onClick={(e) => { e.stopPropagation(); playPreview(voice.voice_id, voice.preview_audio!); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playPreview(voice.voice_id, voice.preview_audio!);
+                      }}
                       title="Прослушать"
                     >
                       {playingId === voice.voice_id ? "⏹" : "▶"}
@@ -202,15 +224,16 @@ function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePickerPro
                   )}
                 </div>
               ))}
-              {filteredVoices.length === 0 && <div className="voice-picker__empty">Голоса не найдены</div>}
+              {filteredVoices.length === 0 && (
+                <div className="voice-picker__empty">Голоса не найдены</div>
+              )}
             </div>
           </>
-        )
-      )}
+        ))}
 
       {/* My recordings */}
-      {tab === "uploads" && (
-        uploadsLoading ? (
+      {tab === "uploads" &&
+        (uploadsLoading ? (
           <div className="voice-picker__loading">Загрузка…</div>
         ) : uploads.length === 0 ? (
           <div className="voice-picker__empty">{t("uploads.empty")}</div>
@@ -230,7 +253,10 @@ function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePickerPro
                 </div>
                 <button
                   className={`voice-picker__play-btn${playingId === upload.id ? " voice-picker__play-btn--playing" : ""}`}
-                  onClick={(e) => { e.stopPropagation(); playPreview(upload.id, upload.url); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    playPreview(upload.id, upload.url);
+                  }}
                   title="Прослушать"
                 >
                   {playingId === upload.id ? "⏹" : "▶"}
@@ -238,8 +264,7 @@ function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePickerPro
               </div>
             ))}
           </div>
-        )
-      )}
+        ))}
     </div>
   );
 }
@@ -672,12 +697,11 @@ const SECTION_TITLE_KEY: Record<MediaSection, Parameters<ReturnType<typeof useI1
   audio: "audioSettings.title",
 };
 
-const SECTION_SUBTITLE_KEY: Record<MediaSection, Parameters<ReturnType<typeof useI18n>["t"]>[0]> =
-  {
-    design: "imageSettings.subtitle",
-    video: "videoSettings.subtitle",
-    audio: "audioSettings.subtitle",
-  };
+const SECTION_SUBTITLE_KEY: Record<MediaSection, Parameters<ReturnType<typeof useI18n>["t"]>[0]> = {
+  design: "imageSettings.subtitle",
+  video: "videoSettings.subtitle",
+  audio: "audioSettings.subtitle",
+};
 
 function MediaSettingsView({ section }: { section: MediaSection }) {
   const { t } = useI18n();
@@ -746,7 +770,8 @@ function MediaSettingsView({ section }: { section: MediaSection }) {
   // Resolve which card to render
   const [pickerType, pickerId] = selectedPickerId.split("__");
   const familyMembers = pickerType === "family" ? (families.get(pickerId) ?? []) : null;
-  const standaloneModel = pickerType === "standalone" ? standalone.find((m) => m.id === pickerId) : null;
+  const standaloneModel =
+    pickerType === "standalone" ? standalone.find((m) => m.id === pickerId) : null;
 
   return (
     <div className="page">
@@ -820,10 +845,16 @@ function UploadsView() {
       .finally(() => setLoading(false));
   }, []);
 
-  const stopAudio = () => { audioRef.current?.pause(); setPlayingId(null); };
+  const stopAudio = () => {
+    audioRef.current?.pause();
+    setPlayingId(null);
+  };
 
   const playPreview = (id: string, url: string) => {
-    if (playingId === id) { stopAudio(); return; }
+    if (playingId === id) {
+      stopAudio();
+      return;
+    }
     stopAudio();
     const audio = new Audio(url);
     audioRef.current = audio;

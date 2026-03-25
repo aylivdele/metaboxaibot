@@ -73,11 +73,11 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
   const modelSettings = videoSettings[modelId];
 
   // For D-ID: pick up any previously saved reference photo (one-shot)
-  const imageUrl = await userStateService.getAndClearVideoRefImageUrl(ctx.user.id) ?? undefined;
+  const imageUrl = (await userStateService.getAndClearVideoRefImageUrl(ctx.user.id)) ?? undefined;
   // For D-ID: pick up any previously saved driver video URL (one-shot)
-  const driverUrl = await userStateService.getAndClearVideoRefDriverUrl(ctx.user.id) ?? undefined;
+  const driverUrl = (await userStateService.getAndClearVideoRefDriverUrl(ctx.user.id)) ?? undefined;
   // For HeyGen: pick up any previously saved voice recording URL (one-shot)
-  const voiceUrl = await userStateService.getAndClearVideoRefVoiceUrl(ctx.user.id) ?? undefined;
+  const voiceUrl = (await userStateService.getAndClearVideoRefVoiceUrl(ctx.user.id)) ?? undefined;
 
   const prompt = ctx.message.text;
 
@@ -93,9 +93,13 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
       sendOriginalLabel: ctx.t.common.sendOriginal,
       aspectRatio: modelSettings?.aspectRatio,
       duration: modelSettings?.duration,
-      extraModelSettings: driverUrl || voiceUrl
-        ? { ...(driverUrl ? { driver_url: driverUrl } : {}), ...(voiceUrl ? { voice_url: voiceUrl } : {}) }
-        : undefined,
+      extraModelSettings:
+        driverUrl || voiceUrl
+          ? {
+              ...(driverUrl ? { driver_url: driverUrl } : {}),
+              ...(voiceUrl ? { voice_url: voiceUrl } : {}),
+            }
+          : undefined,
     });
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);

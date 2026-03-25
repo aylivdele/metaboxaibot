@@ -224,15 +224,13 @@ export const api = {
   },
 
   uploads: {
-    list: (type?: string) =>
-      request<UserUpload[]>(type ? `/uploads?type=${type}` : "/uploads"),
+    list: (type?: string) => request<UserUpload[]>(type ? `/uploads?type=${type}` : "/uploads"),
     rename: (id: string, name: string) =>
       request<UserUpload>(`/uploads/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ name }),
       }),
-    delete: (id: string) =>
-      request<{ success: boolean }>(`/uploads/${id}`, { method: "DELETE" }),
+    delete: (id: string) => request<{ success: boolean }>(`/uploads/${id}`, { method: "DELETE" }),
   },
 
   modelSettings: {

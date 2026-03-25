@@ -2221,10 +2221,10 @@ export const AI_MODELS: Record<string, AIModel> = {
         description: "Эмоциональный тон выступления аватара (выражение лица).",
         type: "select",
         options: [
-          { value: "neutral",  label: "Нейтральное" },
-          { value: "happy",    label: "Радостное" },
+          { value: "neutral", label: "Нейтральное" },
+          { value: "happy", label: "Радостное" },
           { value: "surprise", label: "Удивлённое" },
-          { value: "serious",  label: "Серьёзное" },
+          { value: "serious", label: "Серьёзное" },
         ],
         default: "neutral",
       },

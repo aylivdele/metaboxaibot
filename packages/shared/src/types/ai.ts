@@ -3,7 +3,14 @@ import type { ContextStrategy } from "./dialog.js";
 
 // ── Model settings types ──────────────────────────────────────────────────────
 
-export type ModelSettingType = "select" | "slider" | "toggle" | "text" | "number" | "voice-picker" | "color";
+export type ModelSettingType =
+  | "select"
+  | "slider"
+  | "toggle"
+  | "text"
+  | "number"
+  | "voice-picker"
+  | "color";
 
 export interface ModelSettingOption {
   value: string | number | boolean;
