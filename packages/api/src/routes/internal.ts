@@ -82,6 +82,47 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * POST /internal/revoke-tokens
+   * Called by Metabox when rolling back a token package or subscription purchase.
+   * Deducts tokens from user balance and records a debit transaction.
+   * Body: { telegramId: string, tokens: number, description?: string }
+   */
+  fastify.post("/revoke-tokens", async (request, reply) => {
+    const { telegramId, tokens, description } = request.body as {
+      telegramId: string;
+      tokens: number;
+      description?: string;
+    };
+
+    if (!telegramId || typeof tokens !== "number" || tokens <= 0) {
+      return reply.code(400).send({ error: "telegramId and positive tokens are required" });
+    }
+
+    const user = await db.user.findUnique({ where: { id: BigInt(telegramId) } });
+    if (!user) {
+      return { ok: true }; // user not in bot — nothing to revoke
+    }
+
+    await db.$transaction([
+      db.user.update({
+        where: { id: BigInt(telegramId) },
+        data: { tokenBalance: { decrement: tokens } },
+      }),
+      db.tokenTransaction.create({
+        data: {
+          userId: BigInt(telegramId),
+          amount: -tokens,
+          type: "debit",
+          reason: "admin",
+          description: description || "Откат покупки",
+        },
+      }),
+    ]);
+
+    return { ok: true };
+  });
+
+  /**
    * POST /internal/unlink-metabox
    * Called by Metabox admin when an admin disconnects a user's Telegram account.
    * Clears metaboxUserId and metaboxReferralCode from the AI Box user record.
