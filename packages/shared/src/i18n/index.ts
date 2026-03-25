@@ -86,7 +86,12 @@ export interface Translations {
     videoPhotoSaved: string;
     videoDriverSaved: string;
     videoVoiceSaved: string;
+    avatarPhotoSaved: string;
     myVoiceDefaultName: string;
+    myAvatarDefaultName: string;
+    hintHeygen: string;
+    hintDid: string;
+    hintVideoDefault: string;
   };
   errors: {
     noTool: string;

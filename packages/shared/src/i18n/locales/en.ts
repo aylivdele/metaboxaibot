@@ -95,10 +95,19 @@ export default {
       "Send the text you want the avatar to speak.\nCustomize the voice and background via the Management button.",
     lipSyncActivated:
       "Optionally send a photo with a face first, then send the text to be spoken.\nWithout a photo, the default avatar will be used.",
+    hintHeygen:
+      "📸 Send a photo to create a personalized avatar.\n🎙 You can also send a voice message so the avatar speaks in your voice.\n✉️ Once ready — send the text you want the avatar to speak.\n⚙ Voice, background and avatar can be changed on the Management page.",
+    hintDid:
+      "📸 Optionally send a photo with a face — it will become the avatar.\n✉️ Then send the text to be spoken.\n🎬 You can also send a driver video to control face movements.\n⚙ Voice and other settings are available on the Management page.",
+    hintVideoDefault:
+      "✉️ Send a text prompt to generate a video.\n🖼 Optionally attach an image — the video will start from it.",
     videoPhotoSaved: "📸 Photo saved. Now send the text for voice-over.",
     videoDriverSaved: "🎬 Driver video saved. Now send the text for voice-over.",
     videoVoiceSaved: "🎙 Voice sample saved. Now send the text for the avatar to speak.",
+    avatarPhotoSaved:
+      "📸 Avatar photo saved and selected. Send the text for the avatar to speak.\nYou can change the photo in Management → HeyGen → Avatar.",
     myVoiceDefaultName: "My voice",
+    myAvatarDefaultName: "My avatar",
   },
   errors: {
     unexpected: "Unexpected error. Please, try again later.",

@@ -10,7 +10,9 @@ export type ModelSettingType =
   | "text"
   | "number"
   | "voice-picker"
-  | "color";
+  | "did-voice-picker"
+  | "color"
+  | "avatar-picker";
 
 export interface ModelSettingOption {
   value: string | number | boolean;

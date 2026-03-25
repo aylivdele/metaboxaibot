@@ -2181,6 +2181,13 @@ export const AI_MODELS: Record<string, AIModel> = {
     settings: [
       mkAspectRatio(["16:9", "9:16", "1:1"]),
       {
+        key: "avatar_id",
+        label: "Аватар",
+        description: "Выберите официальный аватар HeyGen или загрузите собственное фото.",
+        type: "avatar-picker",
+        default: "",
+      },
+      {
         key: "voice_id",
         label: "Голос",
         description: "Выберите голос аватара из списка официальных голосов HeyGen.",
@@ -2233,6 +2240,13 @@ export const AI_MODELS: Record<string, AIModel> = {
         label: "URL видео-драйвера",
         description: "URL видео, задающего движения лица/головы аватара.",
         type: "text",
+        default: "",
+      },
+      {
+        key: "voice_id",
+        label: "Голос",
+        description: "Выберите голос для озвучки или используйте свою запись.",
+        type: "did-voice-picker",
         default: "",
       },
     ],

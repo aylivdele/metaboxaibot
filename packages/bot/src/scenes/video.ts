@@ -54,6 +54,14 @@ export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
     await ctx.reply(`🎬 ${model.name}\n\n${model.description}\n\n${costLine}`, {
       reply_markup: kb,
     });
+
+    const hint =
+      modelId === "heygen"
+        ? ctx.t.video.hintHeygen
+        : modelId === "d-id"
+          ? ctx.t.video.hintDid
+          : ctx.t.video.hintVideoDefault;
+    await ctx.reply(hint);
   } else {
     await ctx.reply(ctx.t.video.modelActivated);
   }
@@ -146,10 +154,10 @@ export async function handleVideoAvatars(ctx: BotContext): Promise<void> {
           `${webappUrl}?page=management&section=video`,
         )
       : undefined;
-    await ctx.reply(
-      `👾 ${model.name}\n\n${model.description}\n\n${costLine}\n\n${ctx.t.video.avatarActivated}`,
-      { reply_markup: kb },
-    );
+    await ctx.reply(`👾 ${model.name}\n\n${model.description}\n\n${costLine}`, {
+      reply_markup: kb,
+    });
+    await ctx.reply(ctx.t.video.hintHeygen);
   }
 }
 
@@ -173,22 +181,52 @@ export async function handleVideoLipSync(ctx: BotContext): Promise<void> {
           `${webappUrl}?page=management&section=video`,
         )
       : undefined;
-    await ctx.reply(
-      `🔄 ${model.name}\n\n${model.description}\n\n${costLine}\n\n${ctx.t.video.lipSyncActivated}`,
-      { reply_markup: kb },
-    );
+    await ctx.reply(`🔄 ${model.name}\n\n${model.description}\n\n${costLine}`, {
+      reply_markup: kb,
+    });
+    await ctx.reply(ctx.t.video.hintDid);
   }
 }
 
-// ── Photo handler in VIDEO_ACTIVE state (D-ID source image) ───────────────────
+// ── Photo handler in VIDEO_ACTIVE state ───────────────────────────────────────
+// HeyGen: saves as avatar_photo UserUpload + auto-selects in modelSettings
+// D-ID: saves as one-shot reference image URL
 
 export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
   if (!ctx.user || !ctx.message?.photo) return;
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.videoModelId ?? "kling";
   const photo = ctx.message.photo.at(-1)!;
   const file = await ctx.api.getFile(photo.file_id);
-  const fileUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
-  await userStateService.setVideoRefImageUrl(ctx.user.id, fileUrl);
-  await ctx.reply(ctx.t.video.videoPhotoSaved);
+  const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+
+  if (modelId === "heygen") {
+    const userId = ctx.user.id;
+    const s3Key = `avatar_photo/${userId.toString()}/${file.file_id}.jpg`;
+    const uploadedKey = await s3Service.uploadFromUrl(s3Key, tgUrl, "image/jpeg").catch(() => null);
+    const publicUrl = uploadedKey
+      ? ((await s3Service.getFileUrl(uploadedKey).catch(() => null)) ?? tgUrl)
+      : tgUrl;
+
+    await userUploadsService.create(userId, {
+      type: "avatar_photo",
+      name: ctx.t.video.myAvatarDefaultName,
+      url: publicUrl,
+      s3Key: uploadedKey ?? undefined,
+    });
+
+    // Auto-select: store in modelSettings so adapter picks it up on next generation
+    await userStateService.setModelSettings(userId, "heygen", {
+      avatar_photo_url: publicUrl,
+      avatar_id: "",
+    });
+
+    await ctx.reply(ctx.t.video.avatarPhotoSaved);
+  } else {
+    // D-ID: one-shot reference image
+    await userStateService.setVideoRefImageUrl(ctx.user.id, tgUrl);
+    await ctx.reply(ctx.t.video.videoPhotoSaved);
+  }
 }
 
 // ── Video handler in VIDEO_ACTIVE state (D-ID driver_url) ─────────────────────

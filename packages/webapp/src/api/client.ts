@@ -9,6 +9,8 @@ import type {
   GalleryResponse,
   CatalogResponse,
   HeyGenVoice,
+  HeyGenAvatar,
+  DIDVoice,
   UserUpload,
 } from "../types.js";
 
@@ -221,6 +223,14 @@ export const api = {
 
   heygenVoices: {
     list: () => request<HeyGenVoice[]>("/heygen-voices"),
+  },
+
+  heygenAvatars: {
+    list: () => request<HeyGenAvatar[]>("/heygen-avatars"),
+  },
+
+  didVoices: {
+    list: () => request<DIDVoice[]>("/d-id-voices"),
   },
 
   uploads: {

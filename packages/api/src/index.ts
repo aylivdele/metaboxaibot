@@ -30,6 +30,8 @@ import { internalRoutes } from "./routes/internal.js";
 import { metaboxAibotRoutes } from "./routes/metabox-aibot.js";
 import { tariffsRoutes } from "./routes/tariffs.js";
 import { heygenVoicesRoutes } from "./routes/heygen-voices.js";
+import { heygenAvatarsRoutes } from "./routes/heygen-avatars.js";
+import { didVoicesRoutes } from "./routes/d-id-voices.js";
 import { uploadsRoutes } from "./routes/uploads.js";
 import { startRateScheduler } from "./services/exchange-rate.service.js";
 import { config } from "@metabox/shared";
@@ -106,6 +108,8 @@ await server.register(internalRoutes, { prefix: "/internal" });
 await server.register(metaboxAibotRoutes);
 await server.register(tariffsRoutes);
 await server.register(heygenVoicesRoutes);
+await server.register(heygenAvatarsRoutes);
+await server.register(didVoicesRoutes);
 await server.register(uploadsRoutes);
 
 // Start USDT/RUB exchange rate scheduler (fetches from Binance 4× daily)

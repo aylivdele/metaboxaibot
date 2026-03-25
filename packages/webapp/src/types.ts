@@ -39,7 +39,16 @@ export interface ModelSettingDef {
   key: string;
   label: string;
   description?: string;
-  type: "select" | "slider" | "toggle" | "text" | "number" | "voice-picker" | "color";
+  type:
+    | "select"
+    | "slider"
+    | "toggle"
+    | "text"
+    | "number"
+    | "voice-picker"
+    | "did-voice-picker"
+    | "color"
+    | "avatar-picker";
   options?: ModelSettingOption[];
   min?: number;
   max?: number;
@@ -53,6 +62,23 @@ export interface HeyGenVoice {
   language: string;
   gender: string;
   preview_audio: string | null;
+}
+
+export interface HeyGenAvatar {
+  avatar_id: string;
+  avatar_name: string;
+  gender: string;
+  preview_image_url: string | null;
+}
+
+export interface DIDVoice {
+  id: string;
+  name: string;
+  gender: string;
+  language: string;
+  provider: string;
+  styles: string[];
+  description: string;
 }
 
 export interface UserUpload {

@@ -264,6 +264,8 @@ const translations = {
     "uploads.myVoices": "My recordings",
     "uploads.useVoice": "Use",
     "uploads.voiceActive": "Active",
+    "uploads.officialAvatars": "Official avatars",
+    "uploads.myPhotos": "My photos",
 
     // Auth errors
     "auth.tokenExpired": "Link expired. Press the «Profile» button in the bot menu again.",
@@ -527,6 +529,8 @@ const translations = {
     "uploads.myVoices": "Мои записи",
     "uploads.useVoice": "Использовать",
     "uploads.voiceActive": "Активен",
+    "uploads.officialAvatars": "Официальные",
+    "uploads.myPhotos": "Мои фото",
 
     // Auth errors
     "auth.tokenExpired":

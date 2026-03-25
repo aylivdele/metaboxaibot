@@ -42,17 +42,18 @@ export class DIDAdapter implements VideoAdapter {
   async submit(input: VideoInput): Promise<string> {
     const sentiment = (input.modelSettings?.sentiment as string | undefined) ?? "neutral";
     const driverUrl = input.modelSettings?.driver_url as string | undefined;
+    const voiceUrl = input.modelSettings?.voice_url as string | undefined;
+    const voiceId = (input.modelSettings?.voice_id as string | undefined) || "en-US-JennyNeural";
+    const voiceProvider =
+      (input.modelSettings?.voice_provider as string | undefined) || "microsoft";
+
+    const script: Record<string, unknown> = voiceUrl
+      ? { type: "audio", audio_url: voiceUrl }
+      : { type: "text", input: input.prompt, provider: { type: voiceProvider, voice_id: voiceId } };
 
     const body: Record<string, unknown> = {
       source_url: input.imageUrl ?? this.defaultPresenterUrl,
-      script: {
-        type: "text",
-        input: input.prompt,
-        provider: {
-          type: "microsoft",
-          voice_id: "en-US-JennyNeural",
-        },
-      },
+      script,
       config: {
         fluent: true,
         pad_audio: 0,
