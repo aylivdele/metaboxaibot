@@ -65,7 +65,7 @@ export const paymentService = {
           amount: plan.tokens,
           type: "credit",
           reason: "purchase",
-          description: `Пакет токенов ${plan.name}`,
+          description: `Пакет токенов ${plan.label}`,
           modelId: plan.id,
         },
       }),

@@ -54,16 +54,8 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       endDate: string;
     } | null = null;
     try {
-      const { get } = await import("../services/metabox-bridge.service.js");
-      const subData = await get<{
-        subscription: {
-          planName: string;
-          period: string;
-          daysLeft: number;
-          totalDays: number;
-          endDate: string;
-        } | null;
-      }>(`/internal/subscription-status?telegramId=${userId.toString()}`);
+      const { getSubscriptionStatus } = await import("../services/metabox-bridge.service.js");
+      const subData = await getSubscriptionStatus(userId);
       subscription = subData.subscription;
     } catch {
       // Non-fatal: subscription info unavailable
