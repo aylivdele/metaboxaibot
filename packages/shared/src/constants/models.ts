@@ -96,8 +96,7 @@ const PERPLEXITY_EXTRA: ModelSettingDef = {
 const PERPLEXITY_SEARCH_CONTEXT: ModelSettingDef = {
   key: "search_context_size",
   label: "Глубина поиска",
-  description:
-    "low — быстрее и дешевле, high — больше источников и точнее, но дороже.",
+  description: "low — быстрее и дешевле, high — больше источников и точнее, но дороже.",
   type: "select",
   options: [
     { value: "low", label: "Низкая" },
@@ -156,8 +155,7 @@ const ENABLE_THINKING: ModelSettingDef = {
 const THINKING_BUDGET: ModelSettingDef = {
   key: "thinking_budget",
   label: "Бюджет рассуждений",
-  description:
-    "Сколько токенов модель может потратить на внутренние рассуждения (0 = выключено).",
+  description: "Сколько токенов модель может потратить на внутренние рассуждения (0 = выключено).",
   type: "slider",
   min: 0,
   max: 24576,
@@ -169,8 +167,7 @@ const THINKING_BUDGET: ModelSettingDef = {
 const SEED_SETTING: ModelSettingDef = {
   key: "seed",
   label: "Seed",
-  description:
-    "Число для воспроизводимых результатов. Пусто — случайно каждый раз.",
+  description: "Число для воспроизводимых результатов. Пусто — случайно каждый раз.",
   type: "number",
   min: 0,
   max: 2147483647,
@@ -382,7 +379,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
   },
-  "o3": {
+  o3: {
     id: "o3",
     name: "GPT-o3",
     description: "Мощная reasoning-модель OpenAI, глубокие рассуждения для самых сложных задач.",
@@ -963,8 +960,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   "qwen3.5-flash": {
     id: "qwen3.5-flash",
     name: "Qwen 3.5 Flash",
-    description:
-      "Самая быстрая и дешёвая модель Alibaba нового поколения с контекстом 1M токенов.",
+    description: "Самая быстрая и дешёвая модель Alibaba нового поколения с контекстом 1M токенов.",
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,
@@ -2164,11 +2160,26 @@ export const AI_MODELS: Record<string, AIModel> = {
 // LLM section — assign base settings plus model-specific extras
 const OPENAI_REASONING_IDS = new Set(["o4-mini", "o3", "o3-mini"]);
 const OPENAI_CHAT_IDS = new Set([
-  "gpt-5.4-pro", "gpt-5.4", "gpt-5.3", "gpt-5-mini", "gpt-5-nano",
-  "o4-mini", "o3", "o3-mini",
-  "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+  "gpt-5.4-pro",
+  "gpt-5.4",
+  "gpt-5.3",
+  "gpt-5-mini",
+  "gpt-5-nano",
+  "o4-mini",
+  "o3",
+  "o3-mini",
+  "gpt-4o",
+  "gpt-4o-mini",
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4.1-nano",
 ]);
-const ANTHROPIC_THINKING_IDS = new Set(["claude-opus", "claude-opus-4-5", "claude-sonnet", "claude-sonnet-4-5"]);
+const ANTHROPIC_THINKING_IDS = new Set([
+  "claude-opus",
+  "claude-opus-4-5",
+  "claude-sonnet",
+  "claude-sonnet-4-5",
+]);
 const QWEN_THINKING_IDS = new Set(["qwen-3-max-thinking", "qwen-3-thinking", "qwen-3"]);
 const GEMINI_THINKING_IDS = new Set(["gemini-2-pro", "gemini-3.1-pro"]);
 
