@@ -1,10 +1,26 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
+import { PLANS } from "@metabox/shared";
 import { getAiBotCatalog } from "../services/metabox-bridge.service.js";
 import { getRate, calcStars } from "../services/exchange-rate.service.js";
+import type { AiBotCatalog } from "../services/metabox-bridge.service.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
+
+/** Fallback catalog built from hardcoded PLANS when Metabox API is unavailable. */
+function fallbackCatalog(): AiBotCatalog {
+  return {
+    subscriptions: [],
+    tokenPackages: PLANS.map((p) => ({
+      id: p.id,
+      name: p.label,
+      tokens: p.tokens,
+      priceRub: p.priceRub.toFixed(2),
+      badge: p.popular ? "Популярный" : null,
+    })),
+  };
+}
 
 export const tariffsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", telegramAuthHook);
@@ -12,13 +28,17 @@ export const tariffsRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /tariffs/catalog
    * Returns unified catalog of subscriptions + token packages with Stars prices.
+   * Falls back to hardcoded PLANS if Metabox catalog API is unavailable.
    */
   fastify.get("/tariffs/catalog", async (request) => {
     const { userId } = request as AuthRequest;
 
-    // Fetch catalog from Metabox + exchange rate in parallel
+    // Fetch catalog from Metabox (with fallback) + exchange rate in parallel
     const [catalog, usdtRubRate, user] = await Promise.all([
-      getAiBotCatalog(),
+      getAiBotCatalog().catch((err) => {
+        console.warn("[tariffs/catalog] Metabox catalog unavailable, using fallback:", err.message);
+        return fallbackCatalog();
+      }),
       getRate(),
       db.user.findUnique({
         where: { id: userId },
