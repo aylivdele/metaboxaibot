@@ -28,6 +28,8 @@ import { videoSettingsRoutes } from "./routes/video-settings.js";
 import { modelSettingsRoutes } from "./routes/model-settings.js";
 import { internalRoutes } from "./routes/internal.js";
 import { metaboxAibotRoutes } from "./routes/metabox-aibot.js";
+import { tariffsRoutes } from "./routes/tariffs.js";
+import { startRateScheduler } from "./services/exchange-rate.service.js";
 import { config } from "@metabox/shared";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -100,6 +102,10 @@ await server.register(videoSettingsRoutes);
 await server.register(modelSettingsRoutes);
 await server.register(internalRoutes, { prefix: "/internal" });
 await server.register(metaboxAibotRoutes);
+await server.register(tariffsRoutes);
+
+// Start USDT/RUB exchange rate scheduler (fetches from Binance 4× daily)
+startRateScheduler();
 
 const port = config.api.port;
 await server.listen({ port, host: "0.0.0.0" });
