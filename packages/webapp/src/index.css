@@ -844,16 +844,20 @@ input::placeholder {
   box-shadow: var(--shadow-accent);
   letter-spacing: 0.3px;
 }
+.plan-card__info {
+  flex: 1;
+  min-width: 0;
+}
 .plan-card__label {
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 16px;
-  flex: 1;
 }
 .plan-card__tokens {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--accent);
-  font-weight: 700;
+  font-weight: 600;
+  margin-top: 2px;
 }
 .plan-card__price {
   font-size: 13px;
@@ -2413,7 +2417,9 @@ input::placeholder {
   border: 1.5px solid var(--border);
   background: var(--card-bg);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .avatar-picker__item:hover {
@@ -2704,7 +2710,7 @@ input::placeholder {
   background: var(--card-bg);
   color: var(--text-primary);
   font-weight: 500;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 /* ── Uploads list ────────────────────────────────────────────────────────── */
