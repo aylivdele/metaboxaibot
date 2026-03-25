@@ -19,11 +19,11 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
-   * POST /internal/link-metabox
+   * POST /link-metabox
    * Called by Metabox after a user links their Telegram via deep link.
    * Updates AI Box user.metaboxUserId.
    */
-  fastify.post("/internal/link-metabox", async (request, reply) => {
+  fastify.post("/link-metabox", async (request, reply) => {
     const { telegramId, metaboxUserId } = request.body as {
       telegramId: string;
       metaboxUserId: string;
@@ -46,7 +46,7 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
    * Called by Metabox when an AI bot token package is purchased on the Metabox site.
    * Credits tokens to the user's AI Box balance.
    */
-  fastify.post("/internal/grant-tokens", async (request, reply) => {
+  fastify.post("/grant-tokens", async (request, reply) => {
     const { telegramId, tokens } = request.body as {
       telegramId: string;
       tokens: number;
@@ -84,7 +84,7 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
    * Called by Metabox admin when an admin disconnects a user's Telegram account.
    * Clears metaboxUserId and metaboxReferralCode from the AI Box user record.
    */
-  fastify.post("/internal/unlink-metabox", async (request, reply) => {
+  fastify.post("/unlink-metabox", async (request, reply) => {
     const { telegramId } = request.body as { telegramId: string };
 
     if (!telegramId) {
@@ -114,7 +114,7 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
    * Returns { activated: true } if the user exists in the bot DB, { activated: false } otherwise.
    */
   fastify.get<{ Querystring: { telegramId?: string } }>(
-    "/internal/check-bot-user",
+    "/check-bot-user",
     async (request, reply) => {
       const { telegramId } = request.query;
       if (!telegramId) {

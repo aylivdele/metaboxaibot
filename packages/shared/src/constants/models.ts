@@ -92,6 +92,91 @@ const PERPLEXITY_EXTRA: ModelSettingDef = {
   default: "month",
 };
 
+/** Depth of search for Perplexity models. */
+const PERPLEXITY_SEARCH_CONTEXT: ModelSettingDef = {
+  key: "search_context_size",
+  label: "Глубина поиска",
+  description:
+    "low — быстрее и дешевле, high — больше источников и точнее, но дороже.",
+  type: "select",
+  options: [
+    { value: "low", label: "Низкая" },
+    { value: "medium", label: "Средняя" },
+    { value: "high", label: "Высокая" },
+  ],
+  default: "medium",
+};
+
+/** Domain filter for Perplexity models. */
+const PERPLEXITY_DOMAIN_FILTER: ModelSettingDef = {
+  key: "search_domain_filter",
+  label: "Фильтр сайтов",
+  description:
+    "Ограничить поиск конкретными доменами (через запятую, напр. wikipedia.org, bbc.com). Пусто — без ограничений.",
+  type: "text",
+  default: "",
+};
+
+/** Reasoning effort for OpenAI o-series and Grok reasoning models. */
+const REASONING_EFFORT: ModelSettingDef = {
+  key: "reasoning_effort",
+  label: "Глубина рассуждений",
+  description:
+    "Сколько усилий модель тратит на обдумывание: low — быстро, high — тщательнее и точнее, но дольше.",
+  type: "select",
+  options: [
+    { value: "low", label: "Низкая" },
+    { value: "medium", label: "Средняя" },
+    { value: "high", label: "Высокая" },
+  ],
+  default: "medium",
+};
+
+/** Extended thinking toggle for Anthropic models. */
+const EXTENDED_THINKING: ModelSettingDef = {
+  key: "extended_thinking",
+  label: "Расширенное мышление",
+  description:
+    "Модель думает дольше перед ответом — точнее для сложных задач, но медленнее. Доступно на Opus и Sonnet.",
+  type: "toggle",
+  default: false,
+};
+
+/** Thinking mode toggle for Qwen reasoning models. */
+const ENABLE_THINKING: ModelSettingDef = {
+  key: "enable_thinking",
+  label: "Режим размышления",
+  description:
+    "Модель рассуждает перед ответом — точнее для сложных задач, но исходящих токенов больше.",
+  type: "toggle",
+  default: true,
+};
+
+/** Thinking budget slider for Gemini models. */
+const THINKING_BUDGET: ModelSettingDef = {
+  key: "thinking_budget",
+  label: "Бюджет рассуждений",
+  description:
+    "Сколько токенов модель может потратить на внутренние рассуждения (0 = выключено).",
+  type: "slider",
+  min: 0,
+  max: 24576,
+  step: 256,
+  default: 0,
+};
+
+/** Seed for reproducible results in OpenAI chat models. */
+const SEED_SETTING: ModelSettingDef = {
+  key: "seed",
+  label: "Seed",
+  description:
+    "Число для воспроизводимых результатов. Пусто — случайно каждый раз.",
+  type: "number",
+  min: 0,
+  max: 2147483647,
+  default: null,
+};
+
 /** FLUX / FLUX Pro generation controls. */
 const FLUX_SETTINGS: ModelSettingDef[] = [
   {
@@ -208,8 +293,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 30.0,
-    outputCostUsdPerMToken: 120.0,
+    inputCostUsdPerMToken: 2.5,
+    outputCostUsdPerMToken: 15.0,
     supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
@@ -224,8 +309,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 10.0,
-    outputCostUsdPerMToken: 40.0,
+    inputCostUsdPerMToken: 2.5,
+    outputCostUsdPerMToken: 15.0,
     supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
@@ -256,8 +341,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 1.5,
-    outputCostUsdPerMToken: 6.0,
+    inputCostUsdPerMToken: 0.75,
+    outputCostUsdPerMToken: 4.5,
     supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
@@ -272,8 +357,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 0.15,
-    outputCostUsdPerMToken: 0.6,
+    inputCostUsdPerMToken: 0.2,
+    outputCostUsdPerMToken: 1.25,
     supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
@@ -291,6 +376,38 @@ export const AI_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 1.1,
     outputCostUsdPerMToken: 4.4,
     supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "provider_chain",
+    contextMaxMessages: 0,
+  },
+  "o3": {
+    id: "o3",
+    name: "GPT-o3",
+    description: "Мощная reasoning-модель OpenAI, глубокие рассуждения для самых сложных задач.",
+    section: "gpt",
+    provider: "openai",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 2.0,
+    outputCostUsdPerMToken: 8.0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "provider_chain",
+    contextMaxMessages: 0,
+  },
+  "o3-mini": {
+    id: "o3-mini",
+    name: "GPT-o3 Mini",
+    description: "Компактная reasoning-модель OpenAI, отличное соотношение цена/точность.",
+    section: "gpt",
+    provider: "openai",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 1.1,
+    outputCostUsdPerMToken: 4.4,
+    supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
@@ -324,8 +441,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 15.0,
-    outputCostUsdPerMToken: 75.0,
+    inputCostUsdPerMToken: 5.0,
+    outputCostUsdPerMToken: 25.0,
     supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
@@ -341,8 +458,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 15.0,
-    outputCostUsdPerMToken: 75.0,
+    inputCostUsdPerMToken: 5.0,
+    outputCostUsdPerMToken: 25.0,
     supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
@@ -409,8 +526,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "google",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 2.5,
-    outputCostUsdPerMToken: 15.0,
+    inputCostUsdPerMToken: 2.0,
+    outputCostUsdPerMToken: 12.0,
     supportsImages: true,
     supportsVoice: false,
     supportsWeb: true,
@@ -426,8 +543,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "google",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 3.0,
-    outputCostUsdPerMToken: 18.0,
+    inputCostUsdPerMToken: 2.0,
+    outputCostUsdPerMToken: 12.0,
     supportsImages: true,
     supportsVoice: false,
     supportsWeb: true,
@@ -443,11 +560,28 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "google",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 0.15,
-    outputCostUsdPerMToken: 0.6,
+    inputCostUsdPerMToken: 0.3,
+    outputCostUsdPerMToken: 2.5,
     supportsImages: true,
     supportsVoice: false,
     supportsWeb: true,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 50,
+  },
+  "gemini-2-flash-lite": {
+    id: "gemini-2-flash-lite",
+    name: "Gemini 2.5 Flash Lite",
+    description:
+      "Самая лёгкая и дешёвая модель Google, идеальна для простых задач с минимальными затратами.",
+    section: "gpt",
+    provider: "google",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 0.1,
+    outputCostUsdPerMToken: 0.4,
+    supportsImages: false,
+    supportsVoice: false,
+    supportsWeb: false,
     isAsync: false,
     contextStrategy: "db_history",
     contextMaxMessages: 50,
@@ -497,8 +631,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "xai",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 5.0,
-    outputCostUsdPerMToken: 25.0,
+    inputCostUsdPerMToken: 3.0,
+    outputCostUsdPerMToken: 15.0,
     supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
@@ -629,8 +763,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 4.0,
-    outputCostUsdPerMToken: 16.0,
+    inputCostUsdPerMToken: 0.7,
+    outputCostUsdPerMToken: 2.8,
     supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
@@ -645,8 +779,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 1.0,
-    outputCostUsdPerMToken: 4.0,
+    inputCostUsdPerMToken: 0.2,
+    outputCostUsdPerMToken: 0.8,
     supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
@@ -661,8 +795,8 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 0.5,
-    outputCostUsdPerMToken: 2.0,
+    inputCostUsdPerMToken: 0.18,
+    outputCostUsdPerMToken: 0.7,
     supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
@@ -740,6 +874,23 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
   },
+  "gpt-4.1-nano": {
+    id: "gpt-4.1-nano",
+    name: "GPT-4.1 Nano",
+    description:
+      "Самая лёгкая и дешёвая модель в линейке GPT-4.1, мгновенные ответы для простых задач.",
+    section: "gpt",
+    provider: "openai",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 0.1,
+    outputCostUsdPerMToken: 0.4,
+    supportsImages: false,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "provider_chain",
+    contextMaxMessages: 0,
+  },
   "grok-3-mini": {
     id: "grok-3-mini",
     name: "Grok 3 Mini",
@@ -783,9 +934,43 @@ export const AI_MODELS: Record<string, AIModel> = {
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 1.2,
-    outputCostUsdPerMToken: 6.0,
+    inputCostUsdPerMToken: 1.6,
+    outputCostUsdPerMToken: 6.4,
     supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 40,
+  },
+  "qwen3.5-plus": {
+    id: "qwen3.5-plus",
+    name: "Qwen 3.5 Plus",
+    description:
+      "Продвинутая модель Alibaba нового поколения с контекстом 1M токенов, отличный баланс цены и качества.",
+    section: "gpt",
+    provider: "alibaba",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 0.4,
+    outputCostUsdPerMToken: 2.4,
+    supportsImages: false,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 40,
+  },
+  "qwen3.5-flash": {
+    id: "qwen3.5-flash",
+    name: "Qwen 3.5 Flash",
+    description:
+      "Самая быстрая и дешёвая модель Alibaba нового поколения с контекстом 1M токенов.",
+    section: "gpt",
+    provider: "alibaba",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 0.1,
+    outputCostUsdPerMToken: 0.4,
+    supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
@@ -1976,13 +2161,42 @@ export const AI_MODELS: Record<string, AIModel> = {
 };
 
 // ── Apply settings ────────────────────────────────────────────────────────────
-// LLM section — assign base settings; Perplexity models get extra search filter
+// LLM section — assign base settings plus model-specific extras
+const OPENAI_REASONING_IDS = new Set(["o4-mini", "o3", "o3-mini"]);
+const OPENAI_CHAT_IDS = new Set([
+  "gpt-5.4-pro", "gpt-5.4", "gpt-5.3", "gpt-5-mini", "gpt-5-nano",
+  "o4-mini", "o3", "o3-mini",
+  "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+]);
+const ANTHROPIC_THINKING_IDS = new Set(["claude-opus", "claude-opus-4-5", "claude-sonnet", "claude-sonnet-4-5"]);
+const QWEN_THINKING_IDS = new Set(["qwen-3-max-thinking", "qwen-3-thinking", "qwen-3"]);
+const GEMINI_THINKING_IDS = new Set(["gemini-2-pro", "gemini-3.1-pro"]);
+
 for (const [id, model] of Object.entries(AI_MODELS)) {
-  if (model.section === "gpt") {
-    model.settings = id.startsWith("perplexity")
-      ? [...LLM_SETTINGS, PERPLEXITY_EXTRA]
-      : [...LLM_SETTINGS];
+  if (model.section !== "gpt") continue;
+
+  const extras: ModelSettingDef[] = [];
+
+  if (id.startsWith("perplexity")) {
+    extras.push(PERPLEXITY_EXTRA, PERPLEXITY_SEARCH_CONTEXT, PERPLEXITY_DOMAIN_FILTER);
   }
+  if (OPENAI_REASONING_IDS.has(id) || id === "grok-3-mini") {
+    extras.push(REASONING_EFFORT);
+  }
+  if (ANTHROPIC_THINKING_IDS.has(id)) {
+    extras.push(EXTENDED_THINKING);
+  }
+  if (QWEN_THINKING_IDS.has(id)) {
+    extras.push(ENABLE_THINKING);
+  }
+  if (GEMINI_THINKING_IDS.has(id)) {
+    extras.push(THINKING_BUDGET);
+  }
+  if (OPENAI_CHAT_IDS.has(id)) {
+    extras.push(SEED_SETTING);
+  }
+
+  model.settings = [...LLM_SETTINGS, ...extras];
 }
 
 // Модели по секции
