@@ -122,6 +122,8 @@ export interface Model {
   tokenCostPerMVideoToken: number;
   /** FPS used in video token calculation (0 if not applicable). */
   videoFps: number;
+  /** Cost per second in internal tokens (>0 only for per-second billing models, e.g. Kling, Pika). */
+  tokenCostPerSecond: number;
   supportedAspectRatios?: string[] | null;
   supportedDurations?: number[] | null;
   durationRange?: { min: number; max: number } | null;

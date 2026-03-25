@@ -16,11 +16,18 @@ interface HeyGenVoicesResponse {
   };
 }
 
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+let voicesCache: { data: object[]; at: number } | null = null;
+
 export const heygenVoicesRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", telegramAuthHook);
 
   /** GET /heygen-voices — proxy to HeyGen v2/voices, returns simplified voice list */
   fastify.get("/heygen-voices", async (_request, reply) => {
+    if (voicesCache && Date.now() - voicesCache.at < CACHE_TTL_MS) {
+      return voicesCache.data;
+    }
+
     const apiKey = config.ai.heygen;
     if (!apiKey) {
       return reply.status(503).send({ error: "HeyGen API key not configured" });
@@ -38,12 +45,15 @@ export const heygenVoicesRoutes: FastifyPluginAsync = async (fastify) => {
     const json = (await res.json()) as HeyGenVoicesResponse;
     const voices = json.data?.voices ?? [];
 
-    return voices.map((v) => ({
+    const data = voices.map((v) => ({
       voice_id: v.voice_id,
       name: v.name,
       language: v.language ?? "",
       gender: v.gender ?? "",
       preview_audio: v.preview_audio ?? null,
     }));
+
+    voicesCache = { data, at: Date.now() };
+    return data;
   });
 };

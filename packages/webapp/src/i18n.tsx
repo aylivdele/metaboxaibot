@@ -68,6 +68,7 @@ const translations = {
     "manage.price.perReq": "/req",
     "manage.price.perMsg": "/msg",
     "manage.price.perMPixel": "/MP",
+    "manage.price.perSec": "/sec",
 
     // Tariffs
     "tariffs.title": "Tariffs",
@@ -233,6 +234,7 @@ const translations = {
     "imageSettings.active": "Active",
     "imageSettings.activate": "Activate",
     "imageSettings.activating": "Activating…",
+    "imageSettings.activated": "Activated",
     "imageSettings.version": "Version",
     "imageSettings.variant": "Variant",
     "imageSettings.aspectRatio": "Aspect ratio",
@@ -256,7 +258,10 @@ const translations = {
     // Uploads
     "uploads.title": "My Uploads",
     "uploads.subtitle": "Voice recordings and audio files you've shared with the bot",
-    "uploads.empty": "No uploads yet. Send a voice message to the bot while in HeyGen mode.",
+    "uploads.empty": "No uploads yet.",
+    "uploads.emptyVoices":
+      "No recordings yet. Send a voice message to the bot while in HeyGen or D-ID mode.",
+    "uploads.emptyPhotos": "No photos yet. Send a photo to the bot while in HeyGen mode.",
     "uploads.delete": "Delete",
     "uploads.confirmDelete": "Delete this upload?",
     "uploads.rename": "Rename",
@@ -336,6 +341,7 @@ const translations = {
     "manage.price.perReq": "/запрос",
     "manage.price.perMsg": "/сообщение",
     "manage.price.perMPixel": "/мегапиксель",
+    "manage.price.perSec": "/сек",
 
     // Tariffs
     "tariffs.title": "Тарифы",
@@ -498,6 +504,7 @@ const translations = {
     "imageSettings.active": "Активна",
     "imageSettings.activate": "Активировать",
     "imageSettings.activating": "Активирую…",
+    "imageSettings.activated": "Активирована",
     "imageSettings.version": "Версия",
     "imageSettings.variant": "Вариант",
     "imageSettings.aspectRatio": "Соотношение сторон",
@@ -521,7 +528,10 @@ const translations = {
     // Uploads
     "uploads.title": "Мои загрузки",
     "uploads.subtitle": "Голосовые записи и аудиофайлы, отправленные в бота",
-    "uploads.empty": "Загрузок пока нет. Отправьте голосовое сообщение боту в режиме HeyGen.",
+    "uploads.empty": "Загрузок пока нет.",
+    "uploads.emptyVoices":
+      "Записей пока нет. Отправьте голосовое сообщение боту в режиме HeyGen или D-ID.",
+    "uploads.emptyPhotos": "Фото пока нет. Отправьте фото боту в режиме HeyGen.",
     "uploads.delete": "Удалить",
     "uploads.confirmDelete": "Удалить эту запись?",
     "uploads.rename": "Переименовать",

@@ -16,11 +16,18 @@ interface DIDVoicesResponse {
   voices?: DIDVoice[];
 }
 
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+let voicesCache: { data: object[]; at: number } | null = null;
+
 export const didVoicesRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", telegramAuthHook);
 
   /** GET /d-id-voices — proxy to D-ID /tts/voices, returns simplified voice list */
   fastify.get("/d-id-voices", async (_request, reply) => {
+    if (voicesCache && Date.now() - voicesCache.at < CACHE_TTL_MS) {
+      return voicesCache.data;
+    }
+
     const apiKey = config.ai.did;
     if (!apiKey) {
       return reply.status(503).send({ error: "D-ID API key not configured" });
@@ -39,7 +46,7 @@ export const didVoicesRoutes: FastifyPluginAsync = async (fastify) => {
     const json = (await res.json()) as DIDVoicesResponse;
     const voices = json.voices ?? [];
 
-    return voices.map((v) => ({
+    const data = voices.map((v) => ({
       id: v.id,
       name: v.name,
       gender: v.gender ?? "",
@@ -48,5 +55,8 @@ export const didVoicesRoutes: FastifyPluginAsync = async (fastify) => {
       styles: v.styles ?? [],
       description: v.description ?? "",
     }));
+
+    voicesCache = { data, at: Date.now() };
+    return data;
   });
 };

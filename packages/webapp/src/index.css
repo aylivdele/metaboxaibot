@@ -2396,10 +2396,11 @@ input::placeholder {
 /* Avatar picker grid */
 .avatar-picker__grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  max-height: 320px;
+  max-height: 360px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 4px 0;
 }
 
