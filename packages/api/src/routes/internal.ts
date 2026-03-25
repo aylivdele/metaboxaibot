@@ -84,14 +84,13 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * POST /internal/revoke-tokens
    * Called by Metabox when rolling back a token package or subscription purchase.
-   * Deducts tokens from user balance and records a debit transaction.
-   * Body: { telegramId: string, tokens: number, description?: string }
+   * Deducts tokens from user balance and deletes the matching credit transaction.
+   * Body: { telegramId: string, tokens: number }
    */
   fastify.post("/revoke-tokens", async (request, reply) => {
-    const { telegramId, tokens, description } = request.body as {
+    const { telegramId, tokens } = request.body as {
       telegramId: string;
       tokens: number;
-      description?: string;
     };
 
     if (!telegramId || typeof tokens !== "number" || tokens <= 0) {
@@ -103,21 +102,29 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
       return { ok: true }; // user not in bot — nothing to revoke
     }
 
-    await db.$transaction([
+    // Find the most recent matching credit transaction to delete
+    const txToDelete = await db.tokenTransaction.findFirst({
+      where: {
+        userId: BigInt(telegramId),
+        type: "credit",
+        amount: { gte: tokens - 0.01, lte: tokens + 0.01 },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+
+    const ops: any[] = [
       db.user.update({
         where: { id: BigInt(telegramId) },
         data: { tokenBalance: { decrement: tokens } },
       }),
-      db.tokenTransaction.create({
-        data: {
-          userId: BigInt(telegramId),
-          amount: -tokens,
-          type: "debit",
-          reason: "admin",
-          description: description || "Откат покупки",
-        },
-      }),
-    ]);
+    ];
+
+    if (txToDelete) {
+      ops.push(db.tokenTransaction.delete({ where: { id: txToDelete.id } }));
+    }
+
+    await db.$transaction(ops);
 
     return { ok: true };
   });
