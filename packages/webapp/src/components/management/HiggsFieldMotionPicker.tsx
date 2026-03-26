@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api/client.js";
 import type { HiggsFieldMotion } from "../../types.js";
+import { CustomSlider } from "./CustomSlider.js";
 
 export interface MotionEntry {
   id: string;
@@ -82,19 +83,19 @@ export function HiggsFieldMotionPicker({ value, onChange }: HiggsFieldMotionPick
 
   return (
     <div className="motion-picker">
-      <div className="motion-picker__categories">
+      <select
+        className="motion-picker__category-select"
+        value={activeCategory}
+        onChange={(e) => setActiveCategory(e.target.value)}
+      >
         {categories.map((cat) => (
-          <button
-            key={cat}
-            className={`motion-picker__cat-btn${activeCategory === cat ? " motion-picker__cat-btn--active" : ""}`}
-            onClick={() => setActiveCategory(cat)}
-          >
-            {cat === "all" ? "Все" : cat}
-          </button>
+          <option key={cat} value={cat}>
+            {cat === "all" ? "Все категории" : cat}
+          </option>
         ))}
-      </div>
+      </select>
 
-      <div className="motion-picker__list">
+      <div className="motion-picker__grid">
         {filtered.map((motion) => {
           const selected = isSelected(motion.id);
           const strength = getStrength(motion.id);
@@ -104,36 +105,27 @@ export function HiggsFieldMotionPicker({ value, onChange }: HiggsFieldMotionPick
               className={`motion-picker__item${selected ? " motion-picker__item--selected" : ""}`}
               onClick={() => toggle(motion)}
             >
-              <div className="motion-picker__item-header">
-                <span className="motion-picker__item-check">{selected ? "✓" : ""}</span>
-                <span className="motion-picker__item-name">{motion.name}</span>
-                {motion.preview_url && (
-                  <a
-                    className="motion-picker__preview-btn"
-                    href={motion.preview_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    title="Превью"
-                  >
-                    ▶
-                  </a>
-                )}
-              </div>
-              {motion.description && (
-                <span className="motion-picker__item-desc">{motion.description}</span>
+              {motion.preview_url ? (
+                <img
+                  className="motion-picker__preview-img"
+                  src={motion.preview_url}
+                  alt={motion.name}
+                />
+              ) : (
+                <div className="motion-picker__preview-img motion-picker__preview-placeholder">
+                  🎬
+                </div>
               )}
+              <span className="motion-picker__item-name">{motion.name}</span>
               {selected && (
                 <div className="motion-picker__strength" onClick={(e) => e.stopPropagation()}>
                   <span className="motion-picker__strength-label">Сила: {strength.toFixed(2)}</span>
-                  <input
-                    type="range"
+                  <CustomSlider
                     min={0.1}
                     max={1.0}
                     step={0.05}
                     value={strength}
-                    className="motion-picker__strength-slider"
-                    onChange={(e) => setStrength(motion.id, parseFloat(e.target.value))}
+                    onChange={(v) => setStrength(motion.id, v)}
                   />
                 </div>
               )}
