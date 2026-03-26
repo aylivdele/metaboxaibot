@@ -27,6 +27,7 @@ export {
   createSubscriptionInvoice,
   resolveReferralCode,
   registerBotUser,
+  MetaboxApiError,
 } from "./metabox-bridge.service.js";
 export type {
   AiBotProduct,

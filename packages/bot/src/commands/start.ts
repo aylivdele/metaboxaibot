@@ -7,7 +7,7 @@ import { buildLanguageKeyboard } from "../keyboards/language.keyboard.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { SUPPORTED_LANGUAGES, getT, config } from "@metabox/shared";
 import type { Language, Translations } from "@metabox/shared";
-import { verifyLinkToken } from "@metabox/api/services";
+import { verifyLinkToken, MetaboxApiError } from "@metabox/api/services";
 
 /**
  * /start — handles deep link params, resets FSM state, shows language selection.
@@ -48,7 +48,6 @@ export async function handleStart(ctx: BotContext): Promise<void> {
         );
       }
     } catch (err: unknown) {
-      const { MetaboxApiError } = await import("@metabox/api/services/metabox-bridge.service.js");
       const isMismatch = err instanceof MetaboxApiError && err.code === "TELEGRAM_MISMATCH";
       const msg = isMismatch
         ? "⚠️ Эта ссылка привязки предназначена для другого Telegram-аккаунта. Переключитесь на нужный аккаунт и попробуйте снова."
