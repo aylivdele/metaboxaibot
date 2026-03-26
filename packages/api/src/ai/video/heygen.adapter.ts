@@ -104,13 +104,14 @@ export class HeyGenAdapter implements VideoAdapter {
       const pollData = (await pollRes.json()) as {
         data?: { status?: string; avatar_list?: Array<{ id: string }> };
       };
+      console.log(`[HeyGen Adapter] Response from heygen ${pollData}`);
       const status = pollData.data?.status;
       if (status === "completed") {
         // Use first look id if available, else fall back to groupId
         return pollData.data?.avatar_list?.[0]?.id ?? groupId;
       }
       if (status === "failed") throw new Error("HeyGen: avatar group processing failed");
-      console.log("[HeyGen Adapter] Waiting for avatar creation, attempt=" + i)
+      console.log("[HeyGen Adapter] Waiting for avatar creation, attempt=" + i);
     }
     throw new Error("HeyGen: avatar group did not become ready in time");
   }
