@@ -341,6 +341,7 @@ export async function registerBotUser(params: {
   referralCode: string;
   isNew: boolean;
   isStub: boolean;
+  mentor?: { name: string; telegramUsername: string | null } | null;
 }> {
   return post("/register-bot-user", {
     telegramId: params.telegramId.toString(),
