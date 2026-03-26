@@ -12,7 +12,7 @@ const MODEL_IDS: Record<string, string> = {
   "stable-diffusion": "stability-ai/sdxl",
   ideogram: "ideogram-ai/ideogram-v3",
   midjourney:
-    "tstramer/midjourney-diffusion:436b051ebd8f68d23e83d22de5e198e0995357afef113768c20f0b6fcef23c8b",
+    "adminconteudosflix/midjourney-allcraft:40ab9b32cc4584bc069e22027fffb97e79ed550d4e7c20ed6d5d7ef89e8f08f5",
 };
 
 /**

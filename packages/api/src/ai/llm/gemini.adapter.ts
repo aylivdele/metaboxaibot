@@ -61,15 +61,19 @@ export class GeminiAdapter implements LLMAdapter {
 
     const chat = model.startChat({ history });
 
-    const userParts: Content["parts"] = input.imageUrl
+    const urls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
+
+    const userParts: Content["parts"] = urls.length
       ? [
-          { text: input.prompt },
-          {
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: await fetchImageAsBase64(input.imageUrl),
-            },
-          },
+          ...(input.prompt ? [{ text: input.prompt }] : []),
+          ...(await Promise.all(
+            urls.map(async (url) => ({
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: await fetchImageAsBase64(url),
+              },
+            })),
+          )),
         ]
       : [{ text: input.prompt }];
 

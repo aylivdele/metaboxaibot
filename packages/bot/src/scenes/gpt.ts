@@ -4,10 +4,72 @@ import { logger } from "../logger.js";
 import { config } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 
+/** Media group buffer: groups multiple photos sent at once before processing. */
+interface MediaGroupEntry {
+  dialogId: string;
+  userId: bigint;
+  chatId: number;
+  urls: string[];
+  caption: string;
+  ctx: BotContext;
+  timer: ReturnType<typeof setTimeout>;
+}
+const mediaGroupBuffer = new Map<string, MediaGroupEntry>();
+
 /** Default model for new GPT dialogs (user can change via Management). */
 const DEFAULT_GPT_MODEL = "gpt-4o";
 /** Minimum ms between Telegram message edits (rate-limit safety). */
 const EDIT_THROTTLE_MS = 1200;
+
+// ── Shared streaming helper ───────────────────────────────────────────────────
+
+async function streamGptResponse(
+  ctx: BotContext,
+  chatId: number,
+  dialogId: string,
+  content: string,
+  imageUrls?: string[],
+): Promise<void> {
+  const placeholder = await ctx.reply("⏳");
+  let accumulated = "";
+  let lastEdit = Date.now();
+
+  try {
+    const stream = chatService.sendMessageStream({
+      dialogId,
+      userId: ctx.user!.id,
+      content,
+      ...(imageUrls?.length ? { imageUrls } : {}),
+    });
+
+    for await (const chunk of stream) {
+      accumulated += chunk;
+      const now = Date.now();
+      if (now - lastEdit >= EDIT_THROTTLE_MS && accumulated.trim()) {
+        await ctx.api
+          .editMessageText(chatId, placeholder.message_id, accumulated + " ▌")
+          .catch(() => void 0);
+        lastEdit = now;
+      }
+    }
+
+    if (accumulated.trim()) {
+      await ctx.api
+        .editMessageText(chatId, placeholder.message_id, accumulated)
+        .catch(() => void 0);
+    } else {
+      await ctx.api.deleteMessage(chatId, placeholder.message_id).catch(() => void 0);
+    }
+  } catch (err: unknown) {
+    await ctx.api.deleteMessage(chatId, placeholder.message_id).catch(() => void 0);
+    if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
+      await ctx.reply(ctx.t.errors.insufficientTokens);
+    } else {
+      logger.error(err, "GPT message error");
+      await ctx.reply(ctx.t.errors.noTool);
+    }
+  }
+}
 
 // ── New dialog ────────────────────────────────────────────────────────────────
 
@@ -37,54 +99,82 @@ export async function handleGptMessage(ctx: BotContext): Promise<void> {
 
   const state = await userStateService.get(ctx.user.id);
   if (!state?.gptDialogId) {
-    // No active dialog — prompt user to create one
     await ctx.reply(ctx.t.gpt.newDialogCreated);
     return;
   }
 
-  const userText = ctx.message.text;
   const chatId = ctx.chat?.id;
   if (!chatId) return;
 
-  // Send placeholder message to edit progressively
-  const placeholder = await ctx.reply("⏳");
-  let accumulated = "";
-  let lastEdit = Date.now();
+  await streamGptResponse(ctx, chatId, state.gptDialogId, ctx.message.text);
+}
 
-  try {
-    const stream = chatService.sendMessageStream({
-      dialogId: state.gptDialogId,
-      userId: ctx.user.id,
-      content: userText,
-    });
+// ── Photo / document image in active GPT dialog ───────────────────────────────
 
-    for await (const chunk of stream) {
-      accumulated += chunk;
-      const now = Date.now();
-      if (now - lastEdit >= EDIT_THROTTLE_MS && accumulated.trim()) {
-        await ctx.api
-          .editMessageText(chatId, placeholder.message_id, accumulated + " ▌")
-          .catch(() => void 0);
-        lastEdit = now;
-      }
-    }
+export async function handleGptPhoto(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
 
-    // Final edit — remove cursor
-    if (accumulated.trim()) {
-      await ctx.api
-        .editMessageText(chatId, placeholder.message_id, accumulated)
-        .catch(() => void 0);
+  const state = await userStateService.get(ctx.user.id);
+  if (!state?.gptDialogId) {
+    await ctx.reply(ctx.t.gpt.newDialogCreated);
+    return;
+  }
+
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  // Resolve file ID — photo (compressed) or document (original file)
+  let fileId: string;
+  if (ctx.message?.photo) {
+    fileId = ctx.message.photo.at(-1)!.file_id;
+  } else if (ctx.message?.document?.mime_type?.startsWith("image/")) {
+    fileId = ctx.message.document.file_id;
+  } else {
+    return;
+  }
+
+  const file = await ctx.api.getFile(fileId);
+  const url = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+  const caption = ctx.message?.caption ?? "";
+  const mediaGroupId = ctx.message?.media_group_id;
+
+  if (mediaGroupId) {
+    // Buffer photos from the same album and process together after 800 ms silence
+    const key = `${ctx.user.id}__${mediaGroupId}`;
+    const existing = mediaGroupBuffer.get(key);
+
+    if (existing) {
+      clearTimeout(existing.timer);
+      existing.urls.push(url);
+      if (!existing.caption && caption) existing.caption = caption;
+      existing.timer = setTimeout(() => {
+        mediaGroupBuffer.delete(key);
+        void streamGptResponse(
+          existing.ctx,
+          existing.chatId,
+          existing.dialogId,
+          existing.caption,
+          existing.urls,
+        );
+      }, 800);
     } else {
-      await ctx.api.deleteMessage(chatId, placeholder.message_id).catch(() => void 0);
+      const entry: MediaGroupEntry = {
+        dialogId: state.gptDialogId,
+        userId: ctx.user.id,
+        chatId,
+        urls: [url],
+        caption,
+        ctx,
+        timer: setTimeout(() => {
+          mediaGroupBuffer.delete(key);
+          void streamGptResponse(ctx, chatId, state.gptDialogId!, caption, [url]);
+        }, 800),
+      };
+      mediaGroupBuffer.set(key, entry);
     }
-  } catch (err: unknown) {
-    await ctx.api.deleteMessage(chatId, placeholder.message_id).catch(() => void 0);
-    if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
-      await ctx.reply(ctx.t.errors.insufficientTokens);
-    } else {
-      logger.error(err, "GPT message error");
-      await ctx.reply(ctx.t.errors.noTool);
-    }
+  } else {
+    // Single photo — process immediately
+    await streamGptResponse(ctx, chatId, state.gptDialogId, caption, [url]);
   }
 }
 

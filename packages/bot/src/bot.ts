@@ -8,6 +8,7 @@ import { handleNoTool } from "./handlers/no-tool.handler.js";
 import {
   handleNewGptDialog,
   handleGptMessage,
+  handleGptPhoto,
   handleActivateGptEditor,
   handleGptPrompts,
 } from "./scenes/gpt.js";
@@ -135,7 +136,11 @@ export function createBot(token: string): Bot<BotContext> {
     if (!ctx.user) return next();
 
     const state = await userStateService.get(ctx.user.id);
-    if (state?.state === "GPT_ACTIVE") return handleGptMessage(ctx);
+    if (state?.state === "GPT_ACTIVE") {
+      if (ctx.message?.photo) return handleGptPhoto(ctx);
+      if (ctx.message?.document?.mime_type?.startsWith("image/")) return handleGptPhoto(ctx);
+      return handleGptMessage(ctx);
+    }
     if (state?.state === "DESIGN_ACTIVE") {
       // Photo sent in design state → set as img2img reference
       if (ctx.message?.photo) return handleDesignPhoto(ctx);

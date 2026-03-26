@@ -66,15 +66,18 @@ export class OpenAIAdapter implements LLMAdapter {
   }
 
   private buildInput(input: LLMInput): string | OpenAI.Responses.ResponseInput {
-    if (input.imageUrl) {
-      const msg: OpenAI.Responses.EasyInputMessage = {
-        role: "user",
-        content: [
-          { type: "input_text", text: input.prompt },
-          { type: "input_image", image_url: input.imageUrl, detail: "auto" },
-        ],
-      };
-      return [msg];
+    const urls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
+
+    if (urls.length > 0) {
+      const content: OpenAI.Responses.InputContentPart[] = [
+        ...(input.prompt ? [{ type: "input_text" as const, text: input.prompt }] : []),
+        ...urls.map((url) => ({
+          type: "input_image" as const,
+          image_url: url,
+          detail: "auto" as const,
+        })),
+      ];
+      return [{ role: "user", content }];
     }
     return input.prompt;
   }

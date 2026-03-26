@@ -11,6 +11,7 @@ export interface SendMessageParams {
   userId: bigint;
   content: string;
   imageUrl?: string;
+  imageUrls?: string[];
 }
 
 export interface SendMessageResult {
@@ -28,7 +29,7 @@ export const chatService = {
   async *sendMessageStream(
     params: SendMessageParams,
   ): AsyncGenerator<string, SendMessageResult, unknown> {
-    const { dialogId, userId, content, imageUrl } = params;
+    const { dialogId, userId, content, imageUrl, imageUrls } = params;
 
     const dialog = await dialogService.findById(dialogId);
     if (!dialog) throw new Error(`Dialog ${dialogId} not found`);
@@ -45,6 +46,7 @@ export const chatService = {
     const input: LLMInput = {
       prompt: content,
       imageUrl,
+      ...(imageUrls?.length ? { imageUrls } : {}),
       ...(ms.temperature !== undefined ? { temperature: ms.temperature as number } : {}),
       ...(ms.max_tokens !== undefined ? { maxTokens: ms.max_tokens as number } : {}),
       ...(ms.system_prompt ? { systemPrompt: ms.system_prompt as string } : {}),
@@ -57,8 +59,6 @@ export const chatService = {
       input.history = await dialogService.getHistory(dialogId, adapter.contextMaxMessages);
     } else if (dialog.contextStrategy === "provider_chain") {
       input.previousResponseId = dialog.providerLastResponseId ?? undefined;
-    } else if (dialog.contextStrategy === "provider_thread") {
-      input.threadId = dialog.providerThreadId ?? undefined;
     }
 
     // Save user message
@@ -70,6 +70,7 @@ export const chatService = {
 
     let inputTokensUsed: number | undefined;
     let outputTokensUsed: number | undefined;
+    let providerUsdCost: number | undefined;
 
     while (true) {
       const next = await gen.next();
@@ -79,13 +80,10 @@ export const chatService = {
           await dialogService.updateProviderContext(dialogId, {
             providerLastResponseId: result.newResponseId,
           });
-        } else if (result?.newThreadId) {
-          await dialogService.updateProviderContext(dialogId, {
-            providerThreadId: result.newThreadId,
-          });
         }
         inputTokensUsed = result?.inputTokensUsed;
         outputTokensUsed = result?.outputTokensUsed;
+        providerUsdCost = result?.providerUsdCost;
         break;
       }
       chunks.push(next.value);
@@ -95,9 +93,11 @@ export const chatService = {
     const responseText = chunks.join("");
     const model = AI_MODELS[dialog.modelId];
     const tokensUsed =
-      model && inputTokensUsed !== undefined && outputTokensUsed !== undefined
-        ? calculateCost(model, inputTokensUsed, outputTokensUsed, undefined, undefined, ms)
-        : estimateTokens(content, responseText);
+      providerUsdCost !== undefined
+        ? providerUsdCost
+        : model && inputTokensUsed !== undefined && outputTokensUsed !== undefined
+          ? calculateCost(model, inputTokensUsed, outputTokensUsed, undefined, undefined, ms)
+          : estimateTokens(content, responseText);
 
     // Save assistant message
     await dialogService.saveMessage(dialogId, "assistant", responseText, { tokensUsed });

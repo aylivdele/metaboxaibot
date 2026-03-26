@@ -77,14 +77,36 @@ export class PerplexityAdapter implements LLMAdapter {
 
     let inputTokensUsed = 0;
     let outputTokensUsed = 0;
+    let citationTokens = 0;
+    let numSearchQueries = 0;
+    let reasoningTokens = 0;
 
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) yield delta;
       if (chunk.usage) {
-        inputTokensUsed = chunk.usage.prompt_tokens;
-        outputTokensUsed = chunk.usage.completion_tokens;
+        const u = chunk.usage as typeof chunk.usage & {
+          citation_tokens?: number;
+          num_search_queries?: number;
+          reasoning_tokens?: number;
+        };
+        inputTokensUsed = u.prompt_tokens;
+        outputTokensUsed = u.completion_tokens;
+        citationTokens = u.citation_tokens ?? 0;
+        numSearchQueries = u.num_search_queries ?? 0;
+        reasoningTokens = u.reasoning_tokens ?? 0;
       }
+    }
+
+    // For sonar-deep-research, compute exact USD cost from all billing components
+    if (this.modelId === "perplexity-sonar-research") {
+      const providerUsdCost =
+        (inputTokensUsed / 1_000_000) * 2 +
+        (outputTokensUsed / 1_000_000) * 8 +
+        (citationTokens / 1_000_000) * 2 +
+        (numSearchQueries / 1_000) * 5 +
+        (reasoningTokens / 1_000_000) * 3;
+      return { inputTokensUsed, outputTokensUsed, providerUsdCost };
     }
 
     return { inputTokensUsed, outputTokensUsed };

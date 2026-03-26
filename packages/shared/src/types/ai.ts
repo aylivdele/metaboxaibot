@@ -195,6 +195,17 @@ export interface AIModel {
     map: Record<string, number>;
   }>;
   /**
+   * Tiered pricing based on prompt (input) token count.
+   * When inputTokens exceeds thresholdTokens, the input and output rates
+   * are multiplied by the respective multipliers.
+   * Example: GPT-5.4 doubles input cost and adds ×1.5 output cost above 272k tokens.
+   */
+  contextPricingTiers?: {
+    thresholdTokens: number;
+    inputMultiplier: number;
+    outputMultiplier: number;
+  };
+  /**
    * Configurable generation parameters exposed in the Management mini-app.
    * The frontend renders controls dynamically based on these definitions.
    * User-chosen values are stored in UserState.modelSettings and passed to the adapter.
@@ -211,8 +222,6 @@ export interface ChatInput {
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   // provider_chain: передаём ID предыдущего ответа (OpenAI Responses API)
   previousResponseId?: string;
-  // provider_thread: передаём ID треда (OpenAI Assistants)
-  threadId?: string;
   options?: Record<string, unknown>;
 }
 
@@ -222,8 +231,6 @@ export interface ChatOutput {
   tokensUsed: number;
   // Возвращаем для обновления Dialog
   newResponseId?: string; // provider_chain: сохранить как providerLastResponseId
-  newThreadId?: string; // provider_thread: при первом вызове (создание Thread)
-  newMessageId?: string; // provider_thread: id сообщения ассистента
 }
 
 /** Входные данные для async-генерации (image/video/audio) */

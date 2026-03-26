@@ -77,10 +77,15 @@ export class AnthropicAdapter implements LLMAdapter {
       content: m.content,
     }));
 
-    const userContent: Anthropic.MessageParam["content"] = input.imageUrl
+    const urls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
+
+    const userContent: Anthropic.MessageParam["content"] = urls.length
       ? [
-          { type: "image", source: { type: "url", url: input.imageUrl } },
-          { type: "text", text: input.prompt },
+          ...urls.map((url) => ({
+            type: "image" as const,
+            source: { type: "url" as const, url },
+          })),
+          ...(input.prompt ? [{ type: "text" as const, text: input.prompt }] : []),
         ]
       : input.prompt;
 

@@ -9,12 +9,8 @@ import type {
 import { config } from "@metabox/shared";
 
 const MODEL_MAP: Record<string, string> = {
-  "grok-3": "grok-3",
-  "grok-3-mini": "grok-3-mini",
-  "grok-4": "grok-4",
-  "grok-3-deep-search": "grok-3-deepsearch",
-  "grok-3-reasoner": "grok-3-reasoner",
-  "grok-3-image": "aurora",
+  "grok-4": "grok-4.20",
+  "grok-4-fast": "grok-4-1-fast",
 };
 
 /**

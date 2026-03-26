@@ -70,9 +70,18 @@ export function calculateCost(
   durationSeconds?: number,
   charCount?: number,
 ): number {
+  // Apply context-size-based pricing tiers (e.g. GPT-5.4 doubles input rate above 272k tokens)
+  let inputCostPerMToken = model.inputCostUsdPerMToken;
+  if (model.contextPricingTiers && inputTokens > model.contextPricingTiers.thresholdTokens) {
+    inputCostPerMToken *= model.contextPricingTiers.inputMultiplier;
+  }
+
   // Resolve cost overrides from costVariants based on user's current settings
   let baseRequest = model.costUsdPerRequest;
   let outputCostPerMToken = model.outputCostUsdPerMToken;
+  if (model.contextPricingTiers && inputTokens > model.contextPricingTiers.thresholdTokens) {
+    outputCostPerMToken *= model.contextPricingTiers.outputMultiplier;
+  }
   let costPerSecond = model.costUsdPerSecond;
   let costPerMVideoToken = model.costUsdPerMVideoToken;
   let costPerKChar = model.costUsdPerKChar;
@@ -124,7 +133,7 @@ export function calculateCost(
   const providerUsdCost =
     perRequestCost +
     addonCost +
-    (inputTokens * model.inputCostUsdPerMToken) / 1_000_000 +
+    (inputTokens * inputCostPerMToken) / 1_000_000 +
     (outputTokens * outputCostPerMToken) / 1_000_000;
   return (providerUsdCost / config.billing.usdPerToken) * config.billing.targetMargin;
 }
