@@ -1047,6 +1047,11 @@ input::placeholder {
   color: var(--accent);
   letter-spacing: -1px;
 }
+.referral-stat__value--small {
+  font-size: 20px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
 .referral-stat__label {
   font-size: 12px;
   color: var(--text-hint);
@@ -2992,12 +2997,40 @@ input::placeholder {
   padding: 12px 0;
 }
 
-
 .motion-picker__grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   max-height: 400px;
+  overflow-y: auto;
+}
+
+.motion-picker__cat-btn {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.motion-picker__cat-btn--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.motion-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 360px;
   overflow-y: auto;
 }
 
@@ -3009,7 +3042,9 @@ input::placeholder {
   border-radius: 8px;
   padding: 6px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
   user-select: none;
   gap: 4px;
 }
