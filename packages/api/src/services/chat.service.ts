@@ -38,12 +38,8 @@ export const chatService = {
     const allModelSettings = await userStateService.getModelSettings(userId);
     const ms = allModelSettings[dialog.modelId] ?? {};
 
-    // Check balance using estimated cost (typical 500 input + 500 output tokens)
-    const model = AI_MODELS[dialog.modelId];
-    if (model) {
-      const estimatedCost = calculateCost(model, 500, 500, undefined, undefined, ms);
-      await checkBalance(userId, estimatedCost);
-    }
+    // Check balance > 0 cause we dont know how much outputTokens will be generated
+    await checkBalance(userId, 0);
 
     // Build input based on context strategy
     const input: LLMInput = {
