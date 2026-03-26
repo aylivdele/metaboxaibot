@@ -69,6 +69,10 @@ export function UploadsView() {
     if (playingId === id) stopAudio();
   };
 
+  const voices = uploads.filter((u) => u.type === "voice");
+  const photos = uploads.filter((u) => u.type === "photo");
+  const others = uploads.filter((u) => u.type !== "voice" && u.type !== "photo");
+
   if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 
   return (
@@ -77,62 +81,123 @@ export function UploadsView() {
         <h2>{t("uploads.title")}</h2>
         <p className="page-subtitle">{t("uploads.subtitle")}</p>
       </div>
+
       {uploads.length === 0 ? (
         <p className="uploads-empty">{t("uploads.empty")}</p>
       ) : (
-        <div className="uploads-list">
-          {uploads.map((upload) => (
-            <div key={upload.id} className="uploads-item">
-              <button
-                className={`voice-picker__play-btn${playingId === upload.id ? " voice-picker__play-btn--playing" : ""}${loadingId === upload.id ? " voice-picker__play-btn--loading" : ""}`}
-                onClick={() => playPreview(upload.id, upload.url)}
-                title="Прослушать"
-              >
-                {loadingId === upload.id ? "⏳" : playingId === upload.id ? "⏹" : "▶"}
-              </button>
-
-              <div className="uploads-item__info">
-                {editingId === upload.id ? (
-                  <input
-                    className="uploads-item__name-input"
-                    value={editName}
-                    autoFocus
-                    onChange={(e) => setEditName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void saveEdit(upload.id);
-                      if (e.key === "Escape") setEditingId(null);
-                    }}
-                    onBlur={() => void saveEdit(upload.id)}
-                  />
-                ) : (
-                  <span className="uploads-item__name" onClick={() => startEdit(upload)}>
-                    {upload.name}
-                  </span>
-                )}
-                <span className="uploads-item__meta">
-                  {upload.type} · {new Date(upload.createdAt).toLocaleDateString()}
-                </span>
+        <>
+          {photos.length > 0 && (
+            <section className="uploads-section">
+              <h3 className="uploads-section__title">{t("uploads.photosTitle")}</h3>
+              <div className="uploads-photos-grid">
+                {photos.map((upload) => (
+                  <div key={upload.id} className="uploads-photo-card">
+                    <img src={upload.url} alt={upload.name} className="uploads-photo-card__img" />
+                    <div className="uploads-photo-card__footer">
+                      {editingId === upload.id ? (
+                        <input
+                          className="uploads-item__name-input"
+                          value={editName}
+                          autoFocus
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void saveEdit(upload.id);
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          onBlur={() => void saveEdit(upload.id)}
+                        />
+                      ) : (
+                        <span
+                          className="uploads-photo-card__name"
+                          onClick={() => startEdit(upload)}
+                        >
+                          {upload.name}
+                        </span>
+                      )}
+                      <div className="uploads-item__actions">
+                        <button
+                          className="uploads-item__btn uploads-item__btn--rename"
+                          onClick={() => startEdit(upload)}
+                          title={t("uploads.rename")}
+                        >
+                          ✏
+                        </button>
+                        <button
+                          className="uploads-item__btn uploads-item__btn--delete"
+                          onClick={() => void deleteUpload(upload.id)}
+                          title={t("uploads.delete")}
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
+            </section>
+          )}
 
-              <div className="uploads-item__actions">
-                <button
-                  className="uploads-item__btn uploads-item__btn--rename"
-                  onClick={() => startEdit(upload)}
-                  title={t("uploads.rename")}
-                >
-                  ✏
-                </button>
-                <button
-                  className="uploads-item__btn uploads-item__btn--delete"
-                  onClick={() => void deleteUpload(upload.id)}
-                  title={t("uploads.delete")}
-                >
-                  🗑
-                </button>
+          {(voices.length > 0 || others.length > 0) && (
+            <section className="uploads-section">
+              {photos.length > 0 && (
+                <h3 className="uploads-section__title">{t("uploads.voicesTitle")}</h3>
+              )}
+              <div className="uploads-list">
+                {[...voices, ...others].map((upload) => (
+                  <div key={upload.id} className="uploads-item">
+                    <button
+                      className={`voice-picker__play-btn${playingId === upload.id ? " voice-picker__play-btn--playing" : ""}${loadingId === upload.id ? " voice-picker__play-btn--loading" : ""}`}
+                      onClick={() => playPreview(upload.id, upload.url)}
+                      title={t("uploads.play")}
+                    >
+                      {loadingId === upload.id ? "⏳" : playingId === upload.id ? "⏹" : "▶"}
+                    </button>
+
+                    <div className="uploads-item__info">
+                      {editingId === upload.id ? (
+                        <input
+                          className="uploads-item__name-input"
+                          value={editName}
+                          autoFocus
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void saveEdit(upload.id);
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          onBlur={() => void saveEdit(upload.id)}
+                        />
+                      ) : (
+                        <span className="uploads-item__name" onClick={() => startEdit(upload)}>
+                          {upload.name}
+                        </span>
+                      )}
+                      <span className="uploads-item__meta">
+                        {upload.type} · {new Date(upload.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    <div className="uploads-item__actions">
+                      <button
+                        className="uploads-item__btn uploads-item__btn--rename"
+                        onClick={() => startEdit(upload)}
+                        title={t("uploads.rename")}
+                      >
+                        ✏
+                      </button>
+                      <button
+                        className="uploads-item__btn uploads-item__btn--delete"
+                        onClick={() => void deleteUpload(upload.id)}
+                        title={t("uploads.delete")}
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          ))}
-        </div>
+            </section>
+          )}
+        </>
       )}
     </div>
   );

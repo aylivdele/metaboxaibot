@@ -91,6 +91,7 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
               <HeyGenVoicePicker
                 voiceId={String(values["voice_id"] ?? "")}
                 voiceUrl={String(values["voice_url"] ?? "")}
+                voiceS3Key={String(values["voice_s3key"] ?? "")}
                 onChange={onChange}
               />
             )}
@@ -98,6 +99,7 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
               <DIDVoicePicker
                 voiceId={String(values["voice_id"] ?? "")}
                 voiceUrl={String(values["voice_url"] ?? "")}
+                voiceS3Key={String(values["voice_s3key"] ?? "")}
                 onChange={onChange}
               />
             )}
@@ -105,6 +107,7 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
               <HeyGenAvatarPicker
                 avatarId={String(values["avatar_id"] ?? "")}
                 avatarPhotoUrl={String(values["avatar_photo_url"] ?? "")}
+                avatarPhotoS3Key={String(values["avatar_photo_s3key"] ?? "")}
                 onChange={onChange}
               />
             )}

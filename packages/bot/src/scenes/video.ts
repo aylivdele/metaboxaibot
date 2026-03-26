@@ -218,6 +218,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     // Auto-select: store in modelSettings so adapter picks it up on next generation
     await userStateService.setModelSettings(userId, "heygen", {
       avatar_photo_url: publicUrl,
+      avatar_photo_s3key: uploadedKey ?? "",
       avatar_id: "",
     });
 

@@ -31,10 +31,19 @@ export const audioGenerationService = {
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
 
-    await checkBalance(userId);
-
     const allModelSettings = await userStateService.getModelSettings(userId);
     const modelSettings = allModelSettings[modelId] ?? {};
+    const estimatedCost = calculateCost(
+      model,
+      0,
+      0,
+      undefined,
+      undefined,
+      modelSettings,
+      undefined,
+      prompt.length,
+    );
+    await checkBalance(userId, estimatedCost);
 
     const job = await db.generationJob.create({
       data: {

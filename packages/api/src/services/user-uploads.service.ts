@@ -11,9 +11,9 @@ export const userUploadsService = {
     });
   },
 
-  async list(userId: bigint): Promise<UserUpload[]> {
+  async list(userId: bigint, type?: string): Promise<UserUpload[]> {
     return db.userUpload.findMany({
-      where: { userId },
+      where: { userId, type },
       orderBy: { createdAt: "desc" },
     });
   },

@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { createLLMAdapter } from "../ai/llm/factory.js";
 import { dialogService } from "./dialog.service.js";
-import { calculateCost } from "./token.service.js";
+import { calculateCost, checkBalance } from "./token.service.js";
 import type { LLMInput } from "../ai/llm/base.adapter.js";
 import { AI_MODELS } from "@metabox/shared";
 import { userStateService } from "./user-state.service.js";
@@ -33,16 +33,17 @@ export const chatService = {
     const dialog = await dialogService.findById(dialogId);
     if (!dialog) throw new Error(`Dialog ${dialogId} not found`);
 
-    // Check balance
-    const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
-    if (Number(user.tokenBalance) <= 0) {
-      throw new Error("INSUFFICIENT_TOKENS");
-    }
-
     const adapter = createLLMAdapter(dialog.modelId);
 
     const allModelSettings = await userStateService.getModelSettings(userId);
     const ms = allModelSettings[dialog.modelId] ?? {};
+
+    // Check balance using estimated cost (typical 500 input + 500 output tokens)
+    const model = AI_MODELS[dialog.modelId];
+    if (model) {
+      const estimatedCost = calculateCost(model, 500, 500, undefined, undefined, ms);
+      await checkBalance(userId, estimatedCost);
+    }
 
     // Build input based on context strategy
     const input: LLMInput = {

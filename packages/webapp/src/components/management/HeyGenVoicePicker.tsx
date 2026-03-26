@@ -8,13 +8,22 @@ interface HeyGenVoicePickerProps {
   voiceId: string;
   /** Currently selected user upload URL stored as voice_url (empty string = none) */
   voiceUrl: string;
+  /** S3 key of the selected upload — used to identify selection reliably across URL refreshes */
+  voiceS3Key: string;
   /** Called when user picks an official voice: sets voice_id, clears voice_url */
   onChange: (key: string, value: unknown) => void;
 }
 
-export function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePickerProps) {
+export function HeyGenVoicePicker({
+  voiceId,
+  voiceUrl,
+  voiceS3Key,
+  onChange,
+}: HeyGenVoicePickerProps) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<"official" | "uploads">(voiceUrl ? "uploads" : "official");
+  const [tab, setTab] = useState<"official" | "uploads">(
+    voiceUrl || voiceS3Key ? "uploads" : "official",
+  );
   const [voices, setVoices] = useState<HeyGenVoice[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
   const [langFilter, setLangFilter] = useState("all");
@@ -74,10 +83,12 @@ export function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePi
   const selectOfficial = (id: string) => {
     onChange("voice_id", id);
     onChange("voice_url", "");
+    onChange("voice_s3key", "");
   };
 
-  const selectUpload = (url: string) => {
-    onChange("voice_url", url);
+  const selectUpload = (upload: UserUpload) => {
+    onChange("voice_url", upload.url);
+    onChange("voice_s3key", upload.s3Key ?? "");
     onChange("voice_id", "");
   };
 
@@ -185,30 +196,35 @@ export function HeyGenVoicePicker({ voiceId, voiceUrl, onChange }: HeyGenVoicePi
           <div className="voice-picker__empty">{t("uploads.emptyVoices")}</div>
         ) : (
           <div className="voice-picker__list">
-            {uploads.map((upload) => (
-              <div
-                key={upload.id}
-                className={`voice-picker__item${voiceUrl === upload.url ? " voice-picker__item--selected" : ""}`}
-                onClick={() => selectUpload(upload.url)}
-              >
-                <div className="voice-picker__item-info">
-                  <span className="voice-picker__item-name">{upload.name}</span>
-                  <span className="voice-picker__item-meta">
-                    {new Date(upload.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-                <button
-                  className={`voice-picker__play-btn${playingId === upload.id ? " voice-picker__play-btn--playing" : ""}${loadingId === upload.id ? " voice-picker__play-btn--loading" : ""}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    playPreview(upload.id, upload.url);
-                  }}
-                  title="Прослушать"
+            {uploads.map((upload) => {
+              const isSelected = upload.s3Key
+                ? voiceS3Key === upload.s3Key
+                : voiceUrl === upload.url;
+              return (
+                <div
+                  key={upload.id}
+                  className={`voice-picker__item${isSelected ? " voice-picker__item--selected" : ""}`}
+                  onClick={() => selectUpload(upload)}
                 >
-                  {loadingId === upload.id ? "⏳" : playingId === upload.id ? "⏹" : "▶"}
-                </button>
-              </div>
-            ))}
+                  <div className="voice-picker__item-info">
+                    <span className="voice-picker__item-name">{upload.name}</span>
+                    <span className="voice-picker__item-meta">
+                      {new Date(upload.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <button
+                    className={`voice-picker__play-btn${playingId === upload.id ? " voice-picker__play-btn--playing" : ""}${loadingId === upload.id ? " voice-picker__play-btn--loading" : ""}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      playPreview(upload.id, upload.url);
+                    }}
+                    title="Прослушать"
+                  >
+                    {loadingId === upload.id ? "⏳" : playingId === upload.id ? "⏹" : "▶"}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         ))}
     </div>

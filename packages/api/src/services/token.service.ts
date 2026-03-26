@@ -31,11 +31,11 @@ export async function deductTokens(
 }
 
 /**
- * Throw INSUFFICIENT_TOKENS if the user has no positive balance.
+ * Throw INSUFFICIENT_TOKENS if the user's balance is below the required amount.
  */
-export async function checkBalance(userId: bigint): Promise<void> {
+export async function checkBalance(userId: bigint, required: number): Promise<void> {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
-  if (Number(user.tokenBalance) <= 0) throw new Error("INSUFFICIENT_TOKENS");
+  if (Number(user.tokenBalance) < required) throw new Error("INSUFFICIENT_TOKENS");
 }
 
 /**
@@ -141,5 +141,5 @@ export function computeVideoTokens(
   };
 
   const [w, h] = RESOLUTION[aspectRatio ?? "16:9"] ?? [1280, 720];
-  return (w * h * model.videoFps * duration) / 1024;
+  return (w * h * (model.videoFps ?? 30) * duration) / 1024;
 }

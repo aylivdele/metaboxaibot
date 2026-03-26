@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { getVideoQueue } from "../queues/video.queue.js";
 import { AI_MODELS } from "@metabox/shared";
-import { checkBalance } from "./token.service.js";
+import { checkBalance, calculateCost, computeVideoTokens } from "./token.service.js";
 import { userStateService } from "./user-state.service.js";
 
 export interface SubmitVideoParams {
@@ -42,13 +42,30 @@ export const videoGenerationService = {
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
 
-    await checkBalance(userId);
-
     const allModelSettings = await userStateService.getModelSettings(userId);
     const modelSettings = { ...(allModelSettings[modelId] ?? {}), ...extraModelSettings };
     // Prefer values from modelSettings (set via webapp) over legacy params
     const effectiveAspectRatio = (modelSettings.aspect_ratio as string | undefined) ?? aspectRatio;
-    const effectiveDuration = (modelSettings.duration as number | undefined) ?? duration;
+    const effectiveDuration =
+      (modelSettings.duration as number | undefined) ??
+      duration ??
+      model.durationRange?.min ??
+      model.supportedDurations?.[0] ??
+      5;
+
+    const estimatedVideoTokens = model.costUsdPerMVideoToken
+      ? computeVideoTokens(model, effectiveAspectRatio, effectiveDuration)
+      : undefined;
+    const estimatedCost = calculateCost(
+      model,
+      0,
+      0,
+      undefined,
+      estimatedVideoTokens,
+      modelSettings,
+      effectiveDuration,
+    );
+    await checkBalance(userId, estimatedCost);
 
     // Create DB job record
     const job = await db.generationJob.create({

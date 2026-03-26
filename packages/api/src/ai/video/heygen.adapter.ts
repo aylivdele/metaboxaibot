@@ -1,7 +1,9 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { getFileUrl } from "../../services/s3.service.js";
 
 const HEYGEN_API = "https://api.heygen.com";
+const HEYGEN_UPLOAD = "https://upload.heygen.com";
 
 interface HeyGenVideoStatus {
   data?: {
@@ -61,7 +63,7 @@ export class HeyGenAdapter implements VideoAdapter {
     const formData = new FormData();
     formData.append("file", new Blob([imgBuffer], { type: contentType }), "avatar.jpg");
 
-    const res = await fetch(`${HEYGEN_API}/v1/asset`, {
+    const res = await fetch(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",
       headers: { "X-Api-Key": this.apiKey },
       body: formData,
@@ -78,13 +80,33 @@ export class HeyGenAdapter implements VideoAdapter {
     return imageKey;
   }
 
+  /** Resolve a fresh URL: regenerate from s3Key if available, else use stored URL. */
+  private static async freshUrl(
+    s3KeySetting: unknown,
+    urlSetting: unknown,
+  ): Promise<string | undefined> {
+    const s3Key = s3KeySetting as string | undefined;
+    const url = urlSetting as string | undefined;
+    if (s3Key) {
+      const fresh = await getFileUrl(s3Key).catch(() => null);
+      if (fresh) return fresh;
+    }
+    return url || undefined;
+  }
+
   async submit(input: VideoInput): Promise<string> {
-    const voiceUrl = input.modelSettings?.voice_url as string | undefined;
+    const voiceUrl = await HeyGenAdapter.freshUrl(
+      input.modelSettings?.voice_s3key,
+      input.modelSettings?.voice_url,
+    );
     const voiceId = (input.modelSettings?.voice_id as string | undefined) ?? "en-US-JennyNeural";
     const bgColor = (input.modelSettings?.background_color as string | undefined) ?? "#FFFFFF";
     const dimension = HeyGenAdapter.DIMS[input.aspectRatio ?? "16:9"] ?? HeyGenAdapter.DIMS["16:9"];
 
-    const avatarPhotoUrl = input.modelSettings?.avatar_photo_url as string | undefined;
+    const avatarPhotoUrl = await HeyGenAdapter.freshUrl(
+      input.modelSettings?.avatar_photo_s3key,
+      input.modelSettings?.avatar_photo_url,
+    );
     const avatarId = (input.modelSettings?.avatar_id as string | undefined) || this.avatarId;
 
     const voice = voiceUrl

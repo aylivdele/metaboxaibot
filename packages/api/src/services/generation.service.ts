@@ -48,7 +48,15 @@ export const generationService = {
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
 
-    await checkBalance(userId);
+    const allModelSettings = await userStateService.getModelSettings(userId);
+    const modelSettings = allModelSettings[modelId] ?? {};
+    // Prefer aspect_ratio from modelSettings (set via webapp) over legacy param
+    const effectiveAspectRatio = (modelSettings.aspect_ratio as string | undefined) ?? aspectRatio;
+
+    // For per-megapixel models assume 1 MP (typical for most image resolutions)
+    const estimatedMegapixels = model.costUsdPerMPixel ? 1.0 : undefined;
+    const estimatedCost = calculateCost(model, 0, 0, estimatedMegapixels, undefined, modelSettings);
+    await checkBalance(userId, estimatedCost);
 
     const job = await db.generationJob.create({
       data: {
@@ -61,11 +69,6 @@ export const generationService = {
         status: "pending",
       },
     });
-
-    const allModelSettings = await userStateService.getModelSettings(userId);
-    const modelSettings = allModelSettings[modelId] ?? {};
-    // Prefer aspect_ratio from modelSettings (set via webapp) over legacy param
-    const effectiveAspectRatio = (modelSettings.aspect_ratio as string | undefined) ?? aspectRatio;
 
     const adapter = createImageAdapter(modelId);
 

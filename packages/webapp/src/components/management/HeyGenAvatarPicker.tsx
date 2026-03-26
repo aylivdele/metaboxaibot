@@ -8,6 +8,8 @@ interface HeyGenAvatarPickerProps {
   avatarId: string;
   /** Currently selected user photo URL stored as avatar_photo_url (empty string = none) */
   avatarPhotoUrl: string;
+  /** S3 key of the selected photo — used to identify selection reliably across URL refreshes */
+  avatarPhotoS3Key: string;
   /** Called when user picks an official avatar or a photo upload */
   onChange: (key: string, value: unknown) => void;
 }
@@ -15,10 +17,13 @@ interface HeyGenAvatarPickerProps {
 export function HeyGenAvatarPicker({
   avatarId,
   avatarPhotoUrl,
+  avatarPhotoS3Key,
   onChange,
 }: HeyGenAvatarPickerProps) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<"official" | "uploads">(avatarPhotoUrl ? "uploads" : "official");
+  const [tab, setTab] = useState<"official" | "uploads">(
+    avatarPhotoUrl || avatarPhotoS3Key ? "uploads" : "official",
+  );
   const [avatars, setAvatars] = useState<HeyGenAvatar[]>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(false);
   const [uploads, setUploads] = useState<UserUpload[]>([]);
@@ -47,10 +52,12 @@ export function HeyGenAvatarPicker({
   const selectOfficial = (id: string) => {
     onChange("avatar_id", id);
     onChange("avatar_photo_url", "");
+    onChange("avatar_photo_s3key", "");
   };
 
-  const selectPhoto = (url: string) => {
-    onChange("avatar_photo_url", url);
+  const selectPhoto = (upload: UserUpload) => {
+    onChange("avatar_photo_url", upload.url);
+    onChange("avatar_photo_s3key", upload.s3Key ?? "");
     onChange("avatar_id", "");
   };
 
@@ -127,16 +134,21 @@ export function HeyGenAvatarPicker({
           <div className="voice-picker__empty">{t("uploads.emptyPhotos")}</div>
         ) : (
           <div className="avatar-picker__grid">
-            {uploads.map((upload) => (
-              <div
-                key={upload.id}
-                className={`avatar-picker__item${avatarPhotoUrl === upload.url ? " avatar-picker__item--selected" : ""}`}
-                onClick={() => selectPhoto(upload.url)}
-              >
-                <img className="avatar-picker__img" src={upload.url} alt={upload.name} />
-                <span className="avatar-picker__name">{upload.name}</span>
-              </div>
-            ))}
+            {uploads.map((upload) => {
+              const isSelected = upload.s3Key
+                ? avatarPhotoS3Key === upload.s3Key
+                : avatarPhotoUrl === upload.url;
+              return (
+                <div
+                  key={upload.id}
+                  className={`avatar-picker__item${isSelected ? " avatar-picker__item--selected" : ""}`}
+                  onClick={() => selectPhoto(upload)}
+                >
+                  <img className="avatar-picker__img" src={upload.url} alt={upload.name} />
+                  <span className="avatar-picker__name">{upload.name}</span>
+                </div>
+              );
+            })}
           </div>
         ))}
     </div>

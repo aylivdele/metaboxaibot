@@ -2810,6 +2810,61 @@ input::placeholder {
   color: #e55;
 }
 
+.uploads-section {
+  margin-bottom: 20px;
+}
+
+.uploads-section__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 10px;
+}
+
+.uploads-photos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.uploads-photo-card {
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.uploads-photo-card__img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+}
+
+.uploads-photo-card__footer {
+  padding: 6px 6px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.uploads-photo-card__name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.uploads-photo-card__name:hover {
+  color: var(--accent);
+}
+
 /* ── Period selector ────────────────────────────────────────────────────── */
 .period-selector {
   display: flex;

@@ -262,6 +262,9 @@ const translations = {
     "uploads.emptyVoices":
       "No recordings yet. Send a voice message to the bot while in HeyGen or D-ID mode.",
     "uploads.emptyPhotos": "No photos yet. Send a photo to the bot while in HeyGen mode.",
+    "uploads.photosTitle": "Photos",
+    "uploads.voicesTitle": "Voice recordings",
+    "uploads.play": "Play",
     "uploads.delete": "Delete",
     "uploads.confirmDelete": "Delete this upload?",
     "uploads.rename": "Rename",
@@ -532,6 +535,9 @@ const translations = {
     "uploads.emptyVoices":
       "Записей пока нет. Отправьте голосовое сообщение боту в режиме HeyGen или D-ID.",
     "uploads.emptyPhotos": "Фото пока нет. Отправьте фото боту в режиме HeyGen.",
+    "uploads.photosTitle": "Фотографии",
+    "uploads.voicesTitle": "Голосовые записи",
+    "uploads.play": "Воспроизвести",
     "uploads.delete": "Удалить",
     "uploads.confirmDelete": "Удалить эту запись?",
     "uploads.rename": "Переименовать",
