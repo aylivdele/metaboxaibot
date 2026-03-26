@@ -96,7 +96,7 @@ export class HeyGenAdapter implements VideoAdapter {
     // 4. Poll until avatar group is ready (status: "completed")
     const maxAttempts = 20;
     for (let i = 0; i < maxAttempts; i++) {
-      await new Promise((r) => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, 15000));
       const pollRes = await fetch(`${HEYGEN_API}/v2/photo_avatar/avatar_group/${groupId}`, {
         headers: { "X-Api-Key": this.apiKey },
       });
