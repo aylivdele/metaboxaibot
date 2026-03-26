@@ -11,7 +11,6 @@ const T2I_ENDPOINTS: Record<string, string> = {
   "nano-banana-2": "fal-ai/nano-banana-2",
   "seedream-5": "fal-ai/bytedance/seedream/v5/lite/text-to-image",
   "seedream-4.5": "fal-ai/bytedance/seedream/v4.5/text-to-image",
-  "gpt-image-1.5": "fal-ai/gpt-image-1.5",
 };
 
 /** Image-to-image (edit) endpoint. Falls back to the T2I endpoint when absent. */
@@ -20,7 +19,6 @@ const EDIT_ENDPOINTS: Record<string, string> = {
   "nano-banana-2": "fal-ai/nano-banana-2/edit",
   "seedream-5": "fal-ai/bytedance/seedream/v5/lite/edit",
   "seedream-4.5": "fal-ai/bytedance/seedream/v4.5/edit",
-  "gpt-image-1.5": "fal-ai/gpt-image-1.5/edit",
   "stable-diffusion": "fal-ai/stable-diffusion-v3-medium/image-to-image",
   flux: "fal-ai/flux-2/edit",
   "flux-pro": "fal-ai/flux-2-pro/edit",
@@ -74,6 +72,10 @@ export class FalAdapter implements ImageAdapter {
     if (ms.safety_tolerance != null) msExtras.safety_tolerance = String(ms.safety_tolerance);
     if (ms.enable_web_search != null) msExtras.enable_web_search = ms.enable_web_search;
     if (ms.thinking_level) msExtras.thinking_level = ms.thinking_level;
+    if (ms.acceleration) msExtras.acceleration = ms.acceleration;
+    if (ms.enable_prompt_expansion != null)
+      msExtras.enable_prompt_expansion = ms.enable_prompt_expansion;
+    if (ms.enable_safety_checker != null) msExtras.enable_safety_checker = ms.enable_safety_checker;
 
     const useAspectRatio = ASPECT_RATIO_MODELS.has(this.modelId);
     const { request_id } = await fal.queue.submit(endpoint, {

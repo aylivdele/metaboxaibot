@@ -50,10 +50,18 @@ export class HeyGenAdapter implements VideoAdapter {
   };
 
   /**
-   * Upload an image from a URL to HeyGen Asset API.
-   * Returns the image_key used in Avatar IV requests.
+   * Upload an image to HeyGen Asset API.
+   * Accepts an s3Key (preferred — regenerates a fresh presigned URL right before fetching)
+   * or a fallback URL. Returns the image_key used in Avatar IV requests.
    */
-  private async uploadPhotoToHeygen(imageUrl: string): Promise<string> {
+  private async uploadPhotoToHeygen(
+    s3Key: string | undefined,
+    fallbackUrl: string,
+  ): Promise<string> {
+    // Regenerate a fresh presigned URL from S3 right before fetching to avoid expiry issues
+    const imageUrl = s3Key
+      ? ((await getFileUrl(s3Key).catch(() => null)) ?? fallbackUrl)
+      : fallbackUrl;
     // Download the image first
     const imgRes = await fetch(imageUrl);
     if (!imgRes.ok) throw new Error(`Failed to fetch image for HeyGen upload: ${imgRes.status}`);
@@ -115,7 +123,8 @@ export class HeyGenAdapter implements VideoAdapter {
 
     // Use Avatar IV endpoint when user has uploaded a custom photo
     if (avatarPhotoUrl) {
-      const imageKey = await this.uploadPhotoToHeygen(avatarPhotoUrl);
+      const avatarPhotoS3Key = input.modelSettings?.avatar_photo_s3key as string | undefined;
+      const imageKey = await this.uploadPhotoToHeygen(avatarPhotoS3Key, avatarPhotoUrl);
 
       const script = voiceUrl
         ? { type: "audio", audio_url: voiceUrl }

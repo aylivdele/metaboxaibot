@@ -111,6 +111,14 @@ export interface AIModel {
    */
   costUsdPerMPixel?: number;
   /**
+   * Fixed base USD cost added before the per-megapixel component.
+   * When set together with costUsdPerMPixel, the total formula becomes:
+   *   cost = costUsdPerMPixelBase + ceil(megapixels) × costUsdPerMPixel
+   * Example (FLUX.2 Pro): base=$0.015, perMP=$0.015 →
+   *   1 MP = $0.03, 2 MP = $0.045, 0.25 MP (→ ceil 1) = $0.03
+   */
+  costUsdPerMPixelBase?: number;
+  /**
    * USD per 1 million video tokens for models with per-video-token billing (e.g. Seedance).
    * When set, costUsdPerRequest must be 0.
    * videoTokens = (width × height × fps × duration) / 1024
@@ -183,6 +191,16 @@ export interface AIModel {
           costUsdPerKChar?: number;
         }
     >;
+  };
+  /**
+   * Multi-dimensional pricing table for models where cost depends on 2+ settings.
+   * dims: ordered setting keys, e.g. ["quality", "size"].
+   * table keys: setting values joined by "__", e.g. "medium__1024x1024".
+   * Used by the webapp to display dynamic cost label when settings change.
+   */
+  costMatrix?: {
+    dims: string[];
+    table: Record<string, number>;
   };
   /**
    * Additive USD costs applied on top of the base/variant cost when a setting

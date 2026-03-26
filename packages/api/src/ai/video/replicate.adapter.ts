@@ -4,11 +4,10 @@ import { config } from "@metabox/shared";
 
 /**
  * Replicate-backed video adapter.
- * Used for: sora (OpenAI via Replicate), veo (Google via Replicate).
+ * Used for: sora (OpenAI via Replicate).
  */
 const REPLICATE_MODELS: Record<string, `${string}/${string}:${string}` | `${string}/${string}`> = {
-  sora: "openai/sora",
-  veo: "google/veo-2",
+  sora: "openai/sora-2",
 };
 
 export class ReplicateVideoAdapter implements VideoAdapter {
@@ -27,18 +26,29 @@ export class ReplicateVideoAdapter implements VideoAdapter {
 
   async submit(input: VideoInput): Promise<string> {
     const ms = input.modelSettings ?? {};
-    const msExtras: Record<string, unknown> = {};
-    if (ms.negative_prompt) msExtras.negative_prompt = ms.negative_prompt;
-    if (ms.seed != null) msExtras.seed = ms.seed;
+
+    // Sora uses "seconds" (not "duration"), "input_reference" (not "image"),
+    // and native aspect_ratio values "portrait"/"landscape" from model settings.
+    const isSora = this.modelId === "sora";
+    const predInput: Record<string, unknown> = { prompt: input.prompt };
+
+    if (isSora) {
+      if (input.imageUrl) predInput.input_reference = input.imageUrl;
+      if (input.duration) predInput.seconds = input.duration;
+      // aspect_ratio stored in modelSettings for Sora (portrait/landscape)
+      const ar = ms.aspect_ratio as string | undefined;
+      if (ar) predInput.aspect_ratio = ar;
+    } else {
+      if (ms.negative_prompt) predInput.negative_prompt = ms.negative_prompt;
+      if (ms.seed != null) predInput.seed = ms.seed;
+      if (input.imageUrl) predInput.image = input.imageUrl;
+      if (input.duration) predInput.duration = input.duration;
+      if (input.aspectRatio) predInput.aspect_ratio = input.aspectRatio;
+    }
+
     const prediction = await this.client.predictions.create({
       model: this.model as `${string}/${string}`,
-      input: {
-        prompt: input.prompt,
-        ...(input.imageUrl ? { image: input.imageUrl } : {}),
-        ...(input.duration ? { duration: input.duration } : {}),
-        ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
-        ...msExtras,
-      },
+      input: predInput,
     });
     return prediction.id;
   }

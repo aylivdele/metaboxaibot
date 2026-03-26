@@ -70,6 +70,16 @@ export function calculateCost(
   durationSeconds?: number,
   charCount?: number,
 ): number {
+  // Multi-dimensional pricing table (e.g. resolution × duration for MiniMax).
+  // When all dimension values are present in modelSettings, look up the exact cost.
+  if (model.costMatrix && modelSettings) {
+    const key = model.costMatrix.dims.map((dim) => String(modelSettings[dim] ?? "")).join("__");
+    const matrixCost = model.costMatrix.table[key];
+    if (matrixCost !== undefined) {
+      return (matrixCost / config.billing.usdPerToken) * config.billing.targetMargin;
+    }
+  }
+
   // Apply context-size-based pricing tiers (e.g. GPT-5.4 doubles input rate above 272k tokens)
   let inputCostPerMToken = model.inputCostUsdPerMToken;
   if (model.contextPricingTiers && inputTokens > model.contextPricingTiers.thresholdTokens) {
@@ -114,7 +124,7 @@ export function calculateCost(
     costPerMVideoToken && videoTokens
       ? (videoTokens / 1_000_000) * costPerMVideoToken
       : model.costUsdPerMPixel && megapixels
-        ? Math.ceil(megapixels) * model.costUsdPerMPixel
+        ? (model.costUsdPerMPixelBase ?? 0) + Math.ceil(megapixels) * model.costUsdPerMPixel
         : costPerSecond !== undefined && effectiveDuration !== undefined
           ? costPerSecond * effectiveDuration
           : costPerKChar !== undefined && charCount !== undefined

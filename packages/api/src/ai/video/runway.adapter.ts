@@ -34,7 +34,7 @@ export class RunwayAdapter implements VideoAdapter {
     const ms = input.modelSettings ?? {};
     const body: Record<string, unknown> = {
       promptText: input.prompt,
-      model: "gen3a_turbo",
+      model: "gen4.5",
       ratio: input.aspectRatio ?? "1280:768",
       duration: input.duration ?? 5,
     };

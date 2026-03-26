@@ -4,6 +4,7 @@ import { DalleAdapter } from "./dalle.adapter.js";
 import { FalAdapter } from "./fal.adapter.js";
 import { ReplicateAdapter } from "./replicate.adapter.js";
 import { RecraftAdapter } from "./recraft.adapter.js";
+import { GptImageAdapter } from "./gpt-image.adapter.js";
 
 export function createImageAdapter(modelId: string): ImageAdapter {
   const model = AI_MODELS[modelId];
@@ -11,6 +12,7 @@ export function createImageAdapter(modelId: string): ImageAdapter {
 
   switch (model.provider) {
     case "openai":
+      if (modelId === "gpt-image-1.5") return new GptImageAdapter();
       return new DalleAdapter();
     case "fal":
       return new FalAdapter(modelId);

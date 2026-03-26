@@ -66,6 +66,12 @@ function modelCostLabel(
     return `~${cost.toFixed(2)} ✦${t("manage.price.perReq")}`;
   }
   if (m.tokenCostPerRequest > 0) {
+    // Multi-dimensional pricing (e.g. quality × size)
+    if (m.costMatrix) {
+      const key = m.costMatrix.dims.map((dim) => String(values[dim] ?? "")).join("__");
+      const cost = m.costMatrix.table[key] ?? m.tokenCostPerRequest;
+      return `${cost.toFixed(2)} ✦${t("manage.price.perReq")}`;
+    }
     return `${m.tokenCostPerRequest.toFixed(2)} ✦${t("manage.price.perReq")}`;
   }
   return null;

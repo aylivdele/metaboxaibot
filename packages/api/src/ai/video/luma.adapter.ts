@@ -10,15 +10,20 @@ interface LumaGeneration {
   failure_reason?: string;
 }
 
+/** Maps internal modelId → Luma API model name. */
+const LUMA_MODELS: Record<string, string> = {
+  "luma-ray2": "ray-2",
+};
+
 /**
- * Luma Dream Machine adapter (REST API). Supports luma (Ray3.14) and luma-ray2.
+ * Luma Dream Machine adapter (REST API). Supports luma-ray2 (ray-2).
  */
 export class LumaAdapter implements VideoAdapter {
   readonly modelId: string;
 
   private readonly apiKey: string;
 
-  constructor(modelId = "luma", apiKey = config.ai.luma ?? "") {
+  constructor(modelId = "luma-ray2", apiKey = config.ai.luma ?? "") {
     this.modelId = modelId;
     this.apiKey = apiKey;
   }
@@ -34,10 +39,14 @@ export class LumaAdapter implements VideoAdapter {
   async submit(input: VideoInput): Promise<string> {
     const ms = input.modelSettings ?? {};
     const body: Record<string, unknown> = {
+      model: LUMA_MODELS[this.modelId] ?? "ray-2",
       prompt: input.prompt,
       aspect_ratio: input.aspectRatio ?? "16:9",
       loop: ms.loop !== undefined ? Boolean(ms.loop) : false,
     };
+
+    if (ms.resolution) body.resolution = ms.resolution;
+    if (input.duration) body.duration = `${input.duration}s`;
 
     if (input.imageUrl) {
       body.keyframes = {

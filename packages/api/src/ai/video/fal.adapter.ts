@@ -6,7 +6,7 @@ import { config } from "@metabox/shared";
 const FAL_ENDPOINTS: Record<string, string> = {
   kling: "fal-ai/kling-video/v3/standard/text-to-video",
   "kling-pro": "fal-ai/kling-video/v3/pro/text-to-video",
-  pika: "fal-ai/pika-v2/text-to-video",
+  pika: "fal-ai/pika/v2.2/text-to-video",
   seedance: "fal-ai/bytedance/seedance/v1.5/pro/text-to-video",
 };
 
@@ -15,6 +15,7 @@ const FAL_I2V_ENDPOINTS: Record<string, string> = {
   kling: "fal-ai/kling-video/v3/standard/image-to-video",
   "kling-pro": "fal-ai/kling-video/v3/pro/image-to-video",
   seedance: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
+  pika: "fal-ai/pika/v2.2/image-to-video",
 };
 
 /** Separator used to pack endpoint+requestId into a single opaque string. */
@@ -44,6 +45,7 @@ export class FalVideoAdapter implements VideoAdapter {
     if (ms.generate_audio !== undefined) msExtras.generate_audio = ms.generate_audio;
     if (ms.resolution) msExtras.resolution = ms.resolution;
     if (ms.motion_strength !== undefined) msExtras.motion_strength = ms.motion_strength;
+    if (ms.seed != null) msExtras.seed = ms.seed;
     const { request_id } = await fal.queue.submit(endpoint, {
       input: {
         prompt: input.prompt,

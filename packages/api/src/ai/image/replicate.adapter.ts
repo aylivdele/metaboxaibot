@@ -3,17 +3,28 @@ import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
 /**
+ * Models that accept a raw `aspect_ratio` string (e.g. "16:9") instead of
+ * explicit width/height dimensions.
+ */
+const DIRECT_ASPECT_RATIO_MODELS = new Set(["midjourney"]);
+
+/**
  * Maps modelId → Replicate model string.
  * Format "owner/name" → SDK calls POST /v1/models/{owner}/{name}/predictions (latest deployment).
  * Format "owner/name:sha256hash" → SDK calls POST /v1/predictions with { version: hash }.
  */
 const MODEL_IDS: Record<string, string> = {
   // Use deployment endpoint (no pinned version) — always resolves to latest published version
-  "stable-diffusion": "stability-ai/sdxl",
-  ideogram: "ideogram-ai/ideogram-v3",
+  "stable-diffusion": "stability-ai/stable-diffusion-3.5-large",
+  ideogram: "ideogram-ai/ideogram-v3-quality",
+  "ideogram-balanced": "ideogram-ai/ideogram-v3-balanced",
+  "ideogram-turbo": "ideogram-ai/ideogram-v3-turbo",
   midjourney:
     "adminconteudosflix/midjourney-allcraft:40ab9b32cc4584bc069e22027fffb97e79ed550d4e7c20ed6d5d7ef89e8f08f5",
 };
+
+/** Ideogram model IDs — accept `style_reference_images` array instead of `image`. */
+const IDEOGRAM_MODELS = new Set(["ideogram", "ideogram-balanced", "ideogram-turbo"]);
 
 /**
  * Replicate adapter — async image generation.
@@ -50,19 +61,54 @@ export class ReplicateAdapter implements ImageAdapter {
 
   async submit(input: ImageInput): Promise<string> {
     const modelStr = MODEL_IDS[this.modelId] ?? this.modelId;
-    const { width, height } = this.resolveSize(input);
     const ms = input.modelSettings ?? {};
     const msExtras: Record<string, unknown> = {};
     if (ms.negative_prompt) msExtras.negative_prompt = ms.negative_prompt;
     else if (input.negativePrompt) msExtras.negative_prompt = input.negativePrompt;
     if (ms.guidance_scale !== undefined) msExtras.guidance_scale = ms.guidance_scale;
+    if (ms.cfg !== undefined) msExtras.cfg = ms.cfg;
     if (ms.num_inference_steps !== undefined) msExtras.num_inference_steps = ms.num_inference_steps;
-    if (ms.style_type) msExtras.style_type = ms.style_type;
+    if (ms.style_type && ms.style_type !== "None") msExtras.style_type = ms.style_type;
+    if (ms.style_preset && ms.style_preset !== "None") msExtras.style_preset = ms.style_preset;
+    if (ms.magic_prompt_option) msExtras.magic_prompt_option = ms.magic_prompt_option;
+    if (ms.go_fast !== undefined) msExtras.go_fast = ms.go_fast;
+    if (ms.output_format) msExtras.output_format = ms.output_format;
+    if (ms.output_quality !== undefined) msExtras.output_quality = ms.output_quality;
+    if (ms.prompt_strength !== undefined) msExtras.prompt_strength = ms.prompt_strength;
+    if (ms.lora_scale !== undefined) msExtras.lora_scale = ms.lora_scale;
+    if (ms.extra_lora) msExtras.extra_lora = ms.extra_lora;
+    if (ms.extra_lora_scale !== undefined) msExtras.extra_lora_scale = ms.extra_lora_scale;
+    if (ms.seed != null) msExtras.seed = ms.seed;
+    if (ms.disable_safety_checker !== undefined)
+      msExtras.disable_safety_checker = ms.disable_safety_checker;
+    if (ms.model) msExtras.model = ms.model;
+
+    const useDirectAspectRatio =
+      DIRECT_ASPECT_RATIO_MODELS.has(this.modelId) || IDEOGRAM_MODELS.has(this.modelId);
+    const aspectRatio = input.aspectRatio ?? "1:1";
+    // For ideogram: resolution setting overrides aspect_ratio when set
+    const resolution =
+      IDEOGRAM_MODELS.has(this.modelId) && ms.resolution && ms.resolution !== "None"
+        ? (ms.resolution as string)
+        : undefined;
+    const sizeParams: Record<string, unknown> = resolution
+      ? { resolution }
+      : useDirectAspectRatio
+        ? aspectRatio === "custom"
+          ? { width: ms.width ?? 1024, height: ms.height ?? 1024 }
+          : { aspect_ratio: aspectRatio }
+        : this.resolveSize(input);
+
+    const imageParam = input.imageUrl
+      ? IDEOGRAM_MODELS.has(this.modelId)
+        ? { style_reference_images: [input.imageUrl] }
+        : { image: input.imageUrl }
+      : {};
+
     const predInput = {
       prompt: input.prompt,
-      width,
-      height,
-      ...(input.imageUrl ? { image: input.imageUrl } : {}),
+      ...sizeParams,
+      ...imageParam,
       ...msExtras,
     };
 

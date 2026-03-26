@@ -43,6 +43,10 @@
     "./services/s3": {
       "types": "./src/services/s3.service.ts",
       "default": "./dist/services/s3.service.js"
+    },
+    "./utils/mp4-duration": {
+      "types": "./src/utils/mp4-duration.ts",
+      "default": "./dist/utils/mp4-duration.js"
     }
   },
   "dependencies": {

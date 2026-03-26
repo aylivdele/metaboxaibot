@@ -146,6 +146,8 @@ export interface Model {
   durationRange?: { min: number; max: number } | null;
   /** Configurable generation parameters. Empty array if none. */
   settings: ModelSettingDef[];
+  /** Multi-dimensional cost table. Keys: setting values joined by "__". null if not applicable. */
+  costMatrix?: { dims: string[]; table: Record<string, number> } | null;
 }
 
 export interface UserState {

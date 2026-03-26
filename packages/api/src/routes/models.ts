@@ -52,6 +52,11 @@ function serializeModel(m: AIModel) {
     isLLM,
     /** Configurable generation parameters. Empty array if none. */
     settings: m.settings ?? [],
+    /**
+     * Multi-dimensional cost table (USD) for models where price depends on 2+ settings.
+     * e.g. gpt-image-1.5: quality × size. null for models without multi-dim pricing.
+     */
+    costMatrix: m.costMatrix ?? null,
   };
 }
 

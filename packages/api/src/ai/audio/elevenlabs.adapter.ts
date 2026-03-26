@@ -63,14 +63,21 @@ export class ElevenLabsAdapter implements AudioAdapter {
   }
 
   private async generateSound(input: AudioInput): Promise<AudioResult> {
+    const ms = input.modelSettings ?? {};
+    const durationSeconds =
+      typeof ms.duration_seconds === "number" ? ms.duration_seconds : undefined;
+    const promptInfluence = typeof ms.prompt_influence === "number" ? ms.prompt_influence : 0.3;
+
+    const body: Record<string, unknown> = {
+      text: input.prompt,
+      prompt_influence: promptInfluence,
+    };
+    if (durationSeconds !== undefined) body.duration_seconds = durationSeconds;
+
     const res = await fetch(`${ELEVENLABS_API}/sound-generation`, {
       method: "POST",
       headers: this.headers(),
-      body: JSON.stringify({
-        text: input.prompt,
-        duration_seconds: 5,
-        prompt_influence: 0.3,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {

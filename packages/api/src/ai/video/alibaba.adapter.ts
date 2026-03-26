@@ -1,25 +1,36 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
-const DASHSCOPE_API_BASE = "https://dashscope.aliyuncs.com/api/v1";
+const DASHSCOPE_BASE = "https://dashscope-intl.aliyuncs.com/api/v1";
+const SUBMIT_PATH = "/services/aigc/video-generation/video-synthesis";
 
-/** Maps our model IDs to DashScope model names. */
-const MODEL_MAP: Record<string, string> = {
-  wan: "wan2.1-t2v-turbo",
-};
+const T2V_MODEL = "wan2.6-t2v";
+const I2V_MODEL = "wan2.6-i2v";
 
-/** Maps aspect ratios to DashScope video size strings. */
-const SIZE_MAP: Record<string, string> = {
-  "16:9": "1280*720",
-  "9:16": "720*1280",
-  "1:1": "720*720",
+/**
+ * Size strings for text-to-video (T2V) — resolution tier × aspect ratio → "W*H".
+ * Image-to-video uses a plain "resolution" keyword (720P / 1080P) since
+ * the output aspect ratio is determined by the input image.
+ */
+const T2V_SIZE_MAP: Record<string, Record<string, string>> = {
+  "720P": {
+    "16:9": "1280*720",
+    "9:16": "720*1280",
+    "1:1": "960*960",
+    "4:3": "1088*832",
+    "3:4": "832*1088",
+  },
+  "1080P": {
+    "16:9": "1920*1080",
+    "9:16": "1080*1920",
+    "1:1": "1440*1440",
+    "4:3": "1632*1248",
+    "3:4": "1248*1632",
+  },
 };
 
 interface DashScopeSubmitResponse {
-  output: {
-    task_id: string;
-    task_status: string;
-  };
+  output: { task_id: string; task_status: string };
   request_id?: string;
   code?: string;
   message?: string;
@@ -34,41 +45,54 @@ interface DashScopePollResponse {
 }
 
 /**
- * Alibaba DashScope adapter for Wan video generation.
- * Docs: https://help.aliyun.com/zh/dashscope/developer-reference/wan-api
+ * Alibaba DashScope adapter for Wan 2.6 video generation.
+ * Automatically selects:
+ *   - wan2.6-t2v  when no image is attached (text-to-video)
+ *   - wan2.6-i2v  when an image is attached (image-to-video)
+ * Docs: https://www.alibabacloud.com/help/en/model-studio/developer-reference/wan2-6-api
  */
 export class AlibabaVideoAdapter implements VideoAdapter {
   constructor(readonly modelId: string) {}
 
+  private get apiKey(): string {
+    const key = config.ai.alibaba;
+    if (!key) throw new Error("ALIBABA_API_KEY not configured");
+    return key;
+  }
+
   async submit(input: VideoInput): Promise<string> {
-    const apiKey = config.ai.alibaba;
-    if (!apiKey) throw new Error("ALIBABA_API_KEY not configured");
-
     const ms = input.modelSettings ?? {};
-    const dashscopeModel = MODEL_MAP[this.modelId] ?? "wan2.1-t2v-turbo";
+    const isI2V = !!input.imageUrl;
+    const dashscopeModel = isI2V ? I2V_MODEL : T2V_MODEL;
 
-    const aspectRatio = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "16:9";
-    const size = SIZE_MAP[aspectRatio] ?? "1280*720";
+    const resolution = (ms.resolution as string | undefined) ?? "720P";
     const duration = (ms.duration as number | undefined) ?? input.duration ?? 5;
 
-    const parameters: Record<string, unknown> = { size, duration };
-    if (ms.resolution) parameters.resolution = ms.resolution;
-    if (ms.negative_prompt) parameters.negative_prompt = ms.negative_prompt;
-    if (ms.motion_strength !== undefined) parameters.motion_strength = ms.motion_strength;
+    const apiInput: Record<string, unknown> = { prompt: input.prompt };
+    if (isI2V) apiInput.img_url = input.imageUrl;
+    if (ms.negative_prompt) apiInput.negative_prompt = ms.negative_prompt;
 
-    const body = {
-      model: dashscopeModel,
-      input: {
-        prompt: input.prompt,
-        ...(input.imageUrl ? { img_url: input.imageUrl } : {}),
-      },
-      parameters,
-    };
+    const parameters: Record<string, unknown> = { duration };
 
-    const resp = await fetch(`${DASHSCOPE_API_BASE}/services/aigc/video-generation/generation`, {
+    if (isI2V) {
+      // I2V uses a resolution tier keyword; aspect ratio comes from the input image
+      parameters.resolution = resolution;
+    } else {
+      // T2V uses an exact pixel dimension string (resolution × aspect ratio)
+      const aspectRatio = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "16:9";
+      const size = T2V_SIZE_MAP[resolution]?.[aspectRatio] ?? T2V_SIZE_MAP["720P"]["16:9"];
+      parameters.size = size;
+    }
+
+    if (ms.prompt_extend !== undefined) parameters.prompt_extend = ms.prompt_extend;
+    if (ms.seed != null) parameters.seed = ms.seed;
+
+    const body = { model: dashscopeModel, input: apiInput, parameters };
+
+    const resp = await fetch(`${DASHSCOPE_BASE}${SUBMIT_PATH}`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
         "X-DashScope-Async": "enable",
       },
@@ -86,11 +110,8 @@ export class AlibabaVideoAdapter implements VideoAdapter {
   }
 
   async poll(taskId: string): Promise<VideoResult | null> {
-    const apiKey = config.ai.alibaba;
-    if (!apiKey) throw new Error("ALIBABA_API_KEY not configured");
-
-    const resp = await fetch(`${DASHSCOPE_API_BASE}/tasks/${taskId}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
+    const resp = await fetch(`${DASHSCOPE_BASE}/tasks/${taskId}`, {
+      headers: { Authorization: `Bearer ${this.apiKey}` },
     });
 
     if (!resp.ok) throw new Error(`Alibaba poll error ${resp.status}`);

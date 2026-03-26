@@ -62,6 +62,50 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     ],
   },
 
+  // ── Video families ─────────────────────────────────────────────────────────
+
+  minimax: {
+    id: "minimax",
+    name: "🎞️ Hailuo 2.3",
+    section: "video",
+    description:
+      "Видеомодель MiniMax с плавным движением, поддержкой 1080p и 10-секундных клипов. Fast — быстрее и ~40% дешевле при схожем качестве.",
+    defaultModelId: "hailuo-fast",
+    members: [
+      { modelId: "hailuo-fast", variantLabel: "Fast" },
+      { modelId: "hailuo", variantLabel: "Standard" },
+    ],
+  },
+
+  veo: {
+    id: "veo",
+    name: "🎬 Veo 3",
+    section: "video",
+    description:
+      "Видео от Google со звуком и голосами. Standard — максимальное качество, Fast — быстрее и дешевле. Поддерживает фото/видео как референс.",
+    defaultModelId: "veo-fast",
+    members: [
+      { modelId: "veo-fast", variantLabel: "Fast" },
+      { modelId: "veo", variantLabel: "Standard" },
+    ],
+  },
+
+  // ── Image families ─────────────────────────────────────────────────────────
+
+  ideogram: {
+    id: "ideogram",
+    name: "✍️ Ideogram",
+    section: "design",
+    description:
+      "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров, обложек и рекламы. Принимает фото как стилевой референс.",
+    defaultModelId: "ideogram-balanced",
+    members: [
+      { modelId: "ideogram-turbo", variantLabel: "Turbo" },
+      { modelId: "ideogram-balanced", variantLabel: "Balanced" },
+      { modelId: "ideogram", variantLabel: "Quality" },
+    ],
+  },
+
   "nano-banana": {
     id: "nano-banana",
     name: "🍌 Nano Banana",

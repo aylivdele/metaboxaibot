@@ -7,12 +7,14 @@ const MINIMAX_API_BASE = "https://api.minimax.io/v1";
 const MODEL_MAP: Record<string, string> = {
   minimax: "T2V-01",
   hailuo: "MiniMax-Hailuo-2.3",
+  "hailuo-fast": "MiniMax-Hailuo-2.3-Fast",
 };
 
 /** Valid resolutions per model. */
 const SUPPORTED_RESOLUTIONS: Record<string, string[]> = {
   minimax: ["720P"],
   hailuo: ["768P", "1080P"],
+  "hailuo-fast": ["768P", "1080P"],
 };
 
 interface MinimaxSubmitResponse {
@@ -47,7 +49,8 @@ interface MinimaxFileResponse {
 
 /**
  * MiniMax native video generation adapter.
- * Covers both "minimax" (T2V-01) and "hailuo" (MiniMax-Hailuo-2.3) models.
+ * Covers "minimax" (T2V-01), "hailuo" (MiniMax-Hailuo-2.3), and "hailuo-fast" (MiniMax-Hailuo-2.3-Fast).
+ * Note: hailuo-fast is I2V only — first_frame_image is required.
  * Docs: https://platform.minimax.io/docs/guides/video-generation
  */
 export class MinimaxVideoAdapter implements VideoAdapter {

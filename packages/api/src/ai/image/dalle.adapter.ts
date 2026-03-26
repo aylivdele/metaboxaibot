@@ -2,6 +2,18 @@ import OpenAI from "openai";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
+const DALLE_SIZES: Record<string, "1024x1024" | "1792x1024" | "1024x1792"> = {
+  "1:1": "1024x1024",
+  "16:9": "1792x1024",
+  "9:16": "1024x1792",
+};
+
+/** USD cost table: quality × aspect_ratio */
+const DALLE_COST: Record<string, Record<string, number>> = {
+  standard: { "1024x1024": 0.04, "1792x1024": 0.08, "1024x1792": 0.08 },
+  hd: { "1024x1024": 0.08, "1792x1024": 0.12, "1024x1792": 0.12 },
+};
+
 /**
  * DALL-E adapter — synchronous, returns URL immediately.
  * When input.imageUrl is provided, uses DALL-E 2 createVariation for img2img.
@@ -23,27 +35,25 @@ export class DalleAdapter implements ImageAdapter {
       return this.generateVariation(input.imageUrl);
     }
 
-    const DALLE_SIZES: Record<string, "1024x1024" | "1792x1024" | "1024x1792"> = {
-      "1:1": "1024x1024",
-      "16:9": "1792x1024",
-      "9:16": "1024x1792",
-    };
-    const size = DALLE_SIZES[input.aspectRatio ?? ""] ?? "1024x1024";
-
     const ms = input.modelSettings ?? {};
+    const quality = (ms.quality as "standard" | "hd" | undefined) ?? "standard";
+    const aspectRatio = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "1:1";
+    const size = DALLE_SIZES[aspectRatio] ?? "1024x1024";
+    const providerUsdCost = DALLE_COST[quality]?.[size] ?? 0.04;
+
     const response = await this.client.images.generate({
       model: "dall-e-3",
       prompt: input.prompt,
       n: 1,
       size,
-      quality: (ms.quality as "standard" | "hd" | undefined) ?? "standard",
+      quality,
       style: (ms.style as "vivid" | "natural" | undefined) ?? "vivid",
       response_format: "url",
     });
 
     const url = response.data?.[0]?.url;
     if (!url) throw new Error("DALL-E returned no image URL");
-    return { url, filename: "dalle3.png" };
+    return { url, filename: "dalle3.png", providerUsdCost };
   }
 
   private async generateVariation(imageUrl: string): Promise<ImageResult> {

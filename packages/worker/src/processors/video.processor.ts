@@ -4,7 +4,8 @@ import type { VideoJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createVideoAdapter } from "@metabox/api/ai/video";
 import { deductTokens, calculateCost, computeVideoTokens } from "@metabox/api/services";
-import { buildS3Key, sectionMeta, uploadFromUrl } from "@metabox/api/services/s3";
+import { buildS3Key, sectionMeta, uploadBuffer } from "@metabox/api/services/s3";
+import { parseMp4Duration } from "@metabox/api/utils/mp4-duration";
 import { logger } from "../logger.js";
 import { config, AI_MODELS } from "@metabox/shared";
 
@@ -57,11 +58,27 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     }
 
     const { ext, contentType } = sectionMeta("video");
-    const s3Key = await uploadFromUrl(
-      buildS3Key("video", userIdStr, dbJobId, ext),
-      videoResult.url,
-      contentType,
-    ).catch(() => null);
+
+    // Fetch video to buffer — needed for S3 upload and duration detection
+    let videoBuffer: Buffer | null = null;
+    let actualDuration: number | null = null;
+    try {
+      const videoResp = await fetch(videoResult.url);
+      if (videoResp.ok) {
+        videoBuffer = Buffer.from(await videoResp.arrayBuffer());
+        actualDuration = parseMp4Duration(videoBuffer);
+      }
+    } catch {
+      // non-fatal: fall back to estimated duration
+    }
+
+    const s3Key = videoBuffer
+      ? await uploadBuffer(
+          buildS3Key("video", userIdStr, dbJobId, ext),
+          videoBuffer,
+          contentType,
+        ).catch(() => null)
+      : null;
 
     await db.generationJob.update({
       where: { id: dbJobId },
@@ -70,7 +87,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     const model = AI_MODELS[modelId];
     if (model) {
-      const effectiveDuration = duration ?? 5;
+      const effectiveDuration = actualDuration ?? duration ?? 5;
       const videoTokens = model.costUsdPerMVideoToken
         ? computeVideoTokens(model, aspectRatio, effectiveDuration)
         : undefined;

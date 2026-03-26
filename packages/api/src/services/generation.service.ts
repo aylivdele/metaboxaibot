@@ -3,7 +3,7 @@ import { createImageAdapter } from "../ai/image/factory.js";
 import { getImageQueue } from "../queues/image.queue.js";
 import { AI_MODELS } from "@metabox/shared";
 import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
-import { buildS3Key, sectionMeta, uploadFromUrl } from "./s3.service.js";
+import { buildS3Key, sectionMeta, uploadFromUrl, uploadBuffer, getFileUrl } from "./s3.service.js";
 import { dialogService } from "./dialog.service.js";
 import { userStateService } from "./user-state.service.js";
 
@@ -83,33 +83,54 @@ export const generationService = {
           modelSettings,
         });
 
+        // Resolve final URL — for base64 providers, upload buffer to S3 synchronously
+        let finalUrl = result.url;
+        let s3KeySync: string | null = null;
+        if (result.base64Data) {
+          const fmt = (modelSettings.output_format as string | undefined) ?? "png";
+          const ext = fmt === "jpeg" ? "jpg" : fmt;
+          const contentType =
+            ext === "webp" ? "image/webp" : ext === "jpg" ? "image/jpeg" : "image/png";
+          const key = buildS3Key("image", userId.toString(), job.id, ext);
+          const buffer = Buffer.from(result.base64Data, "base64");
+          s3KeySync = await uploadBuffer(key, buffer, contentType).catch(() => null);
+          if (s3KeySync) {
+            finalUrl = (await getFileUrl(s3KeySync)) ?? result.url;
+          }
+        }
+
         await db.generationJob.update({
           where: { id: job.id },
-          data: { status: "done", outputUrl: result.url, completedAt: new Date() },
+          data: {
+            status: "done",
+            outputUrl: finalUrl,
+            s3Key: s3KeySync ?? undefined,
+            completedAt: new Date(),
+          },
         });
 
         await deductTokens(
           userId,
-          calculateCost(model, 0, 0, undefined, undefined, modelSettings),
+          result.providerUsdCost ?? calculateCost(model, 0, 0, undefined, undefined, modelSettings),
           modelId,
         );
 
         // Save messages to dialog for img2img context
         let assistantMessageId: string | undefined;
-        if (dialogId && result.url) {
+        if (dialogId && finalUrl) {
           await dialogService.saveMessage(dialogId, "user", prompt);
           const assistantMsg = await dialogService.saveMessage(dialogId, "assistant", "", {
-            mediaUrl: result.url,
+            mediaUrl: finalUrl,
             mediaType: "image",
           });
           assistantMessageId = assistantMsg.id;
         }
 
-        // Upload to S3 in background — do not block the response
-        if (result.url) {
+        // Upload to S3 in background for non-base64 providers
+        if (!result.base64Data && finalUrl) {
           const { ext, contentType } = sectionMeta("image");
           const key = buildS3Key("image", userId.toString(), job.id, ext);
-          uploadFromUrl(key, result.url, contentType)
+          uploadFromUrl(key, finalUrl, contentType)
             .then((s3Key) => {
               if (s3Key) {
                 return db.generationJob.update({ where: { id: job.id }, data: { s3Key } });
@@ -118,7 +139,7 @@ export const generationService = {
             .catch(() => void 0);
         }
 
-        return { dbJobId: job.id, imageUrl: result.url, isPending: false, assistantMessageId };
+        return { dbJobId: job.id, imageUrl: finalUrl, isPending: false, assistantMessageId };
       } catch (err) {
         await db.generationJob.update({
           where: { id: job.id },

@@ -20,6 +20,16 @@ export interface ImageResult {
   width?: number;
   /** Actual output height in pixels (used for per-megapixel billing). */
   height?: number;
+  /**
+   * Raw base64 image data returned by some providers (e.g. OpenAI Responses API).
+   * When set, generation.service uploads it directly to S3 instead of fetching url.
+   */
+  base64Data?: string;
+  /**
+   * Exact provider USD cost calculated by the adapter from the pricing table.
+   * Overrides calculateCost() when set.
+   */
+  providerUsdCost?: number;
 }
 
 /**

@@ -5,6 +5,7 @@ import { LumaAdapter } from "./luma.adapter.js";
 import { HeyGenAdapter } from "./heygen.adapter.js";
 import { DIDAdapter } from "./d-id.adapter.js";
 import { ReplicateVideoAdapter } from "./replicate.adapter.js";
+import { VeoAdapter } from "./veo.adapter.js";
 import { HiggsFieldAdapter } from "./higgsfield.adapter.js";
 import { AlibabaVideoAdapter } from "./alibaba.adapter.js";
 import { MinimaxVideoAdapter } from "./minimax.adapter.js";
@@ -13,7 +14,7 @@ import { MinimaxVideoAdapter } from "./minimax.adapter.js";
 const FAL_MODELS = new Set(["kling", "kling-pro", "pika", "seedance"]);
 
 /** Replicate-backed video models */
-const REPLICATE_MODELS = new Set(["sora", "veo"]);
+const REPLICATE_MODELS = new Set(["sora"]);
 
 export function createVideoAdapter(modelId: string): VideoAdapter {
   if (FAL_MODELS.has(modelId)) return new FalVideoAdapter(modelId);
@@ -24,16 +25,19 @@ export function createVideoAdapter(modelId: string): VideoAdapter {
       return new AlibabaVideoAdapter(modelId);
     case "minimax":
     case "hailuo":
+    case "hailuo-fast":
       return new MinimaxVideoAdapter(modelId);
     case "runway":
       return new RunwayAdapter();
-    case "luma":
     case "luma-ray2":
       return new LumaAdapter(modelId);
     case "heygen":
       return new HeyGenAdapter();
     case "d-id":
       return new DIDAdapter();
+    case "veo":
+    case "veo-fast":
+      return new VeoAdapter(modelId);
     case "higgsfield-lite":
     case "higgsfield":
     case "higgsfield-preview":
