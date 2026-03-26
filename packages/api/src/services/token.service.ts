@@ -111,8 +111,19 @@ export function calculateCost(
           : costPerKChar !== undefined && charCount !== undefined
             ? (charCount / 1000) * costPerKChar
             : baseRequest;
+
+  // Apply additive cost components (e.g. web search +$0.015, high thinking +$0.002)
+  let addonCost = 0;
+  if (model.costAddons && modelSettings) {
+    for (const addon of model.costAddons) {
+      const val = String(modelSettings[addon.settingKey] ?? "");
+      addonCost += addon.map[val] ?? 0;
+    }
+  }
+
   const providerUsdCost =
     perRequestCost +
+    addonCost +
     (inputTokens * model.inputCostUsdPerMToken) / 1_000_000 +
     (outputTokens * outputCostPerMToken) / 1_000_000;
   return (providerUsdCost / config.billing.usdPerToken) * config.billing.targetMargin;

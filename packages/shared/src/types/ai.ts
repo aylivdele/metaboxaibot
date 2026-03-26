@@ -185,6 +185,16 @@ export interface AIModel {
     >;
   };
   /**
+   * Additive USD costs applied on top of the base/variant cost when a setting
+   * has a specific value. Each entry defines one setting dimension.
+   * Example: web search toggle adds $0.015, high thinking adds $0.002.
+   * Map keys are String(settingValue); only matched keys add cost.
+   */
+  costAddons?: Array<{
+    settingKey: string;
+    map: Record<string, number>;
+  }>;
+  /**
    * Configurable generation parameters exposed in the Management mini-app.
    * The frontend renders controls dynamically based on these definitions.
    * User-chosen values are stored in UserState.modelSettings and passed to the adapter.

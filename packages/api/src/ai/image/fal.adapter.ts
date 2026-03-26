@@ -8,6 +8,7 @@ const T2I_ENDPOINTS: Record<string, string> = {
   "flux-pro": "fal-ai/flux-2-pro",
   "stable-diffusion": "fal-ai/stable-diffusion-v3-medium",
   "nano-banana-pro": "fal-ai/nano-banana-pro",
+  "nano-banana-2": "fal-ai/nano-banana-2",
   "seedream-5": "fal-ai/bytedance/seedream/v5/lite/text-to-image",
   "seedream-4.5": "fal-ai/bytedance/seedream/v4.5/text-to-image",
   "gpt-image-1.5": "fal-ai/gpt-image-1.5",
@@ -16,6 +17,7 @@ const T2I_ENDPOINTS: Record<string, string> = {
 /** Image-to-image (edit) endpoint. Falls back to the T2I endpoint when absent. */
 const EDIT_ENDPOINTS: Record<string, string> = {
   "nano-banana-pro": "fal-ai/nano-banana-pro/edit",
+  "nano-banana-2": "fal-ai/nano-banana-2/edit",
   "seedream-5": "fal-ai/bytedance/seedream/v5/lite/edit",
   "seedream-4.5": "fal-ai/bytedance/seedream/v4.5/edit",
   "gpt-image-1.5": "fal-ai/gpt-image-1.5/edit",
@@ -23,6 +25,12 @@ const EDIT_ENDPOINTS: Record<string, string> = {
   flux: "fal-ai/flux-2/edit",
   "flux-pro": "fal-ai/flux-2-pro/edit",
 };
+
+/**
+ * Models that accept a raw `aspect_ratio` string (e.g. "16:9") instead of
+ * the standard FAL `image_size` enum (e.g. "landscape_16_9").
+ */
+const ASPECT_RATIO_MODELS = new Set(["nano-banana-pro", "nano-banana-2"]);
 
 /** Separator used to pack endpoint+requestId into a single opaque string. */
 const SEP = "||";
@@ -63,11 +71,18 @@ export class FalAdapter implements ImageAdapter {
     if (ms.style_type) msExtras.style_type = ms.style_type;
     if (ms.magic_prompt_option) msExtras.magic_prompt_option = ms.magic_prompt_option;
     if (ms.resolution) msExtras.resolution = ms.resolution;
+    if (ms.safety_tolerance != null) msExtras.safety_tolerance = String(ms.safety_tolerance);
+    if (ms.enable_web_search != null) msExtras.enable_web_search = ms.enable_web_search;
+    if (ms.thinking_level) msExtras.thinking_level = ms.thinking_level;
+
+    const useAspectRatio = ASPECT_RATIO_MODELS.has(this.modelId);
     const { request_id } = await fal.queue.submit(endpoint, {
       input: {
         prompt: input.prompt,
         negative_prompt: (ms.negative_prompt as string | undefined) || input.negativePrompt,
-        image_size: this.resolveSize(input),
+        ...(useAspectRatio
+          ? { aspect_ratio: input.aspectRatio ?? "1:1" }
+          : { image_size: this.resolveSize(input) }),
         ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
         ...msExtras,
       },

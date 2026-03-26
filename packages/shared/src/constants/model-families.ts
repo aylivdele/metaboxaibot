@@ -61,6 +61,19 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
       { modelId: "seedream-5", versionLabel: "5.0", variantLabel: "Standard" },
     ],
   },
+
+  "nano-banana": {
+    id: "nano-banana",
+    name: "🍌 Nano Banana",
+    section: "design",
+    description:
+      "Генерирует реалистичные фото и позволяет менять детали прямо словами: «убери фон», «добавь шляпу», «сделай вечер». Версия 2 добавляет поиск в интернете и усиленное мышление для более точного следования промпту.",
+    defaultModelId: "nano-banana-2",
+    members: [
+      { modelId: "nano-banana-pro", versionLabel: "1", variantLabel: "Pro" },
+      { modelId: "nano-banana-2", versionLabel: "2", variantLabel: "Standard" },
+    ],
+  },
 };
 
 /** All families grouped by section (e.g. "design", "video"). */
