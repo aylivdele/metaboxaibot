@@ -68,13 +68,11 @@ export class HeyGenAdapter implements VideoAdapter {
     const imgBuffer = await imgRes.arrayBuffer();
     const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
 
-    const formData = new FormData();
-    formData.append("file", new Blob([imgBuffer], { type: contentType }), "avatar.jpg");
-
+    // HeyGen upload API expects raw binary body with the image Content-Type (not multipart)
     const res = await fetch(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",
-      headers: { "X-Api-Key": this.apiKey },
-      body: formData,
+      headers: { "X-Api-Key": this.apiKey, "Content-Type": contentType },
+      body: imgBuffer,
     });
 
     if (!res.ok) {

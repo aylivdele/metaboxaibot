@@ -115,6 +115,8 @@ export interface Model {
   provider: string;
   /** Family this model belongs to, null for standalone models. */
   familyId: string | null;
+  /** Display name of the family (includes emoji), null for standalone models. */
+  familyName: string | null;
   /** Version label within the family, e.g. "v3", "v4". */
   versionLabel: string | null;
   /** Variant label within the family, e.g. "Standard", "Pro", "Vector". */
@@ -146,8 +148,12 @@ export interface Model {
   durationRange?: { min: number; max: number } | null;
   /** Configurable generation parameters. Empty array if none. */
   settings: ModelSettingDef[];
-  /** Multi-dimensional cost table. Keys: setting values joined by "__". null if not applicable. */
+  /** Multi-dimensional cost table (internal tokens). Keys: setting values joined by "__". null if not applicable. */
   costMatrix?: { dims: string[]; table: Record<string, number> } | null;
+  /** Token cost per variant value for single-setting pricing (costVariants). null if not applicable. */
+  tokenCostVariants?: { settingKey: string; map: Record<string, number> } | null;
+  /** Additive token cost per setting value (costAddons). null if not applicable. */
+  tokenCostAddons?: Array<{ settingKey: string; map: Record<string, number> }> | null;
 }
 
 export interface UserState {

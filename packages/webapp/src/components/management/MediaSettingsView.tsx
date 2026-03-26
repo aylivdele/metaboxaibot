@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
 import type { Model, UserState } from "../../types.js";
@@ -34,6 +34,49 @@ const VIDEO_RESOLUTION: Record<string, [number, number]> = {
   "3:4": [720, 960],
 };
 
+/**
+ * When a costMatrix dimension setting changes to a value that creates an invalid
+ * combination, returns corrections for the other dims to restore validity.
+ * Returns null when the combination is valid or the model has no costMatrix.
+ */
+function autoCorrectForCostMatrix(
+  model: Model,
+  changedKey: string,
+  changedValue: unknown,
+  currentValues: Record<string, unknown>,
+): Record<string, unknown> | null {
+  if (!model.costMatrix) return null;
+  const { dims, table } = model.costMatrix;
+  if (!dims.includes(changedKey)) return null;
+
+  const newValues = { ...currentValues, [changedKey]: changedValue };
+  const key = dims.map((d) => String(newValues[d] ?? "")).join("__");
+  if (key in table) return null;
+
+  const changedIndex = dims.indexOf(changedKey);
+  const changedStr = String(changedValue);
+
+  for (const tableKey of Object.keys(table)) {
+    const parts = tableKey.split("__");
+    if (parts[changedIndex] === changedStr) {
+      const corrections: Record<string, unknown> = {};
+      for (let i = 0; i < dims.length; i++) {
+        if (i !== changedIndex) corrections[dims[i]] = parts[i];
+      }
+      return corrections;
+    }
+  }
+  return null;
+}
+
+function resolveAddons(m: Model, values: Record<string, unknown>): number {
+  if (!m.tokenCostAddons?.length) return 0;
+  return m.tokenCostAddons.reduce((sum, addon) => {
+    const val = String(values[addon.settingKey] ?? "");
+    return sum + (addon.map[val] ?? 0);
+  }, 0);
+}
+
 function modelCostLabel(
   m: Model,
   values: Record<string, unknown>,
@@ -62,7 +105,16 @@ function modelCostLabel(
     const duration = Number(
       values["duration"] ?? m.settings.find((s) => s.key === "duration")?.default ?? 5,
     );
-    const cost = m.tokenCostPerSecond * duration;
+    let perSecond = m.tokenCostPerSecond;
+    if (m.tokenCostVariants) {
+      const vKey = String(
+        values[m.tokenCostVariants.settingKey] ??
+          m.settings.find((s) => s.key === m.tokenCostVariants!.settingKey)?.default ??
+          "",
+      );
+      perSecond = m.tokenCostVariants.map[vKey] ?? perSecond;
+    }
+    const cost = perSecond * duration + resolveAddons(m, values);
     return `~${cost.toFixed(2)} ✦${t("manage.price.perReq")}`;
   }
   if (m.tokenCostPerRequest > 0) {
@@ -72,7 +124,18 @@ function modelCostLabel(
       const cost = m.costMatrix.table[key] ?? m.tokenCostPerRequest;
       return `${cost.toFixed(2)} ✦${t("manage.price.perReq")}`;
     }
-    return `${m.tokenCostPerRequest.toFixed(2)} ✦${t("manage.price.perReq")}`;
+    // Single-setting variant pricing + optional addons
+    let base = m.tokenCostPerRequest;
+    if (m.tokenCostVariants) {
+      const vKey = String(
+        values[m.tokenCostVariants.settingKey] ??
+          m.settings.find((s) => s.key === m.tokenCostVariants!.settingKey)?.default ??
+          "",
+      );
+      base = m.tokenCostVariants.map[vKey] ?? base;
+    }
+    const cost = base + resolveAddons(m, values);
+    return `${cost.toFixed(2)} ✦${t("manage.price.perReq")}`;
   }
   return null;
 }
@@ -85,8 +148,9 @@ interface PickerOption {
 function buildPickerOptions(models: Model[]): PickerOption[] {
   const { families, standalone } = groupByFamily(models);
   const opts: PickerOption[] = [];
-  for (const [fid] of families.entries()) {
-    opts.push({ id: `family__${fid}`, label: fid.charAt(0).toUpperCase() + fid.slice(1) });
+  for (const [fid, members] of families.entries()) {
+    const familyName = members[0]?.familyName ?? fid.charAt(0).toUpperCase() + fid.slice(1);
+    opts.push({ id: `family__${fid}`, label: familyName });
   }
   for (const m of standalone) {
     opts.push({ id: `standalone__${m.id}`, label: m.name });
@@ -177,7 +241,8 @@ function FamilyCard({
   const description = selected.descriptionOverride ?? selected.description;
   const currentValues = allModelSettings[selected.id] ?? {};
   const cost = modelCostLabel(selected, currentValues, t);
-  const familyLabel = familyId.charAt(0).toUpperCase() + familyId.slice(1);
+  const familyLabel =
+    members[0]?.familyName ?? familyId.charAt(0).toUpperCase() + familyId.slice(1);
 
   return (
     <div className={`family-card${isGloballyActive ? " family-card--active" : ""}`}>
@@ -401,17 +466,25 @@ export function MediaSettingsView({ section }: { section: MediaSection }) {
   };
 
   const handleSettingChange = (modelId: string, key: string, value: unknown) => {
+    const model = models.find((m) => m.id === modelId);
+    const current = allModelSettings[modelId] ?? {};
+    const corrections = model ? autoCorrectForCostMatrix(model, key, value, current) : null;
+    const allChanges: Record<string, unknown> = { [key]: value, ...(corrections ?? {}) };
+
     setAllModelSettings((prev) => ({
       ...prev,
-      [modelId]: { ...(prev[modelId] ?? {}), [key]: value },
+      [modelId]: { ...(prev[modelId] ?? {}), ...allChanges },
     }));
     setSavedId(modelId);
     setTimeout(() => setSavedId((id) => (id === modelId ? null : id)), 1500);
-    const dKey = `${modelId}__${key}`;
-    clearTimeout(debounceRef.current[dKey]);
-    debounceRef.current[dKey] = setTimeout(() => {
-      void api.modelSettings.set(modelId, { [key]: value });
-    }, 800);
+
+    for (const [changeKey, changeVal] of Object.entries(allChanges)) {
+      const dKey = `${modelId}__${changeKey}`;
+      clearTimeout(debounceRef.current[dKey]);
+      debounceRef.current[dKey] = setTimeout(() => {
+        void api.modelSettings.set(modelId, { [changeKey]: changeVal });
+      }, 800);
+    }
   };
 
   const handleReset = (modelId: string) => {
@@ -427,13 +500,18 @@ export function MediaSettingsView({ section }: { section: MediaSection }) {
 
   if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 
-  const { families, standalone } = groupByFamily(models);
-  const pickerOptions = buildPickerOptions(models);
+  const { families, standalone } = useMemo(() => groupByFamily(models), [models]);
+  const pickerOptions = useMemo(() => buildPickerOptions(models), [models]);
 
   const [pickerType, pickerId] = selectedPickerId.split("__");
-  const familyMembers = pickerType === "family" ? (families.get(pickerId) ?? []) : null;
-  const standaloneModel =
-    pickerType === "standalone" ? standalone.find((m) => m.id === pickerId) : null;
+  const familyMembers = useMemo(
+    () => (pickerType === "family" ? (families.get(pickerId) ?? []) : null),
+    [pickerType, pickerId, families],
+  );
+  const standaloneModel = useMemo(
+    () => (pickerType === "standalone" ? standalone.find((m) => m.id === pickerId) : null),
+    [pickerType, pickerId, standalone],
+  );
 
   return (
     <div className="page">

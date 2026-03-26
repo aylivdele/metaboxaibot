@@ -1,5 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
-import { AI_MODELS, MODELS_BY_SECTION, type AIModel } from "@metabox/shared";
+import {
+  AI_MODELS,
+  MODEL_FAMILIES,
+  MODELS_BY_SECTION,
+  config,
+  type AIModel,
+} from "@metabox/shared";
 import { calculateCost } from "../services/token.service.js";
 
 /** Typical message size used for LLM cost estimation */
@@ -14,6 +20,8 @@ function serializeModel(m: AIModel) {
   return {
     /** Family id this model belongs to, null for standalone models. */
     familyId: m.familyId ?? null,
+    /** Display name of the family (includes emoji), null for standalone models. */
+    familyName: m.familyId ? (MODEL_FAMILIES[m.familyId]?.name ?? null) : null,
     /** Version label within the family, e.g. "v3", "v4". */
     versionLabel: m.versionLabel ?? null,
     /** Variant label within the family, e.g. "Standard", "Pro". */
@@ -53,10 +61,62 @@ function serializeModel(m: AIModel) {
     /** Configurable generation parameters. Empty array if none. */
     settings: m.settings ?? [],
     /**
-     * Multi-dimensional cost table (USD) for models where price depends on 2+ settings.
+     * Multi-dimensional cost table (internal tokens) for models where price depends on 2+ settings.
      * e.g. gpt-image-1.5: quality × size. null for models without multi-dim pricing.
      */
-    costMatrix: m.costMatrix ?? null,
+    costMatrix: m.costMatrix
+      ? {
+          dims: m.costMatrix.dims,
+          table: Object.fromEntries(
+            Object.entries(m.costMatrix.table).map(([k, v]) => [
+              k,
+              (v / config.billing.usdPerToken) * config.billing.targetMargin,
+            ]),
+          ),
+        }
+      : null,
+    /**
+     * Token cost per variant value (only for models with costVariants).
+     * Per-second models: tokens per 1 second for each variant.
+     * Per-request models: total tokens per request for each variant.
+     * null if model has no costVariants.
+     */
+    tokenCostVariants:
+      !isLLM && !isPerMPixel && !isPerMVideoToken && m.costVariants
+        ? {
+            settingKey: m.costVariants.settingKey,
+            map: Object.fromEntries(
+              Object.keys(m.costVariants.map).map((k) => [
+                k,
+                calculateCost(
+                  m,
+                  0,
+                  0,
+                  undefined,
+                  undefined,
+                  { [m.costVariants!.settingKey]: k },
+                  isPerSecond ? 1 : undefined,
+                ),
+              ]),
+            ),
+          }
+        : null,
+    /**
+     * Additive token cost per setting value (only for models with costAddons).
+     * Frontend sums these on top of the base cost.
+     * null if model has no costAddons.
+     */
+    tokenCostAddons: m.costAddons?.length
+      ? m.costAddons.map((addon) => ({
+          settingKey: addon.settingKey,
+          map: Object.fromEntries(
+            Object.entries(addon.map).map(([k, v]) => [
+              k,
+              ((v as number) / config.billing.usdPerToken) * config.billing.targetMargin,
+            ]),
+          ),
+        }))
+      : null,
   };
 }
 
