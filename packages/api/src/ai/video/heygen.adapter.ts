@@ -110,6 +110,7 @@ export class HeyGenAdapter implements VideoAdapter {
         return pollData.data?.avatar_list?.[0]?.id ?? groupId;
       }
       if (status === "failed") throw new Error("HeyGen: avatar group processing failed");
+      console.log("[HeyGen Adapter] Waiting for avatar creation, attempt=" + i)
     }
     throw new Error("HeyGen: avatar group did not become ready in time");
   }
