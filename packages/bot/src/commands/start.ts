@@ -7,7 +7,7 @@ import { buildLanguageKeyboard } from "../keyboards/language.keyboard.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { SUPPORTED_LANGUAGES, getT, config } from "@metabox/shared";
 import type { Language, Translations } from "@metabox/shared";
-import { verifyLinkToken, lookupByTelegramId } from "@metabox/api/services";
+import { verifyLinkToken } from "@metabox/api/services";
 
 /**
  * /start — handles deep link params, resets FSM state, shows language selection.
@@ -56,6 +56,12 @@ export async function handleStart(ctx: BotContext): Promise<void> {
   }
 
   // ── Referral deep link ─────────────────────────────────────────────────────
+  if (param?.startsWith("ref_") && ctx.user && ctx.user.referredById) {
+    // User already has a referrer — notify and skip
+    await ctx
+      .reply("ℹ️ У вас уже есть наставник, поэтому реферальная ссылка не была применена.")
+      .catch(() => {});
+  }
   if (param?.startsWith("ref_") && ctx.user && !ctx.user.referredById) {
     const refParam = param.slice("ref_".length);
 
@@ -109,18 +115,47 @@ export async function handleStart(ctx: BotContext): Promise<void> {
   if (ctx.user) {
     await userStateService.setState(ctx.user.id, "IDLE");
 
-    // Auto-link Metabox account if not yet linked and Metabox has a matching Telegram ID
-    if (!ctx.user.metaboxUserId && config.metabox?.apiUrl) {
-      lookupByTelegramId(ctx.user.id)
-        .then((found) => {
-          if (found) {
-            return db.user.update({
-              where: { id: ctx.user!.id },
-              data: { metaboxUserId: found.metaboxUserId, metaboxReferralCode: found.referralCode },
-            });
+    // Register stub account on Metabox (or link existing)
+    if (config.metabox?.apiUrl) {
+      (async () => {
+        try {
+          const { registerBotUser } = await import("@metabox/api/services");
+          const result = await registerBotUser({
+            telegramId: ctx.user!.id,
+            firstName: ctx.user!.firstName,
+            lastName: ctx.user!.lastName,
+            username: ctx.user!.username,
+            referrerTelegramId: ctx.user!.referredById,
+          });
+          if (result?.ok) {
+            if (!result.isStub) {
+              // Real account found — auto-link
+              await db.user.update({
+                where: { id: ctx.user!.id },
+                data: {
+                  metaboxUserId: result.userId,
+                  metaboxReferralCode: result.referralCode,
+                },
+              });
+              // Notify user about auto-linking
+              const mentorInfo = result.mentor
+                ? `\nВаш наставник: ${result.mentor.name}${result.mentor.telegramUsername ? ` (@${result.mentor.telegramUsername})` : ""}`
+                : "";
+              await ctx
+                .reply(`✅ Мы нашли ваш аккаунт на Metabox и привязали его к боту.${mentorInfo}`)
+                .catch(() => {});
+            } else {
+              // Stub account — store referralCode but NOT metaboxUserId
+              await db.user.update({
+                where: { id: ctx.user!.id },
+                data: { metaboxReferralCode: result.referralCode },
+              });
+            }
           }
-        })
-        .catch(() => void 0); // silent — never block the start flow
+        } catch {
+          // Silent — never block the start flow
+        }
+      })();
     }
   }
   await ctx.reply(ctx.t.start.welcome, {

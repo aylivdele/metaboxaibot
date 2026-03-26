@@ -26,6 +26,7 @@ export {
   getAiBotCatalog,
   createSubscriptionInvoice,
   resolveReferralCode,
+  registerBotUser,
 } from "./metabox-bridge.service.js";
 export type {
   AiBotProduct,

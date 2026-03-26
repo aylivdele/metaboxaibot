@@ -324,3 +324,29 @@ export async function resolveReferralCode(
     return null;
   }
 }
+
+/**
+ * Register a bot user on Metabox (creates stub account with tg_{id}@aibox.meta-box.ru).
+ * Called on /start in the bot. If user already exists — returns existing data.
+ */
+export async function registerBotUser(params: {
+  telegramId: bigint;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  referrerTelegramId?: bigint | null;
+}): Promise<{
+  ok: boolean;
+  userId: string;
+  referralCode: string;
+  isNew: boolean;
+  isStub: boolean;
+}> {
+  return post("/register-bot-user", {
+    telegramId: params.telegramId.toString(),
+    firstName: params.firstName,
+    lastName: params.lastName,
+    username: params.username,
+    referrerTelegramId: params.referrerTelegramId?.toString(),
+  });
+}

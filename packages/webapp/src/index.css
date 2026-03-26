@@ -2991,7 +2991,6 @@ input::placeholder {
   padding: 12px 0;
 }
 
-
 .motion-picker__grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

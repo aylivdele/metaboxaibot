@@ -32,7 +32,12 @@ interface ModalState {
   period?: Period;
 }
 
-export function TariffsPage() {
+interface TariffsProps {
+  profile?: { metaboxUserId: string | null } | null;
+  onLinkMetabox: () => void;
+}
+
+export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
   const { t } = useI18n();
   const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
@@ -110,15 +115,24 @@ export function TariffsPage() {
     }
   };
 
-  const handleCardPay = () => {
-    // Redirect to Metabox site shop subscriptions tab (URL from server config)
-    const metaboxUrl = catalog?.metaboxUrl || "https://app.meta-box.ru";
-    const shopUrl = `${metaboxUrl}/shop?tab=subscriptions`;
-    const tg = getTgWebApp();
-    if (tg?.openLink) {
-      tg.openLink(shopUrl);
-    } else {
-      window.open(shopUrl, "_blank");
+  const handleCardPay = async () => {
+    // Check if user has a real Metabox account (not stub)
+    if (!profile?.metaboxUserId) {
+      setModal(null);
+      onLinkMetabox();
+      return;
+    }
+    // SSO redirect to shop subscriptions tab
+    try {
+      const { ssoUrl } = await api.profile.metaboxSso();
+      const shopUrl = ssoUrl.includes("?")
+        ? `${ssoUrl}&redirect=/shop?tab=subscriptions`
+        : `${ssoUrl}?redirect=/shop?tab=subscriptions`;
+      const tg = getTgWebApp();
+      if (tg?.openLink) tg.openLink(shopUrl);
+      else window.open(shopUrl, "_blank");
+    } catch {
+      onLinkMetabox();
     }
     setModal(null);
   };
