@@ -19,7 +19,7 @@ interface HeyGenVideoStatus {
  * Uses a default avatar + TTS voice from the prompt text, unless:
  * - modelSettings.avatar_id is set → uses that official avatar
  * - modelSettings.avatar_photo_url is set → uploads photo to HeyGen assets,
- *   then uses Avatar IV endpoint (POST /v2/video/avatar-iv)
+ *   creates avatar group, polls until ready, then generates via talking_photo character type
  */
 export class HeyGenAdapter implements VideoAdapter {
   readonly modelId = "heygen";
@@ -50,40 +50,68 @@ export class HeyGenAdapter implements VideoAdapter {
   };
 
   /**
-   * Upload an image to HeyGen Asset API.
-   * Accepts an s3Key (preferred — regenerates a fresh presigned URL right before fetching)
-   * or a fallback URL. Returns the image_key used in Avatar IV requests.
+   * Full flow: upload image → create avatar group → poll until ready → return talking_photo_id.
    */
-  private async uploadPhotoToHeygen(
+  private async createTalkingPhotoId(
     s3Key: string | undefined,
     fallbackUrl: string,
   ): Promise<string> {
-    // Regenerate a fresh presigned URL from S3 right before fetching to avoid expiry issues
+    // 1. Resolve fresh URL and download image
     const imageUrl = s3Key
       ? ((await getFileUrl(s3Key).catch(() => null)) ?? fallbackUrl)
       : fallbackUrl;
-    // Download the image first
     const imgRes = await fetch(imageUrl);
     if (!imgRes.ok) throw new Error(`Failed to fetch image for HeyGen upload: ${imgRes.status}`);
     const imgBuffer = await imgRes.arrayBuffer();
     const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
 
-    // HeyGen upload API expects raw binary body with the image Content-Type (not multipart)
-    const res = await fetch(`${HEYGEN_UPLOAD}/v1/asset`, {
+    // 2. Upload asset (raw binary body required by HeyGen)
+    const uploadRes = await fetch(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",
       headers: { "X-Api-Key": this.apiKey, "Content-Type": contentType },
       body: imgBuffer,
     });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`HeyGen asset upload failed: ${res.status} ${text}`);
+    if (!uploadRes.ok) {
+      const text = await uploadRes.text();
+      throw new Error(`HeyGen asset upload failed: ${uploadRes.status} ${text}`);
     }
-
-    const data = (await res.json()) as { data?: { id?: string; image_key?: string } };
-    const imageKey = data.data?.image_key ?? data.data?.id;
+    const uploadData = (await uploadRes.json()) as { data?: { image_key?: string } };
+    const imageKey = uploadData.data?.image_key;
     if (!imageKey) throw new Error("HeyGen: no image_key in asset upload response");
-    return imageKey;
+
+    // 3. Create avatar group from uploaded image
+    const createRes = await fetch(`${HEYGEN_API}/v2/photo_avatar/avatar_group/create`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({ name: `avatar_${Date.now()}`, image_key: imageKey }),
+    });
+    if (!createRes.ok) {
+      const text = await createRes.text();
+      throw new Error(`HeyGen avatar group create failed: ${createRes.status} ${text}`);
+    }
+    const createData = (await createRes.json()) as { data?: { id?: string; status?: string } };
+    const groupId = createData.data?.id;
+    if (!groupId) throw new Error("HeyGen: no group id in avatar group create response");
+
+    // 4. Poll until avatar group is ready (status: "completed")
+    const maxAttempts = 20;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const pollRes = await fetch(`${HEYGEN_API}/v2/photo_avatar/avatar_group/${groupId}`, {
+        headers: { "X-Api-Key": this.apiKey },
+      });
+      if (!pollRes.ok) continue;
+      const pollData = (await pollRes.json()) as {
+        data?: { status?: string; avatar_list?: Array<{ id: string }> };
+      };
+      const status = pollData.data?.status;
+      if (status === "completed") {
+        // Use first look id if available, else fall back to groupId
+        return pollData.data?.avatar_list?.[0]?.id ?? groupId;
+      }
+      if (status === "failed") throw new Error("HeyGen: avatar group processing failed");
+    }
+    throw new Error("HeyGen: avatar group did not become ready in time");
   }
 
   /** Resolve a fresh URL: regenerate from s3Key if available, else use stored URL. */
@@ -122,7 +150,7 @@ export class HeyGenAdapter implements VideoAdapter {
     // Talking Photo endpoint: upload photo asset, then use talking_photo character type
     if (avatarPhotoUrl) {
       const avatarPhotoS3Key = input.modelSettings?.avatar_photo_s3key as string | undefined;
-      const talkingPhotoId = await this.uploadPhotoToHeygen(avatarPhotoS3Key, avatarPhotoUrl);
+      const talkingPhotoId = await this.createTalkingPhotoId(avatarPhotoS3Key, avatarPhotoUrl);
 
       const body = {
         video_inputs: [
