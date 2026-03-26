@@ -3,6 +3,7 @@ import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
 import type { Model, UserState } from "../../types.js";
 import { SettingsPanel } from "./SettingsPanel.js";
+import { StyledSelect } from "./StyledSelect.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -436,19 +437,11 @@ export function MediaSettingsView({ section }: { section: MediaSection }) {
       </div>
 
       {pickerOptions.length > 1 && (
-        <div className="model-selector-wrap">
-          <select
-            className="model-selector-select"
-            value={selectedPickerId}
-            onChange={(e) => setSelectedPickerId(e.target.value)}
-          >
-            {pickerOptions.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <StyledSelect
+          value={selectedPickerId}
+          onChange={setSelectedPickerId}
+          options={pickerOptions.map((opt) => ({ value: opt.id, label: opt.label }))}
+        />
       )}
 
       {familyMembers && (

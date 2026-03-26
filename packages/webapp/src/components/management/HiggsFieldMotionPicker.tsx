@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../api/client.js";
 import type { HiggsFieldMotion } from "../../types.js";
 import { CustomSlider } from "./CustomSlider.js";
+import { StyledSelect } from "./StyledSelect.js";
 
 export interface MotionEntry {
   id: string;
@@ -83,17 +84,14 @@ export function HiggsFieldMotionPicker({ value, onChange }: HiggsFieldMotionPick
 
   return (
     <div className="motion-picker">
-      <select
-        className="motion-picker__category-select"
+      <StyledSelect
         value={activeCategory}
-        onChange={(e) => setActiveCategory(e.target.value)}
-      >
-        {categories.map((cat) => (
-          <option key={cat} value={cat}>
-            {cat === "all" ? "Все категории" : cat}
-          </option>
-        ))}
-      </select>
+        onChange={setActiveCategory}
+        options={categories.map((cat) => ({
+          value: cat,
+          label: cat === "all" ? "Все категории" : cat,
+        }))}
+      />
 
       <div className="motion-picker__grid">
         {filtered.map((motion) => {

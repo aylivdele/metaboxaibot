@@ -2599,6 +2599,13 @@ input::placeholder {
   border-color: var(--accent);
 }
 
+/* Fix low-contrast native option list on Windows/Chrome.
+   Use theme vars where available, fall back to hardcoded dark values. */
+.model-selector-select option {
+  background-color: var(--card-bg, #141418);
+  color: var(--text-primary, #f0f0f5);
+}
+
 /* ── Activate + Reset button row ────────────────────────────────────────── */
 .family-card__btn-row {
   display: flex;
@@ -2979,22 +2986,6 @@ input::placeholder {
   padding: 12px 0;
 }
 
-.motion-picker__category-select {
-  width: 100%;
-  margin-bottom: 10px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 13px;
-  cursor: pointer;
-  outline: none;
-}
-
-.motion-picker__category-select:focus {
-  border-color: var(--accent);
-}
 
 .motion-picker__grid {
   display: grid;
