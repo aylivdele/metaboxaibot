@@ -7,7 +7,7 @@ import { buildLanguageKeyboard } from "../keyboards/language.keyboard.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { SUPPORTED_LANGUAGES, getT, config } from "@metabox/shared";
 import type { Language, Translations } from "@metabox/shared";
-import { verifyLinkToken, MetaboxApiError } from "@metabox/api/services";
+import { verifyLinkToken } from "@metabox/api/services";
 
 /**
  * /start — handles deep link params, resets FSM state, shows language selection.
