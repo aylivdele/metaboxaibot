@@ -119,18 +119,26 @@ export class HeyGenAdapter implements VideoAdapter {
       ? { type: "audio", audio_url: voiceUrl }
       : { type: "text", input_text: input.prompt, voice_id: voiceId };
 
-    // Use Avatar IV endpoint when user has uploaded a custom photo
+    // Talking Photo endpoint: upload photo asset, then use talking_photo character type
     if (avatarPhotoUrl) {
       const avatarPhotoS3Key = input.modelSettings?.avatar_photo_s3key as string | undefined;
-      const imageKey = await this.uploadPhotoToHeygen(avatarPhotoS3Key, avatarPhotoUrl);
+      const talkingPhotoId = await this.uploadPhotoToHeygen(avatarPhotoS3Key, avatarPhotoUrl);
 
-      const script = voiceUrl
-        ? { type: "audio", audio_url: voiceUrl }
-        : { type: "text", input: input.prompt, voice_id: voiceId };
+      const body = {
+        video_inputs: [
+          {
+            character: {
+              type: "talking_photo",
+              talking_photo_id: talkingPhotoId,
+            },
+            voice,
+            background: { type: "color", value: bgColor },
+          },
+        ],
+        dimension,
+      };
 
-      const body = { image_key: imageKey, script, dimension };
-
-      const res = await fetch(`${HEYGEN_API}/v2/video/avatar-iv`, {
+      const res = await fetch(`${HEYGEN_API}/v2/video/generate`, {
         method: "POST",
         headers: this.headers(),
         body: JSON.stringify(body),
@@ -138,12 +146,12 @@ export class HeyGenAdapter implements VideoAdapter {
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`HeyGen Avatar IV submit failed: ${res.status} ${text}`);
+        throw new Error(`HeyGen Talking Photo submit failed: ${res.status} ${text}`);
       }
 
       const data = (await res.json()) as { data?: { video_id: string } };
       const videoId = data.data?.video_id;
-      if (!videoId) throw new Error("HeyGen: no video_id in Avatar IV response");
+      if (!videoId) throw new Error("HeyGen: no video_id in Talking Photo response");
       return videoId;
     }
 

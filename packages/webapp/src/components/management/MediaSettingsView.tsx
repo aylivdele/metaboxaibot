@@ -498,8 +498,6 @@ export function MediaSettingsView({ section }: { section: MediaSection }) {
     void api.modelSettings.set(modelId, defaults);
   };
 
-  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
-
   const { families, standalone } = useMemo(() => groupByFamily(models), [models]);
   const pickerOptions = useMemo(() => buildPickerOptions(models), [models]);
 
@@ -512,6 +510,8 @@ export function MediaSettingsView({ section }: { section: MediaSection }) {
     () => (pickerType === "standalone" ? standalone.find((m) => m.id === pickerId) : null),
     [pickerType, pickerId, standalone],
   );
+
+  if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 
   return (
     <div className="page">
