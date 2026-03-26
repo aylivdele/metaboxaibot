@@ -85,6 +85,40 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  /** GET /profile/partner-balance — Metabox partner balance for "Партнёрка" tab */
+  fastify.get("/profile/partner-balance", async (request) => {
+    const { userId } = request as AuthRequest;
+    try {
+      const { url, key } = (() => {
+        const u = config.metabox.apiUrl;
+        const k = config.metabox.internalKey;
+        if (!u || !k) throw new Error("METABOX not configured");
+        return { url: u, key: k };
+      })();
+      const res = await fetch(
+        `${url}/api/internal/partner-balance?telegramId=${userId.toString()}`,
+        { headers: { "X-Internal-Key": key } },
+      );
+      if (!res.ok)
+        return {
+          balance: 0,
+          totalEarned: 0,
+          totalWithdrawn: 0,
+          userStatus: "REGISTERED",
+          referralCode: null,
+        };
+      return res.json();
+    } catch {
+      return {
+        balance: 0,
+        totalEarned: 0,
+        totalWithdrawn: 0,
+        userStatus: "REGISTERED",
+        referralCode: null,
+      };
+    }
+  });
+
   /**
    * GET /profile/metabox-sso — get SSO redirect URL for linked Metabox account.
    * Returns { ssoUrl } for already-linked users, 409 if not linked.

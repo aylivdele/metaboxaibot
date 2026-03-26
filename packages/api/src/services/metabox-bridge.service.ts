@@ -307,3 +307,16 @@ export async function createAiBotInvoice(params: {
     telegramId: params.telegramId.toString(),
   });
 }
+
+/** Resolve a Metabox referralCode to a telegramId for bot referral linking. */
+export async function resolveReferralCode(
+  code: string,
+): Promise<{ userId: string; telegramId: string | null; name: string } | null> {
+  try {
+    return await get<{ userId: string; telegramId: string | null; name: string }>(
+      `/internal/resolve-referral?code=${encodeURIComponent(code)}`,
+    );
+  } catch {
+    return null;
+  }
+}

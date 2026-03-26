@@ -98,6 +98,14 @@ export const api = {
 
   profile: {
     get: () => request<UserProfile>("/profile"),
+    partnerBalance: () =>
+      request<{
+        balance: number;
+        totalEarned: number;
+        totalWithdrawn: number;
+        userStatus: string;
+        referralCode: string | null;
+      }>("/profile/partner-balance"),
     metaboxSso: () => request<{ ssoUrl: string }>("/profile/metabox-sso"),
     metaboxRegister: (
       email: string,

@@ -56,22 +56,53 @@ export async function handleStart(ctx: BotContext): Promise<void> {
   }
 
   // ── Referral deep link ─────────────────────────────────────────────────────
-  if (param?.startsWith("ref_") && ctx.user) {
-    const referrerIdStr = param.slice("ref_".length);
-    const referrerId = BigInt(referrerIdStr);
-    if (referrerId !== ctx.user.id && !ctx.user.referredById) {
-      // Only set referredById if the referrer actually exists in the bot DB.
-      // They may have shared the link from Metabox without ever starting the bot.
-      const referrerExists = await db.user.findUnique({
-        where: { id: referrerId },
-        select: { id: true },
-      });
-      if (referrerExists) {
-        await db.user.update({
-          where: { id: ctx.user.id },
-          data: { referredById: referrerId },
+  if (param?.startsWith("ref_") && ctx.user && !ctx.user.referredById) {
+    const refParam = param.slice("ref_".length);
+
+    // Try as referralCode first (new format: ref_HU6PQYST)
+    // Then fall back to telegramId (legacy format: ref_6186315229)
+    let referrerId: bigint | null = null;
+
+    if (/^\d+$/.test(refParam)) {
+      // Legacy: numeric telegramId
+      const legacyId = BigInt(refParam);
+      if (legacyId !== ctx.user.id) {
+        const exists = await db.user.findUnique({
+          where: { id: legacyId },
+          select: { id: true },
         });
+        if (exists) referrerId = legacyId;
       }
+    }
+
+    if (!referrerId) {
+      // New: referralCode → resolve via Metabox API
+      try {
+        const { resolveReferralCode } = await import("@metabox/api/services");
+        const resolved = await resolveReferralCode(refParam);
+        if (resolved?.telegramId) {
+          const resolvedId = BigInt(resolved.telegramId);
+          if (resolvedId !== ctx.user.id) {
+            // Ensure referrer exists in bot DB (create if needed)
+            const exists = await db.user.findUnique({
+              where: { id: resolvedId },
+              select: { id: true },
+            });
+            if (exists) {
+              referrerId = resolvedId;
+            }
+          }
+        }
+      } catch {
+        // Metabox API unavailable — skip referral
+      }
+    }
+
+    if (referrerId) {
+      await db.user.update({
+        where: { id: ctx.user.id },
+        data: { referredById: referrerId },
+      });
     }
   }
 
