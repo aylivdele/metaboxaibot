@@ -34,8 +34,10 @@ export function createVideoAdapter(modelId: string): VideoAdapter {
       return new HeyGenAdapter();
     case "d-id":
       return new DIDAdapter();
+    case "higgsfield-lite":
     case "higgsfield":
-      return new HiggsFieldAdapter();
+    case "higgsfield-preview":
+      return new HiggsFieldAdapter(modelId);
     default:
       throw new Error(`Unknown video model: ${modelId}`);
   }

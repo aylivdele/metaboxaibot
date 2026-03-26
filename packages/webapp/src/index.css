@@ -2921,6 +2921,136 @@ input::placeholder {
   color: var(--accent);
 }
 
+/* ── Higgsfield Motion Picker ────────────────────────────────────────────── */
+
+.motion-picker__loading,
+.motion-picker__empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 12px 0;
+}
+
+.motion-picker__categories {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.motion-picker__cat-btn {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.motion-picker__cat-btn--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.motion-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.motion-picker__item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+
+.motion-picker__item:hover {
+  border-color: var(--accent);
+}
+
+.motion-picker__item--selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.motion-picker__item-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.motion-picker__item-check {
+  width: 16px;
+  font-size: 12px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.motion-picker__item-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.motion-picker__preview-btn {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.motion-picker__preview-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.motion-picker__item-desc {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  padding-left: 22px;
+}
+
+.motion-picker__strength {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-left: 22px;
+}
+
+.motion-picker__strength-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 60px;
+}
+
+.motion-picker__strength-slider {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.motion-picker__summary {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
 /* ── Period selector ────────────────────────────────────────────────────── */
 .period-selector {
   display: flex;

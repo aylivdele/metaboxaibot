@@ -10,6 +10,7 @@ import type {
   CatalogResponse,
   HeyGenVoice,
   HeyGenAvatar,
+  HiggsFieldMotion,
   DIDVoice,
   UserUpload,
 } from "../types.js";
@@ -229,6 +230,10 @@ export const api = {
 
   heygenAvatars: {
     list: () => request<HeyGenAvatar[]>("/heygen-avatars"),
+  },
+
+  higgsfieldMotions: {
+    list: () => request<HiggsFieldMotion[]>("/higgsfield-motions"),
   },
 
   didVoices: {

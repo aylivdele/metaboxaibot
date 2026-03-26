@@ -2,7 +2,12 @@ import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 
 const HIGGSFIELD_API = "https://platform.higgsfield.ai";
-const HIGGSFIELD_MODEL = "higgsfield-ai/dop/standard";
+
+const DOP_MODEL: Record<string, string> = {
+  "higgsfield-lite": "dop-lite",
+  higgsfield: "dop-turbo",
+  "higgsfield-preview": "dop-preview",
+};
 
 interface HiggsFieldStatus {
   status: "queued" | "in_progress" | "nsfw" | "failed" | "completed";
@@ -13,16 +18,21 @@ interface HiggsFieldStatus {
 /**
  * Higgsfield official API adapter (async queue).
  * Auth: Authorization: Key {apiKey}:{apiSecret}
+ * Uses the v1 DOP endpoint with optional motion presets.
+ * Supports dop-lite, dop-turbo (default), dop-preview variants.
  */
 export class HiggsFieldAdapter implements VideoAdapter {
-  readonly modelId = "higgsfield";
-
+  readonly modelId: string;
+  private readonly dopModel: string;
   private readonly authHeader: string;
 
   constructor(
+    modelId = "higgsfield",
     apiKey = config.ai.higgsfieldApiKey ?? "",
     apiSecret = config.ai.higgsfieldApiSecret ?? "",
   ) {
+    this.modelId = modelId;
+    this.dopModel = DOP_MODEL[modelId] ?? "dop-turbo";
     this.authHeader = `Key ${apiKey}:${apiSecret}`;
   }
 
@@ -35,11 +45,24 @@ export class HiggsFieldAdapter implements VideoAdapter {
   }
 
   async submit(input: VideoInput): Promise<string> {
-    const body: Record<string, unknown> = { prompt: input.prompt };
-    if (input.imageUrl) body.image_url = input.imageUrl;
-    if (input.duration) body.duration = input.duration;
+    type MotionEntry = { id: string; strength?: number };
+    const motions = input.modelSettings?.motions as MotionEntry[] | undefined;
 
-    const res = await fetch(`${HIGGSFIELD_API}/${HIGGSFIELD_MODEL}`, {
+    const enhancePrompt = (input.modelSettings?.enhance_prompt as boolean | undefined) ?? true;
+    const seed = (input.modelSettings?.seed as number | null | undefined) ?? undefined;
+
+    const body: Record<string, unknown> = {
+      model: this.dopModel,
+      prompt: input.prompt,
+      enhance_prompt: enhancePrompt,
+      ...(seed != null ? { seed } : {}),
+      ...(input.imageUrl
+        ? { input_images: [{ type: "image_url", image_url: input.imageUrl }] }
+        : {}),
+      ...(motions?.length ? { motions } : {}),
+    };
+
+    const res = await fetch(`${HIGGSFIELD_API}/v1/image2video/dop`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify(body),

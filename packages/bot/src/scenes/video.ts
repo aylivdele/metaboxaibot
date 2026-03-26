@@ -55,12 +55,19 @@ export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
       reply_markup: kb,
     });
 
-    const hint =
-      modelId === "heygen"
-        ? ctx.t.video.hintHeygen
-        : modelId === "d-id"
-          ? ctx.t.video.hintDid
-          : ctx.t.video.hintVideoDefault;
+    let hint = ctx.t.video.hintVideoDefault;
+    switch (modelId) {
+      case "heygen":
+        hint = ctx.t.video.hintHeygen;
+        break;
+      case "d-id":
+        hint = ctx.t.video.hintDid;
+        break;
+      case "higgsfield-lite":
+      case "higgsfield":
+      case "higgsfield-preview":
+        hint = ctx.t.video.hintHiggsfield;
+    }
     await ctx.reply(hint);
   } else {
     await ctx.reply(ctx.t.video.modelActivated);

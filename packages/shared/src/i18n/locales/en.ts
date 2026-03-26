@@ -101,6 +101,8 @@ export default {
       "📸 Send a photo to create a personalized avatar.\n🎙 You can also send a voice message so the avatar speaks in your voice.\n✉️ Once ready — send the text you want the avatar to speak.\n⚙ Voice, background and avatar can be changed on the Management page.",
     hintDid:
       "📸 Optionally send a photo with a face — it will become the avatar.\n✉️ Then send the text to be spoken.\n🎬 You can also send a driver video to control face movements.\n⚙ Voice and other settings are available on the Management page.",
+    hintHiggsfield:
+      "📸 Send a photo to create an animation.\nYou can also pick several motion presets in Management section of Mini App.\n✉️ Once ready — send a text describing a video you want to generate.",
     hintVideoDefault:
       "✉️ Send a text prompt to generate a video.\n🖼 Optionally attach an image — the video will start from it.",
     videoPhotoSaved: "📸 Photo saved. Now send the text for voice-over.",

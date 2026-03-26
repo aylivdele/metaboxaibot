@@ -70,8 +70,10 @@ export function UploadsView() {
   };
 
   const voices = uploads.filter((u) => u.type === "voice");
-  const photos = uploads.filter((u) => u.type === "photo");
-  const others = uploads.filter((u) => u.type !== "voice" && u.type !== "photo");
+  const photos = uploads.filter((u) => u.type === "photo" || u.type === "avatar_photo");
+  const others = uploads.filter(
+    (u) => u.type !== "voice" && u.type !== "photo" && u.type !== "avatar_photo",
+  );
 
   if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 

@@ -1009,6 +1009,7 @@ export const AI_MODELS: Record<string, AIModel> = {
       "Генерирует реалистичные фото и позволяет менять детали прямо словами: «убери фон», «добавь шляпу», «сделай вечер».",
     section: "design",
     provider: "fal",
+    costVariants: { settingKey: "resolution", map: { "1K": 0.15, "2K": 0.15, "4K": 0.3 } },
     costUsdPerRequest: 0.15,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -2080,14 +2081,16 @@ export const AI_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-  higgsfield: {
-    id: "higgsfield",
-    name: "Higgsfield",
+  "higgsfield-lite": {
+    id: "higgsfield-lite",
+    name: "🎬 Higgsfield Lite",
     description:
       "Специализируется на реалистичной анимации людей — мимика, жесты, движения тела выглядят естественно.",
     section: "video",
     provider: "higgsfield",
-    costUsdPerRequest: 0.2,
+    familyId: "higgsfield",
+    variantLabel: "Lite",
+    costUsdPerRequest: 0.125,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -2098,7 +2101,137 @@ export const AI_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: [5],
-    settings: [mkAspectRatio(["16:9", "9:16", "1:1"])],
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1"]),
+      {
+        key: "motions",
+        label: "Пресеты движений",
+        description:
+          "Выберите один или несколько пресетов движения камеры. Можно комбинировать несколько одновременно.",
+        type: "motion-picker",
+        default: null,
+      },
+      {
+        key: "enhance_prompt",
+        label: "Улучшение промпта",
+        description:
+          "Автоматически улучшает ваш промпт с помощью ИИ для более детального результата.",
+        type: "toggle",
+        default: true,
+      },
+      {
+        key: "seed",
+        label: "Seed",
+        description:
+          "Фиксирует случайность генерации для воспроизводимых результатов (1–1 000 000). Оставьте пустым для случайного.",
+        type: "number",
+        min: 1,
+        max: 1000000,
+        default: null,
+      },
+    ],
+  },
+  higgsfield: {
+    id: "higgsfield",
+    name: "🎬 Higgsfield Turbo",
+    description:
+      "Специализируется на реалистичной анимации людей — мимика, жесты, движения тела выглядят естественно.",
+    section: "video",
+    provider: "higgsfield",
+    familyId: "higgsfield",
+    variantLabel: "Turbo",
+    costUsdPerRequest: 0.406,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: [5],
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1"]),
+      {
+        key: "motions",
+        label: "Пресеты движений",
+        description:
+          "Выберите один или несколько пресетов движения камеры. Можно комбинировать несколько одновременно.",
+        type: "motion-picker",
+        default: null,
+      },
+      {
+        key: "enhance_prompt",
+        label: "Улучшение промпта",
+        description:
+          "Автоматически улучшает ваш промпт с помощью ИИ для более детального результата.",
+        type: "toggle",
+        default: true,
+      },
+      {
+        key: "seed",
+        label: "Seed",
+        description:
+          "Фиксирует случайность генерации для воспроизводимых результатов (1–1 000 000). Оставьте пустым для случайного.",
+        type: "number",
+        min: 1,
+        max: 1000000,
+        default: null,
+      },
+    ],
+  },
+  "higgsfield-preview": {
+    id: "higgsfield-preview",
+    name: "🎬 Higgsfield Preview",
+    description:
+      "Специализируется на реалистичной анимации людей — мимика, жесты, движения тела выглядят естественно.",
+    section: "video",
+    provider: "higgsfield",
+    familyId: "higgsfield",
+    variantLabel: "Preview",
+    descriptionOverride:
+      "Флагманская версия с максимальным качеством — наиболее реалистичное освещение, детали и кинематографичность.",
+    costUsdPerRequest: 0.563,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: [5],
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1"]),
+      {
+        key: "motions",
+        label: "Пресеты движений",
+        description:
+          "Выберите один или несколько пресетов движения камеры. Можно комбинировать несколько одновременно.",
+        type: "motion-picker",
+        default: null,
+      },
+      {
+        key: "enhance_prompt",
+        label: "Улучшение промпта",
+        description:
+          "Автоматически улучшает ваш промпт с помощью ИИ для более детального результата.",
+        type: "toggle",
+        default: true,
+      },
+      {
+        key: "seed",
+        label: "Seed",
+        description:
+          "Фиксирует случайность генерации для воспроизводимых результатов (1–1 000 000). Оставьте пустым для случайного.",
+        type: "number",
+        min: 1,
+        max: 1000000,
+        default: null,
+      },
+    ],
   },
   wan: {
     id: "wan",

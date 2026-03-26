@@ -3,6 +3,8 @@ import { CustomSlider } from "./CustomSlider.js";
 import { HeyGenVoicePicker } from "./HeyGenVoicePicker.js";
 import { DIDVoicePicker } from "./DIDVoicePicker.js";
 import { HeyGenAvatarPicker } from "./HeyGenAvatarPicker.js";
+import { HiggsFieldMotionPicker } from "./HiggsFieldMotionPicker.js";
+import type { MotionEntry } from "./HiggsFieldMotionPicker.js";
 
 interface SettingsPanelProps {
   settings: ModelSettingDef[];
@@ -109,6 +111,12 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
                 avatarPhotoUrl={String(values["avatar_photo_url"] ?? "")}
                 avatarPhotoS3Key={String(values["avatar_photo_s3key"] ?? "")}
                 onChange={onChange}
+              />
+            )}
+            {def.type === "motion-picker" && (
+              <HiggsFieldMotionPicker
+                value={(values[def.key] as MotionEntry[] | null) ?? []}
+                onChange={(v) => onChange(def.key, v)}
               />
             )}
           </div>

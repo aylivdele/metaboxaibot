@@ -92,6 +92,7 @@ export interface Translations {
     myAvatarDefaultName: string;
     hintHeygen: string;
     hintDid: string;
+    hintHiggsfield: string;
     hintVideoDefault: string;
   };
   errors: {

@@ -56,7 +56,8 @@ export interface ModelSettingDef {
     | "voice-picker"
     | "did-voice-picker"
     | "color"
-    | "avatar-picker";
+    | "avatar-picker"
+    | "motion-picker";
   options?: ModelSettingOption[];
   min?: number;
   max?: number;
@@ -77,6 +78,14 @@ export interface HeyGenAvatar {
   avatar_name: string;
   gender: string;
   preview_image_url: string | null;
+}
+
+export interface HiggsFieldMotion {
+  id: string;
+  name: string;
+  description?: string;
+  preview_url?: string | null;
+  category?: string;
 }
 
 export interface DIDVoice {
