@@ -47,10 +47,13 @@ export async function handleStart(ctx: BotContext): Promise<void> {
             "✅ Аккаунты объединены! Ваши токены и подписка перенесены на аккаунт meta-box.ru.",
         );
       }
-    } catch {
-      await ctx.reply(
-        ctx.t.start.metaboxLinkFailed ?? "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.",
-      );
+    } catch (err: unknown) {
+      const { MetaboxApiError } = await import("@metabox/api/services/metabox-bridge.service.js");
+      const isMismatch = err instanceof MetaboxApiError && err.code === "TELEGRAM_MISMATCH";
+      const msg = isMismatch
+        ? "⚠️ Эта ссылка привязки предназначена для другого Telegram-аккаунта. Переключитесь на нужный аккаунт и попробуйте снова."
+        : "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.";
+      await ctx.reply(msg);
     }
     return;
   }
