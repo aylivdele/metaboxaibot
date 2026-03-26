@@ -73,10 +73,18 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       openSso(result.ssoUrl);
       onSuccess?.();
       onBack();
-    } catch (err) {
-      const code = (err as Error & { code?: string }).code;
-      const key = code ? ERROR_MAP[code] : undefined;
-      setError(key ? t(key) : t("linkMetabox.error"));
+    } catch (err: any) {
+      const code = err?.code;
+      if (code === "TELEGRAM_LINKED" && err?.linkedTo) {
+        const lt = err.linkedTo;
+        const tgInfo = lt.telegramUsername ? `@${lt.telegramUsername}` : lt.telegramPhone || "";
+        setError(
+          `На аккаунте ${lt.name || email}${tgInfo ? ` (${tgInfo})` : ""} уже привязан другой Telegram. Обратитесь в поддержку @metaboxsupport`,
+        );
+      } else {
+        const key = code ? ERROR_MAP[code] : undefined;
+        setError(key ? t(key) : t("linkMetabox.error"));
+      }
     } finally {
       setLoading(false);
     }

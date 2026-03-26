@@ -45,6 +45,22 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (!user) throw new Error("User not found");
 
+    // Fetch subscription status from Metabox
+    let subscription: {
+      planName: string;
+      period: string;
+      daysLeft: number;
+      totalDays: number;
+      endDate: string;
+    } | null = null;
+    try {
+      const { getSubscriptionStatus } = await import("../services/metabox-bridge.service.js");
+      const subData = await getSubscriptionStatus(userId);
+      subscription = subData.subscription;
+    } catch {
+      // Non-fatal: subscription info unavailable
+    }
+
     return {
       id: user.id.toString(),
       username: user.username ?? null,
@@ -56,11 +72,13 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       tokenBalance: user.tokenBalance.toString(),
       referralCount,
       createdAt: user.createdAt.toISOString(),
+      subscription,
       transactions: transactions.map((t) => ({
         id: t.id,
         amount: t.amount.toString(),
         type: t.type,
         reason: t.reason,
+        description: t.description ?? null,
         modelId: t.modelId ?? null,
         createdAt: t.createdAt.toISOString(),
       })),
@@ -175,7 +193,14 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       };
     } catch (err) {
       if (err instanceof MetaboxApiError) {
-        return reply.code(err.status).send({ error: err.body, code: err.code });
+        // Parse JSON body for rich error info (e.g. TELEGRAM_LINKED with linkedTo)
+        let parsed: Record<string, unknown> = {};
+        try {
+          parsed = JSON.parse(err.body);
+        } catch {
+          parsed = { error: err.body };
+        }
+        return reply.code(err.status).send({ ...parsed, code: err.code ?? parsed.code });
       }
       throw err;
     }

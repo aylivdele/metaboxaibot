@@ -28,6 +28,7 @@ const translations = {
     "profile.reason.welcome_bonus": "🎁 Welcome bonus",
     "profile.reason.ai_usage": "🤖 AI usage",
     "profile.reason.purchase": "💳 Token purchase",
+    "profile.reason.metabox_purchase": "💳 Metabox purchase",
     "profile.reason.referral_bonus": "🎁 Referral bonus",
     "profile.reason.admin": "🔧 Admin adjustment",
 
@@ -304,6 +305,7 @@ const translations = {
     "profile.reason.welcome_bonus": "🎁 Приветственный бонус",
     "profile.reason.ai_usage": "🤖 Использование AI",
     "profile.reason.purchase": "💳 Покупка токенов",
+    "profile.reason.metabox_purchase": "💳 Покупка через Metabox",
     "profile.reason.referral_bonus": "🎁 Реферальный бонус",
     "profile.reason.admin": "🔧 Корректировка",
 

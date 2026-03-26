@@ -45,7 +45,7 @@ export const paymentsRoutes: FastifyPluginAsync = async (fastify) => {
       const invoiceUrl = await paymentService.createDynamicInvoice({
         title: `${product.name} — ${product.tokens} tokens`,
         description: `${product.tokens} AI tokens for use in Metabox`,
-        payload: `product:${product.id}:${product.tokens}:${product.priceRub}`,
+        payload: `product:${product.id}:${product.tokens}:${product.priceRub}:${product.name}`,
         stars,
       });
       return { invoiceUrl };
@@ -76,7 +76,7 @@ export const paymentsRoutes: FastifyPluginAsync = async (fastify) => {
       const invoiceUrl = await paymentService.createDynamicInvoice({
         title: `${sub.name} — ${period} (${tokens} tokens)`,
         description: `AI subscription: ${tokens} tokens`,
-        payload: `subscription:${sub.id}:${period}:${tokens}:${totalPrice.toFixed(2)}`,
+        payload: `subscription:${sub.id}:${period}:${tokens}:${Math.round(totalPrice)}:${sub.name}`,
         stars,
       });
       return { invoiceUrl };

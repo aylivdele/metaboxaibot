@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
+import { config } from "@metabox/shared";
 import { getAiBotCatalog } from "../services/metabox-bridge.service.js";
 import { getRate, calcStars } from "../services/exchange-rate.service.js";
 import type { AiBotCatalog } from "../services/metabox-bridge.service.js";
@@ -85,6 +86,7 @@ export const tariffsRoutes: FastifyPluginAsync = async (fastify) => {
       tokenPackages,
       canPayByCard: !!user?.metaboxUserId,
       usdtRubRate,
+      metaboxUrl: config.metabox.apiUrl || "https://app.meta-box.ru",
     };
   });
 };

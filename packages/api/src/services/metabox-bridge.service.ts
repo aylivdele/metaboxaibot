@@ -270,6 +270,19 @@ export async function getAiBotCatalog(): Promise<AiBotCatalog> {
   return get<AiBotCatalog>("/aibot/catalog");
 }
 
+/** Fetch subscription status for a user from Metabox. */
+export async function getSubscriptionStatus(telegramId: bigint): Promise<{
+  subscription: {
+    planName: string;
+    period: string;
+    daysLeft: number;
+    totalDays: number;
+    endDate: string;
+  } | null;
+}> {
+  return get(`/internal/subscription-status?telegramId=${telegramId.toString()}`);
+}
+
 /** Create a subscription invoice on Metabox for a linked user. */
 export async function createSubscriptionInvoice(params: {
   metaboxUserId: string;

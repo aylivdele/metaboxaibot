@@ -47,13 +47,14 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
    * Credits tokens to the user's AI Box balance.
    */
   fastify.post("/grant-tokens", async (request, reply) => {
-    const { telegramId, tokens } = request.body as {
+    const { telegramId, tokens, description } = request.body as {
       telegramId: string;
       tokens: number;
+      description?: string;
     };
 
-    if (!telegramId || typeof tokens !== "number" || tokens <= 0) {
-      return reply.code(400).send({ error: "telegramId and positive tokens are required" });
+    if (!telegramId || typeof tokens !== "number" || tokens === 0) {
+      return reply.code(400).send({ error: "telegramId and non-zero tokens are required" });
     }
 
     const user = await db.user.findUnique({ where: { id: BigInt(telegramId) } });
@@ -70,11 +71,60 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
         data: {
           userId: BigInt(telegramId),
           amount: tokens,
-          type: "credit",
+          type: tokens > 0 ? "credit" : "debit",
           reason: "metabox_purchase",
+          description: description || null,
         },
       }),
     ]);
+
+    return { ok: true };
+  });
+
+  /**
+   * POST /internal/revoke-tokens
+   * Called by Metabox when rolling back a token package or subscription purchase.
+   * Deducts tokens from user balance and deletes the matching credit transaction.
+   * Body: { telegramId: string, tokens: number }
+   */
+  fastify.post("/revoke-tokens", async (request, reply) => {
+    const { telegramId, tokens } = request.body as {
+      telegramId: string;
+      tokens: number;
+    };
+
+    if (!telegramId || typeof tokens !== "number" || tokens <= 0) {
+      return reply.code(400).send({ error: "telegramId and positive tokens are required" });
+    }
+
+    const user = await db.user.findUnique({ where: { id: BigInt(telegramId) } });
+    if (!user) {
+      return { ok: true }; // user not in bot — nothing to revoke
+    }
+
+    // Find the most recent matching credit transaction to delete
+    const txToDelete = await db.tokenTransaction.findFirst({
+      where: {
+        userId: BigInt(telegramId),
+        type: "credit",
+        amount: { gte: tokens - 0.01, lte: tokens + 0.01 },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+
+    const ops: any[] = [
+      db.user.update({
+        where: { id: BigInt(telegramId) },
+        data: { tokenBalance: { decrement: tokens } },
+      }),
+    ];
+
+    if (txToDelete) {
+      ops.push(db.tokenTransaction.delete({ where: { id: txToDelete.id } }));
+    }
+
+    await db.$transaction(ops);
 
     return { ok: true };
   });

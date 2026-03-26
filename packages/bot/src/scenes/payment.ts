@@ -39,6 +39,7 @@ export async function handleSuccessfulPayment(ctx: BotContext): Promise<void> {
       const productId = parts[1];
       const tokens = Number(parts[isSubscription ? 3 : 2]);
       const priceRub = Number(parts[isSubscription ? 4 : 3]);
+      const productName = parts[isSubscription ? 5 : 4] || undefined;
       const productType = isSubscription ? "subscription" : "product";
       const period = isSubscription ? parts[2] : undefined;
 
@@ -50,6 +51,7 @@ export async function handleSuccessfulPayment(ctx: BotContext): Promise<void> {
         productType,
         period,
         userInfo,
+        productName,
       );
     } else {
       // Legacy format: planId directly
