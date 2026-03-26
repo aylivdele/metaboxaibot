@@ -79,7 +79,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
         const lt = err.linkedTo;
         const tgInfo = lt.telegramUsername ? `@${lt.telegramUsername}` : lt.telegramPhone || "";
         setError(
-          `На аккаунте ${lt.name || email}${tgInfo ? ` (${tgInfo})` : ""} уже привязан другой Telegram. Обратитесь в поддержку @metaboxsupport`,
+          `На аккаунте ${lt.name || email}${tgInfo ? ` (${tgInfo})` : ""} уже привязан другой Telegram. Обратитесь в поддержку @${import.meta.env.VITE_SUPPORT_TG ?? "metaboxsupport"}`,
         );
       } else {
         const key = code ? ERROR_MAP[code] : undefined;

@@ -54,6 +54,7 @@ export class MetaboxApiError extends Error {
     public readonly body: string,
     path: string,
     public readonly code?: string,
+    public readonly data?: Record<string, unknown>,
   ) {
     super(`Metabox internal API ${path} → ${status}: ${body}`);
   }
@@ -73,14 +74,16 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     const text = await res.text().catch(() => "");
     let message = text;
     let code: string | undefined;
+    let data: Record<string, unknown> | undefined;
     try {
-      const parsed = JSON.parse(text) as { error?: string; code?: string };
-      if (parsed.error) message = parsed.error;
-      if (parsed.code) code = parsed.code;
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      if (parsed.error) message = String(parsed.error);
+      if (parsed.code) code = String(parsed.code);
+      data = parsed;
     } catch {
       // keep raw text
     }
-    throw new MetaboxApiError(res.status, message, path, code);
+    throw new MetaboxApiError(res.status, message, path, code, data);
   }
   return res.json() as Promise<T>;
 }

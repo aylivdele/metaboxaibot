@@ -126,6 +126,9 @@ export const config = {
     ssoSecret: opt("METABOX_SSO_SECRET"),
   },
 
+  /** Support Telegram username (without @) */
+  supportTg: optDefault("SUPPORT_TG_USERNAME", "metaboxsupport"),
+
   /** AI providers (all optional — only needed for models you enable) */
   ai: {
     openai: opt("OPENAI_API_KEY"),
