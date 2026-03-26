@@ -6,7 +6,47 @@ import type { ModelFamily } from "../types/ai.js";
  * shown in the bot menu. Users drill into version/variant/settings in the mini-app.
  */
 export const MODEL_FAMILIES: Record<string, ModelFamily> = {
-  // ── Image families ─────────────────────────────────────────────────────────
+  // ── Design families ────────────────────────────────────────────────────────
+
+  "nano-banana": {
+    id: "nano-banana",
+    name: "🍌 Nano Banana",
+    section: "design",
+    description:
+      "Генерирует реалистичные фото и позволяет менять детали прямо словами: «убери фон», «добавь шляпу», «сделай вечер». Версия 2 добавляет поиск в интернете и усиленное мышление для более точного следования промпту.",
+    defaultModelId: "nano-banana-2",
+    members: [
+      { modelId: "nano-banana-pro", versionLabel: "1", variantLabel: "Pro" },
+      { modelId: "nano-banana-2", versionLabel: "2", variantLabel: "Standard" },
+    ],
+  },
+
+  ideogram: {
+    id: "ideogram",
+    name: "✍️ Ideogram",
+    section: "design",
+    description:
+      "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров, обложек и рекламы. Принимает фото как стилевой референс.",
+    defaultModelId: "ideogram-balanced",
+    members: [
+      { modelId: "ideogram-turbo", variantLabel: "Turbo" },
+      { modelId: "ideogram-balanced", variantLabel: "Balanced" },
+      { modelId: "ideogram", variantLabel: "Quality" },
+    ],
+  },
+
+  flux: {
+    id: "flux",
+    name: "⚡ FLUX",
+    section: "design",
+    description:
+      "Генерация изображений с оплатой за мегапиксель — платите только за фактическое разрешение. FLUX.2 — быстрый и качественный; Pro-вариант добавляет повышенную детализацию и фотореализм.",
+    defaultModelId: "flux",
+    members: [
+      { modelId: "flux", versionLabel: "2", variantLabel: "Standard" },
+      { modelId: "flux-pro", versionLabel: "2", variantLabel: "Pro" },
+    ],
+  },
 
   recraft: {
     id: "recraft",
@@ -36,19 +76,6 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     ],
   },
 
-  flux: {
-    id: "flux",
-    name: "⚡ FLUX",
-    section: "design",
-    description:
-      "Генерация изображений с оплатой за мегапиксель — платите только за фактическое разрешение. FLUX.2 — быстрый и качественный; Pro-вариант добавляет повышенную детализацию и фотореализм.",
-    defaultModelId: "flux",
-    members: [
-      { modelId: "flux", versionLabel: "2", variantLabel: "Standard" },
-      { modelId: "flux-pro", versionLabel: "2", variantLabel: "Pro" },
-    ],
-  },
-
   seedream: {
     id: "seedream",
     name: "🛍️ Seedream",
@@ -63,6 +90,19 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
   },
 
   // ── Video families ─────────────────────────────────────────────────────────
+
+  kling: {
+    id: "kling",
+    name: "🎥 Kling",
+    section: "video",
+    description:
+      "Генерирует видео длиной до 2 минут со звуком. Лучше всех передаёт движения людей. Pro-вариант повышает качество и детализацию.",
+    defaultModelId: "kling",
+    members: [
+      { modelId: "kling", variantLabel: "Standard" },
+      { modelId: "kling-pro", variantLabel: "Pro" },
+    ],
+  },
 
   minimax: {
     id: "minimax",
@@ -79,7 +119,7 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
 
   veo: {
     id: "veo",
-    name: "🎬 Veo 3",
+    name: "📽️ Veo 3",
     section: "video",
     description:
       "Видео от Google со звуком и голосами. Standard — максимальное качество, Fast — быстрее и дешевле. Поддерживает фото/видео как референс.",
@@ -87,35 +127,6 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     members: [
       { modelId: "veo-fast", variantLabel: "Fast" },
       { modelId: "veo", variantLabel: "Standard" },
-    ],
-  },
-
-  // ── Image families ─────────────────────────────────────────────────────────
-
-  ideogram: {
-    id: "ideogram",
-    name: "✍️ Ideogram",
-    section: "design",
-    description:
-      "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров, обложек и рекламы. Принимает фото как стилевой референс.",
-    defaultModelId: "ideogram-balanced",
-    members: [
-      { modelId: "ideogram-turbo", variantLabel: "Turbo" },
-      { modelId: "ideogram-balanced", variantLabel: "Balanced" },
-      { modelId: "ideogram", variantLabel: "Quality" },
-    ],
-  },
-
-  "nano-banana": {
-    id: "nano-banana",
-    name: "🍌 Nano Banana",
-    section: "design",
-    description:
-      "Генерирует реалистичные фото и позволяет менять детали прямо словами: «убери фон», «добавь шляпу», «сделай вечер». Версия 2 добавляет поиск в интернете и усиленное мышление для более точного следования промпту.",
-    defaultModelId: "nano-banana-2",
-    members: [
-      { modelId: "nano-banana-pro", versionLabel: "1", variantLabel: "Pro" },
-      { modelId: "nano-banana-2", versionLabel: "2", variantLabel: "Standard" },
     ],
   },
 };

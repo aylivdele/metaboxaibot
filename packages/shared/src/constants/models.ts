@@ -527,7 +527,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   // ── GPT 5 ─────────────────────────────────────────────────────────────────
   "gpt-5.4-pro": {
     id: "gpt-5.4-pro",
-    name: "GPT 5.4 Pro",
+    name: "🧠 GPT 5.4 Pro",
     description: "Самая мощная модель OpenAI, максимальная точность и глубина рассуждений.",
     section: "gpt",
     provider: "openai",
@@ -544,7 +544,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "gpt-5.4": {
     id: "gpt-5.4",
-    name: "GPT 5.4",
+    name: "💬 GPT 5.4",
     description: "Флагман OpenAI, отличный баланс интеллекта и скорости.",
     section: "gpt",
     provider: "openai",
@@ -561,7 +561,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "gpt-5-pro": {
     id: "gpt-5-pro",
-    name: "GPT 5 Pro",
+    name: "💡 GPT 5 Pro",
     description: "Предыдущий флагман OpenAI, хороший баланс интеллекта и скорости.",
     section: "gpt",
     provider: "openai",
@@ -577,7 +577,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "gpt-5-mini": {
     id: "gpt-5-mini",
-    name: "GPT 5 Mini",
+    name: "🌀 GPT 5 Mini",
     description: "Компактная и быстрая, хороша для повседневных задач.",
     section: "gpt",
     provider: "openai",
@@ -593,7 +593,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "gpt-5-nano": {
     id: "gpt-5-nano",
-    name: "GPT 5 Nano",
+    name: "✨ GPT 5 Nano",
     description: "Самая лёгкая и дешёвая в линейке GPT 5, мгновенные ответы.",
     section: "gpt",
     provider: "openai",
@@ -609,7 +609,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "o4-mini": {
     id: "o4-mini",
-    name: "GPT-o4 Mini",
+    name: "🔬 GPT-o4 Mini",
     description: "Reasoning-модель OpenAI, цепочка рассуждений для сложных задач за низкую цену.",
     section: "gpt",
     provider: "openai",
@@ -625,7 +625,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   o3: {
     id: "o3",
-    name: "GPT-o3",
+    name: "🧩 GPT-o3",
     description: "Мощная reasoning-модель OpenAI, глубокие рассуждения для самых сложных задач.",
     section: "gpt",
     provider: "openai",
@@ -641,7 +641,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "o3-mini": {
     id: "o3-mini",
-    name: "GPT-o3 Mini",
+    name: "🔩 GPT-o3 Mini",
     description: "Компактная reasoning-модель OpenAI, отличное соотношение цена/точность.",
     section: "gpt",
     provider: "openai",
@@ -658,7 +658,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   // ── Anthropic ─────────────────────────────────────────────────────────────
   "claude-opus": {
     id: "claude-opus",
-    name: "Claude 4.6 Opus",
+    name: "🎭 Claude 4.6 Opus",
     description:
       "Самая умная модель Anthropic, лучшая для сложных аналитических и творческих задач. Понимает изображения.",
     section: "gpt",
@@ -675,7 +675,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "claude-opus-4-5": {
     id: "claude-opus-4-5",
-    name: "Claude 4.5 Opus",
+    name: "🃏 Claude 4.5 Opus",
     description:
       "Предыдущий флагман Anthropic, глубокий анализ и длинные тексты. Понимает изображения.",
     section: "gpt",
@@ -692,7 +692,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "claude-sonnet": {
     id: "claude-sonnet",
-    name: "Claude 4.6 Sonnet",
+    name: "📜 Claude 4.6 Sonnet",
     description:
       "Быстрая и умная, лучший баланс цена/качество у Anthropic. Отлично справляется с кодом, текстами и анализом.",
     section: "gpt",
@@ -709,7 +709,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "claude-sonnet-4-5": {
     id: "claude-sonnet-4-5",
-    name: "Claude 4.5 Sonnet",
+    name: "🖊️ Claude 4.5 Sonnet",
     description: "Надёжная рабочая лошадка Anthropic, отлично для кода и текстов.",
     section: "gpt",
     provider: "anthropic",
@@ -725,7 +725,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "claude-haiku": {
     id: "claude-haiku",
-    name: "Claude 4.5 Haiku",
+    name: "🍃 Claude 4.5 Haiku",
     description: "Самая быстрая и дешёвая модель Anthropic, мгновенные ответы для простых задач.",
     section: "gpt",
     provider: "anthropic",
@@ -743,7 +743,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   // ── Google Gemini ──────────────────────────────────────────────────────────
   "gemini-3-pro": {
     id: "gemini-3-pro",
-    name: "Gemini 3 Pro",
+    name: "💎 Gemini 3 Pro",
     description:
       "Флагман Google, огромный контекст и мультимодальность. Поддерживает поиск в интернете.",
     section: "gpt",
@@ -760,7 +760,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "gemini-3.1-pro": {
     id: "gemini-3.1-pro",
-    name: "Gemini 3.1 Pro",
+    name: "💍 Gemini 3.1 Pro",
     description:
       "Обновлённый Gemini 3 Pro с улучшенным следованием инструкциям. Поиск в интернете.",
     section: "gpt",
@@ -777,7 +777,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "gemini-2-flash": {
     id: "gemini-2-flash",
-    name: "Gemini 2.5 Flash",
+    name: "🌟 Gemini 2.5 Flash",
     description:
       "Быстрая и дешёвая модель Google с reasoning, отличное соотношение цена/качество. Поддерживает поиск в интернете.",
     section: "gpt",
@@ -794,7 +794,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "gemini-2-flash-lite": {
     id: "gemini-2-flash-lite",
-    name: "Gemini 2.5 Flash Lite",
+    name: "⭐ Gemini 2.5 Flash Lite",
     description:
       "Самая лёгкая и дешёвая модель Google, идеальна для простых задач с минимальными затратами.",
     section: "gpt",
@@ -813,7 +813,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   // ── DeepSeek ──────────────────────────────────────────────────────────────
   "deepseek-r1": {
     id: "deepseek-r1",
-    name: "DeepSeek R1",
+    name: "🔍 DeepSeek R1",
     description:
       "Reasoning-модель из Китая, конкурент o1, сильна в математике и коде. Открытые веса.",
     section: "gpt",
@@ -830,7 +830,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "deepseek-v3": {
     id: "deepseek-v3",
-    name: "DeepSeek V3",
+    name: "🐋 DeepSeek V3",
     description:
       "Быстрая модель, отличная для общих задач и генерации текста при очень низкой стоимости.",
     section: "gpt",
@@ -849,7 +849,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   // ── xAI Grok ──────────────────────────────────────────────────────────────
   "grok-4": {
     id: "grok-4",
-    name: "Grok 4",
+    name: "🤖 Grok 4",
     description: "Флагман xAI (Илон Маск), мощные рассуждения с доступом к данным X.",
     section: "gpt",
     provider: "xai",
@@ -866,7 +866,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "grok-4-fast": {
     id: "grok-4-fast",
-    name: "Grok 4-fast",
+    name: "🏎️ Grok 4-fast",
     description: "Ускоренная модель флагмана Grok 4 от xAI. Быстрые ответы с рассуждением.",
     section: "gpt",
     provider: "xai",
@@ -885,7 +885,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   // ── Perplexity ────────────────────────────────────────────────────────────
   "perplexity-sonar-pro": {
     id: "perplexity-sonar-pro",
-    name: "Perplexity Sonar Pro + Internet",
+    name: "🌐 Perplexity Sonar Pro + Internet",
     description: "Мощный AI-поиск с глубокими ответами. Актуальные данные из интернета.",
     section: "gpt",
     provider: "perplexity",
@@ -901,7 +901,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "perplexity-sonar-research": {
     id: "perplexity-sonar-research",
-    name: "Perplexity Sonar Deep Research",
+    name: "🔭 Perplexity Sonar Deep Research",
     description: "Автономный исследователь, анализирует десятки источников за один запрос.",
     section: "gpt",
     provider: "perplexity",
@@ -917,7 +917,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "perplexity-sonar": {
     id: "perplexity-sonar",
-    name: "Perplexity Sonar + Internet",
+    name: "📡 Perplexity Sonar + Internet",
     description: "Быстрый AI-поиск с актуальными данными из интернета.",
     section: "gpt",
     provider: "perplexity",
@@ -935,7 +935,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   // ── Qwen 3 ───────────────────────────────────────────────────────────────
   "qwen-3-max-thinking": {
     id: "qwen-3-max-thinking",
-    name: "Qwen 3 Max Thinking",
+    name: "🧮 Qwen 3 Max Thinking",
     description: "Крупнейшая reasoning-модель Alibaba, конкурент GPT и Claude.",
     section: "gpt",
     provider: "alibaba",
@@ -955,7 +955,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "qwen-3-thinking": {
     id: "qwen-3-thinking",
-    name: "Qwen 3 Thinking",
+    name: "💭 Qwen 3 Thinking",
     description: "Reasoning-модель Alibaba среднего размера, сильна в коде и математике.",
     section: "gpt",
     provider: "alibaba",
@@ -975,7 +975,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "qwen-3": {
     id: "qwen-3",
-    name: "Qwen 3",
+    name: "🏮 Qwen 3",
     description: "Быстрая модель Alibaba, отличная для мультиязычных задач.",
     section: "gpt",
     provider: "alibaba",
@@ -1583,30 +1583,6 @@ export const AI_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-  flux: {
-    id: "flux",
-    name: "⚡ FLUX.2",
-    description:
-      "Максимально реалистичные фото за секунды. Лучший выбор, когда нужно быстро и неотличимо от настоящего снимка.",
-    section: "design",
-    provider: "fal",
-    familyId: "flux",
-    versionLabel: "2",
-    variantLabel: "Standard",
-    costUsdPerRequest: 0,
-    costUsdPerMPixel: 0.012, // $0.012/MP, billed as ceil(px/1_000_000)
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    // FAL image_size categories: square_hd, landscape_4_3, portrait_4_3, landscape_16_9, portrait_16_9
-    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
-    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]), ...FLUX_SETTINGS],
-  },
   ideogram: {
     id: "ideogram",
     name: "✍️ Ideogram v3.0",
@@ -1752,6 +1728,30 @@ export const AI_MODELS: Record<string, AIModel> = {
         default: "standard",
       },
     ],
+  },
+  flux: {
+    id: "flux",
+    name: "⚡ FLUX.2",
+    description:
+      "Максимально реалистичные фото за секунды. Лучший выбор, когда нужно быстро и неотличимо от настоящего снимка.",
+    section: "design",
+    provider: "fal",
+    familyId: "flux",
+    versionLabel: "2",
+    variantLabel: "Standard",
+    costUsdPerRequest: 0,
+    costUsdPerMPixel: 0.012, // $0.012/MP, billed as ceil(px/1_000_000)
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    // FAL image_size categories: square_hd, landscape_4_3, portrait_4_3, landscape_16_9, portrait_16_9
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]), ...FLUX_SETTINGS],
   },
   "flux-pro": {
     id: "flux-pro",
@@ -2036,11 +2036,13 @@ export const AI_MODELS: Record<string, AIModel> = {
   // ── Видео ─────────────────────────────────────────────────────────────────
   kling: {
     id: "kling",
-    name: "Kling 3.0",
+    name: "🎥 Kling 3.0",
     description:
       "Генерирует самые длинные видео — до 2 минут сразу, со звуком. Лучше всех передаёт движения людей.",
     section: "video",
     provider: "fal",
+    familyId: "kling",
+    variantLabel: "Standard",
     // $0.126/s with audio (default), $0.084/s without audio
     costUsdPerRequest: 0,
     costUsdPerSecond: 0.126,
@@ -2062,11 +2064,13 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "kling-pro": {
     id: "kling-pro",
-    name: "Kling 3.0 Pro",
+    name: "🎥 Kling 3.0 Pro",
     description:
       "Генерирует самые длинные видео — до 2 минут сразу, со звуком. Лучше всех передаёт движения людей.",
     section: "video",
     provider: "fal",
+    familyId: "kling",
+    variantLabel: "Pro",
     // $0.168/s with audio (default), $0.112/s without audio
     costUsdPerRequest: 0,
     costUsdPerSecond: 0.168,
@@ -2088,7 +2092,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   veo: {
     id: "veo",
-    name: "Veo 3",
+    name: "📽️ Veo 3",
     description:
       "Видео от Google в качестве 4K со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Отправьте фото или видео вместе с текстом — фото станет стилевым референсом, видео — основой для продолжения.",
     section: "video",
@@ -2145,7 +2149,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "veo-fast": {
     id: "veo-fast",
-    name: "Veo 3",
+    name: "📽️ Veo 3",
     description:
       "Быстрая версия Veo 3 от Google. Та же высокая скорость и голоса, за меньшую цену. Отправьте фото или видео вместе с текстом — фото станет стилевым референсом, видео — основой для продолжения.",
     section: "video",
@@ -2202,7 +2206,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   sora: {
     id: "sora",
-    name: "Sora 2",
+    name: "🌌 Sora 2",
     description:
       "Самое реалистичное видео от OpenAI. Объекты двигаются как в реальности, со звуком и правильной физикой. Отправьте фото вместе с текстом — оно станет первым кадром видео.",
     section: "video",
@@ -2238,7 +2242,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   runway: {
     id: "runway",
-    name: "Runway Gen-4.5",
+    name: "🛫 Runway Gen-4.5",
     description:
       "Полный контроль над видео: указывайте, что и как должно двигаться, управляйте камерой. Выбор профессионалов.",
     section: "video",
@@ -2312,7 +2316,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   seedance: {
     id: "seedance",
-    name: "Seedance 1.5 Pro (ByteDance)",
+    name: "💃 Seedance 1.5 Pro (ByteDance)",
     description:
       "Создаёт видео с выразительным и необычным движением. Хорош для креативных и стилизованных роликов.",
     section: "video",
@@ -2363,7 +2367,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "luma-ray2": {
     id: "luma-ray2",
-    name: "Luma: Ray 2",
+    name: "☀️ Luma: Ray 2",
     description:
       "Реалистичное видео от Luma AI. Плавные движения, кинематографическое качество. Поддерживает фото как первый кадр.",
     section: "video",
@@ -2416,7 +2420,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   minimax: {
     id: "minimax",
-    name: "MiniMax Video-01",
+    name: "🎦 MiniMax Video-01",
     description:
       "Китайская видеомодель с отличным качеством движения персонажей. Генерирует 6-секундные клипы с высокой плавностью.",
     section: "video",
@@ -2445,7 +2449,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   pika: {
     id: "pika",
-    name: "Pika 2.2",
+    name: "📸 Pika 2.2",
     description:
       "Быстрые видео с крутыми спецэффектами: взрывы, плавление, сжатие. Идеально для TikTok и Reels. Поддерживает фото как первый кадр.",
     section: "video",
@@ -2503,7 +2507,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   hailuo: {
     id: "hailuo",
-    name: "Hailuo 2.3",
+    name: "🎞️ Hailuo 2.3",
     description:
       "Видеомодель MiniMax с поддержкой 1080p и 10-секундных клипов. Принимает фото как первый кадр.",
     section: "video",
@@ -2548,7 +2552,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "hailuo-fast": {
     id: "hailuo-fast",
-    name: "Hailuo 2.3",
+    name: "🎞️ Hailuo 2.3",
     description:
       "Быстрая версия Hailuo 2.3 от MiniMax — ~40% дешевле стандарта при схожем качестве. Требует фото как первый кадр.",
     section: "video",
@@ -2745,7 +2749,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   wan: {
     id: "wan",
-    name: "Wan 2.6 (Alibaba)",
+    name: "🏯 Wan 2.6 (Alibaba)",
     description:
       "Видеомодель Alibaba с высоким качеством движения и поддержкой 1080p. Отправьте фото вместе с текстом — модель перейдёт в режим image-to-video, где соотношение сторон берётся из фото.",
     section: "video",
@@ -2814,13 +2818,14 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   heygen: {
     id: "heygen",
-    name: "HeyGen",
+    name: "👤 HeyGen",
     description:
       "Особенно популярен среди соло-креаторов, инфлюенсеров и небольших команд. Для аватаров, lip-sync, перевода видео на 175+ языков.",
     section: "video",
     provider: "heygen",
     // $0.0167/s Engine III (public/standard avatar) ≈ $1.00/min
     // $0.10/s Engine IV (Avatar IV — custom photo upload) ≈ $6.00/min
+    costUsdPerRequest: 0,
     costUsdPerSecond: 0.0167,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -2858,13 +2863,14 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "d-id": {
     id: "d-id",
-    name: "D-ID",
+    name: "🤳 D-ID",
     description:
       "Оживляет фотографии и аватары. Синхронизирует речь с движением губ для создания реалистичных говорящих персонажей.",
     section: "video",
     provider: "d-id",
     // $0.018/s (Pro plan, 1 credit = 15s ≈ $0.27/credit) ≈ $1.07/min
     // API streaming users get 50% discount → ~$0.009/s ≈ $0.54/min
+    costUsdPerRequest: 0,
     costUsdPerSecond: 0.018,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -2911,7 +2917,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   // ── Аудио ─────────────────────────────────────────────────────────────────
   "tts-openai": {
     id: "tts-openai",
-    name: "Синтез речи (OpenAI)",
+    name: "🔊 Синтез речи (OpenAI)",
     description:
       "Синтез речи от OpenAI. Несколько голосов, естественная интонация и быстрая генерация для любого текста.",
     section: "audio",
@@ -3005,7 +3011,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "voice-clone": {
     id: "voice-clone",
-    name: "Клонирование голоса",
+    name: "🎤 Клонирование голоса",
     description:
       "Клонирование голоса с высокой точностью. Воспроизводит тембр и интонации исходного голоса по короткому аудиообразцу.",
     section: "audio",
@@ -3084,7 +3090,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   suno: {
     id: "suno",
-    name: "Генерация музыки (Suno)",
+    name: "🎵 Генерация музыки (Suno)",
     description:
       "Генерирует полноценные музыкальные треки с вокалом и аранжировкой по текстовому описанию стиля и настроения.",
     section: "audio",
@@ -3130,7 +3136,7 @@ export const AI_MODELS: Record<string, AIModel> = {
   },
   "sounds-el": {
     id: "sounds-el",
-    name: "Звуковые эффекты (ElevenLabs)",
+    name: "🔔 Звуковые эффекты (ElevenLabs)",
     description:
       "Генерирует оригинальные звуковые эффекты по описанию. Подходит для видеопроизводства, игр и подкастов.",
     section: "audio",

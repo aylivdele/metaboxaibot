@@ -173,26 +173,27 @@ export function UploadsView() {
                           {upload.name}
                         </span>
                       )}
-                      <span className="uploads-item__meta">
-                        {upload.type} · {new Date(upload.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-
-                    <div className="uploads-item__actions">
-                      <button
-                        className="uploads-item__btn uploads-item__btn--rename"
-                        onClick={() => startEdit(upload)}
-                        title={t("uploads.rename")}
-                      >
-                        ✏
-                      </button>
-                      <button
-                        className="uploads-item__btn uploads-item__btn--delete"
-                        onClick={() => void deleteUpload(upload.id)}
-                        title={t("uploads.delete")}
-                      >
-                        🗑
-                      </button>
+                      <div className="uploads-item__bottom">
+                        <span className="uploads-item__meta">
+                          {upload.type} · {new Date(upload.createdAt).toLocaleDateString()}
+                        </span>
+                        <div className="uploads-item__actions">
+                          <button
+                            className="uploads-item__btn uploads-item__btn--rename"
+                            onClick={() => startEdit(upload)}
+                            title={t("uploads.rename")}
+                          >
+                            ✏
+                          </button>
+                          <button
+                            className="uploads-item__btn uploads-item__btn--delete"
+                            onClick={() => void deleteUpload(upload.id)}
+                            title={t("uploads.delete")}
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}

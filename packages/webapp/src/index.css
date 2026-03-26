@@ -2841,7 +2841,7 @@ input::placeholder {
 
 .uploads-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
   background: var(--card-bg);
@@ -2853,7 +2853,7 @@ input::placeholder {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -2885,6 +2885,13 @@ input::placeholder {
 
 .uploads-item__name-input:focus {
   outline: none;
+}
+
+.uploads-item__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 
 .uploads-item__meta {
@@ -2958,9 +2965,8 @@ input::placeholder {
 .uploads-photo-card__footer {
   padding: 6px 6px 4px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .uploads-photo-card__name {

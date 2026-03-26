@@ -69,7 +69,7 @@ export class OpenAIAdapter implements LLMAdapter {
     const urls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
 
     if (urls.length > 0) {
-      const content: OpenAI.Responses.InputContentPart[] = [
+      const content: OpenAI.Responses.ResponseInputContent[] = [
         ...(input.prompt ? [{ type: "input_text" as const, text: input.prompt }] : []),
         ...urls.map((url) => ({
           type: "input_image" as const,
