@@ -47,11 +47,15 @@ export async function handleStart(ctx: BotContext): Promise<void> {
             "✅ Аккаунты объединены! Ваши токены и подписка перенесены на аккаунт meta-box.ru.",
         );
       }
-    } catch (err: unknown) {
-      const isMismatch = err instanceof MetaboxApiError && err.code === "TELEGRAM_MISMATCH";
-      const msg = isMismatch
-        ? "⚠️ Эта ссылка привязки предназначена для другого Telegram-аккаунта. Переключитесь на нужный аккаунт и попробуйте снова."
-        : "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.";
+    } catch (err) {
+      let msg = "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.";
+      const apiErr = err as { code?: string; data?: Record<string, unknown> };
+      if (apiErr.code === "TELEGRAM_MISMATCH") {
+        msg = `⚠️ Этот аккаунт на Metabox уже привязан к другому Telegram.\n\nПереключитесь на нужный Telegram-аккаунт и попробуйте снова.\n\nЕсли это ошибка — напишите в поддержку: @${config.supportTg}`;
+      } else if (apiErr.code === "TELEGRAM_ALREADY_LINKED") {
+        const email = apiErr.data?.linkedEmail ? String(apiErr.data.linkedEmail) : "";
+        msg = `⚠️ Этот Telegram уже привязан к другому аккаунту на Metabox${email ? ` (${email})` : ""}.\n\nЕсли это ошибка — напишите в поддержку: @${config.supportTg}`;
+      }
       await ctx.reply(msg);
     }
     return;
