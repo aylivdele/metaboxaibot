@@ -212,6 +212,8 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
         password,
         telegramId: userId,
         telegramUsername: user.username,
+        firstName: user.firstName ?? undefined,
+        lastName: user.lastName ?? undefined,
         referrerTelegramId: user.referredById,
         botHasPurchase: !!botPurchase,
         botCreatedAt: user.createdAt,

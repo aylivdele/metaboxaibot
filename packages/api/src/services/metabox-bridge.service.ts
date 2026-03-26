@@ -135,6 +135,8 @@ export async function loginAndLink(params: {
   password: string;
   telegramId: bigint;
   telegramUsername: string | null;
+  firstName?: string;
+  lastName?: string;
   referrerTelegramId?: bigint | null;
   botHasPurchase: boolean;
   botCreatedAt: Date;
@@ -144,6 +146,8 @@ export async function loginAndLink(params: {
     password: params.password,
     telegramId: params.telegramId.toString(),
     telegramUsername: params.telegramUsername,
+    firstName: params.firstName,
+    lastName: params.lastName,
     referrerTelegramId: params.referrerTelegramId?.toString(),
     botHasPurchase: params.botHasPurchase,
     botCreatedAt: params.botCreatedAt.toISOString(),
