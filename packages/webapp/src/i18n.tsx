@@ -12,7 +12,7 @@ const translations = {
     "nav.manage": "Manage",
     "nav.learning": "Learning",
     "nav.tariffs": "Tariffs",
-    "nav.referral": "Referral",
+    "nav.referral": "Partner",
     "nav.admin": "Admin",
 
     // Profile tabs
@@ -103,19 +103,26 @@ const translations = {
 
     // Referral
     "referral.title": "Referral Program",
+    "referral.partnerTitle": "Partner Program",
     "referral.subtitle":
       "Invite friends and earn tokens for every new user who joins via your link.",
-    "referral.invited": "Friends invited",
+    "referral.invited": "Invited",
     "referral.perReferral": "Tokens per referral",
+    "referral.rewardPerSub": "per referral with subscription",
+    "referral.rewardInfo":
+      "Rewards are available to users with an active subscription or a course purchased on meta-box.ru. Invite via any link — the referral will be linked to you.",
+    "referral.partnerBalance": "Partner Balance",
+    "referral.totalEarned": "Total earned",
+    "referral.withdraw": "Withdrawal request",
     "referral.yourLink": "Your referral link",
     "referral.copy": "Copy",
     "referral.copied": "✓ Copied!",
     "referral.share": "Share",
     "referral.shareText": "Try Metabox — 70+ AI tools in one Telegram bot! 🚀",
-    "referral.botLink": "🤖 Bot referral link",
-    "referral.botLinkHint": "Friend joins the bot — you earn token bonuses",
-    "referral.metaboxLink": "🎓 Metabox referral link",
-    "referral.metaboxLinkHint": "Friend registers on the platform — you earn MLM bonuses",
+    "referral.botLink": "🤖 Bot link",
+    "referral.botLinkHint": "Friend joins the bot — you earn rewards",
+    "referral.metaboxLink": "🎓 Site link",
+    "referral.metaboxLinkHint": "Friend registers on the platform — you earn rewards",
     "referral.metaboxLinkCta": "Link Metabox account to get this link",
     "referral.howTitle": "How it works",
     "referral.step1": "Share your unique link with friends",
@@ -289,7 +296,7 @@ const translations = {
     "nav.manage": "Управление",
     "nav.learning": "Обучение",
     "nav.tariffs": "Тарифы",
-    "nav.referral": "Рефералы",
+    "nav.referral": "Партнёрка",
     "nav.admin": "Админ",
 
     // Profile tabs
@@ -378,20 +385,27 @@ const translations = {
     "tariffs.tokensTotal": "токенов всего",
     "tariffs.close": "Закрыть",
 
-    // Referral
+    // Referral / Partner
     "referral.title": "Реферальная программа",
+    "referral.partnerTitle": "Партнёрка",
     "referral.subtitle": "Приглашайте друзей и получайте токены за каждого нового пользователя.",
-    "referral.invited": "Друзей приглашено",
+    "referral.invited": "Приглашено",
     "referral.perReferral": "Токенов за реферала",
+    "referral.rewardPerSub": "за реферала с подпиской",
+    "referral.rewardInfo":
+      "Вознаграждения начисляются пользователям с активной подпиской на бота или с приобретённым курсом/пакетом курсов на meta-box.ru. Приглашайте по любой из ссылок — реферал будет закреплён за вами.",
+    "referral.partnerBalance": "Партнёрский баланс",
+    "referral.totalEarned": "Всего заработано",
+    "referral.withdraw": "Заявка на вывод",
     "referral.yourLink": "Ваша реферальная ссылка",
     "referral.copy": "Копировать",
     "referral.copied": "✓ Скопировано!",
     "referral.share": "Поделиться",
     "referral.shareText": "Попробуй Metabox — 70+ AI инструментов в одном Telegram-боте! 🚀",
     "referral.botLink": "🤖 Ссылка на бота",
-    "referral.botLinkHint": "Друг присоединяется к боту — вы получаете бонусные токены",
-    "referral.metaboxLink": "🎓 Ссылка на платформу Metabox",
-    "referral.metaboxLinkHint": "Друг регистрируется на платформе — вы получаете MLM-бонусы",
+    "referral.botLinkHint": "Друг присоединяется к боту — вы получаете вознаграждение",
+    "referral.metaboxLink": "🎓 Ссылка на сайт",
+    "referral.metaboxLinkHint": "Друг регистрируется на платформе — вы получаете вознаграждение",
     "referral.metaboxLinkCta": "Привяжите аккаунт Metabox, чтобы получить эту ссылку",
     "referral.howTitle": "Как это работает",
     "referral.step1": "Поделитесь своей ссылкой с друзьями",

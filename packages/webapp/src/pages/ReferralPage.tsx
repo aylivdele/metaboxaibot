@@ -29,62 +29,118 @@ function shareLink(url: string, text: string) {
   }
 }
 
+function fmtRub(n: number): string {
+  return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ₽";
+}
+
 export function ReferralPage({ onLinkMetabox }: { onLinkMetabox: () => void }) {
   const { t } = useI18n();
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [partnerData, setPartnerData] = useState<{
+    balance: number;
+    totalEarned: number;
+    totalWithdrawn: number;
+    userStatus: string;
+    referralCode: string | null;
+  } | null>(null);
 
   useEffect(() => {
     api.profile.get().then(setProfile).catch(console.error);
+    api.profile.partnerBalance().then(setPartnerData).catch(console.error);
   }, []);
 
-  const botLink = profile ? `https://t.me/${BOT_USERNAME}?start=ref_${profile.id}` : null;
-  const metaboxLink = profile?.metaboxReferralCode
-    ? `${METABOX_LANDING_URL}/?promo=${profile.metaboxReferralCode}`
-    : null;
+  const referralCode = partnerData?.referralCode || profile?.metaboxReferralCode;
+  const botLink = referralCode ? `https://t.me/${BOT_USERNAME}?start=ref_${referralCode}` : null;
+  const metaboxLink = referralCode ? `${METABOX_LANDING_URL}/?promo=${referralCode}` : null;
 
   const botCopy = useCopy();
   const metaboxCopy = useCopy();
 
+  const isLinked = !!profile?.metaboxUserId;
+  const hasPlaceholderEmail = profile?.metaboxUserId && !profile.metaboxReferralCode;
+
+  // Min reward: 1 PV × 2.4 × 135 = 324₽
+  const minReward = 324;
+
+  const handleWithdraw = async () => {
+    if (!isLinked || hasPlaceholderEmail) {
+      onLinkMetabox();
+      return;
+    }
+    try {
+      const { ssoUrl } = await api.profile.metaboxSso();
+      // Redirect to finance page
+      const financeUrl = ssoUrl.includes("?")
+        ? `${ssoUrl}&redirect=/partner/finance`
+        : `${ssoUrl}?redirect=/partner/finance`;
+      window.open(financeUrl, "_blank");
+    } catch {
+      // Fallback
+      onLinkMetabox();
+    }
+  };
+
   return (
     <div className="page">
       <div className="page-header">
-        <h2>{t("referral.title")}</h2>
-        <p className="page-subtitle">{t("referral.subtitle")}</p>
+        <h2>{t("referral.partnerTitle")}</h2>
       </div>
 
+      {/* Partner balance */}
+      <div className="partner-balance-card">
+        <div className="partner-balance-card__label">{t("referral.partnerBalance")}</div>
+        <div className="partner-balance-card__value">
+          {partnerData ? fmtRub(partnerData.balance) : "—"}
+        </div>
+        {partnerData && partnerData.totalEarned > 0 && (
+          <div className="partner-balance-card__earned">
+            {t("referral.totalEarned")}: {fmtRub(partnerData.totalEarned)}
+          </div>
+        )}
+        <button
+          className="btn btn--primary partner-balance-card__withdraw"
+          onClick={handleWithdraw}
+        >
+          {t("referral.withdraw")}
+        </button>
+      </div>
+
+      {/* Stats */}
       <div className="referral-stats">
         <div className="referral-stat">
           <div className="referral-stat__value">{profile?.referralCount ?? "—"}</div>
           <div className="referral-stat__label">{t("referral.invited")}</div>
         </div>
         <div className="referral-stat">
-          <div className="referral-stat__value">0.5</div>
-          <div className="referral-stat__label">{t("referral.perReferral")}</div>
+          <div className="referral-stat__value">от {minReward.toLocaleString("ru-RU")} ₽</div>
+          <div className="referral-stat__label">{t("referral.rewardPerSub")}</div>
         </div>
       </div>
 
-      {/* Bot referral link */}
-      <div className="referral-card">
-        <div className="referral-card__type">{t("referral.botLink")}</div>
-        <div className="referral-card__label">{t("referral.botLinkHint")}</div>
-        <div className="referral-card__link">{botLink ?? t("common.loading")}</div>
-        <div className="referral-card__actions">
-          <button
-            className="btn btn--secondary"
-            onClick={() => botLink && botCopy.copy(botLink)}
-            disabled={!botLink}
-          >
-            {botCopy.copied ? t("referral.copied") : t("referral.copy")}
-          </button>
-          <button
-            className="btn btn--primary"
-            onClick={() => botLink && shareLink(botLink, t("referral.shareText"))}
-            disabled={!botLink}
-          >
-            {t("referral.share")}
-          </button>
-        </div>
+      {/* Info about rewards */}
+      <div className="referral-info">
+        <p>{t("referral.rewardInfo")}</p>
       </div>
+
+      {/* Bot referral link */}
+      {botLink && (
+        <div className="referral-card">
+          <div className="referral-card__type">{t("referral.botLink")}</div>
+          <div className="referral-card__label">{t("referral.botLinkHint")}</div>
+          <div className="referral-card__link">{botLink}</div>
+          <div className="referral-card__actions">
+            <button className="btn btn--secondary" onClick={() => botCopy.copy(botLink)}>
+              {botCopy.copied ? t("referral.copied") : t("referral.copy")}
+            </button>
+            <button
+              className="btn btn--primary"
+              onClick={() => shareLink(botLink, t("referral.shareText"))}
+            >
+              {t("referral.share")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Metabox referral link */}
       <div className="referral-card">
@@ -110,15 +166,6 @@ export function ReferralPage({ onLinkMetabox }: { onLinkMetabox: () => void }) {
             {t("referral.metaboxLinkCta")}
           </button>
         )}
-      </div>
-
-      <div className="referral-how">
-        <div className="section-title">{t("referral.howTitle")}</div>
-        <ol className="referral-steps">
-          <li>{t("referral.step1")}</li>
-          <li>{t("referral.step2")}</li>
-          <li>{t("referral.step3")}</li>
-        </ol>
       </div>
     </div>
   );

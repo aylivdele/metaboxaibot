@@ -25,6 +25,7 @@ export {
   lookupByTelegramId,
   getAiBotCatalog,
   createSubscriptionInvoice,
+  resolveReferralCode,
 } from "./metabox-bridge.service.js";
 export type {
   AiBotProduct,
