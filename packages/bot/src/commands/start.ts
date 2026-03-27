@@ -93,6 +93,30 @@ export async function handleStart(ctx: BotContext): Promise<void> {
         return;
       }
 
+      // ── MERGE_BLOCKED (row 13): both mentors + both have purchases ──
+      if (apiErr.code === "MERGE_BLOCKED" && apiErr.data) {
+        const d = apiErr.data as {
+          siteMentor: { name: string; contact: string };
+          botMentor: { name: string; contact: string };
+        };
+        const siteName = d.siteMentor?.contact
+          ? `${d.siteMentor.name} (${d.siteMentor.contact})`
+          : d.siteMentor?.name || "Неизвестен";
+        const botName = d.botMentor?.contact
+          ? `${d.botMentor.name} (${d.botMentor.contact})`
+          : d.botMentor?.name || "Неизвестен";
+
+        await ctx.reply(
+          `⛔ *Невозможно объединить аккаунты*\n\n` +
+            `У вас разные наставники и на обоих аккаунтах есть покупки.\n\n` +
+            `Наставник на сайте: *${siteName}*\n` +
+            `Наставник в боте: *${botName}*\n\n` +
+            `Если у вас есть вопросы — обратитесь в поддержку: @${config.supportTg}`,
+          { parse_mode: "Markdown" },
+        );
+        return;
+      }
+
       let msg = "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.";
       if (apiErr.code === "TELEGRAM_MISMATCH") {
         msg = `⚠️ Этот аккаунт на Metabox уже привязан к другому Telegram.\n\nПереключитесь на нужный Telegram-аккаунт и попробуйте снова.\n\nЕсли это ошибка — напишите в поддержку: @${config.supportTg}`;
