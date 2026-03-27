@@ -62,20 +62,23 @@ function AppContent() {
   const isAdmin = profile?.role === "ADMIN" || profile?.role === "MODERATOR";
 
   const handleLearning = async () => {
-    if (profile?.metaboxUserId) {
-      try {
+    // Refresh profile to check if metaboxUserId is still valid
+    try {
+      const fresh = await api.profile.get();
+      setProfile(fresh);
+      if (fresh?.metaboxUserId) {
         const { ssoUrl } = await api.profile.metaboxSso();
         const tg = (
           window as Window & { Telegram?: { WebApp?: { openLink?: (u: string) => void } } }
         ).Telegram?.WebApp;
         if (tg?.openLink) tg.openLink(ssoUrl);
         else window.open(ssoUrl, "_blank");
-      } catch {
-        setPage("linkMetabox");
+        return;
       }
-    } else {
-      setPage("linkMetabox");
+    } catch {
+      // SSO failed or profile refresh failed
     }
+    setPage("linkMetabox");
   };
 
   if (error) {
