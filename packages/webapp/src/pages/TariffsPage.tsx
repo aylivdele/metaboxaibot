@@ -234,28 +234,29 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
                     </div>
                   )}
 
-                  <div className="plan-card__pricing">
-                    <div className="plan-card__actual-price">
-                      {actualPrice.toLocaleString("ru-RU")} {"₽"}
+                  <div className="plan-card__pricing-row">
+                    <div className="plan-card__pricing">
+                      <div className="plan-card__actual-price">
+                        {actualPrice.toLocaleString("ru-RU")} ₽
+                      </div>
+                      {discount && (
+                        <div className="plan-card__old-price">
+                          {basePrice.toLocaleString("ru-RU")} ₽
+                        </div>
+                      )}
+                      {discount && (
+                        <div className="plan-card__save">
+                          -{Math.round(((basePrice - actualPrice) / basePrice) * 100)}%
+                        </div>
+                      )}
                     </div>
-                    {discount && (
-                      <div className="plan-card__old-price">
-                        {basePrice.toLocaleString("ru-RU")} {"₽"}
-                      </div>
-                    )}
-                    {discount && (
-                      <div className="plan-card__save">
-                        Экономия {(basePrice - actualPrice).toLocaleString("ru-RU")} ₽
-                      </div>
-                    )}
+                    <button
+                      className="plan-card__btn"
+                      onClick={() => openSubModal(sub, currentPeriod)}
+                    >
+                      {t("tariffs.buy")}
+                    </button>
                   </div>
-
-                  <button
-                    className="plan-card__btn"
-                    onClick={() => openSubModal(sub, currentPeriod)}
-                  >
-                    {t("tariffs.buy")}
-                  </button>
                 </div>
               );
             })}
