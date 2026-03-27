@@ -940,6 +940,68 @@ input::placeholder {
   pointer-events: none;
 }
 
+/* Subscription card with periods */
+.plan-card--sub {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.plan-card__periods {
+  display: flex;
+  gap: 6px;
+}
+.plan-card__period-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--bg-card);
+  color: var(--text-hint);
+  border: 1.5px solid var(--border);
+  transition: all 0.2s var(--ease);
+  position: relative;
+  text-align: center;
+}
+.plan-card__period-btn--active {
+  background: var(--accent-gradient);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-accent);
+}
+.plan-card__period-discount {
+  display: block;
+  font-size: 10px;
+  color: #22c55e;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.plan-card__period-btn--active .plan-card__period-discount {
+  color: #bbf7d0;
+}
+.plan-card__pricing {
+  text-align: center;
+}
+.plan-card__actual-price {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.plan-card__old-price {
+  font-size: 13px;
+  color: var(--text-hint);
+  text-decoration: line-through;
+  margin-top: 2px;
+}
+.plan-card__save {
+  font-size: 11px;
+  color: #22c55e;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
 .payment-notice {
   padding: 12px 16px;
   border-radius: var(--radius);

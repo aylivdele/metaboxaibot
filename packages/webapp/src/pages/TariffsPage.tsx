@@ -41,7 +41,7 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
   const { t } = useI18n();
   const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
-  const [period, setPeriod] = useState<Period>("M1");
+  const [subPeriods, setSubPeriods] = useState<Record<string, Period>>({});
   const [buying, setBuying] = useState(false);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
@@ -56,23 +56,20 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
   }, []);
 
   // Compute available periods from subscriptions (union of all available periods)
-  const availablePeriods = useMemo<Period[]>(() => {
-    if (!catalog || catalog.subscriptions.length === 0) return ["M1"];
-    const set = new Set<Period>();
-    for (const sub of catalog.subscriptions) {
-      for (const p of ALL_PERIODS) {
-        if (sub.periods[p]) set.add(p);
-      }
-    }
-    return ALL_PERIODS.filter((p) => set.has(p));
-  }, [catalog]);
+  // Helper: get available periods for a specific subscription
+  const getSubPeriods = (sub: CatalogSubscription): Period[] => {
+    return ALL_PERIODS.filter((p) => !!sub.periods[p]);
+  };
 
-  // Reset period to M1 if the current selection is no longer available
-  useEffect(() => {
-    if (!availablePeriods.includes(period)) {
-      setPeriod("M1");
-    }
-  }, [availablePeriods, period]);
+  const getSubPeriod = (subId: string, sub: CatalogSubscription): Period => {
+    const selected = subPeriods[subId];
+    if (selected && sub.periods[selected]) return selected;
+    return "M1";
+  };
+
+  const setSubPeriod = (subId: string, p: Period) => {
+    setSubPeriods((prev) => ({ ...prev, [subId]: p }));
+  };
 
   const openModal = (state: ModalState) => {
     setModal(state);
@@ -137,10 +134,10 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
     setModal(null);
   };
 
-  const openSubModal = (sub: CatalogSubscription) => {
-    const p = sub.periods[period];
+  const openSubModal = (sub: CatalogSubscription, selectedPeriod: Period) => {
+    const p = sub.periods[selectedPeriod];
     if (!p) return;
-    const months = PERIOD_MONTHS[period];
+    const months = PERIOD_MONTHS[selectedPeriod];
     openModal({
       type: "subscription",
       id: sub.id,
@@ -148,7 +145,7 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
       tokens: sub.tokens * months,
       priceRub: p.priceRub,
       stars: p.stars,
-      period,
+      period: selectedPeriod,
     });
   };
 
@@ -192,37 +189,72 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
         <>
           <h3 className="section-title">{t("tariffs.subscriptions")}</h3>
 
-          {availablePeriods.length > 1 && (
-            <div className="period-selector">
-              {availablePeriods.map((p) => (
-                <button
-                  key={p}
-                  className={`period-selector__btn${p === period ? " period-selector__btn--active" : ""}`}
-                  onClick={() => setPeriod(p)}
-                >
-                  {t(`tariffs.period.${p}`)}
-                </button>
-              ))}
-            </div>
-          )}
-
           <div className="plans-grid">
             {catalog.subscriptions.map((sub) => {
-              const p = sub.periods[period];
+              const periods = getSubPeriods(sub);
+              const currentPeriod = getSubPeriod(sub.id, sub);
+              const p = sub.periods[currentPeriod];
               if (!p) return null;
-              const months = PERIOD_MONTHS[period];
+              const months = PERIOD_MONTHS[currentPeriod];
+              const basePrice = Number(sub.periods.M1?.priceRub ?? 0) * months;
+              const actualPrice = Number(p.priceRub);
+              const discount = currentPeriod !== "M1" && basePrice > actualPrice;
+
               return (
-                <div key={sub.id} className="plan-card">
+                <div key={sub.id} className="plan-card plan-card--sub">
                   <div className="plan-card__info">
                     <div className="plan-card__label">{sub.name}</div>
                     <div className="plan-card__tokens">
                       {"⚡"} {(sub.tokens * months).toLocaleString("ru-RU")} токенов
                     </div>
                   </div>
-                  <div className="plan-card__price">
-                    {Number(p.priceRub).toLocaleString("ru-RU")} {"₽"}
+
+                  {periods.length > 1 && (
+                    <div className="plan-card__periods">
+                      {periods.map((pd) => {
+                        const disc = pd !== "M1" ? sub.periods[pd] : null;
+                        const m1Price = Number(sub.periods.M1?.priceRub ?? 0);
+                        const pdPrice = Number(sub.periods[pd]?.priceRub ?? 0);
+                        const pctOff =
+                          m1Price > 0 && pd !== "M1"
+                            ? Math.round((1 - pdPrice / (m1Price * PERIOD_MONTHS[pd])) * 100)
+                            : 0;
+                        return (
+                          <button
+                            key={pd}
+                            className={`plan-card__period-btn${pd === currentPeriod ? " plan-card__period-btn--active" : ""}`}
+                            onClick={() => setSubPeriod(sub.id, pd)}
+                          >
+                            {t(`tariffs.period.${pd}`)}
+                            {pctOff > 0 && (
+                              <span className="plan-card__period-discount">-{pctOff}%</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="plan-card__pricing">
+                    <div className="plan-card__actual-price">
+                      {actualPrice.toLocaleString("ru-RU")} {"₽"}
+                    </div>
+                    {discount && (
+                      <div className="plan-card__old-price">
+                        {basePrice.toLocaleString("ru-RU")} {"₽"}
+                      </div>
+                    )}
+                    {discount && (
+                      <div className="plan-card__save">
+                        Экономия {(basePrice - actualPrice).toLocaleString("ru-RU")} ₽
+                      </div>
+                    )}
                   </div>
-                  <button className="plan-card__btn" onClick={() => openSubModal(sub)}>
+
+                  <button
+                    className="plan-card__btn"
+                    onClick={() => openSubModal(sub, currentPeriod)}
+                  >
                     {t("tariffs.buy")}
                   </button>
                 </div>
