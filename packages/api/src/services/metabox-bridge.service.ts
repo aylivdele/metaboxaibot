@@ -163,6 +163,9 @@ export async function verifyLinkToken(
   token: string,
   telegramId: bigint,
   botInfo?: {
+    telegramUsername?: string;
+    firstName?: string;
+    lastName?: string;
     referrerTelegramId?: bigint | null;
     botHasPurchase: boolean;
     botCreatedAt: Date;
@@ -177,6 +180,9 @@ export async function verifyLinkToken(
   return post("/verify-link-token", {
     token,
     telegramId: telegramId.toString(),
+    telegramUsername: botInfo?.telegramUsername,
+    firstName: botInfo?.firstName,
+    lastName: botInfo?.lastName,
     referrerTelegramId: botInfo?.referrerTelegramId?.toString(),
     botHasPurchase: botInfo?.botHasPurchase,
     botCreatedAt: botInfo?.botCreatedAt.toISOString(),

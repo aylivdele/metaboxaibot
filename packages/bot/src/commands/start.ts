@@ -31,6 +31,9 @@ export async function handleStart(ctx: BotContext): Promise<void> {
         token,
         ctx.user.id,
         {
+          telegramUsername: ctx.from?.username,
+          firstName: ctx.from?.first_name,
+          lastName: ctx.from?.last_name,
           referrerTelegramId: ctx.user.referredById,
           botHasPurchase: !!botPurchase,
           botCreatedAt: ctx.user.createdAt,
