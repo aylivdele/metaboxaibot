@@ -65,10 +65,10 @@ export class HeyGenAdapter implements VideoAdapter {
       const text = await uploadRes.text();
       throw new Error(`HeyGen asset upload failed: ${uploadRes.status} ${text}`);
     }
-    const uploadData = (await uploadRes.json()) as { data?: { image_key?: string } };
-    const imageKey = uploadData.data?.image_key;
-    if (!imageKey) throw new Error("HeyGen: no image_key in asset upload response");
-    return imageKey;
+    const uploadData = (await uploadRes.json()) as { data?: { id?: string; image_key?: string } };
+    const assetId = uploadData.data?.id;
+    if (!assetId) throw new Error(`HeyGen: no asset id in upload response: ${JSON.stringify(uploadData)}`);
+    return assetId;
   }
 
   /** Resolve URL: try fresh presigned URL from S3 first, then fall back to stored URL. */
