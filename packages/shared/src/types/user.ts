@@ -24,7 +24,8 @@ export type BotState =
   | "AUDIO_SECTION"
   | "AUDIO_ACTIVE"
   | "VIDEO_SECTION"
-  | "VIDEO_ACTIVE";
+  | "VIDEO_ACTIVE"
+  | "HEYGEN_AVATAR_PHOTO";
 
 export type Section = "gpt" | "design" | "audio" | "video";
 

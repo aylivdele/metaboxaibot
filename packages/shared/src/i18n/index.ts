@@ -94,6 +94,8 @@ export interface Translations {
     hintDid: string;
     hintHiggsfield: string;
     hintVideoDefault: string;
+    avatarCreationCancelled: string;
+    avatarCreationStarted: string;
   };
   errors: {
     noTool: string;

@@ -282,6 +282,10 @@ const translations = {
     "uploads.voiceActive": "Active",
     "uploads.officialAvatars": "Official avatars",
     "uploads.myPhotos": "My photos",
+    "uploads.myAvatars": "My avatars",
+    "uploads.createAvatar": "➕ Create avatar",
+    "uploads.avatarCreating": "Creating...",
+    "uploads.emptyAvatars": 'No avatars yet. Click "Create avatar" to start.',
 
     // Auth errors
     "auth.tokenExpired": "Link expired. Press the «Profile» button in the bot menu again.",
@@ -563,6 +567,10 @@ const translations = {
     "uploads.voiceActive": "Активен",
     "uploads.officialAvatars": "Официальные",
     "uploads.myPhotos": "Мои фото",
+    "uploads.myAvatars": "Мои аватары",
+    "uploads.createAvatar": "➕ Создать аватар",
+    "uploads.avatarCreating": "Создаётся...",
+    "uploads.emptyAvatars": "Аватаров пока нет. Нажмите «Создать аватар».",
 
     // Auth errors
     "auth.tokenExpired":

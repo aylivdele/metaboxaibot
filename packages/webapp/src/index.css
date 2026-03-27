@@ -2567,6 +2567,51 @@ input::placeholder {
   width: 100%;
 }
 
+.avatar-picker__item--disabled {
+  opacity: 0.6;
+  cursor: default;
+  pointer-events: none;
+}
+
+.avatar-picker__delete-btn {
+  margin-top: 2px;
+  padding: 1px 6px;
+  font-size: 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.avatar-picker__delete-btn:hover {
+  border-color: #e05555;
+  color: #e05555;
+}
+
+.voice-picker__create-btn {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1.5px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.voice-picker__create-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.voice-picker__create-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .settings-panel__color-hex {
   font-size: 13px;
   font-family: monospace;

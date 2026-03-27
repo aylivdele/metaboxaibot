@@ -29,6 +29,8 @@ import {
   handleNewVideoDialog,
   handleVideoAvatars,
   handleVideoLipSync,
+  handleAvatarPhotoCapture,
+  handleHeygenAvatarCancel,
 } from "./scenes/video.js";
 import { handleAudioSubSection, handleAudioMessage } from "./scenes/audio.js";
 import { handleSendOriginal } from "./handlers/send-original.handler.js";
@@ -80,6 +82,9 @@ export function createBot(token: string): Bot<BotContext> {
 
   // ── Send original file callback ───────────────────────────────────────────
   bot.callbackQuery(/^orig_/, handleSendOriginal);
+
+  // ── HeyGen avatar creation cancel ────────────────────────────────────────
+  bot.callbackQuery("heygen_avatar_cancel", handleHeygenAvatarCancel);
 
   // ── Reply keyboard — menu navigation ─────────────────────────────────────
   // Translation keys are resolved at runtime after i18n middleware runs.
@@ -151,6 +156,10 @@ export function createBot(token: string): Bot<BotContext> {
       if (ctx.message?.video) return handleVideoVideo(ctx);
       if (ctx.message?.voice) return handleVideoVoice(ctx);
       return handleVideoMessage(ctx);
+    }
+    if (state?.state === "HEYGEN_AVATAR_PHOTO") {
+      if (ctx.message?.photo) return handleAvatarPhotoCapture(ctx);
+      return; // ignore non-photo messages while waiting for avatar photo
     }
     if (state?.state === "AUDIO_ACTIVE") return handleAudioMessage(ctx);
 

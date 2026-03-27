@@ -6,3 +6,6 @@ export type { VideoJobData } from "./video.queue.js";
 
 export { getAudioQueue } from "./audio.queue.js";
 export type { AudioJobData } from "./audio.queue.js";
+
+export { getAvatarQueue } from "./avatar.queue.js";
+export type { AvatarJobData } from "./avatar.queue.js";

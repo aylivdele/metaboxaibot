@@ -47,6 +47,14 @@
     "./utils/mp4-duration": {
       "types": "./src/utils/mp4-duration.ts",
       "default": "./dist/utils/mp4-duration.js"
+    },
+    "./services/user-avatar": {
+      "types": "./src/services/user-avatar.service.ts",
+      "default": "./dist/services/user-avatar.service.js"
+    },
+    "./ai/avatar/heygen": {
+      "types": "./src/ai/avatar/heygen.avatar.adapter.ts",
+      "default": "./dist/ai/avatar/heygen.avatar.adapter.js"
     }
   },
   "dependencies": {

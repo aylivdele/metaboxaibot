@@ -34,6 +34,7 @@ import { heygenAvatarsRoutes } from "./routes/heygen-avatars.js";
 import { didVoicesRoutes } from "./routes/d-id-voices.js";
 import { uploadsRoutes } from "./routes/uploads.js";
 import { higgsfieldMotionsRoutes } from "./routes/higgsfield-motions.js";
+import { userAvatarsRoutes } from "./routes/user-avatars.js";
 import { startRateScheduler } from "./services/exchange-rate.service.js";
 import { config } from "@metabox/shared";
 
@@ -113,6 +114,7 @@ await server.register(heygenAvatarsRoutes);
 await server.register(didVoicesRoutes);
 await server.register(uploadsRoutes);
 await server.register(higgsfieldMotionsRoutes);
+await server.register(userAvatarsRoutes);
 
 // Start USDT/RUB exchange rate scheduler (fetches from Binance 4× daily)
 startRateScheduler();

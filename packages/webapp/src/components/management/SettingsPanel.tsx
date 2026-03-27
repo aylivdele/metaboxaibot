@@ -108,9 +108,10 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
             {def.type === "avatar-picker" && (
               <HeyGenAvatarPicker
                 avatarId={String(values["avatar_id"] ?? "")}
-                avatarPhotoUrl={String(values["avatar_photo_url"] ?? "")}
-                avatarPhotoS3Key={String(values["avatar_photo_s3key"] ?? "")}
-                onChange={onChange}
+                talkingPhotoId={String(values["talking_photo_id"] ?? "")}
+                onChange={(changes) => {
+                  Object.entries(changes).forEach(([k, v]) => onChange(k, v));
+                }}
               />
             )}
             {def.type === "motion-picker" && (

@@ -2,10 +2,11 @@ import "dotenv/config";
 import { config } from "@metabox/shared";
 import { Worker } from "bullmq";
 import { Redis } from "ioredis";
-import type { ImageJobData, VideoJobData, AudioJobData } from "@metabox/api/queues";
+import type { ImageJobData, VideoJobData, AudioJobData, AvatarJobData } from "@metabox/api/queues";
 import { processImageJob } from "./processors/image.processor.js";
 import { processVideoJob } from "./processors/video.processor.js";
 import { processAudioJob } from "./processors/audio.processor.js";
+import { processAvatarJob } from "./processors/avatar.processor.js";
 import { checkProviderBalances } from "./monitors/balance.monitor.js";
 import { logger } from "./logger.js";
 
@@ -52,7 +53,20 @@ audioWorker.on("failed", (job, err) => {
   logger.error({ jobId: job?.id, err }, "Audio job failed");
 });
 
-logger.info("Worker started — listening on image, video and audio queues");
+const avatarWorker = new Worker<AvatarJobData>("avatar", processAvatarJob, {
+  connection,
+  concurrency: 3,
+});
+
+avatarWorker.on("completed", (job) => {
+  logger.info({ jobId: job.id }, "Avatar job completed");
+});
+
+avatarWorker.on("failed", (job, err) => {
+  logger.error({ jobId: job?.id, err }, "Avatar job failed");
+});
+
+logger.info("Worker started — listening on image, video, audio and avatar queues");
 
 // ── Balance monitor ───────────────────────────────────────────────────────────
 if (config.alerts.chatId) {
@@ -66,12 +80,22 @@ if (config.alerts.chatId) {
 
   process.on("SIGTERM", async () => {
     clearInterval(balanceTimer);
-    await Promise.all([imageWorker.close(), videoWorker.close(), audioWorker.close()]);
+    await Promise.all([
+      imageWorker.close(),
+      videoWorker.close(),
+      audioWorker.close(),
+      avatarWorker.close(),
+    ]);
     process.exit(0);
   });
 } else {
   process.on("SIGTERM", async () => {
-    await Promise.all([imageWorker.close(), videoWorker.close(), audioWorker.close()]);
+    await Promise.all([
+      imageWorker.close(),
+      videoWorker.close(),
+      audioWorker.close(),
+      avatarWorker.close(),
+    ]);
     process.exit(0);
   });
 }

@@ -1,33 +1,31 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
-import type { HeyGenAvatar, UserUpload } from "../../types.js";
+import type { HeyGenAvatar, UserAvatar } from "../../types.js";
 
 interface HeyGenAvatarPickerProps {
   /** Currently selected official avatar_id (empty string = none) */
   avatarId: string;
-  /** Currently selected user photo URL stored as avatar_photo_url (empty string = none) */
-  avatarPhotoUrl: string;
-  /** S3 key of the selected photo — used to identify selection reliably across URL refreshes */
-  avatarPhotoS3Key: string;
-  /** Called when user picks an official avatar or a photo upload */
-  onChange: (key: string, value: unknown) => void;
+  /** Currently selected pre-created avatar talking_photo_id (empty string = none) */
+  talkingPhotoId: string;
+  /** Called when user picks an official avatar or a pre-created avatar */
+  onChange: (changes: Record<string, unknown>) => void;
 }
 
 export function HeyGenAvatarPicker({
   avatarId,
-  avatarPhotoUrl,
-  avatarPhotoS3Key,
+  talkingPhotoId,
   onChange,
 }: HeyGenAvatarPickerProps) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<"official" | "uploads">(
-    avatarPhotoUrl || avatarPhotoS3Key ? "uploads" : "official",
+  const [tab, setTab] = useState<"official" | "myAvatars">(
+    talkingPhotoId ? "myAvatars" : "official",
   );
   const [avatars, setAvatars] = useState<HeyGenAvatar[]>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(false);
-  const [uploads, setUploads] = useState<UserUpload[]>([]);
-  const [uploadsLoading, setUploadsLoading] = useState(false);
+  const [myAvatars, setMyAvatars] = useState<UserAvatar[]>([]);
+  const [myAvatarsLoading, setMyAvatarsLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [genderFilter, setGenderFilter] = useState("all");
 
   useEffect(() => {
@@ -39,26 +37,58 @@ export function HeyGenAvatarPicker({
         .catch(() => setAvatars([]))
         .finally(() => setAvatarsLoading(false));
     }
-    if (tab === "uploads") {
-      setUploadsLoading(true);
-      api.uploads
-        .list("avatar_photo")
-        .then(setUploads)
-        .catch(() => setUploads([]))
-        .finally(() => setUploadsLoading(false));
+    if (tab === "myAvatars") {
+      setMyAvatarsLoading(true);
+      api.userAvatars
+        .list("heygen")
+        .then(setMyAvatars)
+        .catch(() => setMyAvatars([]))
+        .finally(() => setMyAvatarsLoading(false));
     }
   }, [tab, avatars.length]);
 
   const selectOfficial = (id: string) => {
-    onChange("avatar_id", id);
-    onChange("avatar_photo_url", "");
-    onChange("avatar_photo_s3key", "");
+    onChange({
+      avatar_id: id,
+      talking_photo_id: "",
+      avatar_photo_url: "",
+      avatar_photo_s3key: "",
+    });
   };
 
-  const selectPhoto = (upload: UserUpload) => {
-    onChange("avatar_photo_url", upload.url);
-    onChange("avatar_photo_s3key", upload.s3Key ?? "");
-    onChange("avatar_id", "");
+  const selectMyAvatar = (avatar: UserAvatar) => {
+    if (avatar.status !== "ready" || !avatar.externalId) return;
+    onChange({
+      talking_photo_id: avatar.externalId,
+      avatar_id: "",
+      avatar_photo_url: "",
+      avatar_photo_s3key: "",
+    });
+  };
+
+  const handleCreateAvatar = async () => {
+    setCreating(true);
+    try {
+      await api.userAvatars.startCreation("heygen");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteAvatar = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    await api.userAvatars.delete(id).catch(() => void 0);
+    setMyAvatars((prev) => prev.filter((a) => a.id !== id));
+    // Clear selection if the deleted avatar was selected
+    const deleted = myAvatars.find((a) => a.id === id);
+    if (deleted?.externalId && deleted.externalId === talkingPhotoId) {
+      onChange({
+        talking_photo_id: "",
+        avatar_id: "",
+        avatar_photo_url: "",
+        avatar_photo_s3key: "",
+      });
+    }
   };
 
   const filtered = avatars.filter((a) => genderFilter === "all" || a.gender === genderFilter);
@@ -73,10 +103,10 @@ export function HeyGenAvatarPicker({
           {t("uploads.officialAvatars")}
         </button>
         <button
-          className={`voice-picker__tab${tab === "uploads" ? " voice-picker__tab--active" : ""}`}
-          onClick={() => setTab("uploads")}
+          className={`voice-picker__tab${tab === "myAvatars" ? " voice-picker__tab--active" : ""}`}
+          onClick={() => setTab("myAvatars")}
         >
-          {t("uploads.myPhotos")}
+          {t("uploads.myAvatars")}
         </button>
       </div>
 
@@ -100,7 +130,7 @@ export function HeyGenAvatarPicker({
             </div>
             <div className="avatar-picker__grid">
               {filtered.map((avatar) => {
-                const isSelected = avatarId === avatar.avatar_id && !avatarPhotoUrl;
+                const isSelected = avatarId === avatar.avatar_id && !talkingPhotoId;
                 return (
                   <div
                     key={avatar.avatar_id}
@@ -127,30 +157,64 @@ export function HeyGenAvatarPicker({
           </>
         ))}
 
-      {tab === "uploads" &&
-        (uploadsLoading ? (
-          <div className="voice-picker__loading">Загрузка…</div>
-        ) : uploads.length === 0 ? (
-          <div className="voice-picker__empty">{t("uploads.emptyPhotos")}</div>
-        ) : (
-          <div className="avatar-picker__grid">
-            {uploads.map((upload) => {
-              const isSelected = upload.s3Key
-                ? avatarPhotoS3Key === upload.s3Key
-                : avatarPhotoUrl === upload.url;
-              return (
-                <div
-                  key={upload.id}
-                  className={`avatar-picker__item${isSelected ? " avatar-picker__item--selected" : ""}`}
-                  onClick={() => selectPhoto(upload)}
-                >
-                  <img className="avatar-picker__img" src={upload.url} alt={upload.name} />
-                  <span className="avatar-picker__name">{upload.name}</span>
-                </div>
-              );
-            })}
-          </div>
-        ))}
+      {tab === "myAvatars" && (
+        <>
+          <button
+            className="voice-picker__create-btn"
+            onClick={handleCreateAvatar}
+            disabled={creating}
+          >
+            {creating ? "…" : t("uploads.createAvatar")}
+          </button>
+
+          {myAvatarsLoading ? (
+            <div className="voice-picker__loading">Загрузка…</div>
+          ) : myAvatars.length === 0 ? (
+            <div className="voice-picker__empty">{t("uploads.emptyAvatars")}</div>
+          ) : (
+            <div className="avatar-picker__grid">
+              {myAvatars.map((avatar) => {
+                const isReady = avatar.status === "ready";
+                const isSelected = isReady && avatar.externalId === talkingPhotoId;
+                return (
+                  <div
+                    key={avatar.id}
+                    className={`avatar-picker__item${isSelected ? " avatar-picker__item--selected" : ""}${!isReady ? " avatar-picker__item--disabled" : ""}`}
+                    onClick={() => selectMyAvatar(avatar)}
+                  >
+                    {avatar.previewUrl ? (
+                      <img
+                        className="avatar-picker__img"
+                        src={avatar.previewUrl}
+                        alt={avatar.name}
+                      />
+                    ) : (
+                      <div className="avatar-picker__img avatar-picker__img--placeholder">
+                        {avatar.status === "creating"
+                          ? "⏳"
+                          : avatar.status === "failed"
+                            ? "❌"
+                            : "👤"}
+                      </div>
+                    )}
+                    <span className="avatar-picker__name">
+                      {avatar.status === "creating" ? t("uploads.avatarCreating") : avatar.name}
+                    </span>
+                    {isReady && (
+                      <button
+                        className="avatar-picker__delete-btn"
+                        onClick={(e) => handleDeleteAvatar(e, avatar.id)}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

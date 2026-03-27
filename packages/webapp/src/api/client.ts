@@ -13,6 +13,7 @@ import type {
   HiggsFieldMotion,
   DIDVoice,
   UserUpload,
+  UserAvatar,
 } from "../types.js";
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
@@ -246,6 +247,23 @@ export const api = {
 
   didVoices: {
     list: () => request<DIDVoice[]>("/d-id-voices"),
+  },
+
+  userAvatars: {
+    list: (provider?: string) =>
+      request<UserAvatar[]>(provider ? `/user-avatars?provider=${provider}` : "/user-avatars"),
+    startCreation: (provider: string) =>
+      request<{ ok: boolean }>("/user-avatars/start-creation", {
+        method: "POST",
+        body: JSON.stringify({ provider }),
+      }),
+    rename: (id: string, name: string) =>
+      request<UserAvatar>(`/user-avatars/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/user-avatars/${id}`, { method: "DELETE" }),
   },
 
   uploads: {

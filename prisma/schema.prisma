@@ -38,6 +38,7 @@ model User {
   transactions TokenTransaction[]
   userState    UserState?
   uploads      UserUpload[]
+  userAvatars  UserAvatar[]
 
   @@map("users")
 }
@@ -202,6 +203,28 @@ model UserUpload {
 
   @@index([userId])
   @@map("user_uploads")
+}
+
+// ─────────────────────────────────────────────
+// Пользовательские аватары (кастомные, создаются через провайдеры)
+// ─────────────────────────────────────────────
+model UserAvatar {
+  id         String   @id @default(cuid())
+  userId     BigInt
+  provider   String   // "heygen" | расширяется для других провайдеров
+  name       String
+  externalId String?  // talking_photo_id (заполняется когда аватар готов)
+  previewUrl String?
+  status     String   @default("creating") // "creating" | "ready" | "failed"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, provider])
+  @@map("user_avatars")
 }
 
 // ─────────────────────────────────────────────

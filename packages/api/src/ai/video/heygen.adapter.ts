@@ -1,6 +1,7 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { getFileUrl } from "../../services/s3.service.js";
+import { logger } from "../../logger.js";
 
 const HEYGEN_API = "https://api.heygen.com";
 const HEYGEN_UPLOAD = "https://upload.heygen.com";
@@ -104,14 +105,14 @@ export class HeyGenAdapter implements VideoAdapter {
       const pollData = (await pollRes.json()) as {
         data?: { status?: string; avatar_list?: Array<{ id: string }> };
       };
-      console.log(`[HeyGen Adapter] Response from heygen ${pollData}`);
+      logger.info(`[HeyGen Adapter] Response from heygen ${pollData}`);
       const status = pollData.data?.status;
       if (status === "completed") {
         // Use first look id if available, else fall back to groupId
         return pollData.data?.avatar_list?.[0]?.id ?? groupId;
       }
       if (status === "failed") throw new Error("HeyGen: avatar group processing failed");
-      console.log("[HeyGen Adapter] Waiting for avatar creation, attempt=" + i);
+      logger.info("[HeyGen Adapter] Waiting for avatar creation, attempt=" + i);
     }
     throw new Error("HeyGen: avatar group did not become ready in time");
   }
@@ -144,12 +145,41 @@ export class HeyGenAdapter implements VideoAdapter {
       input.modelSettings?.avatar_photo_url,
     );
     const avatarId = (input.modelSettings?.avatar_id as string | undefined) || this.avatarId;
+    // Pre-created avatar: talking_photo_id is already known — no upload/creation needed
+    const talkingPhotoId = input.modelSettings?.talking_photo_id as string | undefined;
 
     const voice = voiceUrl
       ? { type: "audio", audio_url: voiceUrl }
       : { type: "text", input_text: input.prompt, voice_id: voiceId };
 
-    // Talking Photo endpoint: upload photo asset, then use talking_photo character type
+    // Fast path: pre-created talking photo avatar (from async avatar creation job)
+    if (talkingPhotoId) {
+      const body = {
+        video_inputs: [
+          {
+            character: { type: "talking_photo", talking_photo_id: talkingPhotoId },
+            voice,
+            background: { type: "color", value: bgColor },
+          },
+        ],
+        dimension,
+      };
+      const res = await fetch(`${HEYGEN_API}/v2/video/generate`, {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HeyGen Talking Photo (fast path) submit failed: ${res.status} ${text}`);
+      }
+      const data = (await res.json()) as { data?: { video_id: string } };
+      const videoId = data.data?.video_id;
+      if (!videoId) throw new Error("HeyGen: no video_id in Talking Photo (fast path) response");
+      return videoId;
+    }
+
+    // Slow path: upload photo asset now, create avatar group, poll, then generate
     if (avatarPhotoUrl) {
       const avatarPhotoS3Key = input.modelSettings?.avatar_photo_s3key as string | undefined;
       const talkingPhotoId = await this.createTalkingPhotoId(avatarPhotoS3Key, avatarPhotoUrl);
@@ -219,7 +249,7 @@ export class HeyGenAdapter implements VideoAdapter {
   }
 
   async poll(videoId: string): Promise<VideoResult | null> {
-    const res = await fetch(`${HEYGEN_API}/v2/video_status.get?video_id=${videoId}`, {
+    const res = await fetch(`${HEYGEN_API}/v1/video_status.get?video_id=${videoId}`, {
       headers: this.headers(),
     });
 

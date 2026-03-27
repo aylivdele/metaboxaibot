@@ -107,6 +107,16 @@ export interface UserUpload {
   createdAt: string;
 }
 
+export interface UserAvatar {
+  id: string;
+  provider: string;
+  name: string;
+  externalId: string | null;
+  previewUrl: string | null;
+  status: "creating" | "ready" | "failed";
+  createdAt: string;
+}
+
 export interface Model {
   id: string;
   name: string;
