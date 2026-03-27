@@ -11,9 +11,9 @@ import { config } from "@metabox/shared";
 const telegram = new Api(config.bot.token);
 
 /** Delay between polls (5 minutes) */
-const POLL_DELAY_MS = 5 * 60 * 1000;
+const POLL_DELAY_MS = 1 * 60 * 1000;
 /** Maximum poll attempts (~2 hours) */
-const MAX_POLL_ATTEMPTS = 24;
+const MAX_POLL_ATTEMPTS = 30;
 
 function getAdapter(provider: string) {
   if (provider === "heygen") return new HeyGenAvatarAdapter();

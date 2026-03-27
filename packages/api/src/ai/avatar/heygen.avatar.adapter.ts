@@ -57,7 +57,7 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
     }
     const pollData = (await pollRes.json()) as {
       error?: string;
-      data?: { avatar_list: Array<{ id: string; status: string }> };
+      data?: { avatar_list: Array<{ id: string; status: string; image_url: string }> };
     };
     logger.info(
       { groupId: externalId },
@@ -79,11 +79,11 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
         }
         return pv;
       },
-      undefined as { id: string; status: string } | undefined,
+      undefined as { id: string; status: string, image_url: string } | undefined,
     );
 
     if (avatar?.status === "completed") {
-      return { status: "ready", talkingPhotoId: avatar.id };
+      return { status: "ready", talkingPhotoId: avatar.id, previewUrl: avatar.image_url };
     }
     if (avatar?.status === "failed") throw new Error("HeyGen: avatar group processing failed");
 

@@ -298,7 +298,7 @@ export class HeyGenAdapter implements VideoAdapter {
 
     if (!data) throw new Error("HeyGen: empty status response");
     if (data.status === "failed")
-      throw new Error(`HeyGen video failed: ${data.error ?? "unknown"}`);
+      throw new Error(`HeyGen video failed: ${JSON.stringify(data.error ?? "unknown")}`);
     if (data.status !== "completed") return null;
 
     const url = data.video_url;
