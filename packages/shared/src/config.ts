@@ -146,7 +146,6 @@ export const config = {
     elevenlabs: opt("ELEVENLABS_API_KEY"),
     heygen: opt("HEYGEN_API_KEY"),
     heygenAvatarId: opt("HEYGEN_AVATAR_ID"),
-    heygenTestMode: opt("HEYGEN_TEST_MODE") === "true",
     did: opt("DID_API_KEY"),
     didPresenterUrl: opt("DID_PRESENTER_URL"),
     higgsfieldApiKey: opt("HIGGSFIELD_API_KEY"),
