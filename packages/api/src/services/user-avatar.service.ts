@@ -13,9 +13,12 @@ export const userAvatarService = {
     return db.userAvatar.findUnique({ where: { id } });
   },
 
-  async create(userId: bigint, params: { provider: string; name: string }): Promise<UserAvatar> {
+  async create(
+    userId: bigint,
+    params: { provider: string; name: string; externalId?: string; status?: string },
+  ): Promise<UserAvatar> {
     return db.userAvatar.create({
-      data: { userId, ...params, status: "creating" },
+      data: { userId, status: "creating", ...params },
     });
   },
 

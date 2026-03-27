@@ -47,7 +47,52 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
   }
 
   async poll(externalId: string): Promise<AvatarPollResult> {
-    const res = await fetch(`${HEYGEN_API}/v2/photo_avatar/avatar_group/${externalId}`, {
+    const pollRes = await fetch(`${HEYGEN_API}/v2/avatar_group/${externalId}/avatars`, {
+      headers: { "X-Api-Key": this.apiKey },
+    });
+    if (!pollRes.ok) {
+      const text = await pollRes.text();
+      logger.error({ externalId }, `HeyGen: list avatars in group error: ${text}`);
+      throw new Error("HeyGen: avatar group processing failed");
+    }
+    const pollData = (await pollRes.json()) as {
+      error?: string;
+      data?: { avatar_list: Array<{ id: string; status: string }> };
+    };
+    logger.info(
+      { groupId: externalId },
+      `[HeyGen Adapter] Response from heygen group creation poll ${pollData}`,
+    );
+    if (pollData.error) {
+      throw new Error(`HeyGen avatar group poll error: ${pollData.error}`);
+    }
+    const avatar = pollData.data?.avatar_list?.reduce(
+      (pv, cv) => {
+        if (!pv) {
+          return cv;
+        }
+        if (pv.id === externalId) {
+          return pv;
+        }
+        if (cv.id.startsWith(externalId)) {
+          return cv;
+        }
+        return pv;
+      },
+      undefined as { id: string; status: string } | undefined,
+    );
+
+    if (avatar?.status === "completed") {
+      return { status: "ready", talkingPhotoId: avatar.id };
+    }
+    if (avatar?.status === "failed") throw new Error("HeyGen: avatar group processing failed");
+
+    return { status: "processing" };
+  }
+
+  async poll_training(externalId: string): Promise<AvatarPollResult> {
+    // Step 1: check training status
+    const res = await fetch(`${HEYGEN_API}/v2/photo_avatar/train/status/${externalId}`, {
       headers: { "X-Api-Key": this.apiKey },
     });
     if (!res.ok) {
@@ -59,21 +104,46 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
       return { status: "processing" };
     }
     const data = (await res.json()) as {
+      data?: { status?: string; error_msg?: string | null };
+    };
+    logger.info({ externalId, data }, "HeyGen avatar poll result");
+
+    const status = data.data?.status;
+    if (status === "ready") {
+      // Step 2: find talking_photo_id and preview from the avatars list
+      const talkingPhotoId = await this.findTalkingPhotoId(externalId);
+      return { status: "ready", talkingPhotoId };
+    }
+    if (data.data?.error_msg) return { status: "failed" };
+    return { status: "processing" };
+  }
+
+  private async findTalkingPhotoId(groupId: string): Promise<string | undefined> {
+    const res = await fetch(`${HEYGEN_API}/v2/avatars`, {
+      headers: { "X-Api-Key": this.apiKey },
+    });
+    if (!res.ok) {
+      const resText = await res.text();
+      throw new Error(`HeyGen avatars list error: ${res.status} ${resText}`);
+    }
+    const data = (await res.json()) as {
       data?: {
-        status?: string;
-        avatar_list?: Array<{ id: string; preview_url?: string; preview_image_url?: string }>;
+        talking_photos?: Array<{
+          talking_photo_id: string;
+          talking_photo_name?: string;
+          preview_image_url?: string;
+        }>;
       };
     };
-    logger.info({ externalId }, `Poll result: ${JSON.stringify(data)}`);
-    const status = data.data?.status;
-    if (status === "completed") {
-      const first = data.data?.avatar_list?.[0];
-      return {
-        status: "ready",
-        previewUrl: first?.preview_image_url ?? first?.preview_url,
-      };
-    }
-    if (status === "failed") return { status: "failed" };
-    return { status: "processing" };
+    const photos = data.data?.talking_photos ?? [];
+    // Match by group_id prefix or name containing group_id
+    const match = photos.find(
+      (p) =>
+        p.talking_photo_id.startsWith(groupId) ||
+        p.talking_photo_id === groupId ||
+        p.talking_photo_name?.includes(groupId),
+    );
+    logger.info({ groupId, match, totalPhotos: photos.length }, "HeyGen talking photo lookup");
+    return match?.talking_photo_id;
   }
 }

@@ -1,6 +1,7 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { getFileUrl } from "../../services/s3.service.js";
+import { userAvatarService } from "../../services/user-avatar.service.js";
 import { logger } from "../../logger.js";
 
 const HEYGEN_API = "https://api.heygen.com";
@@ -97,21 +98,43 @@ export class HeyGenAdapter implements VideoAdapter {
     // 4. Poll until avatar group is ready (status: "completed")
     const maxAttempts = 20;
     for (let i = 0; i < maxAttempts; i++) {
-      await new Promise((r) => setTimeout(r, 15000));
-      const pollRes = await fetch(`${HEYGEN_API}/v2/photo_avatar/avatar_group/${groupId}`, {
+      await new Promise((r) => setTimeout(r, 5000));
+      const pollRes = await fetch(`${HEYGEN_API}/v2/avatar_group/${groupId}/avatars`, {
         headers: { "X-Api-Key": this.apiKey },
       });
       if (!pollRes.ok) continue;
       const pollData = (await pollRes.json()) as {
-        data?: { status?: string; avatar_list?: Array<{ id: string }> };
+        error?: string;
+        data?: { avatar_list: Array<{ id: string; status: string }> };
       };
-      logger.info(`[HeyGen Adapter] Response from heygen ${pollData}`);
-      const status = pollData.data?.status;
-      if (status === "completed") {
-        // Use first look id if available, else fall back to groupId
-        return pollData.data?.avatar_list?.[0]?.id ?? groupId;
+      logger.info(
+        { attemp: i + 1, groupId },
+        `[HeyGen Adapter] Response from heygen group creation poll ${pollData}`,
+      );
+      if (pollData.error) {
+        throw new Error(`HeyGen avatar group poll error: ${pollData.error}`);
       }
-      if (status === "failed") throw new Error("HeyGen: avatar group processing failed");
+      const avatar = pollData.data?.avatar_list?.reduce(
+        (pv, cv) => {
+          if (!pv) {
+            return cv;
+          }
+          if (pv.id === groupId) {
+            return pv;
+          }
+          if (cv.id.startsWith(groupId)) {
+            return cv;
+          }
+          return pv;
+        },
+        undefined as { id: string; status: string } | undefined,
+      );
+
+      if (avatar?.status === "completed") {
+        // Use first look id if available, else fall back to groupId
+        return avatar.id;
+      }
+      if (avatar?.status === "failed") throw new Error("HeyGen: avatar group processing failed");
       logger.info("[HeyGen Adapter] Waiting for avatar creation, attempt=" + i);
     }
     throw new Error("HeyGen: avatar group did not become ready in time");
@@ -183,6 +206,18 @@ export class HeyGenAdapter implements VideoAdapter {
     if (avatarPhotoUrl) {
       const avatarPhotoS3Key = input.modelSettings?.avatar_photo_s3key as string | undefined;
       const talkingPhotoId = await this.createTalkingPhotoId(avatarPhotoS3Key, avatarPhotoUrl);
+
+      // Persist created avatar so it appears in the mini-app and can be reused without re-creation
+      if (input.userId) {
+        userAvatarService
+          .create(input.userId, {
+            provider: "heygen",
+            name: "My avatar",
+            externalId: talkingPhotoId,
+            status: "ready",
+          })
+          .catch((err) => logger.warn({ err }, "Failed to persist auto-created HeyGen avatar"));
+      }
 
       const body = {
         video_inputs: [

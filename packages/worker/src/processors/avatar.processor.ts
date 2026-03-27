@@ -84,6 +84,8 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
       if (result.status === "ready") {
         await userAvatarService.updateStatus(userAvatarId, {
           status: "ready",
+          // Use talking_photo_id if returned (HeyGen), otherwise keep the group_id
+          externalId: result.talkingPhotoId ?? undefined,
           previewUrl: result.previewUrl,
         });
         await telegram

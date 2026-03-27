@@ -8,6 +8,8 @@ export interface VideoInput {
   aspectRatio?: string;
   /** User-configured model settings (from modelSettings storage). Each adapter picks what it supports. */
   modelSettings?: Record<string, unknown>;
+  /** User ID — used by adapters that persist side-effects (e.g. saving created avatars). */
+  userId?: bigint;
 }
 
 export interface VideoResult {

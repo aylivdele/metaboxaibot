@@ -44,6 +44,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       aspectRatio,
       duration,
       modelSettings,
+      userId: BigInt(userIdStr),
     });
 
     let videoResult = null;

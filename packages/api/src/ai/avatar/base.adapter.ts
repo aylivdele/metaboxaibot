@@ -7,6 +7,12 @@ export interface AvatarPollResult {
   status: "ready" | "processing" | "failed";
   /** Preview image URL when status is "ready". */
   previewUrl?: string;
+  /**
+   * Final ID to store in UserAvatar.externalId when status is "ready".
+   * For HeyGen this is the talking_photo_id (may differ from the group_id used for polling).
+   * If omitted, the original externalId (group_id) is kept.
+   */
+  talkingPhotoId?: string;
 }
 
 export interface AvatarAdapter {
