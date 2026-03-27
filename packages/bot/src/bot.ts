@@ -34,6 +34,11 @@ import {
 } from "./scenes/video.js";
 import { handleAudioSubSection, handleAudioMessage } from "./scenes/audio.js";
 import { handleSendOriginal } from "./handlers/send-original.handler.js";
+import {
+  handleMergeChoice,
+  handleMergeCancel,
+  handleMergeConfirm,
+} from "./handlers/merge-conflict.handler.js";
 import { handlePreCheckoutQuery, handleSuccessfulPayment } from "./scenes/payment.js";
 import { userStateService } from "@metabox/api/services";
 import { getT, config } from "@metabox/shared";
@@ -85,6 +90,11 @@ export function createBot(token: string): Bot<BotContext> {
 
   // ── HeyGen avatar creation cancel ────────────────────────────────────────
   bot.callbackQuery("heygen_avatar_cancel", handleHeygenAvatarCancel);
+
+  // ── Merge conflict resolution callbacks ────────────────────────────────────
+  bot.callbackQuery(/^merge:(site|bot):/, handleMergeChoice);
+  bot.callbackQuery("merge:cancel", handleMergeCancel);
+  bot.callbackQuery(/^merge_confirm:(site|bot):/, handleMergeConfirm);
 
   // ── Reply keyboard — menu navigation ─────────────────────────────────────
   // Translation keys are resolved at runtime after i18n middleware runs.

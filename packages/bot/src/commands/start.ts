@@ -7,7 +7,7 @@ import { buildLanguageKeyboard } from "../keyboards/language.keyboard.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { SUPPORTED_LANGUAGES, getT, config } from "@metabox/shared";
 import type { Language, Translations } from "@metabox/shared";
-import { verifyLinkToken } from "@metabox/api/services";
+import { verifyLinkToken, confirmMerge, MetaboxApiError } from "@metabox/api/services";
 
 /**
  * /start — handles deep link params, resets FSM state, shows language selection.
@@ -48,8 +48,52 @@ export async function handleStart(ctx: BotContext): Promise<void> {
         );
       }
     } catch (err) {
-      let msg = "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.";
       const apiErr = err as { code?: string; data?: Record<string, unknown> };
+
+      // ── Mentor conflict — ask user to choose ──
+      if (apiErr.code === "MENTOR_CONFLICT" && apiErr.data) {
+        const d = apiErr.data as {
+          token: string;
+          siteMentor: { name: string; contact: string };
+          botMentor: { name: string; contact: string };
+        };
+        const siteName = d.siteMentor?.contact
+          ? `${d.siteMentor.name} (${d.siteMentor.contact})`
+          : d.siteMentor?.name || "Неизвестен";
+        const botName = d.botMentor?.contact
+          ? `${d.botMentor.name} (${d.botMentor.contact})`
+          : d.botMentor?.name || "Неизвестен";
+
+        await ctx.reply(
+          `⚠️ *Обнаружен конфликт наставников*\n\n` +
+            `На вашем аккаунте Metabox наставник:\n*${siteName}*\n\n` +
+            `В AI Box боте ваш наставник:\n*${botName}*\n\n` +
+            `При объединении аккаунтов необходимо выбрать одного наставника.`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: `Оставить ${d.siteMentor?.name || "Наставника с сайта"}`,
+                    callback_data: `merge:site:${d.token}`,
+                  },
+                ],
+                [
+                  {
+                    text: `Оставить ${d.botMentor?.name || "Наставника из бота"}`,
+                    callback_data: `merge:bot:${d.token}`,
+                  },
+                ],
+                [{ text: "❌ Отмена", callback_data: "merge:cancel" }],
+              ],
+            },
+          },
+        );
+        return;
+      }
+
+      let msg = "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.";
       if (apiErr.code === "TELEGRAM_MISMATCH") {
         msg = `⚠️ Этот аккаунт на Metabox уже привязан к другому Telegram.\n\nПереключитесь на нужный Telegram-аккаунт и попробуйте снова.\n\nЕсли это ошибка — напишите в поддержку: @${config.supportTg}`;
       } else if (apiErr.code === "TELEGRAM_ALREADY_LINKED") {

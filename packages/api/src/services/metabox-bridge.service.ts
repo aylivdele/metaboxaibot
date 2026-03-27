@@ -183,6 +183,25 @@ export async function verifyLinkToken(
   });
 }
 
+/** Confirm merge after mentor conflict resolution. */
+export async function confirmMerge(params: {
+  token: string;
+  telegramId: bigint;
+  chosenMentor: "site" | "bot";
+}): Promise<{
+  metaboxUserId: string;
+  email: string;
+  firstName: string;
+  referralCode: string;
+  mergedFrom?: MergedAccountInfo;
+}> {
+  return post("/confirm-merge", {
+    token: params.token,
+    telegramId: params.telegramId.toString(),
+    chosenMentor: params.chosenMentor,
+  });
+}
+
 /** Issue a fresh SSO token for an already-linked user. */
 export async function issueSsoTokenRemote(metaboxUserId: string): Promise<{ ssoToken: string }> {
   return post("/issue-sso-token", { metaboxUserId });
