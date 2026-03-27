@@ -75,11 +75,28 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       onBack();
     } catch (err: any) {
       const code = err?.code;
-      if (code === "TELEGRAM_LINKED" && err?.linkedTo) {
+      const supportTg = import.meta.env.VITE_SUPPORT_TG ?? "metaboxsupport";
+      if (code === "MERGE_BLOCKED") {
+        const sm = err?.siteMentor || {};
+        const bm = err?.botMentor || {};
+        const siteInfo = sm.contact ? `${sm.name} (${sm.contact})` : sm.name || "Неизвестен";
+        const botInfo = bm.contact ? `${bm.name} (${bm.contact})` : bm.name || "Неизвестен";
+        setError(
+          `Невозможно объединить аккаунты. У вас разные наставники и на обоих аккаунтах есть покупки.\n\nНаставник на сайте: ${siteInfo}\nНаставник в боте: ${botInfo}\n\nОбратитесь в поддержку: @${supportTg}`,
+        );
+      } else if (code === "MENTOR_CONFLICT") {
+        const sm = err?.siteMentor || {};
+        const bm = err?.botMentor || {};
+        const siteInfo = sm.contact ? `${sm.name} (${sm.contact})` : sm.name || "Неизвестен";
+        const botInfo = bm.contact ? `${bm.name} (${bm.contact})` : bm.name || "Неизвестен";
+        setError(
+          `Конфликт наставников. На сайте: ${siteInfo}, в боте: ${botInfo}. Для объединения перейдите по кнопке AI Box на сайте Metabox.`,
+        );
+      } else if (code === "TELEGRAM_LINKED" && err?.linkedTo) {
         const lt = err.linkedTo;
         const tgInfo = lt.telegramUsername ? `@${lt.telegramUsername}` : lt.telegramPhone || "";
         setError(
-          `На аккаунте ${lt.name || email}${tgInfo ? ` (${tgInfo})` : ""} уже привязан другой Telegram. Обратитесь в поддержку @${import.meta.env.VITE_SUPPORT_TG ?? "metaboxsupport"}`,
+          `На аккаунте ${lt.name || email}${tgInfo ? ` (${tgInfo})` : ""} уже привязан другой Telegram. Обратитесь в поддержку @${supportTg}`,
         );
       } else {
         const key = code ? ERROR_MAP[code] : undefined;
