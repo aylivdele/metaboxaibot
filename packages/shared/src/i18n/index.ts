@@ -96,6 +96,7 @@ export interface Translations {
     hintVideoDefault: string;
     avatarCreationCancelled: string;
     avatarCreationStarted: string;
+    avatarReady: string;
   };
   errors: {
     noTool: string;

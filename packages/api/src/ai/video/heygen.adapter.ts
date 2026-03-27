@@ -45,6 +45,32 @@ export class HeyGenAdapter implements VideoAdapter {
     return { "X-Api-Key": this.apiKey, "Content-Type": "application/json" };
   }
 
+  /** Upload audio file to HeyGen asset storage. Returns asset id. */
+  private async uploadAudioAsset(audioUrl: string): Promise<string> {
+    const audioRes = await fetch(audioUrl);
+    if (!audioRes.ok)
+      throw new Error(`Failed to fetch audio for HeyGen upload: ${audioRes.status}`);
+    const audioBuffer = await audioRes.arrayBuffer();
+    const contentType = audioRes.headers.get("content-type") ?? "audio/mpeg";
+
+    const uploadRes = await fetch(`${HEYGEN_UPLOAD}/v1/asset`, {
+      method: "POST",
+      headers: { "X-Api-Key": this.apiKey, "Content-Type": contentType },
+      body: audioBuffer,
+    });
+    if (!uploadRes.ok) {
+      const text = await uploadRes.text();
+      throw new Error(`HeyGen audio asset upload failed: ${uploadRes.status} ${text}`);
+    }
+    const uploadData = (await uploadRes.json()) as { data?: { id?: string } };
+    const assetId = uploadData.data?.id;
+    if (!assetId)
+      throw new Error(
+        `HeyGen: no asset id in audio upload response: ${JSON.stringify(uploadData)}`,
+      );
+    return assetId;
+  }
+
   /** Upload raw image to HeyGen asset storage. Returns image_key (used as image_asset_id). */
   private async uploadImageAsset(s3Key: string | undefined, fallbackUrl: string): Promise<string> {
     const imageUrl = s3Key
@@ -94,9 +120,17 @@ export class HeyGenAdapter implements VideoAdapter {
     const voiceId = (input.modelSettings?.voice_id as string | undefined) ?? "en-US-JennyNeural";
     const bgColor = (input.modelSettings?.background_color as string | undefined) ?? "#FFFFFF";
     const aspectRatio = input.aspectRatio ?? "16:9";
+    const resolution = (input.modelSettings?.resolution as string | undefined) ?? "1080p";
+
+    // ── Audio ────────────────────────────────────────────────────────────────
+    let audioAssetId: string | undefined;
+    if (voiceUrl) {
+      audioAssetId = await this.uploadAudioAsset(voiceUrl);
+      logger.info({ audioAssetId }, "HeyGen: uploaded audio asset");
+    }
 
     // ── Avatar source ────────────────────────────────────────────────────────
-    // const talkingPhotoId = input.modelSettings?.talking_photo_id as string | undefined;
+    const imageAssetIdFromSettings = input.modelSettings?.image_asset_id as string | undefined;
     const avatarPhotoUrl = await HeyGenAdapter.freshUrl(
       input.modelSettings?.avatar_photo_s3key,
       input.modelSettings?.avatar_photo_url,
@@ -106,23 +140,48 @@ export class HeyGenAdapter implements VideoAdapter {
     // ── Build flat /v2/videos body ───────────────────────────────────────────
     const body: Record<string, unknown> = {
       aspect_ratio: aspectRatio,
+      resolution,
       background: { type: "color", value: bgColor },
-      ...(voiceUrl ? { audio_url: voiceUrl } : { script: input.prompt, voice_id: voiceId }),
+      ...(audioAssetId
+        ? { audio_asset_id: audioAssetId }
+        : { script: input.prompt, voice_id: voiceId }),
     };
 
-    // if (talkingPhotoId) {
-    //   // Pre-created photo avatar from async job — use directly as avatar_id
-    //   body.avatar_id = talkingPhotoId;
-    //   logger.info({ talkingPhotoId }, "HeyGen: using pre-created photo avatar");
-    // } else
-    if (avatarPhotoUrl) {
-      // One-shot photo: upload now and use as image_asset_id
+    // Avatar priority: pre-uploaded asset → one-shot photo upload → official avatar
+    let usesImageAsset = false;
+    if (imageAssetIdFromSettings) {
+      body.image_asset_id = imageAssetIdFromSettings;
+      usesImageAsset = true;
+      logger.info(
+        { imageAssetId: imageAssetIdFromSettings },
+        "HeyGen: using pre-uploaded image asset",
+      );
+    } else if (avatarPhotoUrl) {
       const avatarPhotoS3Key = input.modelSettings?.avatar_photo_s3key as string | undefined;
-      const imageAssetId = await this.uploadImageAsset(avatarPhotoS3Key, avatarPhotoUrl);
-      body.image_asset_id = imageAssetId;
-      logger.info({ imageAssetId }, "HeyGen: using uploaded image asset");
+      const uploadedId = await this.uploadImageAsset(avatarPhotoS3Key, avatarPhotoUrl);
+      body.image_asset_id = uploadedId;
+      usesImageAsset = true;
+      logger.info({ imageAssetId: uploadedId }, "HeyGen: using uploaded image asset");
     } else {
       body.avatar_id = avatarId;
+    }
+
+    // Photo-avatar-only fields
+    if (usesImageAsset) {
+      const expressiveness = input.modelSettings?.expressiveness as string | undefined;
+      const motionPrompt = input.modelSettings?.motion_prompt as string | undefined;
+      if (expressiveness) body.expressiveness = expressiveness;
+      if (motionPrompt) body.motion_prompt = motionPrompt;
+    }
+
+    // Voice settings (only when enabled)
+    if (input.modelSettings?.voice_settings_enabled === true) {
+      const speed = input.modelSettings?.voice_speed as number | undefined;
+      const pitch = input.modelSettings?.voice_pitch as number | undefined;
+      const locale = input.modelSettings?.voice_locale as string | undefined;
+      if (speed !== undefined) body.speed = speed;
+      if (pitch !== undefined) body.pitch = pitch;
+      if (locale) body.locale = locale;
     }
 
     const res = await fetch(`${HEYGEN_API}/v2/videos`, {

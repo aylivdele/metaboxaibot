@@ -1,6 +1,32 @@
 import type { Section } from "./user.js";
 import type { ContextStrategy } from "./dialog.js";
 
+// ── Model settings condition types ───────────────────────────────────────────
+
+/** Atomic condition: matches based on the value of another setting key. */
+export interface SettingCondition {
+  /** Key of another setting to inspect. */
+  key: string;
+  /** Unavailable when the value strictly equals this. */
+  eq?: unknown;
+  /** Unavailable when the value does NOT strictly equal this. */
+  neq?: unknown;
+  /** Unavailable when the key has a meaningful value (non-empty string / true / non-zero number / non-empty array). */
+  present?: true;
+  /** Unavailable when the key is falsy / empty. */
+  absent?: true;
+}
+
+export interface AndCondition {
+  and: UnavailableRule[];
+}
+export interface OrCondition {
+  or: UnavailableRule[];
+}
+
+/** Composable condition tree used in `ModelSettingDef.unavailableIf`. */
+export type UnavailableRule = SettingCondition | AndCondition | OrCondition;
+
 // ── Model settings types ──────────────────────────────────────────────────────
 
 export type ModelSettingType =
@@ -41,6 +67,8 @@ export interface ModelSettingDef {
   step?: number;
   /** Default value shown when the user has not saved a preference. null = empty/unset. */
   default: string | number | boolean | null;
+  /** When this rule evaluates to true the setting is hidden in the UI. */
+  unavailableIf?: UnavailableRule;
 }
 
 /** One specific model variant that belongs to a family (e.g. recraft-v4-pro). */

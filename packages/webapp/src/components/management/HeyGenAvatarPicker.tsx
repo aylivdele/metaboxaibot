@@ -6,21 +6,15 @@ import type { HeyGenAvatar, UserAvatar } from "../../types.js";
 interface HeyGenAvatarPickerProps {
   /** Currently selected official avatar_id (empty string = none) */
   avatarId: string;
-  /** Currently selected pre-created avatar talking_photo_id (empty string = none) */
-  talkingPhotoId: string;
+  /** Currently selected photo avatar image_asset_id (empty string = none) */
+  imageAssetId: string;
   /** Called when user picks an official avatar or a pre-created avatar */
   onChange: (changes: Record<string, unknown>) => void;
 }
 
-export function HeyGenAvatarPicker({
-  avatarId,
-  talkingPhotoId,
-  onChange,
-}: HeyGenAvatarPickerProps) {
+export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenAvatarPickerProps) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<"official" | "myAvatars">(
-    talkingPhotoId ? "myAvatars" : "official",
-  );
+  const [tab, setTab] = useState<"official" | "myAvatars">(imageAssetId ? "myAvatars" : "official");
   const [avatars, setAvatars] = useState<HeyGenAvatar[]>([]);
   const [avatarsLoading, setAvatarsLoading] = useState(false);
   const [myAvatars, setMyAvatars] = useState<UserAvatar[]>([]);
@@ -50,6 +44,7 @@ export function HeyGenAvatarPicker({
   const selectOfficial = (id: string) => {
     onChange({
       avatar_id: id,
+      image_asset_id: "",
       talking_photo_id: "",
       avatar_photo_url: "",
       avatar_photo_s3key: "",
@@ -59,7 +54,8 @@ export function HeyGenAvatarPicker({
   const selectMyAvatar = (avatar: UserAvatar) => {
     if (avatar.status !== "ready" || !avatar.externalId) return;
     onChange({
-      talking_photo_id: avatar.externalId,
+      image_asset_id: avatar.externalId,
+      talking_photo_id: "",
       avatar_id: "",
       avatar_photo_url: "",
       avatar_photo_s3key: "",
@@ -81,8 +77,9 @@ export function HeyGenAvatarPicker({
     setMyAvatars((prev) => prev.filter((a) => a.id !== id));
     // Clear selection if the deleted avatar was selected
     const deleted = myAvatars.find((a) => a.id === id);
-    if (deleted?.externalId && deleted.externalId === talkingPhotoId) {
+    if (deleted?.externalId && deleted.externalId === imageAssetId) {
       onChange({
+        image_asset_id: "",
         talking_photo_id: "",
         avatar_id: "",
         avatar_photo_url: "",
@@ -130,7 +127,7 @@ export function HeyGenAvatarPicker({
             </div>
             <div className="avatar-picker__grid">
               {filtered.map((avatar) => {
-                const isSelected = avatarId === avatar.avatar_id && !talkingPhotoId;
+                const isSelected = avatarId === avatar.avatar_id && !imageAssetId;
                 return (
                   <div
                     key={avatar.avatar_id}
@@ -175,7 +172,7 @@ export function HeyGenAvatarPicker({
             <div className="avatar-picker__grid">
               {myAvatars.map((avatar) => {
                 const isReady = avatar.status === "ready";
-                const isSelected = isReady && avatar.externalId === talkingPhotoId;
+                const isSelected = isReady && avatar.externalId === imageAssetId;
                 return (
                   <div
                     key={avatar.id}

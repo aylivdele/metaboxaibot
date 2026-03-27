@@ -7,7 +7,7 @@ import {
   s3Service,
   calculateCost,
 } from "@metabox/api/services";
-import { getAvatarQueue } from "@metabox/api/queues";
+import { HeyGenAvatarAdapter } from "@metabox/api/ai/avatar/heygen";
 import { MODELS_BY_SECTION, AI_MODELS, config } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -249,42 +249,36 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
   await ctx.reply(ctx.t.video.videoDriverSaved);
 }
 
-// ── HEYGEN_AVATAR_PHOTO state: capture photo and start async avatar creation ───
+// ── HEYGEN_AVATAR_PHOTO state: capture photo and synchronously upload as HeyGen asset ──
 
 export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
   if (!ctx.user || !ctx.message?.photo) return;
-  const chatId = ctx.chat?.id;
-  if (!chatId) return;
 
   const photo = ctx.message.photo.at(-1)!;
   const file = await ctx.api.getFile(photo.file_id);
   const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
 
-  // Upload to S3 for reliable long-term access during async processing
   const userId = ctx.user.id;
-  const s3Key = `avatar_photo/${userId.toString()}/${file.file_id}.jpg`;
-  const uploadedKey = await s3Service.uploadFromUrl(s3Key, tgUrl, "image/jpeg").catch(() => null);
 
-  // Create UserAvatar record in DB (status: "creating")
-  const avatar = await userAvatarService.create(userId, {
+  // Fetch image buffer
+  const imgRes = await fetch(tgUrl);
+  if (!imgRes.ok) throw new Error(`Failed to fetch avatar photo from Telegram: ${imgRes.status}`);
+  const imageBuffer = Buffer.from(await imgRes.arrayBuffer());
+
+  // Upload directly to HeyGen asset storage — synchronous, no worker needed
+  const adapter = new HeyGenAvatarAdapter();
+  const { externalId } = await adapter.create(imageBuffer, "image/jpeg");
+
+  // Persist UserAvatar record (status ready immediately)
+  await userAvatarService.create(userId, {
     provider: "heygen",
     name: ctx.t.video.myAvatarDefaultName,
+    externalId,
+    status: "ready",
   });
 
-  // Enqueue creation job
-  await getAvatarQueue().add("create", {
-    userAvatarId: avatar.id,
-    userId: userId.toString(),
-    provider: "heygen",
-    action: "create",
-    imageUrl: tgUrl,
-    s3Key: uploadedKey ?? undefined,
-    telegramChatId: Number(chatId),
-  });
-
-  // Return to VIDEO_ACTIVE state
   await userStateService.setState(userId, "VIDEO_ACTIVE", "video");
-  await ctx.reply(ctx.t.video.avatarCreationStarted);
+  await ctx.reply(ctx.t.video.avatarReady);
 }
 
 export async function handleHeygenAvatarCancel(ctx: BotContext): Promise<void> {

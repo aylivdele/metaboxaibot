@@ -43,6 +43,23 @@ export interface ModelSettingOption {
   label: string;
 }
 
+export interface SettingCondition {
+  key: string;
+  eq?: unknown;
+  neq?: unknown;
+  present?: true;
+  absent?: true;
+}
+
+export interface AndCondition {
+  and: UnavailableRule[];
+}
+export interface OrCondition {
+  or: UnavailableRule[];
+}
+
+export type UnavailableRule = SettingCondition | AndCondition | OrCondition;
+
 export interface ModelSettingDef {
   key: string;
   label: string;
@@ -63,6 +80,7 @@ export interface ModelSettingDef {
   max?: number;
   step?: number;
   default: string | number | boolean | null;
+  unavailableIf?: UnavailableRule;
 }
 
 export interface HeyGenVoice {

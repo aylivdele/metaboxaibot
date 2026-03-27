@@ -2826,7 +2826,7 @@ export const AI_MODELS: Record<string, AIModel> = {
     // $0.0167/s Engine III (public/standard avatar) ≈ $1.00/min
     // $0.10/s Engine IV (Avatar IV — custom photo upload) ≈ $6.00/min
     costUsdPerRequest: 0,
-    costUsdPerSecond: 0.0167,
+    costUsdPerSecond: 0.06,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -2835,10 +2835,10 @@ export const AI_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedAspectRatios: ["16:9", "9:16"],
     supportedDurations: null, // avatar duration is script-driven
     settings: [
-      mkAspectRatio(["16:9", "9:16", "1:1"]),
+      mkAspectRatio(["16:9", "9:16"]),
       {
         key: "avatar_id",
         label: "Аватар",
@@ -2858,6 +2858,81 @@ export const AI_MODELS: Record<string, AIModel> = {
         label: "Цвет фона",
         type: "color",
         default: "#FFFFFF",
+      },
+      {
+        key: "resolution",
+        label: "Разрешение",
+        type: "select",
+        options: [
+          { value: "1080p", label: "1080p" },
+          { value: "720p", label: "720p" },
+        ],
+        default: "1080p",
+      },
+      {
+        key: "expressiveness",
+        label: "Выразительность",
+        description: "Только для фото-аватара",
+        type: "select",
+        options: [
+          { value: "low", label: "Низкая" },
+          { value: "medium", label: "Средняя" },
+          { value: "high", label: "Высокая" },
+        ],
+        default: "low",
+        unavailableIf: {
+          and: [
+            { key: "avatar_id", present: true },
+            { key: "image_asset_id", absent: true },
+          ],
+        },
+      },
+      {
+        key: "motion_prompt",
+        label: "Описание движений",
+        description: "Только для фото-аватара",
+        type: "text",
+        default: null,
+        unavailableIf: {
+          and: [
+            { key: "avatar_id", present: true },
+            { key: "image_asset_id", absent: true },
+          ],
+        },
+      },
+      {
+        key: "voice_settings_enabled",
+        label: "Настроить голос",
+        type: "toggle",
+        default: false,
+      },
+      {
+        key: "voice_speed",
+        label: "Скорость речи",
+        type: "slider",
+        min: 0.5,
+        max: 1.5,
+        step: 0.1,
+        default: 1.0,
+        unavailableIf: { key: "voice_settings_enabled", absent: true },
+      },
+      {
+        key: "voice_pitch",
+        label: "Тон голоса",
+        type: "slider",
+        min: -50,
+        max: 50,
+        step: 1,
+        default: 0,
+        unavailableIf: { key: "voice_settings_enabled", absent: true },
+      },
+      {
+        key: "voice_locale",
+        label: "Язык (locale)",
+        description: "Например: en-US, ru-RU",
+        type: "text",
+        default: null,
+        unavailableIf: { key: "voice_settings_enabled", absent: true },
       },
     ],
   },

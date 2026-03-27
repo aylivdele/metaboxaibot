@@ -1,10 +1,27 @@
-import type { ModelSettingDef } from "../../types.js";
+import type { ModelSettingDef, UnavailableRule } from "../../types.js";
 import { CustomSlider } from "./CustomSlider.js";
 import { HeyGenVoicePicker } from "./HeyGenVoicePicker.js";
 import { DIDVoicePicker } from "./DIDVoicePicker.js";
 import { HeyGenAvatarPicker } from "./HeyGenAvatarPicker.js";
 import { HiggsFieldMotionPicker } from "./HiggsFieldMotionPicker.js";
 import type { MotionEntry } from "./HiggsFieldMotionPicker.js";
+
+function isPresent(v: unknown): boolean {
+  if (v === null || v === undefined || v === false || v === "" || v === 0) return false;
+  if (Array.isArray(v)) return v.length > 0;
+  return true;
+}
+
+function evalRule(rule: UnavailableRule, vals: Record<string, unknown>): boolean {
+  if ("and" in rule) return rule.and.every((r) => evalRule(r, vals));
+  if ("or" in rule) return rule.or.some((r) => evalRule(r, vals));
+  const v = vals[rule.key];
+  if (rule.present !== undefined) return isPresent(v);
+  if (rule.absent !== undefined) return !isPresent(v);
+  if ("eq" in rule) return v === rule.eq;
+  if ("neq" in rule) return v !== rule.neq;
+  return false;
+}
 
 interface SettingsPanelProps {
   settings: ModelSettingDef[];
@@ -17,6 +34,7 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
   return (
     <div className="settings-panel">
       {settings.map((def) => {
+        if (def.unavailableIf && evalRule(def.unavailableIf, values)) return null;
         const val = values[def.key] !== undefined ? values[def.key] : def.default;
         return (
           <div key={def.key} className="settings-panel__row">
@@ -108,10 +126,8 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
             {def.type === "avatar-picker" && (
               <HeyGenAvatarPicker
                 avatarId={String(values["avatar_id"] ?? "")}
-                talkingPhotoId={String(values["talking_photo_id"] ?? "")}
-                onChange={(changes) => {
-                  Object.entries(changes).forEach(([k, v]) => onChange(k, v));
-                }}
+                imageAssetId={String(values["image_asset_id"] ?? "")}
+                onChange={(changes) => Object.entries(changes).forEach(([k, v]) => onChange(k, v))}
               />
             )}
             {def.type === "motion-picker" && (
