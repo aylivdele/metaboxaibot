@@ -175,6 +175,8 @@ export class HeyGenAdapter implements VideoAdapter {
       ? { type: "audio", audio_url: voiceUrl }
       : { type: "text", input_text: input.prompt, voice_id: voiceId };
 
+    const testMode = config.ai.heygenTestMode;
+
     // Fast path: pre-created talking photo avatar (from async avatar creation job)
     if (talkingPhotoId) {
       const body = {
@@ -186,6 +188,7 @@ export class HeyGenAdapter implements VideoAdapter {
           },
         ],
         dimension,
+        ...(testMode ? { test: true } : {}),
       };
       const res = await fetch(`${HEYGEN_API}/v2/video/generate`, {
         method: "POST",
@@ -231,6 +234,7 @@ export class HeyGenAdapter implements VideoAdapter {
           },
         ],
         dimension,
+        ...(testMode ? { test: true } : {}),
       };
 
       const res = await fetch(`${HEYGEN_API}/v2/video/generate`, {
@@ -264,6 +268,7 @@ export class HeyGenAdapter implements VideoAdapter {
         },
       ],
       dimension,
+      ...(testMode ? { test: true } : {}),
     };
 
     const res = await fetch(`${HEYGEN_API}/v2/video/generate`, {
