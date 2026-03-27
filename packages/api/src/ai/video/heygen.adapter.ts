@@ -67,7 +67,8 @@ export class HeyGenAdapter implements VideoAdapter {
     }
     const uploadData = (await uploadRes.json()) as { data?: { id?: string; image_key?: string } };
     const assetId = uploadData.data?.id;
-    if (!assetId) throw new Error(`HeyGen: no asset id in upload response: ${JSON.stringify(uploadData)}`);
+    if (!assetId)
+      throw new Error(`HeyGen: no asset id in upload response: ${JSON.stringify(uploadData)}`);
     return assetId;
   }
 
