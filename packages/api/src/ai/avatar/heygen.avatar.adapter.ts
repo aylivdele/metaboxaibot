@@ -1,5 +1,6 @@
 import { config } from "@metabox/shared";
 import type { AvatarAdapter, AvatarCreateResult, AvatarPollResult } from "./base.adapter.js";
+import { logger } from "../../logger.js";
 
 const HEYGEN_API = "https://api.heygen.com";
 const HEYGEN_UPLOAD = "https://upload.heygen.com";
@@ -59,6 +60,7 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
         avatar_list?: Array<{ id: string; preview_url?: string; preview_image_url?: string }>;
       };
     };
+    logger.info({ externalId }, `Poll result: ${JSON.stringify(data)}`);
     const status = data.data?.status;
     if (status === "completed") {
       const first = data.data?.avatar_list?.[0];
