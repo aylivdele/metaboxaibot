@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { CatalogResponse, CatalogSubscription, CatalogTokenPackage } from "../types.js";
@@ -212,7 +212,6 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
                   {periods.length > 1 && (
                     <div className="plan-card__periods">
                       {periods.map((pd) => {
-                        const disc = pd !== "M1" ? sub.periods[pd] : null;
                         const m1Price = Number(sub.periods.M1?.priceRub ?? 0);
                         const pdPrice = Number(sub.periods[pd]?.priceRub ?? 0);
                         const pctOff =
