@@ -150,11 +150,9 @@ export class HeyGenAdapter implements VideoAdapter {
 
     if (!res.ok) {
       throw new Error(`HeyGen poll failed: ${res.status} ${text}`);
-    } else {
-      logger.info({ videoId }, `HeyGen polling response: ${text}`);
     }
 
-    const result = (await res.json()) as HeyGenVideoStatus;
+    const result = JSON.parse(text) as HeyGenVideoStatus;
     const data = result.data;
 
     if (!data) throw new Error("HeyGen: empty status response");
@@ -167,3 +165,5 @@ export class HeyGenAdapter implements VideoAdapter {
     return { url, filename: "heygen.mp4" };
   }
 }
+
+//{"data":{"completed_at":1774616501,"created_at":1774616460,"duration":1.69796,"gif_url":"https://resource2.heygen.ai/video/398e496ce80049118a38da09d481c1db/gif.gif","id":"398e496ce80049118a38da09d481c1db","status":"completed","thumbnail_url":"https://files2.heygen.ai/aws_pacific/avatar_tmp/a2e501ec43184c02813519fb555d46ab/398e496ce80049118a38da09d481c1db.jpeg?Expires=1775221770&Signature=T9v8mrJrHcd3iI5OFv-qu6g1JnSQNLEAf3~MD6G1OiB9x4Q3MNGL9XjiQHZ8IogAVNnnaFbj8oHnPCpkOLMczXLIW5ibJtyBpbFfaSvroBj6xKN1k9pb8aDVX4oOa8-UtB9~ed1O4hkb8PhoSkdr3Tm8ObG6l1Vx6UKR5Iu-426pCZy62-9l21F7KO-~Bq4ixVqQckNcZnYUGxU64Ji9URGOAVfofHhqFapusd7e2DRRjkTiIswM13Rt8qWcgV33T4EMfVvUqtpDKLbeHanK8a2bkV9KmFO1xt5UxS~ZIQFQmHV4JA~gdnZIzPGurqCAC1u-yijEa~KOhkigeHLGZw__&Key-Pair-Id=K38HBHX5LX3X2H","title":"398e496ce80049118a38da09d481c1db","video_page_url":"https://app.heygen.com/videos/398e496ce80049118a38da09d481c1db","video_url":"https://files2.heygen.ai/aws_pacific/avatar_tmp/a2e501ec43184c02813519fb555d46ab/398e496ce80049118a38da09d481c1db.mp4?Expires=1775221317&Signature=P~3LVRRn4rOERciuizscb-Fuayi3ANAXnAk7PwYXQuxRzYIYLi7PSxbj-puwh0r3uT50xRn8MdbkWoI3GJC9PRQQGKhq5hb3LLytzJ4liNWMnvC53VRDrGREF6fRAdspeb6vcu-s8gvHkSfUtN2NOpwsvB5-7oM~qGQqEMQYmn0uj-7JxiG5xtmF-6XAcPl0PJPgjop6NW-j7nBXDu7ne-yU8W2iWYD7k4jKc377nkgz~BqIPy4pjtu0z7m5RQx8xMqCO7kYICZX7ppSB8tRUQk9lI7izLyH-l~RJnQCLftIXnPHtHw4D5TAp2prubwpJvTknu4g1ViXwZia7yfJMA__&Key-Pair-Id=K38HBHX5LX3X2H"}}

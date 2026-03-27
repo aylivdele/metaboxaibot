@@ -46,6 +46,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       modelSettings,
       userId: BigInt(userIdStr),
     });
+    logger.info({ dbJobId, modelId, providerJobId }, "Submitted video generation task");
 
     let videoResult = null;
     for (let i = 0; i < MAX_POLLS; i++) {
