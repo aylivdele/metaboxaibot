@@ -79,7 +79,7 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
         }
         return pv;
       },
-      undefined as { id: string; status: string, image_url: string } | undefined,
+      undefined as { id: string; status: string; image_url: string } | undefined,
     );
 
     if (avatar?.status === "completed") {
