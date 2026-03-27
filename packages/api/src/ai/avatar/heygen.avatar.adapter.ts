@@ -51,7 +51,11 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
       headers: { "X-Api-Key": this.apiKey },
     });
     if (!res.ok) {
-      // Treat HTTP errors as still-processing to avoid premature failure
+      const text = await res.text().catch(() => "");
+      logger.warn(
+        { externalId, status: res.status, body: text },
+        "HeyGen avatar poll HTTP error, treating as processing",
+      );
       return { status: "processing" };
     }
     const data = (await res.json()) as {
