@@ -55,7 +55,11 @@ export class DeepSeekAdapter implements LLMAdapter {
       { role: "user", content: input.prompt },
     ];
 
-    logCall(this.apiModel, "chatStream", { temperature: input.temperature, max_tokens: input.maxTokens, messages_count: messages.length });
+    logCall(this.apiModel, "chatStream", {
+      temperature: input.temperature,
+      max_tokens: input.maxTokens,
+      messages_count: messages.length,
+    });
     const stream = await this.client.chat.completions.create({
       model: this.apiModel,
       messages,

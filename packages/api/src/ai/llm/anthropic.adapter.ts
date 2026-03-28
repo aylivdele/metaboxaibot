@@ -48,7 +48,11 @@ export class AnthropicAdapter implements LLMAdapter {
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
     const messages = this.buildMessages(input);
-    logCall(this.apiModel, "chatStream", { temperature: input.temperature, max_tokens: input.maxTokens, messages_count: messages.length });
+    logCall(this.apiModel, "chatStream", {
+      temperature: input.temperature,
+      max_tokens: input.maxTokens,
+      messages_count: messages.length,
+    });
     const stream = this.client.messages.stream({
       model: this.apiModel,
       max_tokens: input.maxTokens ?? 4096,

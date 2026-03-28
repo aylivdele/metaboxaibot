@@ -38,7 +38,10 @@ export class OpenAIAdapter implements LLMAdapter {
   }
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
-    logCall(this.model, "chatStream", { temperature: input.temperature, max_tokens: input.maxTokens });
+    logCall(this.model, "chatStream", {
+      temperature: input.temperature,
+      max_tokens: input.maxTokens,
+    });
     const stream = await this.client.responses.create({
       model: this.model,
       input: this.buildInput(input),

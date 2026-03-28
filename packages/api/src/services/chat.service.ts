@@ -103,12 +103,7 @@ export const chatService = {
     await dialogService.saveMessage(dialogId, "assistant", responseText, { tokensUsed });
 
     // Deduct tokens
-    await deductTokens(
-      userId,
-      tokensUsed,
-      dialog.modelId,
-      dialogId
-    )
+    await deductTokens(userId, tokensUsed, dialog.modelId, dialogId);
 
     return { text: responseText, tokensUsed };
   },

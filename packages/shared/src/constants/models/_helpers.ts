@@ -3,7 +3,10 @@ import type { ModelSettingDef } from "../../types/ai.js";
 // ── Helper builders ───────────────────────────────────────────────────────────
 
 /** Creates an aspect_ratio select setting from an ordered list of ratio strings. */
-export function mkAspectRatio(ratios: string[], labelMap?: Record<string, string>): ModelSettingDef {
+export function mkAspectRatio(
+  ratios: string[],
+  labelMap?: Record<string, string>,
+): ModelSettingDef {
   return {
     key: "aspect_ratio",
     label: "Соотношение сторон",

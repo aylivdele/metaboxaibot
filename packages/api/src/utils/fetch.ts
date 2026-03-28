@@ -29,10 +29,7 @@ export function truncateStrings(value: unknown, maxLen = 20): unknown {
  *  - ArrayBuffer / TypedArray → logged as `<binary N bytes>`
  *  - null / undefined → not logged
  */
-export function fetchWithLog(
-  url: string | URL | Request,
-  init?: RequestInit,
-): Promise<Response> {
+export function fetchWithLog(url: string | URL | Request, init?: RequestInit): Promise<Response> {
   if (logger.isLevelEnabled("debug")) {
     const method = init?.method ?? "GET";
     const urlStr = url instanceof Request ? url.url : String(url);
