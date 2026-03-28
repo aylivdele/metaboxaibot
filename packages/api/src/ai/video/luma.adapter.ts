@@ -1,5 +1,6 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const LUMA_API = "https://api.lumalabs.ai/dream-machine/v1";
 
@@ -54,7 +55,7 @@ export class LumaAdapter implements VideoAdapter {
       };
     }
 
-    const res = await fetch(`${LUMA_API}/generations`, {
+    const res = await fetchWithLog(`${LUMA_API}/generations`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify(body),
@@ -70,7 +71,7 @@ export class LumaAdapter implements VideoAdapter {
   }
 
   async poll(generationId: string): Promise<VideoResult | null> {
-    const res = await fetch(`${LUMA_API}/generations/${generationId}`, {
+    const res = await fetchWithLog(`${LUMA_API}/generations/${generationId}`, {
       headers: this.headers(),
     });
 

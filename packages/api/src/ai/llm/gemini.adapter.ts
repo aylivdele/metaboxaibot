@@ -7,6 +7,7 @@ import type {
   StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const MODEL_MAP: Record<string, string> = {
   "gemini-2-flash": "gemini-2.5-flash",
@@ -93,7 +94,7 @@ export class GeminiAdapter implements LLMAdapter {
 }
 
 async function fetchImageAsBase64(url: string): Promise<string> {
-  const res = await fetch(url);
+  const res = await fetchWithLog(url);
   const buf = await res.arrayBuffer();
   return Buffer.from(buf).toString("base64");
 }

@@ -1,6 +1,7 @@
 import Replicate from "replicate";
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 /**
  * Replicate-backed video adapter.
@@ -46,6 +47,7 @@ export class ReplicateVideoAdapter implements VideoAdapter {
       if (input.aspectRatio) predInput.aspect_ratio = input.aspectRatio;
     }
 
+    logCall(String(this.model), "submit", predInput);
     const prediction = await this.client.predictions.create({
       model: this.model as `${string}/${string}`,
       input: predInput,

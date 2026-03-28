@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { LLMAdapter, LLMInput, LLMOutput, StreamResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 /**
  * OpenAI Responses API adapter (provider_chain strategy).
@@ -20,6 +21,7 @@ export class OpenAIAdapter implements LLMAdapter {
   }
 
   async chat(input: LLMInput): Promise<LLMOutput> {
+    logCall(this.model, "chat", { temperature: input.temperature, max_tokens: input.maxTokens });
     const response = await this.client.responses.create({
       model: this.model,
       input: this.buildInput(input),
@@ -36,6 +38,7 @@ export class OpenAIAdapter implements LLMAdapter {
   }
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
+    logCall(this.model, "chatStream", { temperature: input.temperature, max_tokens: input.maxTokens });
     const stream = await this.client.responses.create({
       model: this.model,
       input: this.buildInput(input),

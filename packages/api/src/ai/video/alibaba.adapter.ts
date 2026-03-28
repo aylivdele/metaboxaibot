@@ -1,5 +1,6 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const DASHSCOPE_BASE = "https://dashscope-intl.aliyuncs.com/api/v1";
 const SUBMIT_PATH = "/services/aigc/video-generation/video-synthesis";
@@ -89,7 +90,7 @@ export class AlibabaVideoAdapter implements VideoAdapter {
 
     const body = { model: dashscopeModel, input: apiInput, parameters };
 
-    const resp = await fetch(`${DASHSCOPE_BASE}${SUBMIT_PATH}`, {
+    const resp = await fetchWithLog(`${DASHSCOPE_BASE}${SUBMIT_PATH}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -110,7 +111,7 @@ export class AlibabaVideoAdapter implements VideoAdapter {
   }
 
   async poll(taskId: string): Promise<VideoResult | null> {
-    const resp = await fetch(`${DASHSCOPE_BASE}/tasks/${taskId}`, {
+    const resp = await fetchWithLog(`${DASHSCOPE_BASE}/tasks/${taskId}`, {
       headers: { Authorization: `Bearer ${this.apiKey}` },
     });
 

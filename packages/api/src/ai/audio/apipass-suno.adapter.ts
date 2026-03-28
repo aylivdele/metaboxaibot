@@ -1,5 +1,6 @@
 import type { AudioAdapter, AudioInput, AudioResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const APIPASS_BASE = "https://api.apipass.net";
 
@@ -24,7 +25,7 @@ export class ApipassSunoAdapter implements AudioAdapter {
 
     const ms = input.modelSettings ?? {};
 
-    const resp = await fetch(`${APIPASS_BASE}/api/generate`, {
+    const resp = await fetchWithLog(`${APIPASS_BASE}/api/generate`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -53,7 +54,7 @@ export class ApipassSunoAdapter implements AudioAdapter {
     const apiKey = config.ai.apipass;
     if (!apiKey) throw new Error("APIPASS_API_KEY not configured");
 
-    const resp = await fetch(`${APIPASS_BASE}/api/get?ids=${encodeURIComponent(clipId)}`, {
+    const resp = await fetchWithLog(`${APIPASS_BASE}/api/get?ids=${encodeURIComponent(clipId)}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
 

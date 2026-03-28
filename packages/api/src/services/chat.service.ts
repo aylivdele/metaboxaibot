@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { createLLMAdapter } from "../ai/llm/factory.js";
 import { dialogService } from "./dialog.service.js";
-import { calculateCost, checkBalance } from "./token.service.js";
+import { calculateCost, checkBalance, deductTokens } from "./token.service.js";
 import type { LLMInput } from "../ai/llm/base.adapter.js";
 import { AI_MODELS } from "@metabox/shared";
 import { userStateService } from "./user-state.service.js";
@@ -103,22 +103,12 @@ export const chatService = {
     await dialogService.saveMessage(dialogId, "assistant", responseText, { tokensUsed });
 
     // Deduct tokens
-    await db.$transaction([
-      db.user.update({
-        where: { id: userId },
-        data: { tokenBalance: { decrement: tokensUsed } },
-      }),
-      db.tokenTransaction.create({
-        data: {
-          userId,
-          amount: -tokensUsed,
-          type: "debit",
-          reason: "ai_usage",
-          modelId: dialog.modelId,
-          dialogId,
-        },
-      }),
-    ]);
+    await deductTokens(
+      userId,
+      tokensUsed,
+      dialog.modelId,
+      dialogId
+    )
 
     return { text: responseText, tokensUsed };
   },

@@ -7,6 +7,7 @@ import type {
   StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 const MODEL_MAP: Record<string, string> = {
   "perplexity-sonar-pro": "sonar-pro",
@@ -59,6 +60,7 @@ export class PerplexityAdapter implements LLMAdapter {
     if (input.temperature !== undefined) extraParams.temperature = input.temperature;
     if (input.maxTokens !== undefined) extraParams.max_tokens = input.maxTokens;
     if (input.searchRecencyFilter) extraParams.search_recency_filter = input.searchRecencyFilter;
+    logCall(this.apiModel, "chatStream", { messages_count: messages.length, ...extraParams });
     const stream = await (
       this.client.chat.completions.create as (p: unknown) => Promise<
         AsyncIterable<

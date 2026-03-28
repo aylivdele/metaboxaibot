@@ -7,6 +7,7 @@ import type {
   StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 const MODEL_MAP: Record<string, string> = {
   "deepseek-v3": "deepseek-chat",
@@ -54,6 +55,7 @@ export class DeepSeekAdapter implements LLMAdapter {
       { role: "user", content: input.prompt },
     ];
 
+    logCall(this.apiModel, "chatStream", { temperature: input.temperature, max_tokens: input.maxTokens, messages_count: messages.length });
     const stream = await this.client.chat.completions.create({
       model: this.apiModel,
       messages,

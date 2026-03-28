@@ -12,6 +12,7 @@ export async function deductTokens(
   modelId: string,
   dialogId?: string,
 ): Promise<void> {
+  
   await db.$transaction([
     db.user.update({
       where: { id: userId },

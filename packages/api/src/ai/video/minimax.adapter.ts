@@ -1,5 +1,6 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const MINIMAX_API_BASE = "https://api.minimax.io/v1";
 
@@ -85,7 +86,7 @@ export class MinimaxVideoAdapter implements VideoAdapter {
       body.first_frame_image = input.imageUrl;
     }
 
-    const resp = await fetch(`${MINIMAX_API_BASE}/video_generation`, {
+    const resp = await fetchWithLog(`${MINIMAX_API_BASE}/video_generation`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -108,7 +109,7 @@ export class MinimaxVideoAdapter implements VideoAdapter {
   }
 
   async poll(taskId: string): Promise<VideoResult | null> {
-    const resp = await fetch(
+    const resp = await fetchWithLog(
       `${MINIMAX_API_BASE}/query/video_generation?task_id=${encodeURIComponent(taskId)}`,
       {
         headers: { Authorization: `Bearer ${this.apiKey}` },
@@ -127,7 +128,7 @@ export class MinimaxVideoAdapter implements VideoAdapter {
     if (!data.file_id) throw new Error("MiniMax: no file_id in success response");
 
     // Retrieve actual download URL from file ID
-    const fileResp = await fetch(
+    const fileResp = await fetchWithLog(
       `${MINIMAX_API_BASE}/files/retrieve?file_id=${encodeURIComponent(data.file_id)}`,
       {
         headers: { Authorization: `Bearer ${this.apiKey}` },

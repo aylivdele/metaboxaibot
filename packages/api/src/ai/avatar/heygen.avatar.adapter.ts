@@ -1,5 +1,6 @@
 import { config } from "@metabox/shared";
 import type { AvatarAdapter, AvatarCreateResult, AvatarPollResult } from "./base.adapter.js";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const HEYGEN_UPLOAD = "https://upload.heygen.com";
 
@@ -18,7 +19,7 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
    * Creation is synchronous — no training job needed.
    */
   async create(imageBuffer: Buffer, contentType: string): Promise<AvatarCreateResult> {
-    const uploadRes = await fetch(`${HEYGEN_UPLOAD}/v1/asset`, {
+    const uploadRes = await fetchWithLog(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",
       headers: { "X-Api-Key": this.apiKey, "Content-Type": contentType },
       body: imageBuffer,

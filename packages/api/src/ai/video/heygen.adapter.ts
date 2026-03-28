@@ -2,6 +2,7 @@ import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { getFileUrl } from "../../services/s3.service.js";
 import { logger } from "../../logger.js";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const HEYGEN_API = "https://api.heygen.com";
 const HEYGEN_UPLOAD = "https://upload.heygen.com";
@@ -47,13 +48,13 @@ export class HeyGenAdapter implements VideoAdapter {
 
   /** Upload audio file to HeyGen asset storage. Returns asset id. */
   private async uploadAudioAsset(audioUrl: string): Promise<string> {
-    const audioRes = await fetch(audioUrl);
+    const audioRes = await fetchWithLog(audioUrl);
     if (!audioRes.ok)
       throw new Error(`Failed to fetch audio for HeyGen upload: ${audioRes.status}`);
     const audioBuffer = await audioRes.arrayBuffer();
     const contentType = audioRes.headers.get("content-type") ?? "audio/mpeg";
 
-    const uploadRes = await fetch(`${HEYGEN_UPLOAD}/v1/asset`, {
+    const uploadRes = await fetchWithLog(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",
       headers: { "X-Api-Key": this.apiKey, "Content-Type": contentType },
       body: audioBuffer,
@@ -77,12 +78,12 @@ export class HeyGenAdapter implements VideoAdapter {
       ? ((await getFileUrl(s3Key).catch(() => null)) ?? fallbackUrl)
       : fallbackUrl;
 
-    const imgRes = await fetch(imageUrl);
+    const imgRes = await fetchWithLog(imageUrl);
     if (!imgRes.ok) throw new Error(`Failed to fetch image for HeyGen upload: ${imgRes.status}`);
     const imgBuffer = await imgRes.arrayBuffer();
     const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
 
-    const uploadRes = await fetch(`${HEYGEN_UPLOAD}/v1/asset`, {
+    const uploadRes = await fetchWithLog(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",
       headers: { "X-Api-Key": this.apiKey, "Content-Type": contentType },
       body: imgBuffer,
@@ -184,7 +185,7 @@ export class HeyGenAdapter implements VideoAdapter {
       if (locale) body.locale = locale;
     }
 
-    const res = await fetch(`${HEYGEN_API}/v2/videos`, {
+    const res = await fetchWithLog(`${HEYGEN_API}/v2/videos`, {
       method: "POST",
       headers: this.jsonHeaders,
       body: JSON.stringify(body),
@@ -202,7 +203,7 @@ export class HeyGenAdapter implements VideoAdapter {
   }
 
   async poll(videoId: string): Promise<VideoResult | null> {
-    const res = await fetch(`${HEYGEN_API}/v2/videos/${videoId}`, {
+    const res = await fetchWithLog(`${HEYGEN_API}/v2/videos/${videoId}`, {
       headers: this.jsonHeaders,
     });
     const text = await res.text();

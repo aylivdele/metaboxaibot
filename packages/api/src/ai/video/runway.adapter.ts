@@ -1,5 +1,6 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const RUNWAY_API = "https://api.dev.runwayml.com/v1";
 
@@ -56,7 +57,7 @@ export class RunwayAdapter implements VideoAdapter {
       };
     }
 
-    const res = await fetch(`${RUNWAY_API}/image_to_video`, {
+    const res = await fetchWithLog(`${RUNWAY_API}/image_to_video`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify(body),
@@ -72,7 +73,7 @@ export class RunwayAdapter implements VideoAdapter {
   }
 
   async poll(taskId: string): Promise<VideoResult | null> {
-    const res = await fetch(`${RUNWAY_API}/tasks/${taskId}`, {
+    const res = await fetchWithLog(`${RUNWAY_API}/tasks/${taskId}`, {
       headers: this.headers(),
     });
 

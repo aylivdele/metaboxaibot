@@ -1,5 +1,6 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -72,7 +73,7 @@ export class VeoAdapter implements VideoAdapter {
     if (ms.resolution) parameters.resolution = ms.resolution;
     if (ms.negative_prompt) parameters.negativePrompt = ms.negative_prompt;
 
-    const res = await fetch(
+    const res = await fetchWithLog(
       `${BASE}/models/${this.apiModel}:predictLongRunning?key=${this.apiKey}`,
       {
         method: "POST",
@@ -92,7 +93,7 @@ export class VeoAdapter implements VideoAdapter {
   }
 
   async poll(operationName: string): Promise<VideoResult | null> {
-    const res = await fetch(`${BASE}/${operationName}?key=${this.apiKey}`, {
+    const res = await fetchWithLog(`${BASE}/${operationName}?key=${this.apiKey}`, {
       headers: this.headers(),
     });
 

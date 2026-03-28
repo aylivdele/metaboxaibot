@@ -1,6 +1,7 @@
 import Replicate from "replicate";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 /**
  * Models that accept a raw `aspect_ratio` string (e.g. "16:9") instead of
@@ -112,6 +113,7 @@ export class ReplicateAdapter implements ImageAdapter {
       ...msExtras,
     };
 
+    logCall(modelStr, "submit", predInput);
     // "owner/name:sha256hash" → pass version hash directly (POST /v1/predictions)
     // "owner/name"            → pass as model (POST /v1/models/{owner}/{name}/predictions)
     const colonIdx = modelStr.indexOf(":");

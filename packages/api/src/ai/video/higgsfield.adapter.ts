@@ -1,5 +1,6 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const HIGGSFIELD_API = "https://platform.higgsfield.ai";
 
@@ -62,7 +63,7 @@ export class HiggsFieldAdapter implements VideoAdapter {
       ...(motions?.length ? { motions } : {}),
     };
 
-    const res = await fetch(`${HIGGSFIELD_API}/v1/image2video/dop`, {
+    const res = await fetchWithLog(`${HIGGSFIELD_API}/v1/image2video/dop`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify(body),
@@ -78,7 +79,7 @@ export class HiggsFieldAdapter implements VideoAdapter {
   }
 
   async poll(requestId: string): Promise<VideoResult | null> {
-    const res = await fetch(`${HIGGSFIELD_API}/requests/${requestId}/status`, {
+    const res = await fetchWithLog(`${HIGGSFIELD_API}/requests/${requestId}/status`, {
       headers: this.headers(),
     });
 

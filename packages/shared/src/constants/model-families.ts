@@ -104,16 +104,17 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     ],
   },
 
-  minimax: {
-    id: "minimax",
-    name: "🎞️ Hailuo 2.3",
+  higgsfield: {
+    id: "higgsfield",
+    name: "🎬 Higgsfield",
     section: "video",
     description:
-      "Видеомодель MiniMax с плавным движением, поддержкой 1080p и 10-секундных клипов. Fast — быстрее и ~40% дешевле при схожем качестве.",
-    defaultModelId: "hailuo-fast",
+      "Специализируется на реалистичной анимации людей — мимика, жесты, движения тела выглядят естественно. Lite — доступная версия, Turbo — профессиональная, Preview — флагман.",
+    defaultModelId: "higgsfield",
     members: [
-      { modelId: "hailuo-fast", variantLabel: "Fast" },
-      { modelId: "hailuo", variantLabel: "Standard" },
+      { modelId: "higgsfield-lite", variantLabel: "Lite" },
+      { modelId: "higgsfield", variantLabel: "Turbo" },
+      { modelId: "higgsfield-preview", variantLabel: "Preview" },
     ],
   },
 
@@ -127,6 +128,19 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     members: [
       { modelId: "veo-fast", variantLabel: "Fast" },
       { modelId: "veo", variantLabel: "Standard" },
+    ],
+  },
+
+  minimax: {
+    id: "minimax",
+    name: "🎞️ Hailuo 2.3",
+    section: "video",
+    description:
+      "Видеомодель MiniMax с плавным движением, поддержкой 1080p и 10-секундных клипов. Fast — быстрее и ~40% дешевле при схожем качестве.",
+    defaultModelId: "hailuo-fast",
+    members: [
+      { modelId: "hailuo-fast", variantLabel: "Fast" },
+      { modelId: "hailuo", variantLabel: "Standard" },
     ],
   },
 };

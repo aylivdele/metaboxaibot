@@ -1,5 +1,6 @@
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const RECRAFT_API_BASE = "https://external.api.recraft.ai/v1";
 
@@ -49,7 +50,7 @@ export class RecraftAdapter implements ImageAdapter {
 
     if (input.imageUrl) {
       // Image-to-image via multipart form
-      const imgResp = await fetch(input.imageUrl);
+      const imgResp = await fetchWithLog(input.imageUrl);
       if (!imgResp.ok) throw new Error(`Failed to fetch source image: ${imgResp.status}`);
       const blob = await imgResp.blob();
 
@@ -60,7 +61,7 @@ export class RecraftAdapter implements ImageAdapter {
       form.append("style", style);
       if (ms.seed != null) form.append("random_seed", String(ms.seed));
 
-      const resp = await fetch(`${RECRAFT_API_BASE}/images/imageToImage`, {
+      const resp = await fetchWithLog(`${RECRAFT_API_BASE}/images/imageToImage`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}` },
         body: form,
@@ -82,7 +83,7 @@ export class RecraftAdapter implements ImageAdapter {
       };
       if (ms.seed != null) body.random_seed = ms.seed;
 
-      const resp = await fetch(`${RECRAFT_API_BASE}/images/generations`, {
+      const resp = await fetchWithLog(`${RECRAFT_API_BASE}/images/generations`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,

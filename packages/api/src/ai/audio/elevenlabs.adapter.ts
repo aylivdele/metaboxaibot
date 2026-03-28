@@ -1,5 +1,6 @@
 import type { AudioAdapter, AudioInput, AudioResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const ELEVENLABS_API = "https://api.elevenlabs.io/v1";
 
@@ -43,7 +44,7 @@ export class ElevenLabsAdapter implements AudioAdapter {
       use_speaker_boost: (ms.use_speaker_boost as boolean | undefined) ?? true,
     };
 
-    const res = await fetch(`${ELEVENLABS_API}/text-to-speech/${voiceId}`, {
+    const res = await fetchWithLog(`${ELEVENLABS_API}/text-to-speech/${voiceId}`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({
@@ -74,7 +75,7 @@ export class ElevenLabsAdapter implements AudioAdapter {
     };
     if (durationSeconds !== undefined) body.duration_seconds = durationSeconds;
 
-    const res = await fetch(`${ELEVENLABS_API}/sound-generation`, {
+    const res = await fetchWithLog(`${ELEVENLABS_API}/sound-generation`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify(body),

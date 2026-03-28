@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { AudioAdapter, AudioInput, AudioResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 const DEFAULT_VOICE: OpenAI.Audio.Speech.SpeechCreateParams["voice"] = "alloy";
 
@@ -26,6 +27,7 @@ export class OpenAiTtsAdapter implements AudioAdapter {
     const format = ((ms.format as string | undefined) ??
       "mp3") as OpenAI.Audio.Speech.SpeechCreateParams["response_format"];
 
+    logCall("tts-1", "tts", { voice, speed, format });
     const response = await this.client.audio.speech.create({
       model: "tts-1",
       input: input.prompt,

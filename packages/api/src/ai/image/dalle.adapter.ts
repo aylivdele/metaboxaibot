@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const DALLE_SIZES: Record<string, "1024x1024" | "1792x1024" | "1024x1792"> = {
   "1:1": "1024x1024",
@@ -58,7 +59,7 @@ export class DalleAdapter implements ImageAdapter {
 
   private async generateVariation(imageUrl: string): Promise<ImageResult> {
     // Download the reference image as a Buffer for the DALL-E 2 variations API
-    const resp = await fetch(imageUrl);
+    const resp = await fetchWithLog(imageUrl);
     if (!resp.ok) throw new Error(`Failed to fetch reference image: ${resp.status}`);
     const arrayBuffer = await resp.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);

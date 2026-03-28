@@ -1,6 +1,7 @@
 import { fal } from "@fal-ai/client";
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 /** Text-to-video endpoint for each model. */
 const FAL_ENDPOINTS: Record<string, string> = {
@@ -46,15 +47,15 @@ export class FalVideoAdapter implements VideoAdapter {
     if (ms.resolution) msExtras.resolution = ms.resolution;
     if (ms.motion_strength !== undefined) msExtras.motion_strength = ms.motion_strength;
     if (ms.seed != null) msExtras.seed = ms.seed;
-    const { request_id } = await fal.queue.submit(endpoint, {
-      input: {
-        prompt: input.prompt,
-        ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
-        ...(input.duration ? { duration: input.duration } : {}),
-        ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
-        ...msExtras,
-      },
-    });
+    const falInput = {
+      prompt: input.prompt,
+      ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
+      ...(input.duration ? { duration: input.duration } : {}),
+      ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
+      ...msExtras,
+    };
+    logCall(endpoint, "submit", falInput);
+    const { request_id } = await fal.queue.submit(endpoint, { input: falInput });
     return `${endpoint}${SEP}${request_id}`;
   }
 

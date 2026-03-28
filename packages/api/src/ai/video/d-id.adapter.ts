@@ -1,6 +1,7 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { getFileUrl } from "../../services/s3.service.js";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const DID_API = "https://api.d-id.com";
 
@@ -71,7 +72,7 @@ export class DIDAdapter implements VideoAdapter {
       ...(driverUrl ? { driver_url: driverUrl } : {}),
     };
 
-    const res = await fetch(`${DID_API}/talks`, {
+    const res = await fetchWithLog(`${DID_API}/talks`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify(body),
@@ -87,7 +88,7 @@ export class DIDAdapter implements VideoAdapter {
   }
 
   async poll(talkId: string): Promise<VideoResult | null> {
-    const res = await fetch(`${DID_API}/talks/${talkId}`, {
+    const res = await fetchWithLog(`${DID_API}/talks/${talkId}`, {
       headers: this.headers(),
     });
 

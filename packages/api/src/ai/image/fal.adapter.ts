@@ -1,6 +1,7 @@
 import { fal } from "@fal-ai/client";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 /** Text-to-image endpoint for each model. */
 const T2I_ENDPOINTS: Record<string, string> = {
@@ -78,17 +79,17 @@ export class FalAdapter implements ImageAdapter {
     if (ms.enable_safety_checker != null) msExtras.enable_safety_checker = ms.enable_safety_checker;
 
     const useAspectRatio = ASPECT_RATIO_MODELS.has(this.modelId);
-    const { request_id } = await fal.queue.submit(endpoint, {
-      input: {
-        prompt: input.prompt,
-        negative_prompt: (ms.negative_prompt as string | undefined) || input.negativePrompt,
-        ...(useAspectRatio
-          ? { aspect_ratio: input.aspectRatio ?? "1:1" }
-          : { image_size: this.resolveSize(input) }),
-        ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
-        ...msExtras,
-      },
-    });
+    const falInput = {
+      prompt: input.prompt,
+      negative_prompt: (ms.negative_prompt as string | undefined) || input.negativePrompt,
+      ...(useAspectRatio
+        ? { aspect_ratio: input.aspectRatio ?? "1:1" }
+        : { image_size: this.resolveSize(input) }),
+      ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
+      ...msExtras,
+    };
+    logCall(endpoint, "submit", falInput as Record<string, unknown>);
+    const { request_id } = await fal.queue.submit(endpoint, { input: falInput });
     // Encode endpoint in the returned ID so poll() uses the correct route.
     return `${endpoint}${SEP}${request_id}`;
   }

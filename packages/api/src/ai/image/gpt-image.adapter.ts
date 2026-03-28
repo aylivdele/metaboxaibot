@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 /** USD cost per image by quality × size. */
 const COST_TABLE: Record<string, Record<string, number>> = {
@@ -42,6 +43,7 @@ export class GptImageAdapter implements ImageAdapter {
     if (background && background !== "auto") tool.background = background;
     if (moderation && moderation !== "auto") tool.moderation = moderation;
 
+    logCall("gpt-image-1", "generate", { quality, size, output_format: outputFormat });
     const response = await (
       this.client.responses.create as (p: unknown) => Promise<{
         output: Array<{ type: string; result?: string }>;
