@@ -5,7 +5,16 @@ import { logger } from "../logger.js";
 
 /** Answer Telegram's pre-checkout query — must respond within 10 seconds. */
 export async function handlePreCheckoutQuery(ctx: BotContext): Promise<void> {
-  await ctx.answerPreCheckoutQuery(true);
+  logger.info(
+    { userId: ctx.from?.id, payload: ctx.preCheckoutQuery?.invoice_payload },
+    "pre_checkout_query received",
+  );
+  try {
+    await ctx.answerPreCheckoutQuery(true);
+    logger.info("pre_checkout_query answered OK");
+  } catch (err) {
+    logger.error({ err }, "pre_checkout_query answer FAILED");
+  }
 }
 
 /** Credit tokens after Stars payment is confirmed. */
