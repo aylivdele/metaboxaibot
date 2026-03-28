@@ -92,23 +92,31 @@ const REASONING_EFFORT: ModelSettingDef = {
 };
 
 /**
- * Reasoning effort for gpt-5.4 / gpt-5.4-pro — extended range:
- * none (disable reasoning, enables temperature), low, medium, high, xhigh.
+ * Reasoning effort for gpt-5.4 / gpt-5.4-pro — supported: medium, high, xhigh.
  */
 const REASONING_EFFORT_GPT5: ModelSettingDef = {
   key: "reasoning_effort",
   label: "Глубина рассуждений",
-  description:
-    "none — отключает рассуждения (быстрее), xhigh — максимальная точность для сложных задач.",
+  description: "medium — сбалансировано, xhigh — максимальная точность для сложных задач.",
   type: "select",
   options: [
-    { value: "none", label: "Откл." },
-    { value: "low", label: "Низкая" },
     { value: "medium", label: "Средняя" },
     { value: "high", label: "Высокая" },
     { value: "xhigh", label: "Макс." },
   ],
   default: "medium",
+};
+
+/**
+ * Reasoning effort for gpt-5-pro — only "high" is supported.
+ */
+const REASONING_EFFORT_GPT5_PRO: ModelSettingDef = {
+  key: "reasoning_effort",
+  label: "Глубина рассуждений",
+  description: "gpt-5-pro поддерживает только максимальный уровень рассуждений.",
+  type: "select",
+  options: [{ value: "high", label: "Высокая" }],
+  default: "high",
 };
 
 /** Output verbosity for gpt-5 family models. */
@@ -255,25 +263,25 @@ export const GPT_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
-    settings: [REASONING_EFFORT, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
+    settings: [REASONING_EFFORT_GPT5_PRO, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
   },
-  "gpt-5-mini": {
-    id: "gpt-5-mini",
-    name: "🌀 GPT 5 Mini",
-    description: "Компактная и быстрая, хороша для повседневных задач.",
-    section: "gpt",
-    provider: "openai",
-    costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 0.25,
-    outputCostUsdPerMToken: 2.0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    contextStrategy: "provider_chain",
-    contextMaxMessages: 0,
-    settings: [VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
-  },
+  // "gpt-5-mini": { //TODO: verify account org
+  //   id: "gpt-5-mini",
+  //   name: "🌀 GPT 5 Mini",
+  //   description: "Компактная и быстрая, хороша для повседневных задач.",
+  //   section: "gpt",
+  //   provider: "openai",
+  //   costUsdPerRequest: 0,
+  //   inputCostUsdPerMToken: 0.25,
+  //   outputCostUsdPerMToken: 2.0,
+  //   supportsImages: true,
+  //   supportsVoice: false,
+  //   supportsWeb: false,
+  //   isAsync: false,
+  //   contextStrategy: "provider_chain",
+  //   contextMaxMessages: 0,
+  //   settings: [VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
+  // },
   "gpt-5-nano": {
     id: "gpt-5-nano",
     name: "✨ GPT 5 Nano",
@@ -308,23 +316,23 @@ export const GPT_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     settings: [REASONING_EFFORT, ...REASONING_MODEL_SETTINGS],
   },
-  o3: {
-    id: "o3",
-    name: "🧩 GPT-o3",
-    description: "Мощная reasoning-модель OpenAI, глубокие рассуждения для самых сложных задач.",
-    section: "gpt",
-    provider: "openai",
-    costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 2.0,
-    outputCostUsdPerMToken: 8.0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    contextStrategy: "provider_chain",
-    contextMaxMessages: 0,
-    settings: [REASONING_EFFORT, ...REASONING_MODEL_SETTINGS],
-  },
+  // o3: {
+  //   id: "o3",
+  //   name: "🧩 GPT-o3",
+  //   description: "Мощная reasoning-модель OpenAI, глубокие рассуждения для самых сложных задач.",
+  //   section: "gpt",
+  //   provider: "openai",
+  //   costUsdPerRequest: 0,
+  //   inputCostUsdPerMToken: 2.0,
+  //   outputCostUsdPerMToken: 8.0,
+  //   supportsImages: true,
+  //   supportsVoice: false,
+  //   supportsWeb: false,
+  //   isAsync: false,
+  //   contextStrategy: "provider_chain",
+  //   contextMaxMessages: 0,
+  //   settings: [REASONING_EFFORT, ...REASONING_MODEL_SETTINGS],
+  // },
   "o3-mini": {
     id: "o3-mini",
     name: "🔩 GPT-o3 Mini",

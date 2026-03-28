@@ -51,6 +51,7 @@ export const dialogsRoutes: FastifyPluginAsync = async (fastify) => {
         modelId: dialog.modelId,
         title: dialog.title ?? null,
         createdAt: dialog.createdAt.toISOString(),
+        updatedAt: dialog.updatedAt.toISOString(),
       };
     },
   );

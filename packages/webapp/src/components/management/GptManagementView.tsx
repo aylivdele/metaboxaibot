@@ -125,7 +125,7 @@ export function GptManagementView() {
       <div className="page">
         <div className="page-header">
           <button className="back-btn" onClick={() => setSettingsDialog(null)}>
-            ← {t("common.back")}
+            {t("common.back")}
           </button>
           <h2>{settingsDialog.title ?? settingsDialog.modelId}</h2>
           {dlgModel && <p className="page-subtitle">{dlgModel.name}</p>}

@@ -21,6 +21,39 @@ const DEFAULT_GPT_MODEL = "gpt-4o";
 /** Minimum ms between Telegram message edits (rate-limit safety). */
 const EDIT_THROTTLE_MS = 1200;
 
+/**
+ * Closes any unclosed Markdown markers so that a partial streaming response
+ * is always valid for Telegram's Markdown parser.
+ * Priority: ``` → ` → * → _
+ */
+function closeOpenMarkdown(text: string): string {
+  // 1. Close unclosed triple-backtick code block
+  if ((text.match(/```/g) ?? []).length % 2 !== 0) {
+    return text + "\n```";
+  }
+
+  // Strip complete code blocks/inline code before counting remaining markers
+  const noBlocks = text.replace(/```[\s\S]*?```/g, "");
+  const noInline = noBlocks.replace(/`[^`\n]*`/g, "");
+
+  // 2. Close unclosed inline backtick
+  if ((noBlocks.match(/`/g) ?? []).length % 2 !== 0) {
+    return text + "`";
+  }
+
+  // 3. Close unclosed bold/italic asterisk
+  if ((noInline.match(/\*/g) ?? []).length % 2 !== 0) {
+    return text + "*";
+  }
+
+  // 4. Close unclosed italic underscore
+  if ((noInline.match(/_/g) ?? []).length % 2 !== 0) {
+    return text + "_";
+  }
+
+  return text;
+}
+
 // ── Shared streaming helper ───────────────────────────────────────────────────
 
 async function streamGptResponse(
@@ -46,17 +79,26 @@ async function streamGptResponse(
       accumulated += chunk;
       const now = Date.now();
       if (now - lastEdit >= EDIT_THROTTLE_MS && accumulated.trim()) {
+        const preview = closeOpenMarkdown(accumulated) + " ▌";
         await ctx.api
-          .editMessageText(chatId, placeholder.message_id, accumulated + " ▌")
-          .catch(() => void 0);
+          .editMessageText(chatId, placeholder.message_id, preview, { parse_mode: "Markdown" })
+          .catch(() =>
+            ctx.api
+              .editMessageText(chatId, placeholder.message_id, accumulated + " ▌")
+              .catch(() => void 0),
+          );
         lastEdit = now;
       }
     }
 
     if (accumulated.trim()) {
+      // Try to render with Markdown; fall back to plain text if the response
+      // contains characters that break the parser (e.g. unbalanced symbols).
       await ctx.api
-        .editMessageText(chatId, placeholder.message_id, accumulated)
-        .catch(() => void 0);
+        .editMessageText(chatId, placeholder.message_id, accumulated, { parse_mode: "Markdown" })
+        .catch(() =>
+          ctx.api.editMessageText(chatId, placeholder.message_id, accumulated).catch(() => void 0),
+        );
     } else {
       await ctx.api.deleteMessage(chatId, placeholder.message_id).catch(() => void 0);
     }
