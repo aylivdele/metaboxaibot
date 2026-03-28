@@ -250,11 +250,16 @@ jobs:
             echo "Updating repo (compose file, nginx config)..."
             git -c "url.https://x-access-token:${GHCR_TOKEN}@github.com/.insteadOf=https://github.com/" pull origin develop
 
-            echo "Updating IMAGE_TAG and GHCR_IMAGE_PREFIX in .env..."
-            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env \
-              || echo "IMAGE_TAG=$IMAGE_TAG" >> .env
-            sed -i "s|^GHCR_IMAGE_PREFIX=.*|GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX|" .env \
-              || echo "GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX" >> .env
+            # Only update IMAGE_TAG if at least one service was rebuilt
+            if [ "$BUILT_API" = "true" ] || [ "$BUILT_BOT" = "true" ] || [ "$BUILT_WORKER" = "true" ]; then
+              echo "Updating IMAGE_TAG and GHCR_IMAGE_PREFIX in .env..."
+              sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env \
+                || echo "IMAGE_TAG=$IMAGE_TAG" >> .env
+              sed -i "s|^GHCR_IMAGE_PREFIX=.*|GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX|" .env \
+                || echo "GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX" >> .env
+            else
+              echo "No services rebuilt — keeping existing IMAGE_TAG"
+            fi
 
             # Pull only services that were actually rebuilt
             SERVICES=""
@@ -265,12 +270,12 @@ jobs:
             if [ -n "$SERVICES" ]; then
               echo "Pulling new images:$SERVICES"
               docker compose -f docker-compose.test.yml pull $SERVICES
-            else
-              echo "No new images to pull"
-            fi
 
-            echo "Restarting services..."
-            docker compose -f docker-compose.test.yml up -d --no-build --remove-orphans
+              echo "Restarting updated services:$SERVICES"
+              docker compose -f docker-compose.test.yml up -d --no-build $SERVICES
+            else
+              echo "No new images to pull — skipping restart"
+            fi
 
             echo "Pruning old images..."
             docker image prune -af
