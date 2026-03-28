@@ -25,6 +25,29 @@ export const paymentService = {
     });
   },
 
+  /** Send a Telegram Stars invoice directly to user's chat via sendInvoice. */
+  async sendInvoiceToChat(
+    chatId: bigint,
+    params: { title: string; description: string; payload: string; stars: number },
+  ): Promise<void> {
+    const res = await fetch(`https://api.telegram.org/bot${config.bot.token}/sendInvoice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId.toString(),
+        title: params.title,
+        description: params.description,
+        payload: params.payload,
+        provider_token: "",
+        currency: "XTR",
+        prices: [{ label: params.title, amount: params.stars }],
+      }),
+    });
+
+    const data = (await res.json()) as { ok: boolean; description?: string };
+    if (!data.ok) throw new Error(data.description ?? "sendInvoice failed");
+  },
+
   /** Create a Telegram Stars invoice with arbitrary parameters. */
   async createDynamicInvoice(params: {
     title: string;
