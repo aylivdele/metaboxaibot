@@ -5,8 +5,8 @@ import {
   userUploadsService,
   userAvatarService,
   s3Service,
-  calculateCost,
 } from "@metabox/api/services";
+import { buildCostLine } from "../utils/cost-line.js";
 import { HeyGenAvatarAdapter } from "@metabox/api/ai/avatar/heygen";
 import { MODELS_BY_SECTION, AI_MODELS, config } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
@@ -44,8 +44,7 @@ export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
       model.supportedDurations?.[0] ??
       model.durationRange?.min ??
       5;
-    const cost = calculateCost(model, 0, 0, undefined, undefined, modelSettings, defaultDuration);
-    const costLine = ctx.t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
+    const costLine = buildCostLine(model, modelSettings, ctx.t, defaultDuration);
     const webappUrl = config.bot.webappUrl;
     const kb = webappUrl
       ? new InlineKeyboard().webApp(
@@ -154,8 +153,7 @@ export async function handleVideoAvatars(ctx: BotContext): Promise<void> {
   if (model) {
     const allSettings = await userStateService.getModelSettings(ctx.user.id);
     const modelSettings = allSettings["heygen"] ?? {};
-    const cost = calculateCost(model, 0, 0, undefined, undefined, modelSettings);
-    const costLine = ctx.t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
+    const costLine = buildCostLine(model, modelSettings, ctx.t);
     const webappUrl = config.bot.webappUrl;
     const kb = webappUrl
       ? new InlineKeyboard().webApp(
@@ -181,8 +179,7 @@ export async function handleVideoLipSync(ctx: BotContext): Promise<void> {
   if (model) {
     const allSettings = await userStateService.getModelSettings(ctx.user.id);
     const modelSettings = allSettings["d-id"] ?? {};
-    const cost = calculateCost(model, 0, 0, undefined, undefined, modelSettings);
-    const costLine = ctx.t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
+    const costLine = buildCostLine(model, modelSettings, ctx.t);
     const webappUrl = config.bot.webappUrl;
     const kb = webappUrl
       ? new InlineKeyboard().webApp(

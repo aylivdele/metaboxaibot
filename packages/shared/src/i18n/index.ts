@@ -115,6 +115,9 @@ export interface Translations {
     tokens: string;
     sendOriginal: string;
     costPerRequest: string;
+    costPerMPixel: string;
+    costPerSecond: string;
+    costPerKChar: string;
   };
   payments: {
     success: string;

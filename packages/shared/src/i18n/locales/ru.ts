@@ -137,6 +137,9 @@ export default {
     tokens: "токенов",
     sendOriginal: "📎 Отправить оригинал",
     costPerRequest: "💰 {cost} ✦ за запрос",
+    costPerMPixel: "💰 {cost} ✦ за мегапиксель",
+    costPerSecond: "💰 {cost} ✦ за секунду",
+    costPerKChar: "💰 {cost} ✦ за 1К символов",
   },
   payments: {
     success: "✅ Оплата прошла успешно! Токены зачислены на ваш баланс.",

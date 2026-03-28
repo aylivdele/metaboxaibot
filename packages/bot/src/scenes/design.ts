@@ -1,10 +1,6 @@
 import type { BotContext } from "../types/context.js";
-import {
-  dialogService,
-  generationService,
-  userStateService,
-  calculateCost,
-} from "@metabox/api/services";
+import { dialogService, generationService, userStateService } from "@metabox/api/services";
+import { buildCostLine } from "../utils/cost-line.js";
 import {
   MODELS_BY_SECTION,
   AI_MODELS,
@@ -67,8 +63,7 @@ export async function activateDesignModel(ctx: BotContext, modelId: string): Pro
   if (model) {
     const allSettings = await userStateService.getModelSettings(ctx.user.id);
     const modelSettings = allSettings[modelId] ?? {};
-    const cost = calculateCost(model, 0, 0, undefined, undefined, modelSettings);
-    const costLine = ctx.t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
+    const costLine = buildCostLine(model, modelSettings, ctx.t);
     const webappUrl = config.bot.webappUrl;
     const kb = webappUrl
       ? new InlineKeyboard().webApp(

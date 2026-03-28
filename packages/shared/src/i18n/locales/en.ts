@@ -137,6 +137,9 @@ export default {
     tokens: "tokens",
     sendOriginal: "📎 Send as file",
     costPerRequest: "💰 {cost} ✦ per request",
+    costPerMPixel: "💰 {cost} ✦ per megapixel",
+    costPerSecond: "💰 {cost} ✦ per second",
+    costPerKChar: "💰 {cost} ✦ per 1K characters",
   },
   payments: {
     success: "✅ Payment successful! Tokens have been credited to your balance.",
