@@ -72,8 +72,8 @@ export const chatService = {
       input.previousResponseId = dialog.providerLastResponseId ?? undefined;
     }
 
-    // Save user message
-    await dialogService.saveMessage(dialogId, "user", content);
+    // Save user message — keep the ID so we can mark it failed on error
+    const userMessage = await dialogService.saveMessage(dialogId, "user", content);
 
     // Stream response — iterate manually to capture the generator return value
     const chunks: string[] = [];
@@ -83,22 +83,27 @@ export const chatService = {
     let outputTokensUsed: number | undefined;
     let providerUsdCost: number | undefined;
 
-    while (true) {
-      const next = await gen.next();
-      if (next.done) {
-        const result = next.value;
-        if (result?.newResponseId) {
-          await dialogService.updateProviderContext(dialogId, {
-            providerLastResponseId: result.newResponseId,
-          });
+    try {
+      while (true) {
+        const next = await gen.next();
+        if (next.done) {
+          const result = next.value;
+          if (result?.newResponseId) {
+            await dialogService.updateProviderContext(dialogId, {
+              providerLastResponseId: result.newResponseId,
+            });
+          }
+          inputTokensUsed = result?.inputTokensUsed;
+          outputTokensUsed = result?.outputTokensUsed;
+          providerUsdCost = result?.providerUsdCost;
+          break;
         }
-        inputTokensUsed = result?.inputTokensUsed;
-        outputTokensUsed = result?.outputTokensUsed;
-        providerUsdCost = result?.providerUsdCost;
-        break;
+        chunks.push(next.value);
+        yield next.value;
       }
-      chunks.push(next.value);
-      yield next.value;
+    } catch (err) {
+      await dialogService.markMessageFailed(userMessage.id);
+      throw err;
     }
 
     const responseText = chunks.join("");

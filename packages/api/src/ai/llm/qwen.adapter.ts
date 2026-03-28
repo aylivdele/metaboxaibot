@@ -32,9 +32,10 @@ export class QwenAdapter implements LLMAdapter {
     contextMaxMessages = 40,
     apiKey = config.ai.qwen,
   ) {
+    if (!apiKey) throw new Error("[QwenAdapter] QWEN_API_KEY is not set");
     this.client = new OpenAI({
       apiKey,
-      baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
     });
     this.apiModel = MODEL_MAP[model] ?? model;
     this.contextMaxMessages = contextMaxMessages;

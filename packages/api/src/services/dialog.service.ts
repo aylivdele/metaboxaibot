@@ -70,6 +70,11 @@ export const dialogService = {
     });
   },
 
+  /** Mark a message as failed so it is excluded from future LLM history. */
+  async markMessageFailed(messageId: string): Promise<void> {
+    await db.message.update({ where: { id: messageId }, data: { failed: true } });
+  },
+
   /** Fetch a single message by ID (used for img2img reference lookup). */
   async getMessageById(id: string): Promise<Pick<Message, "id" | "mediaUrl" | "mediaType"> | null> {
     return db.message.findUnique({
@@ -94,13 +99,13 @@ export const dialogService = {
     });
   },
 
-  /** Fetch last N messages for db_history strategy. */
+  /** Fetch last N messages for db_history strategy (excludes failed messages). */
   async getHistory(
     dialogId: string,
     limit: number,
   ): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
     const messages = await db.message.findMany({
-      where: { dialogId },
+      where: { dialogId, failed: false },
       orderBy: { createdAt: "desc" },
       take: limit,
       select: { role: true, content: true },

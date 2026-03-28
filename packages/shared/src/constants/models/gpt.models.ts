@@ -2,19 +2,24 @@ import type { AIModel, ModelSettingDef } from "../../types/ai.js";
 
 // ── Reusable setting blocks ───────────────────────────────────────────────────
 
+const TEMPERATURE_SETTING: ModelSettingDef = {
+  key: "temperature",
+  label: "Температура",
+  description:
+    "Степень случайности ответов: ниже — точнее и предсказуемее, выше — разнообразнее и творчески.",
+  type: "slider",
+  min: 0,
+  max: 2,
+  step: 0.05,
+  default: 1.0,
+};
+
+/** Perplexity requires t < 2 (strictly), so cap at 1.99. */
+const TEMPERATURE_SETTING_PERPLEXITY: ModelSettingDef = { ...TEMPERATURE_SETTING, max: 1.99 };
+
 /** Standard LLM controls: temperature, max output tokens, system prompt. */
 const LLM_SETTINGS: ModelSettingDef[] = [
-  {
-    key: "temperature",
-    label: "Температура",
-    description:
-      "Степень случайности ответов: ниже — точнее и предсказуемее, выше — разнообразнее и творчески.",
-    type: "slider",
-    min: 0,
-    max: 2,
-    step: 0.05,
-    default: 1.0,
-  },
+  TEMPERATURE_SETTING,
   {
     key: "max_tokens",
     label: "Макс. длина ответа",
@@ -693,7 +698,6 @@ export const GPT_MODELS: Record<string, AIModel> = {
 // ── Apply settings ────────────────────────────────────────────────────────────
 // Models with explicitly defined settings (e.g. gpt-5 family, o-series) are skipped.
 // All other LLM models get LLM_SETTINGS + provider-specific extras.
-const GROK_REASONING_IDS = new Set(["grok-4", "grok-4-fast"]);
 const ANTHROPIC_THINKING_IDS = new Set([
   "claude-opus",
   "claude-opus-4-5",
@@ -714,13 +718,17 @@ for (const [id, model] of Object.entries(GPT_MODELS)) {
   const extras: ModelSettingDef[] = [];
 
   if (id.startsWith("perplexity")) {
-    extras.push(PERPLEXITY_EXTRA, PERPLEXITY_SEARCH_CONTEXT, PERPLEXITY_DOMAIN_FILTER);
+    model.settings = [
+      TEMPERATURE_SETTING_PERPLEXITY,
+      ...LLM_SETTINGS.slice(1),
+      PERPLEXITY_EXTRA,
+      PERPLEXITY_SEARCH_CONTEXT,
+      PERPLEXITY_DOMAIN_FILTER,
+    ];
+    continue;
   }
   if (id === "grok-3-mini") {
     extras.push(GROK_MINI_REASONING);
-  }
-  if (GROK_REASONING_IDS.has(id)) {
-    extras.push(REASONING_EFFORT);
   }
   if (ANTHROPIC_THINKING_IDS.has(id)) {
     extras.push(EXTENDED_THINKING);
