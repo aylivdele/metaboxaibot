@@ -65,8 +65,9 @@ export function createBot(token: string): Bot<BotContext> {
   bot.use(rateLimitMiddleware);
 
   // ── Private chats only — ignore all group/channel updates ────────────────
+  // Updates without ctx.chat (e.g. pre_checkout_query) must always pass through.
   bot.use(async (ctx, next) => {
-    if (ctx.chat?.type === "private") return next();
+    if (!ctx.chat || ctx.chat.type === "private") return next();
   });
 
   // ── Commands ─────────────────────────────────────────────────────────────
