@@ -56,6 +56,14 @@ function closeOpenMarkdown(text: string): string {
   return text;
 }
 
+/** Strip <think>...</think> blocks. During streaming, also hides an unclosed partial block. */
+function stripThinkingBlocks(text: string): string {
+  let result = text.replace(/\s*<think>[\s\S]*?<\/think>\s*/g, "");
+  const openIdx = result.indexOf("<think>");
+  if (openIdx !== -1) result = result.slice(0, openIdx);
+  return result.trim();
+}
+
 // ── Shared streaming helper ───────────────────────────────────────────────────
 
 async function streamGptResponse(
@@ -93,7 +101,7 @@ async function streamGptResponse(
 
       // Split into a new message when approaching Telegram's 4096-char limit
       if (accumulated.length >= MSG_SPLIT_AT) {
-        await finalizeMessage(placeholder.message_id, closeOpenMarkdown(accumulated));
+        await finalizeMessage(placeholder.message_id, closeOpenMarkdown(stripThinkingBlocks(accumulated)));
         placeholder = await ctx.reply("⏳");
         accumulated = "";
         lastEdit = Date.now();
@@ -102,21 +110,25 @@ async function streamGptResponse(
 
       const now = Date.now();
       if (now - lastEdit >= EDIT_THROTTLE_MS && accumulated.trim()) {
-        const preview = closeOpenMarkdown(accumulated) + " ▌";
-        await ctx.api
-          .editMessageText(chatId, placeholder.message_id, preview, { parse_mode: "Markdown" })
-          .catch(async (err) => {
-            logger.warn(err, "GPT stream: markdown preview failed, retrying as plain text");
-            await ctx.api
-              .editMessageText(chatId, placeholder.message_id, accumulated + " ▌")
-              .catch((e) => logger.error(e, "GPT stream: plain text preview also failed"));
-          });
-        lastEdit = now;
+        const visible = stripThinkingBlocks(accumulated);
+        if (visible) {
+          const preview = closeOpenMarkdown(visible) + " ▌";
+          await ctx.api
+            .editMessageText(chatId, placeholder.message_id, preview, { parse_mode: "Markdown" })
+            .catch(async (err) => {
+              logger.warn(err, "GPT stream: markdown preview failed, retrying as plain text");
+              await ctx.api
+                .editMessageText(chatId, placeholder.message_id, visible + " ▌")
+                .catch((e) => logger.error(e, "GPT stream: plain text preview also failed"));
+            });
+          lastEdit = now;
+        }
       }
     }
 
-    if (accumulated.trim()) {
-      await finalizeMessage(placeholder.message_id, accumulated);
+    const finalText = stripThinkingBlocks(accumulated);
+    if (finalText) {
+      await finalizeMessage(placeholder.message_id, finalText);
     } else {
       await ctx.api.deleteMessage(chatId, placeholder.message_id).catch(() => void 0);
     }

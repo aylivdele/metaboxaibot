@@ -106,7 +106,7 @@ export const chatService = {
       throw err;
     }
 
-    const responseText = chunks.join("");
+    const responseText = stripThinkingBlocks(chunks.join(""));
     const model = AI_MODELS[dialog.modelId];
     const tokensUsed =
       providerUsdCost !== undefined
@@ -124,6 +124,11 @@ export const chatService = {
     return { text: responseText, tokensUsed };
   },
 };
+
+/** Strip <think>...</think> reasoning blocks from model output before saving. */
+function stripThinkingBlocks(text: string): string {
+  return text.replace(/\s*<think>[\s\S]*?<\/think>\s*/g, "").trim();
+}
 
 /** Rough token estimation: ~4 chars per token. */
 function estimateTokens(prompt: string, completion: string): number {

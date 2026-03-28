@@ -14,8 +14,8 @@ const TEMPERATURE_SETTING: ModelSettingDef = {
   default: 1.0,
 };
 
-/** Perplexity requires t < 2 (strictly), so cap at 1.99. */
-const TEMPERATURE_SETTING_PERPLEXITY: ModelSettingDef = { ...TEMPERATURE_SETTING, max: 1.99 };
+/** Perplexity and Qwen require t < 2 (strictly), so cap at 1.99. */
+const TEMPERATURE_SETTING_CAPPED: ModelSettingDef = { ...TEMPERATURE_SETTING, max: 1.99 };
 
 /** Standard LLM controls: temperature, max output tokens, system prompt. */
 const LLM_SETTINGS: ModelSettingDef[] = [
@@ -719,12 +719,18 @@ for (const [id, model] of Object.entries(GPT_MODELS)) {
 
   if (id.startsWith("perplexity")) {
     model.settings = [
-      TEMPERATURE_SETTING_PERPLEXITY,
+      TEMPERATURE_SETTING_CAPPED,
       ...LLM_SETTINGS.slice(1),
       PERPLEXITY_EXTRA,
       PERPLEXITY_SEARCH_CONTEXT,
       PERPLEXITY_DOMAIN_FILTER,
     ];
+    continue;
+  }
+  if (id.startsWith("qwen")) {
+    const qwenExtras: ModelSettingDef[] = [];
+    if (QWEN_THINKING_IDS.has(id)) qwenExtras.push(ENABLE_THINKING);
+    model.settings = [TEMPERATURE_SETTING_CAPPED, ...LLM_SETTINGS.slice(1), ...qwenExtras];
     continue;
   }
   if (id === "grok-3-mini") {
