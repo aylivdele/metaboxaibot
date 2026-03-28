@@ -101,7 +101,10 @@ async function streamGptResponse(
 
       // Split into a new message when approaching Telegram's 4096-char limit
       if (accumulated.length >= MSG_SPLIT_AT) {
-        await finalizeMessage(placeholder.message_id, closeOpenMarkdown(stripThinkingBlocks(accumulated)));
+        await finalizeMessage(
+          placeholder.message_id,
+          closeOpenMarkdown(stripThinkingBlocks(accumulated)),
+        );
         placeholder = await ctx.reply("⏳");
         accumulated = "";
         lastEdit = Date.now();
