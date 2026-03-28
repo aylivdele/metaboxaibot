@@ -32,21 +32,30 @@ export const paymentService = {
     payload: string;
     stars: number;
   }): Promise<string> {
-    const res = await fetch(`https://api.telegram.org/bot${config.bot.token}/createInvoiceLink`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: params.title,
-        description: params.description,
-        payload: params.payload,
-        currency: "XTR",
-        prices: [{ label: params.title, amount: params.stars }],
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
-    const data = (await res.json()) as { ok: boolean; result?: string; description?: string };
-    if (!data.ok) throw new Error(data.description ?? "Telegram API error");
-    return data.result!;
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${config.bot.token}/createInvoiceLink`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: params.title,
+          description: params.description,
+          payload: params.payload,
+          provider_token: "",
+          currency: "XTR",
+          prices: [{ label: params.title, amount: params.stars }],
+        }),
+        signal: controller.signal,
+      });
+
+      const data = (await res.json()) as { ok: boolean; result?: string; description?: string };
+      if (!data.ok) throw new Error(data.description ?? "Telegram API error");
+      return data.result!;
+    } finally {
+      clearTimeout(timeout);
+    }
   },
 
   /** Credit tokens to user after successful Stars payment (legacy hardcoded plans). */
