@@ -2023,6 +2023,16 @@ input::placeholder {
   padding-bottom: 80px;
 }
 
+/* When ChatHistory is active — disable container scroll so the header stays fixed */
+.manage-content:has(.chat-view) {
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.manage-content .chat-view {
+  height: 100%;
+}
+
 .manage-tabs {
   display: flex;
   gap: 4px;

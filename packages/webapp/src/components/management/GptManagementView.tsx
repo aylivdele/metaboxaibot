@@ -43,6 +43,7 @@ export function GptManagementView() {
   const [isCreating, setIsCreating] = useState(false);
   const [creating, setCreating] = useState(false);
   const [viewingDialog, setViewingDialog] = useState<Dialog | null>(null);
+  const [settingsDialog, setSettingsDialog] = useState<Dialog | null>(null);
   const [filter, setFilter] = useState<ModelFilter>("all");
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -85,6 +86,7 @@ export function GptManagementView() {
       setState((s) => (s ? { ...s, gptDialogId: null } : s));
     }
     if (viewingDialog?.id === id) setViewingDialog(null);
+    if (settingsDialog?.id === id) setSettingsDialog(null);
   };
 
   const handleActivate = async (dialog: Dialog) => {
@@ -115,6 +117,32 @@ export function GptManagementView() {
 
   if (viewingDialog) {
     return <ChatHistory dialog={viewingDialog} onBack={() => setViewingDialog(null)} />;
+  }
+
+  if (settingsDialog) {
+    const dlgModel = models.find((m) => m.id === settingsDialog.modelId);
+    return (
+      <div className="page">
+        <div className="page-header">
+          <button className="back-btn" onClick={() => setSettingsDialog(null)}>
+            ← {t("common.back")}
+          </button>
+          <h2>{settingsDialog.title ?? settingsDialog.modelId}</h2>
+          {dlgModel && <p className="page-subtitle">{dlgModel.name}</p>}
+        </div>
+        {dlgModel && dlgModel.settings.length > 0 ? (
+          <div className="model-settings-panel">
+            <SettingsPanel
+              settings={dlgModel.settings}
+              values={allModelSettings[dlgModel.id] ?? {}}
+              onChange={(key, val) => handleSettingChange(dlgModel.id, key, val)}
+            />
+          </div>
+        ) : (
+          <div className="empty-state">{t("manage.noSettings")}</div>
+        )}
+      </div>
+    );
   }
 
   if (loading) return <div className="page-loading">{t("common.loading")}</div>;
@@ -199,23 +227,6 @@ export function GptManagementView() {
             {t("manage.newDialog")}
           </button>
 
-          {(() => {
-            const activeModel = state?.gptModelId
-              ? models.find((m) => m.id === state.gptModelId)
-              : undefined;
-            if (!activeModel || activeModel.settings.length === 0) return null;
-            return (
-              <div className="model-settings-panel">
-                <div className="model-settings-panel__desc">{activeModel.name}</div>
-                <SettingsPanel
-                  settings={activeModel.settings}
-                  values={allModelSettings[activeModel.id] ?? {}}
-                  onChange={(key, val) => handleSettingChange(activeModel.id, key, val)}
-                />
-              </div>
-            );
-          })()}
-
           {dialogs.length === 0 ? (
             <div className="empty-state">{t("manage.noDialogs")}</div>
           ) : (
@@ -249,7 +260,7 @@ export function GptManagementView() {
                   <>
                     <div
                       className="dialog-item__info"
-                      onClick={() => setViewingDialog(d)}
+                      onClick={() => setSettingsDialog(d)}
                       style={{ cursor: "pointer" }}
                     >
                       <div className="dialog-item__title">{d.title ?? d.modelId}</div>
