@@ -9,7 +9,6 @@ import {
 } from "../services/metabox-bridge.service.js";
 import type { AiBotCatalog } from "../services/metabox-bridge.service.js";
 import { getRate, calcStars, STAR_PRICE_USD } from "../services/exchange-rate.service.js";
-import { config } from "@metabox/shared";
 import type { SaleUserInfo } from "../services/payment.service.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
