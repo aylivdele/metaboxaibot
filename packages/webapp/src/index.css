@@ -588,6 +588,8 @@ input::placeholder {
   background: var(--bg-secondary);
   border-radius: 3px;
   overflow: hidden;
+  display: flex;
+  justify-content: flex-end;
 }
 .sub-card__bar-fill {
   height: 100%;
