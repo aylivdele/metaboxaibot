@@ -13,6 +13,16 @@ async function main() {
 
   logger.info("Starting bot (long polling)...");
   await bot.start({
+    allowed_updates: [
+      "message",
+      "edited_message",
+      "callback_query",
+      "inline_query",
+      "chosen_inline_result",
+      "pre_checkout_query",
+      "my_chat_member",
+      "chat_member",
+    ],
     onStart: (info) => logger.info({ username: info.username }, "Bot started"),
   });
 }

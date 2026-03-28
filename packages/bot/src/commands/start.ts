@@ -196,13 +196,18 @@ export async function handleStart(ctx: BotContext): Promise<void> {
     if (config.metabox?.apiUrl) {
       (async () => {
         try {
+          // Re-read user from DB to get updated referredById (set in ref_ handler above)
+          const freshUser = await db.user.findUnique({
+            where: { id: ctx.user!.id },
+            select: { referredById: true, firstName: true, lastName: true, username: true },
+          });
           const { registerBotUser } = await import("@metabox/api/services");
           const result = await registerBotUser({
             telegramId: ctx.user!.id,
-            firstName: ctx.user!.firstName,
-            lastName: ctx.user!.lastName,
-            username: ctx.user!.username,
-            referrerTelegramId: ctx.user!.referredById,
+            firstName: freshUser?.firstName ?? ctx.user!.firstName,
+            lastName: freshUser?.lastName ?? ctx.user!.lastName,
+            username: freshUser?.username ?? ctx.user!.username,
+            referrerTelegramId: freshUser?.referredById ?? ctx.user!.referredById,
           });
           if (result?.ok) {
             if (!result.isStub) {
