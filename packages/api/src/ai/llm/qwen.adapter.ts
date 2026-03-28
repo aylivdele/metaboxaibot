@@ -74,7 +74,9 @@ export class QwenAdapter implements LLMAdapter {
       messages,
       stream: true,
       stream_options: { include_usage: true },
-      ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+      ...(input.temperature !== undefined
+        ? { temperature: parseFloat(String(input.temperature)) }
+        : {}),
       ...(input.maxTokens !== undefined ? { max_tokens: input.maxTokens } : {}),
       ...(input.enableThinking !== undefined ? { enable_thinking: input.enableThinking } : {}),
     });
