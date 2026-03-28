@@ -8,30 +8,52 @@ import {
 } from "@metabox/api/services";
 import { buildCostLine } from "../utils/cost-line.js";
 import { HeyGenAvatarAdapter } from "@metabox/api/ai/avatar/heygen";
-import { MODELS_BY_SECTION, AI_MODELS, config } from "@metabox/shared";
+import { MODELS_BY_SECTION, FAMILIES_BY_SECTION, MODEL_TO_FAMILY, AI_MODELS, config } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 
 // ── Model selection keyboard ──────────────────────────────────────────────────
 
-export function buildVideoModelKeyboard(): InlineKeyboard {
-  const models = MODELS_BY_SECTION["video"] ?? [];
+/**
+ * Builds the video-section keyboard preserving MODELS_BY_SECTION order.
+ * Family members are collapsed into one button at the position of the first member.
+ */
+export function buildVideoModelKeyboard(savedModelId?: string | null): InlineKeyboard {
+  const allModels = MODELS_BY_SECTION["video"] ?? [];
+  const families = FAMILIES_BY_SECTION["video"] ?? [];
+  const familyById = new Map(families.map((f) => [f.id, f]));
   const kb = new InlineKeyboard();
-  for (let i = 0; i < models.length; i += 2) {
-    kb.text(models[i].name, `video_model_${models[i].id}`);
-    if (models[i + 1]) kb.text(models[i + 1].name, `video_model_${models[i + 1].id}`);
+
+  const rows: Array<[string, string]> = [];
+  const addedFamilies = new Set<string>();
+
+  for (const m of allModels) {
+    const familyId = MODEL_TO_FAMILY[m.id];
+    if (familyId) {
+      if (addedFamilies.has(familyId)) continue;
+      addedFamilies.add(familyId);
+      const family = familyById.get(familyId)!;
+      const memberIds = new Set(family.members.map((fm) => fm.modelId));
+      const modelId =
+        savedModelId && memberIds.has(savedModelId) ? savedModelId : family.defaultModelId;
+      rows.push([family.name, `video_family_${family.id}__${modelId}`]);
+    } else {
+      rows.push([m.name, `video_model_${m.id}`]);
+    }
+  }
+
+  for (let i = 0; i < rows.length; i += 2) {
+    kb.text(rows[i][0], rows[i][1]);
+    if (rows[i + 1]) kb.text(rows[i + 1][0], rows[i + 1][1]);
     kb.row();
   }
   return kb;
 }
 
-// ── Model selected via inline callback ───────────────────────────────────────
+// ── Model activation (shared logic) ──────────────────────────────────────────
 
-export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
+async function activateVideoModel(ctx: BotContext, modelId: string): Promise<void> {
   if (!ctx.user) return;
-  const modelId = ctx.callbackQuery?.data?.replace("video_model_", "") ?? "";
-
-  await ctx.answerCallbackQuery();
   await userStateService.setState(ctx.user.id, "VIDEO_ACTIVE", "video");
   await userStateService.setModelForSection(ctx.user.id, "video", modelId);
 
@@ -73,6 +95,30 @@ export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
   } else {
     await ctx.reply(ctx.t.video.modelActivated);
   }
+}
+
+// ── Model selected via inline callback ───────────────────────────────────────
+
+export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const modelId = ctx.callbackQuery?.data?.replace("video_model_", "") ?? "";
+  await ctx.answerCallbackQuery();
+  await activateVideoModel(ctx, modelId);
+}
+
+/**
+ * Family button tapped: data format is `video_family_{familyId}__{modelId}`
+ */
+export async function handleVideoFamilySelect(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const data = ctx.callbackQuery?.data ?? "";
+  const modelId = data.split("__")[1] ?? "";
+  if (!modelId || !AI_MODELS[modelId] || !MODEL_TO_FAMILY[modelId]) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await activateVideoModel(ctx, modelId);
 }
 
 // ── Incoming prompt in VIDEO_ACTIVE state ─────────────────────────────────────
@@ -137,8 +183,9 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
 export async function handleNewVideoDialog(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "VIDEO_SECTION", "video");
+  const state = await userStateService.get(ctx.user.id);
   await ctx.reply(ctx.t.video.sectionTitle, {
-    reply_markup: buildVideoModelKeyboard(),
+    reply_markup: buildVideoModelKeyboard(state?.videoModelId),
   });
 }
 

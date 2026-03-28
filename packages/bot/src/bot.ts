@@ -22,6 +22,7 @@ import {
 } from "./scenes/design.js";
 import {
   handleVideoModelSelect,
+  handleVideoFamilySelect,
   handleVideoMessage,
   handleVideoPhoto,
   handleVideoVideo,
@@ -84,6 +85,7 @@ export function createBot(token: string): Bot<BotContext> {
 
   // ── Video model selection callback ───────────────────────────────────────
   bot.callbackQuery(/^video_model_/, handleVideoModelSelect);
+  bot.callbackQuery(/^video_family_/, handleVideoFamilySelect);
 
   // ── Send original file callback ───────────────────────────────────────────
   bot.callbackQuery(/^orig_/, handleSendOriginal);

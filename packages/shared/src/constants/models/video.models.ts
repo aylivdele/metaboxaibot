@@ -306,7 +306,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
 
   "veo-fast": {
     id: "veo-fast",
-    name: "📽️ Veo 3",
+    name: "📽️ Veo 3 Fast",
     description:
       "Быстрая версия Veo 3 от Google. Та же высокая скорость и голоса, за меньшую цену. Отправьте фото или видео вместе с текстом — фото станет стилевым референсом, видео — основой для продолжения.",
     section: "video",
