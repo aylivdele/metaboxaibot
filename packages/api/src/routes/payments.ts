@@ -75,14 +75,13 @@ export const paymentsRoutes: FastifyPluginAsync = async (fastify) => {
         return { testMode: true, message: "Тестовая оплата: токены начислены" };
       }
 
-      // Send invoice directly to user's chat (more reliable for pre_checkout_query)
-      await paymentService.sendInvoiceToChat(userId, {
+      const invoiceUrl = await paymentService.createDynamicInvoice({
         title: `${product.name} — ${product.tokens} tokens`,
         description: `${product.tokens} AI tokens for use in Metabox`,
         payload: `product:${product.id}:${product.tokens}:${product.priceRub}:${product.name}`,
         stars,
       });
-      return { sentToChat: true };
+      return { invoiceUrl };
     }
 
     if (type === "subscription") {
@@ -131,13 +130,13 @@ export const paymentsRoutes: FastifyPluginAsync = async (fastify) => {
         return { testMode: true, message: "Тестовая оплата: подписка активирована" };
       }
 
-      await paymentService.sendInvoiceToChat(userId, {
+      const invoiceUrl = await paymentService.createDynamicInvoice({
         title: `${sub.name} — ${period} (${tokens} tokens)`,
         description: `AI subscription: ${tokens} tokens`,
         payload: `subscription:${sub.id}:${period}:${tokens}:${Math.round(totalPrice)}:${sub.name}`,
         stars,
       });
-      return { sentToChat: true };
+      return { invoiceUrl };
     }
 
     return reply.code(400).send({ error: "Invalid type" });
