@@ -232,11 +232,14 @@ jobs:
           GH_ACTOR: ${{ github.actor }}
           IMAGE_TAG: test-${{ github.sha }}
           GHCR_IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
+          BUILT_API: ${{ needs.build-api.result == 'success' && 'true' || 'false' }}
+          BUILT_BOT: ${{ needs.build-bot.result == 'success' && 'true' || 'false' }}
+          BUILT_WORKER: ${{ needs.build-worker.result == 'success' && 'true' || 'false' }}
         with:
           host: ${{ secrets.TEST_VPS_HOST }}
           username: ${{ secrets.TEST_VPS_USER }}
           key: ${{ secrets.TEST_VPS_SSH_KEY }}
-          envs: GHCR_TOKEN,GH_ACTOR,IMAGE_TAG,GHCR_IMAGE_PREFIX
+          envs: GHCR_TOKEN,GH_ACTOR,IMAGE_TAG,GHCR_IMAGE_PREFIX,BUILT_API,BUILT_BOT,BUILT_WORKER
           script: |
             set -e
             cd /opt/metaboxaibot-test
@@ -253,8 +256,18 @@ jobs:
             sed -i "s|^GHCR_IMAGE_PREFIX=.*|GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX|" .env \
               || echo "GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX" >> .env
 
-            echo "Pulling new images..."
-            docker compose -f docker-compose.test.yml pull bot api worker
+            # Pull only services that were actually rebuilt
+            SERVICES=""
+            [ "$BUILT_API" = "true" ] && SERVICES="$SERVICES api"
+            [ "$BUILT_BOT" = "true" ] && SERVICES="$SERVICES bot"
+            [ "$BUILT_WORKER" = "true" ] && SERVICES="$SERVICES worker"
+
+            if [ -n "$SERVICES" ]; then
+              echo "Pulling new images:$SERVICES"
+              docker compose -f docker-compose.test.yml pull $SERVICES
+            else
+              echo "No new images to pull"
+            fi
 
             echo "Restarting services..."
             docker compose -f docker-compose.test.yml up -d --no-build --remove-orphans
