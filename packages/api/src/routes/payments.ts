@@ -8,7 +8,9 @@ import {
   createSubscriptionInvoice,
 } from "../services/metabox-bridge.service.js";
 import type { AiBotCatalog } from "../services/metabox-bridge.service.js";
-import { getRate, calcStars } from "../services/exchange-rate.service.js";
+import { getRate, calcStars, STAR_PRICE_USD } from "../services/exchange-rate.service.js";
+import { config } from "@metabox/shared";
+import type { SaleUserInfo } from "../services/payment.service.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
@@ -37,11 +39,43 @@ export const paymentsRoutes: FastifyPluginAsync = async (fastify) => {
     });
     const rate = await getRate();
 
+    const isTestMode = config.env !== "production";
+    const { userId } = request as AuthRequest;
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, username: true, referredById: true },
+    });
+
     if (type === "product") {
       const product = catalog.tokenPackages.find((p) => p.id === id);
       if (!product) return reply.code(404).send({ error: "Product not found" });
 
       const stars = calcStars(Number(product.priceRub), rate);
+      const starRate = rate * STAR_PRICE_USD;
+
+      // Test mode: skip Telegram Invoice, credit directly
+      if (isTestMode) {
+        const userInfo: SaleUserInfo = {
+          firstName: user?.firstName ?? "Test",
+          lastName: user?.lastName ?? undefined,
+          username: user?.username ?? undefined,
+          referrerTelegramId: user?.referredById ?? undefined,
+          stars,
+          starRate,
+        };
+        await paymentService.creditDynamicPurchase(
+          userId,
+          product.tokens,
+          product.id,
+          Number(product.priceRub),
+          "product",
+          undefined,
+          userInfo,
+          product.name,
+        );
+        return { testMode: true, message: "Тестовая оплата: токены начислены" };
+      }
+
       const invoiceUrl = await paymentService.createDynamicInvoice({
         title: `${product.name} — ${product.tokens} tokens`,
         description: `${product.tokens} AI tokens for use in Metabox`,
@@ -72,6 +106,30 @@ export const paymentsRoutes: FastifyPluginAsync = async (fastify) => {
       const totalPrice = monthly * months * (1 - Number(discountField) / 100);
       const tokens = sub.tokens * months;
       const stars = calcStars(totalPrice, rate);
+      const starRate = rate * STAR_PRICE_USD;
+
+      // Test mode: skip Telegram Invoice, credit directly
+      if (isTestMode) {
+        const userInfo: SaleUserInfo = {
+          firstName: user?.firstName ?? "Test",
+          lastName: user?.lastName ?? undefined,
+          username: user?.username ?? undefined,
+          referrerTelegramId: user?.referredById ?? undefined,
+          stars,
+          starRate,
+        };
+        await paymentService.creditDynamicPurchase(
+          userId,
+          tokens,
+          sub.id,
+          Math.round(totalPrice),
+          "subscription",
+          period,
+          userInfo,
+          sub.name,
+        );
+        return { testMode: true, message: "Тестовая оплата: подписка активирована" };
+      }
 
       const invoiceUrl = await paymentService.createDynamicInvoice({
         title: `${sub.name} — ${period} (${tokens} tokens)`,

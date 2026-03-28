@@ -37,8 +37,9 @@ model User {
   dialogs      Dialog[]
   transactions TokenTransaction[]
   userState    UserState?
-  uploads      UserUpload[]
-  userAvatars  UserAvatar[]
+  uploads           UserUpload[]
+  userAvatars       UserAvatar[]
+  localSubscription LocalSubscription?
 
   @@map("users")
 }
@@ -243,6 +244,26 @@ model BannerSlide {
 
   @@index([active, sortOrder])
   @@map("banner_slides")
+}
+
+// ─────────────────────────────────────────────
+// Локальная подписка (сохраняется при отвязке от сайта)
+// ─────────────────────────────────────────────
+model LocalSubscription {
+  id             String   @id @default(cuid())
+  userId         BigInt   @unique
+  planName       String
+  period         String   // M1 | M3 | M6 | M12
+  tokensGranted  Int
+  endDate        DateTime
+  startDate      DateTime
+  isActive       Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("local_subscriptions")
 }
 
 // ─────────────────────────────────────────────

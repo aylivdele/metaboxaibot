@@ -471,6 +471,10 @@ input::placeholder {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.3px;
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .profile-username {
   color: var(--text-hint);
