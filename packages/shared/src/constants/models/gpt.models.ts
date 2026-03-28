@@ -136,17 +136,6 @@ const GROK_MINI_REASONING: ModelSettingDef = {
   default: "low",
 };
 
-/** Seed for reproducible results in OpenAI chat models. */
-const SEED_SETTING: ModelSettingDef = {
-  key: "seed",
-  label: "Seed",
-  description: "Число для воспроизводимых результатов. Пусто — случайно каждый раз.",
-  type: "number",
-  min: 0,
-  max: 2147483647,
-  default: null,
-};
-
 export const GPT_MODELS: Record<string, AIModel> = {
   // ── GPT / LLM ─────────────────────────────────────────────────────────────
   // LLM models have costUsdPerRequest = 0; cost is entirely token-driven.
@@ -628,22 +617,6 @@ export const GPT_MODELS: Record<string, AIModel> = {
 // LLM section — assign base settings plus model-specific extras
 const OPENAI_REASONING_IDS = new Set(["o4-mini", "o3", "o3-mini"]);
 const GROK_REASONING_IDS = new Set(["grok-4", "grok-4-fast"]);
-const OPENAI_CHAT_IDS = new Set([
-  "gpt-5.4-pro",
-  "gpt-5.4",
-  "gpt-5.3",
-  "gpt-5-pro",
-  "gpt-5-mini",
-  "gpt-5-nano",
-  "o4-mini",
-  "o3",
-  "o3-mini",
-  "gpt-4o",
-  "gpt-4o-mini",
-  "gpt-4.1",
-  "gpt-4.1-mini",
-  "gpt-4.1-nano",
-]);
 const ANTHROPIC_THINKING_IDS = new Set([
   "claude-opus",
   "claude-opus-4-5",
@@ -682,9 +655,5 @@ for (const [id, model] of Object.entries(GPT_MODELS)) {
   if (GEMINI_THINKING_IDS.has(id)) {
     extras.push(THINKING_BUDGET);
   }
-  if (OPENAI_CHAT_IDS.has(id)) {
-    extras.push(SEED_SETTING);
-  }
-
   model.settings = [...LLM_SETTINGS, ...extras];
 }

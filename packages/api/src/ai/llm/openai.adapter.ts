@@ -31,7 +31,6 @@ export class OpenAIAdapter implements LLMAdapter {
         : {}),
       ...(input.maxTokens !== undefined ? { max_output_tokens: input.maxTokens } : {}),
       ...(input.reasoningEffort ? { reasoning: { effort: input.reasoningEffort } } : {}),
-      ...(input.seed != null ? { seed: input.seed } : {}),
     };
   }
 
