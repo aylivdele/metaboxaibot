@@ -1,4 +1,3 @@
-import { db } from "../db.js";
 import { createLLMAdapter } from "../ai/llm/factory.js";
 import { dialogService } from "./dialog.service.js";
 import { calculateCost, checkBalance, deductTokens } from "./token.service.js";

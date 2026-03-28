@@ -1,5 +1,5 @@
 import type { AIModel, ModelSettingDef } from "../../types/ai.js";
-import { mkAspectRatio, mkDurationSelect, mkDurationSlider } from "./_helpers.js";
+import { mkAspectRatio } from "./_helpers.js";
 
 /** FLUX.2 [dev] generation controls. */
 const FLUX_SETTINGS: ModelSettingDef[] = [
