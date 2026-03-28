@@ -8,6 +8,7 @@ import { processVideoJob } from "./processors/video.processor.js";
 import { processAudioJob } from "./processors/audio.processor.js";
 import { processAvatarJob } from "./processors/avatar.processor.js";
 import { checkProviderBalances } from "./monitors/balance.monitor.js";
+import { sendUsageReport, msUntilNextMidnightMsk } from "./monitors/usage-report.monitor.js";
 import { logger } from "./logger.js";
 
 const connection = new Redis(config.redis.url, {
@@ -78,8 +79,26 @@ if (config.alerts.chatId) {
   }, intervalMs);
   logger.info({ intervalHours: config.alerts.intervalHours }, "Balance monitor started");
 
+  // ── Daily usage report at 00:00 MSK ──────────────────────────────────────
+  let usageReportTimer: ReturnType<typeof setInterval> | undefined;
+  const scheduleUsageReport = (): void => {
+    const delay = msUntilNextMidnightMsk();
+    logger.info({ delayMin: Math.round(delay / 60_000) }, "Usage report scheduled");
+    setTimeout(() => {
+      sendUsageReport().catch((err) => logger.error({ err }, "Usage report error"));
+      usageReportTimer = setInterval(
+        () => {
+          sendUsageReport().catch((err) => logger.error({ err }, "Usage report error"));
+        },
+        24 * 60 * 60 * 1000,
+      );
+    }, delay);
+  };
+  scheduleUsageReport();
+
   process.on("SIGTERM", async () => {
     clearInterval(balanceTimer);
+    if (usageReportTimer) clearInterval(usageReportTimer);
     await Promise.all([
       imageWorker.close(),
       videoWorker.close(),

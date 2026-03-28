@@ -627,10 +627,12 @@ export const GPT_MODELS: Record<string, AIModel> = {
 // ── Apply settings ────────────────────────────────────────────────────────────
 // LLM section — assign base settings plus model-specific extras
 const OPENAI_REASONING_IDS = new Set(["o4-mini", "o3", "o3-mini"]);
+const GROK_REASONING_IDS = new Set(["grok-4", "grok-4-fast"]);
 const OPENAI_CHAT_IDS = new Set([
   "gpt-5.4-pro",
   "gpt-5.4",
   "gpt-5.3",
+  "gpt-5-pro",
   "gpt-5-mini",
   "gpt-5-nano",
   "o4-mini",
@@ -649,7 +651,12 @@ const ANTHROPIC_THINKING_IDS = new Set([
   "claude-sonnet-4-5",
 ]);
 const QWEN_THINKING_IDS = new Set(["qwen-3-max-thinking", "qwen-3-thinking", "qwen-3"]);
-const GEMINI_THINKING_IDS = new Set(["gemini-2-pro", "gemini-3.1-pro"]);
+const GEMINI_THINKING_IDS = new Set([
+  "gemini-2-flash",
+  "gemini-2-pro",
+  "gemini-3-pro",
+  "gemini-3.1-pro",
+]);
 
 for (const [id, model] of Object.entries(GPT_MODELS)) {
   const extras: ModelSettingDef[] = [];
@@ -662,6 +669,9 @@ for (const [id, model] of Object.entries(GPT_MODELS)) {
   }
   if (id === "grok-3-mini") {
     extras.push(GROK_MINI_REASONING);
+  }
+  if (GROK_REASONING_IDS.has(id)) {
+    extras.push(REASONING_EFFORT);
   }
   if (ANTHROPIC_THINKING_IDS.has(id)) {
     extras.push(EXTENDED_THINKING);

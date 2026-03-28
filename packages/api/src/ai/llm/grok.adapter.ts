@@ -48,6 +48,7 @@ export class GrokAdapter implements LLMAdapter {
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
     const messages: OpenAI.ChatCompletionMessageParam[] = [
+      ...(input.systemPrompt ? [{ role: "system" as const, content: input.systemPrompt }] : []),
       ...(input.history ?? []).map((m: MessageRecord) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
@@ -59,14 +60,20 @@ export class GrokAdapter implements LLMAdapter {
       temperature: input.temperature,
       max_tokens: input.maxTokens,
       messages_count: messages.length,
+      reasoning_effort: input.reasoningEffort,
     });
-    const stream = await this.client.chat.completions.create({
+    const stream = await (
+      this.client.chat.completions.create as (
+        p: unknown,
+      ) => Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>>
+    )({
       model: this.apiModel,
       messages,
       stream: true,
       stream_options: { include_usage: true },
       ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
       ...(input.maxTokens !== undefined ? { max_tokens: input.maxTokens } : {}),
+      ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
     });
 
     let inputTokensUsed = 0;

@@ -49,6 +49,7 @@ export class PerplexityAdapter implements LLMAdapter {
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
     const messages: OpenAI.ChatCompletionMessageParam[] = [
+      ...(input.systemPrompt ? [{ role: "system" as const, content: input.systemPrompt }] : []),
       ...(input.history ?? []).map((m: MessageRecord) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
@@ -60,6 +61,15 @@ export class PerplexityAdapter implements LLMAdapter {
     if (input.temperature !== undefined) extraParams.temperature = input.temperature;
     if (input.maxTokens !== undefined) extraParams.max_tokens = input.maxTokens;
     if (input.searchRecencyFilter) extraParams.search_recency_filter = input.searchRecencyFilter;
+    if (input.searchContextSize)
+      extraParams.web_search_options = { search_context_size: input.searchContextSize };
+    if (input.searchDomainFilter) {
+      const domains = input.searchDomainFilter
+        .split(",")
+        .map((d) => d.trim())
+        .filter(Boolean);
+      if (domains.length) extraParams.search_domain_filter = domains;
+    }
     logCall(this.apiModel, "chatStream", { messages_count: messages.length, ...extraParams });
     const stream = await (
       this.client.chat.completions.create as (p: unknown) => Promise<

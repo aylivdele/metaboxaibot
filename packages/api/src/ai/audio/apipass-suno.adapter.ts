@@ -25,18 +25,23 @@ export class ApipassSunoAdapter implements AudioAdapter {
 
     const ms = input.modelSettings ?? {};
 
+    const lyrics = (ms.lyrics as string | undefined) || undefined;
+    const body: Record<string, unknown> = {
+      make_instrumental: (ms.make_instrumental as boolean | undefined) ?? false,
+      mv: (ms.model_version as string | undefined) ?? "chirp-v4.5",
+      wait_audio: false,
+      ...(lyrics
+        ? { prompt: lyrics, tags: input.prompt, custom_mode: true }
+        : { gpt_description_prompt: input.prompt }),
+    };
+
     const resp = await fetchWithLog(`${APIPASS_BASE}/api/generate`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        gpt_description_prompt: input.prompt,
-        make_instrumental: (ms.make_instrumental as boolean | undefined) ?? false,
-        mv: "chirp-v4",
-        wait_audio: false,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!resp.ok) {

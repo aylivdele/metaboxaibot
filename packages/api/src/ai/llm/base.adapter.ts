@@ -22,6 +22,20 @@ export interface LLMInput {
   maxTokens?: number;
   /** Perplexity: restrict search results to a time window (month/week/day/hour). */
   searchRecencyFilter?: string;
+  /** Perplexity: depth of web search context (low/medium/high). */
+  searchContextSize?: string;
+  /** Perplexity: comma-separated domain allowlist (e.g. "wikipedia.org,bbc.com"). */
+  searchDomainFilter?: string;
+  /** OpenAI o-series / Grok: reasoning effort (low/medium/high). */
+  reasoningEffort?: string;
+  /** Anthropic: enable extended thinking mode. */
+  extendedThinking?: boolean;
+  /** Qwen3: enable chain-of-thought thinking (true by default for thinking models). */
+  enableThinking?: boolean;
+  /** Gemini: internal reasoning token budget (0 = disabled). */
+  thinkingBudget?: number;
+  /** OpenAI chat models: seed for reproducible outputs. */
+  seed?: number;
 }
 
 export interface LLMOutput {

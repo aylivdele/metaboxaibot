@@ -48,6 +48,7 @@ export class DeepSeekAdapter implements LLMAdapter {
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
     const messages: OpenAI.ChatCompletionMessageParam[] = [
+      ...(input.systemPrompt ? [{ role: "system" as const, content: input.systemPrompt }] : []),
       ...(input.history ?? []).map((m: MessageRecord) => ({
         role: m.role as "user" | "assistant",
         content: m.content,

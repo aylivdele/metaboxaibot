@@ -52,7 +52,10 @@ export class GeminiAdapter implements LLMAdapter {
       generationConfig: {
         ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
         ...(input.maxTokens !== undefined ? { maxOutputTokens: input.maxTokens } : {}),
-      },
+        ...(input.thinkingBudget !== undefined
+          ? { thinkingConfig: { thinkingBudget: input.thinkingBudget } }
+          : {}),
+      } as Record<string, unknown>,
     });
 
     const history: Content[] = (input.history ?? []).map((m: MessageRecord) => ({

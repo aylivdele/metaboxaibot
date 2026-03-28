@@ -52,12 +52,22 @@ export class AnthropicAdapter implements LLMAdapter {
       temperature: input.temperature,
       max_tokens: input.maxTokens,
       messages_count: messages.length,
+      extended_thinking: input.extendedThinking,
     });
-    const stream = this.client.messages.stream({
+    // Extended thinking requires a higher max_tokens budget (must exceed budget_tokens).
+    const maxTokens = input.extendedThinking
+      ? Math.max(input.maxTokens ?? 16000, 16000)
+      : (input.maxTokens ?? 4096);
+    const stream = (
+      this.client.messages.stream as (p: unknown) => ReturnType<typeof this.client.messages.stream>
+    )({
       model: this.apiModel,
-      max_tokens: input.maxTokens ?? 4096,
-      ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+      max_tokens: maxTokens,
+      ...(input.temperature !== undefined && !input.extendedThinking
+        ? { temperature: input.temperature }
+        : {}),
       ...(input.systemPrompt ? { system: input.systemPrompt } : {}),
+      ...(input.extendedThinking ? { thinking: { type: "enabled", budget_tokens: 10000 } } : {}),
       messages,
     });
 

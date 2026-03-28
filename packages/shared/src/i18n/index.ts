@@ -103,6 +103,7 @@ export interface Translations {
     unexpected: string;
     insufficientTokens: string;
     userBlocked: string;
+    sendOriginalFailed: string;
   };
   common: {
     backToMain: string;

@@ -43,8 +43,14 @@ export class RecraftAdapter implements ImageAdapter {
     const ms = input.modelSettings ?? {};
     const recraftModel = MODEL_MAP[this.modelId] ?? "recraft20b";
     const isVector = VECTOR_MODELS.has(this.modelId);
+    const isV3 = this.modelId === "recraft-v3";
     const defaultStyle = isVector ? "vector_illustration" : "realistic_image";
     const style = (ms.style as string | undefined) ?? defaultStyle;
+
+    // Build optional controls block (V3 supports artistic_level; all support no_text)
+    const controls: Record<string, unknown> = {};
+    if (ms.no_text) controls.no_text = true;
+    if (isV3 && ms.artistic_level != null) controls.artistic_level = Number(ms.artistic_level);
 
     let url: string;
 
@@ -59,7 +65,9 @@ export class RecraftAdapter implements ImageAdapter {
       form.append("prompt", input.prompt);
       form.append("model", recraftModel);
       form.append("style", style);
+      if (isV3 && ms.substyle) form.append("substyle", ms.substyle as string);
       if (ms.seed != null) form.append("random_seed", String(ms.seed));
+      if (Object.keys(controls).length) form.append("controls", JSON.stringify(controls));
 
       const resp = await fetchWithLog(`${RECRAFT_API_BASE}/images/imageToImage`, {
         method: "POST",
@@ -81,7 +89,9 @@ export class RecraftAdapter implements ImageAdapter {
         size,
         style,
       };
+      if (isV3 && ms.substyle) body.substyle = ms.substyle;
       if (ms.seed != null) body.random_seed = ms.seed;
+      if (Object.keys(controls).length) body.controls = controls;
 
       const resp = await fetchWithLog(`${RECRAFT_API_BASE}/images/generations`, {
         method: "POST",

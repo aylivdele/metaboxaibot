@@ -33,5 +33,8 @@ export async function handleSendOriginal(ctx: BotContext): Promise<void> {
   }
 
   await ctx.answerCallbackQuery();
-  await ctx.replyWithDocument(url);
+  const message = await ctx.replyWithDocument(url).catch(() => undefined);
+  if (!message) {
+    await ctx.reply(ctx.t.errors.sendOriginalFailed);
+  }
 }

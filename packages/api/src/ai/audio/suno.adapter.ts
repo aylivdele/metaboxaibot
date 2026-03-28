@@ -18,13 +18,18 @@ export class SunoAdapter implements AudioAdapter {
 
   async submit(input: AudioInput): Promise<string> {
     const ms = input.modelSettings ?? {};
-    const sunoInput = {
+    const lyrics = (ms.lyrics as string | undefined) || undefined;
+    const sunoInput: Record<string, unknown> = {
       prompt: input.prompt,
       make_instrumental: (ms.make_instrumental as boolean | undefined) ?? false,
+      model_version: (ms.model_version as string | undefined) ?? "chirp-v4.5",
       wait_audio: false,
+      ...(lyrics ? { lyric: lyrics } : {}),
     };
-    logCall(SUNO_ENDPOINT, "submit", sunoInput as Record<string, unknown>);
-    const { request_id } = await fal.queue.submit(SUNO_ENDPOINT, { input: sunoInput });
+    logCall(SUNO_ENDPOINT, "submit", sunoInput);
+    const { request_id } = await fal.queue.submit(SUNO_ENDPOINT, {
+      input: sunoInput as Parameters<typeof fal.queue.submit>[1]["input"],
+    });
     return request_id;
   }
 

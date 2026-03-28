@@ -44,12 +44,14 @@ export class ElevenLabsAdapter implements AudioAdapter {
       use_speaker_boost: (ms.use_speaker_boost as boolean | undefined) ?? true,
     };
 
+    const modelId = (ms.model_id as string | undefined) ?? "eleven_multilingual_v2";
+
     const res = await fetchWithLog(`${ELEVENLABS_API}/text-to-speech/${voiceId}`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({
         text: input.prompt,
-        model_id: "eleven_multilingual_v2",
+        model_id: modelId,
         voice_settings: voiceSettings,
       }),
     });

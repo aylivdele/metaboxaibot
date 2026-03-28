@@ -232,11 +232,49 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     });
 
     await ctx.reply(ctx.t.video.avatarPhotoSaved);
-  } else {
-    // D-ID: one-shot reference image
-    await userStateService.setVideoRefImageUrl(ctx.user.id, tgUrl);
-    await ctx.reply(ctx.t.video.videoPhotoSaved);
+    return;
   }
+
+  // For image-to-video models: if caption is provided, generate immediately
+  const caption = ctx.message.caption?.trim();
+  const model = AI_MODELS[modelId];
+  if (caption && model?.supportsImages) {
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
+
+    const videoSettings = await userStateService.getVideoSettings(ctx.user.id);
+    const modelSettings = videoSettings[modelId];
+    const pendingMsg = await ctx.reply(ctx.t.video.queuing);
+
+    try {
+      await videoGenerationService.submitVideo({
+        userId: ctx.user.id,
+        modelId,
+        prompt: caption,
+        imageUrl: tgUrl,
+        telegramChatId: chatId,
+        sendOriginalLabel: ctx.t.common.sendOriginal,
+        aspectRatio: modelSettings?.aspectRatio,
+        duration: modelSettings?.duration,
+      });
+
+      await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+      await ctx.reply(ctx.t.video.asyncPending);
+    } catch (err: unknown) {
+      await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+      if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
+        await ctx.reply(ctx.t.errors.insufficientTokens);
+      } else {
+        logger.error(err, "Video photo+caption error");
+        await ctx.reply(ctx.t.video.generationFailed);
+      }
+    }
+    return;
+  }
+
+  // No caption — save as one-shot reference for next text message
+  await userStateService.setVideoRefImageUrl(ctx.user.id, tgUrl);
+  await ctx.reply(ctx.t.video.videoPhotoSaved);
 }
 
 // ── Video handler in VIDEO_ACTIVE state (D-ID driver_url) ─────────────────────

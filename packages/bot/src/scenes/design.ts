@@ -219,9 +219,56 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     mediaType: "image",
   });
 
-  // Mark this message as the next reference (one-shot)
-  await userStateService.setDesignRefMessage(ctx.user.id, msg.id);
+  // If photo came with a caption, treat it as a prompt and generate immediately
+  const caption = ctx.message.caption?.trim();
+  if (caption) {
+    const chatId = ctx.chat?.id;
+    if (!chatId) return;
 
+    const imageSettings = await userStateService.getImageSettings(ctx.user.id);
+    const aspectRatio = imageSettings[modelId]?.aspectRatio;
+    const pendingMsg = await ctx.reply(ctx.t.design.generating);
+
+    try {
+      const result = await generationService.submitImage({
+        userId: ctx.user.id,
+        modelId,
+        prompt: caption,
+        sourceImageUrl: fileUrl,
+        telegramChatId: chatId,
+        dialogId,
+        sendOriginalLabel: ctx.t.common.sendOriginal,
+        aspectRatio,
+      });
+
+      await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+
+      if (!result.isPending && result.imageUrl) {
+        const model = AI_MODELS[modelId];
+        const captionText = `🎨 ${caption.slice(0, 200)} ${ctx.t.design.withReference}`;
+        const kb = new InlineKeyboard();
+        if (model?.supportsImages && result.assistantMessageId) {
+          kb.text(ctx.t.design.refine, `design_ref_${result.assistantMessageId}`);
+        }
+        kb.text(ctx.t.common.sendOriginal, `orig_${result.dbJobId}`);
+        await ctx.replyWithPhoto(result.imageUrl, { caption: captionText, reply_markup: kb });
+      } else {
+        await ctx.reply(ctx.t.design.asyncPending);
+      }
+    } catch (err: unknown) {
+      await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+      if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
+        await ctx.reply(ctx.t.errors.insufficientTokens);
+      } else {
+        logger.error(err, "Design photo+caption error");
+        await ctx.reply(ctx.t.design.generationFailed);
+      }
+    }
+    return;
+  }
+
+  // No caption — save as ref and ask user to type a prompt
+  await userStateService.setDesignRefMessage(ctx.user.id, msg.id);
   await ctx.reply(ctx.t.design.photoSaved);
 }
 

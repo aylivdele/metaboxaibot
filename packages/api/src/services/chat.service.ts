@@ -52,6 +52,17 @@ export const chatService = {
       ...(ms.search_recency_filter
         ? { searchRecencyFilter: ms.search_recency_filter as string }
         : {}),
+      ...(ms.search_context_size ? { searchContextSize: ms.search_context_size as string } : {}),
+      ...(ms.search_domain_filter ? { searchDomainFilter: ms.search_domain_filter as string } : {}),
+      ...(ms.reasoning_effort ? { reasoningEffort: ms.reasoning_effort as string } : {}),
+      ...(ms.extended_thinking !== undefined
+        ? { extendedThinking: ms.extended_thinking as boolean }
+        : {}),
+      ...(ms.enable_thinking !== undefined
+        ? { enableThinking: ms.enable_thinking as boolean }
+        : {}),
+      ...(ms.thinking_budget !== undefined ? { thinkingBudget: ms.thinking_budget as number } : {}),
+      ...(ms.seed != null ? { seed: ms.seed as number } : {}),
     };
 
     if (dialog.contextStrategy === "db_history") {

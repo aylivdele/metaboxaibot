@@ -43,14 +43,27 @@ export class GptImageAdapter implements ImageAdapter {
     if (background && background !== "auto") tool.background = background;
     if (moderation && moderation !== "auto") tool.moderation = moderation;
 
-    logCall("gpt-image-1", "generate", { quality, size, output_format: outputFormat });
+    // When a source image is provided, include it as reference for editing/refining
+    const apiInput: unknown = input.imageUrl
+      ? [
+          { type: "input_image", image_url: input.imageUrl, detail: "high" },
+          { type: "input_text", text: input.prompt },
+        ]
+      : input.prompt;
+
+    logCall("gpt-image-1", "generate", {
+      quality,
+      size,
+      output_format: outputFormat,
+      has_image: !!input.imageUrl,
+    });
     const response = await (
       this.client.responses.create as (p: unknown) => Promise<{
         output: Array<{ type: string; result?: string }>;
       }>
     )({
       model: "gpt-image-1",
-      input: input.prompt,
+      input: apiInput,
       tools: [tool],
     });
 

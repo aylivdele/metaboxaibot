@@ -20,14 +20,33 @@ export class OpenAIAdapter implements LLMAdapter {
     this.client = new OpenAI({ apiKey });
   }
 
+  private buildParams(input: LLMInput): Record<string, unknown> {
+    const isReasoning = /^o\d/.test(this.model);
+    return {
+      ...(input.previousResponseId ? { previous_response_id: input.previousResponseId } : {}),
+      ...(input.systemPrompt ? { instructions: input.systemPrompt } : {}),
+      // Reasoning models don't support temperature
+      ...(!isReasoning && input.temperature !== undefined
+        ? { temperature: input.temperature }
+        : {}),
+      ...(input.maxTokens !== undefined ? { max_output_tokens: input.maxTokens } : {}),
+      ...(input.reasoningEffort ? { reasoning: { effort: input.reasoningEffort } } : {}),
+      ...(input.seed != null ? { seed: input.seed } : {}),
+    };
+  }
+
   async chat(input: LLMInput): Promise<LLMOutput> {
-    logCall(this.model, "chat", { temperature: input.temperature, max_tokens: input.maxTokens });
-    const response = await this.client.responses.create({
+    logCall(this.model, "chat", {
+      temperature: input.temperature,
+      max_tokens: input.maxTokens,
+      reasoning_effort: input.reasoningEffort,
+    });
+    const response = await (
+      this.client.responses.create as (p: unknown) => Promise<OpenAI.Responses.Response>
+    )({
       model: this.model,
       input: this.buildInput(input),
-      ...(input.previousResponseId ? { previous_response_id: input.previousResponseId } : {}),
-      ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
-      ...(input.maxTokens !== undefined ? { max_output_tokens: input.maxTokens } : {}),
+      ...this.buildParams(input),
     });
     const usage = response.usage;
     return {
@@ -41,13 +60,16 @@ export class OpenAIAdapter implements LLMAdapter {
     logCall(this.model, "chatStream", {
       temperature: input.temperature,
       max_tokens: input.maxTokens,
+      reasoning_effort: input.reasoningEffort,
     });
-    const stream = await this.client.responses.create({
+    const stream = await (
+      this.client.responses.create as (
+        p: unknown,
+      ) => Promise<AsyncIterable<OpenAI.Responses.ResponseStreamEvent>>
+    )({
       model: this.model,
       input: this.buildInput(input),
-      ...(input.previousResponseId ? { previous_response_id: input.previousResponseId } : {}),
-      ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
-      ...(input.maxTokens !== undefined ? { max_output_tokens: input.maxTokens } : {}),
+      ...this.buildParams(input),
       stream: true,
     });
 
