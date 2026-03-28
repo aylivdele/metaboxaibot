@@ -9,7 +9,6 @@ import {
   handleNewGptDialog,
   handleGptMessage,
   handleGptPhoto,
-  handleActivateGptEditor,
   handleGptPrompts,
 } from "./scenes/gpt.js";
 import {
@@ -116,7 +115,6 @@ export function createBot(token: string): Bot<BotContext> {
       [t.video.backToMain]: () => handleMenu(ctx),
       // GPT section buttons
       [t.gpt.newDialog]: () => handleNewGptDialog(ctx),
-      [t.gpt.activateEditor]: () => handleActivateGptEditor(ctx),
       [t.gpt.prompts]: () => handleGptPrompts(ctx),
       // Design section buttons
       [t.design.chooseModel]: async () => {
@@ -153,7 +151,7 @@ export function createBot(token: string): Bot<BotContext> {
     if (!ctx.user) return next();
 
     const state = await userStateService.get(ctx.user.id);
-    if (state?.state === "GPT_ACTIVE") {
+    if (state?.state === "GPT_ACTIVE" || state?.state === "GPT_SECTION") {
       if (ctx.message?.photo) return handleGptPhoto(ctx);
       if (ctx.message?.document?.mime_type?.startsWith("image/")) return handleGptPhoto(ctx);
       return handleGptMessage(ctx);

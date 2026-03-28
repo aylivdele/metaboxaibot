@@ -177,7 +177,7 @@ export async function handleGptPhoto(ctx: BotContext): Promise<void> {
 
   const file = await ctx.api.getFile(fileId);
   const url = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
-  const caption = ctx.message?.caption ?? "";
+  const caption = ctx.message?.caption?.trim() ?? "";
   const mediaGroupId = ctx.message?.media_group_id;
 
   if (mediaGroupId) {
@@ -191,11 +191,12 @@ export async function handleGptPhoto(ctx: BotContext): Promise<void> {
       if (!existing.caption && caption) existing.caption = caption;
       existing.timer = setTimeout(() => {
         mediaGroupBuffer.delete(key);
+        const prompt = existing.caption || existing.ctx.t.gpt.photoDefaultPrompt;
         void streamGptResponse(
           existing.ctx,
           existing.chatId,
           existing.dialogId,
-          existing.caption,
+          prompt,
           existing.urls,
         );
       }, 800);
@@ -216,16 +217,9 @@ export async function handleGptPhoto(ctx: BotContext): Promise<void> {
     }
   } else {
     // Single photo — process immediately
-    await streamGptResponse(ctx, chatId, state.gptDialogId, caption, [url]);
+    const prompt = caption || ctx.t.gpt.photoDefaultPrompt;
+    await streamGptResponse(ctx, chatId, state.gptDialogId, prompt, [url]);
   }
-}
-
-// ── GPT Editor activation ─────────────────────────────────────────────────────
-
-export async function handleActivateGptEditor(ctx: BotContext): Promise<void> {
-  if (!ctx.user) return;
-  await userStateService.setState(ctx.user.id, "GPT_ACTIVE", "gpt");
-  await ctx.reply(ctx.t.gpt.gptEditorActivated);
 }
 
 // ── Management — opens Mini App ───────────────────────────────────────────────

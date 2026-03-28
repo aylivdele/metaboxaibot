@@ -42,6 +42,7 @@ export default {
       '🔆 GPT Editor activated! Now you can use the OpenAI editor to draw or modify your image.\nSend an image with a request in one message or just ask 👇\nIf you decide to change the model, go to the "⚙ Management" menu.',
     newDialogCreated:
       '💬 New dialog created. View all dialogs in the "⚙ Management" menu, "Dialogs" tab.',
+    photoDefaultPrompt: "Here is the image",
     backToMain: "🏠 Main Menu",
     dialogSelected: "✅ Dialog selected: {title}\nModel: {model}",
   },

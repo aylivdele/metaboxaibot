@@ -36,6 +36,7 @@ export interface Translations {
     prompts: string;
     gptEditorActivated: string;
     newDialogCreated: string;
+    photoDefaultPrompt: string;
     backToMain: string;
     dialogSelected: string;
   };

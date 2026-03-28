@@ -25,7 +25,11 @@ export async function handleMenu(ctx: BotContext): Promise<void> {
 export async function handleGpt(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   const dialogLabel = await activeDialogLabel(ctx.user.id, "gpt");
-  await userStateService.setState(ctx.user.id, "GPT_SECTION", "gpt");
+  // If a dialog is already active — go straight to GPT_ACTIVE so the user
+  // can start chatting immediately without pressing an extra button.
+  const newState = dialogLabel ? "GPT_ACTIVE" : "GPT_SECTION";
+  await userStateService.setState(ctx.user.id, newState, "gpt");
+
   const text = dialogLabel
     ? `${ctx.t.gpt.sectionTitle}\n\n💬 Активный диалог: ${dialogLabel}`
     : ctx.t.gpt.sectionTitle;
@@ -43,7 +47,6 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
     reply_markup: {
       keyboard: [
         [{ text: ctx.t.gpt.newDialog }],
-        [{ text: ctx.t.gpt.activateEditor }],
         [managementBtn, { text: ctx.t.gpt.prompts }],
         [{ text: ctx.t.common.backToMain }],
       ],
