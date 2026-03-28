@@ -11,6 +11,10 @@ async function main() {
 
   const bot = createBot(config.bot.token);
 
+  // Reset webhook and pending updates to ensure allowed_updates takes effect
+  logger.info("Resetting webhook and pending updates...");
+  await bot.api.deleteWebhook({ drop_pending_updates: true });
+
   logger.info("Starting bot (long polling)...");
   await bot.start({
     allowed_updates: [
