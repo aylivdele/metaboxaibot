@@ -55,6 +55,7 @@ export const chatService = {
       ...(ms.search_context_size ? { searchContextSize: ms.search_context_size as string } : {}),
       ...(ms.search_domain_filter ? { searchDomainFilter: ms.search_domain_filter as string } : {}),
       ...(ms.reasoning_effort ? { reasoningEffort: ms.reasoning_effort as string } : {}),
+      ...(ms.verbosity ? { verbosity: ms.verbosity as string } : {}),
       ...(ms.extended_thinking !== undefined
         ? { extendedThinking: ms.extended_thinking as boolean }
         : {}),

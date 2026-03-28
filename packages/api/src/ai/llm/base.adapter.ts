@@ -26,8 +26,10 @@ export interface LLMInput {
   searchContextSize?: string;
   /** Perplexity: comma-separated domain allowlist (e.g. "wikipedia.org,bbc.com"). */
   searchDomainFilter?: string;
-  /** OpenAI o-series / Grok: reasoning effort (low/medium/high). */
+  /** OpenAI o-series / gpt-5: reasoning effort (none/low/medium/high/xhigh). */
   reasoningEffort?: string;
+  /** OpenAI gpt-5 family: output verbosity hint (low/medium/high). Passed as text.verbosity. */
+  verbosity?: string;
   /** Anthropic: enable extended thinking mode. */
   extendedThinking?: boolean;
   /** Qwen3: enable chain-of-thought thinking (true by default for thinking models). */

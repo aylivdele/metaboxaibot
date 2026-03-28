@@ -76,7 +76,7 @@ const PERPLEXITY_DOMAIN_FILTER: ModelSettingDef = {
   default: "",
 };
 
-/** Reasoning effort for OpenAI o-series and Grok reasoning models. */
+/** Reasoning effort for OpenAI o-series and Grok reasoning models (low/medium/high). */
 const REASONING_EFFORT: ModelSettingDef = {
   key: "reasoning_effort",
   label: "Глубина рассуждений",
@@ -87,6 +87,41 @@ const REASONING_EFFORT: ModelSettingDef = {
     { value: "low", label: "Низкая" },
     { value: "medium", label: "Средняя" },
     { value: "high", label: "Высокая" },
+  ],
+  default: "medium",
+};
+
+/**
+ * Reasoning effort for gpt-5.4 / gpt-5.4-pro — extended range:
+ * none (disable reasoning, enables temperature), low, medium, high, xhigh.
+ */
+const REASONING_EFFORT_GPT5: ModelSettingDef = {
+  key: "reasoning_effort",
+  label: "Глубина рассуждений",
+  description:
+    "none — отключает рассуждения (быстрее), xhigh — максимальная точность для сложных задач.",
+  type: "select",
+  options: [
+    { value: "none", label: "Откл." },
+    { value: "low", label: "Низкая" },
+    { value: "medium", label: "Средняя" },
+    { value: "high", label: "Высокая" },
+    { value: "xhigh", label: "Макс." },
+  ],
+  default: "medium",
+};
+
+/** Output verbosity for gpt-5 family models. */
+const VERBOSITY_SETTING: ModelSettingDef = {
+  key: "verbosity",
+  label: "Подробность ответа",
+  description:
+    "low — краткие ответы, medium — сбалансировано, high — развёрнуто (для объяснений и аналитики).",
+  type: "select",
+  options: [
+    { value: "low", label: "Краткий" },
+    { value: "medium", label: "Стандартный" },
+    { value: "high", label: "Подробный" },
   ],
   default: "medium",
 };
@@ -122,6 +157,32 @@ const THINKING_BUDGET: ModelSettingDef = {
   step: 256,
   default: 0,
 };
+
+/**
+ * Settings for reasoning models (gpt-5 family, o-series) — no temperature.
+ * Temperature is unsupported by these models via the Responses API.
+ */
+const REASONING_MODEL_SETTINGS: ModelSettingDef[] = [
+  {
+    key: "max_tokens",
+    label: "Макс. длина ответа",
+    description:
+      "Максимальное количество слов, которые ИИ может написать за один ответ. Увеличьте для длинных текстов.",
+    type: "slider",
+    min: 256,
+    max: 8192,
+    step: 256,
+    default: 2048,
+  },
+  {
+    key: "system_prompt",
+    label: "Системный промпт",
+    description:
+      "Скрытая инструкция, которую ИИ всегда соблюдает: задайте роль, стиль или ограничения для всего диалога.",
+    type: "text",
+    default: "",
+  },
+];
 
 /** Reasoning effort for Grok 3 Mini — only supports low/high (no medium). */
 const GROK_MINI_REASONING: ModelSettingDef = {
@@ -159,6 +220,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
+    settings: [REASONING_EFFORT_GPT5, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
   },
   "gpt-5.4": {
     id: "gpt-5.4",
@@ -176,6 +238,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
+    settings: [REASONING_EFFORT_GPT5, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
   },
   "gpt-5-pro": {
     id: "gpt-5-pro",
@@ -192,6 +255,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
+    settings: [REASONING_EFFORT, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
   },
   "gpt-5-mini": {
     id: "gpt-5-mini",
@@ -208,6 +272,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
+    settings: [VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
   },
   "gpt-5-nano": {
     id: "gpt-5-nano",
@@ -224,6 +289,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
+    settings: [VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
   },
   "o4-mini": {
     id: "o4-mini",
@@ -240,6 +306,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
+    settings: [REASONING_EFFORT, ...REASONING_MODEL_SETTINGS],
   },
   o3: {
     id: "o3",
@@ -256,6 +323,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
+    settings: [REASONING_EFFORT, ...REASONING_MODEL_SETTINGS],
   },
   "o3-mini": {
     id: "o3-mini",
@@ -272,6 +340,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
+    settings: [REASONING_EFFORT, ...REASONING_MODEL_SETTINGS],
   },
   // ── Anthropic ─────────────────────────────────────────────────────────────
   "claude-opus": {

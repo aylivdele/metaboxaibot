@@ -21,7 +21,9 @@ export class OpenAIAdapter implements LLMAdapter {
   }
 
   private buildParams(input: LLMInput): Record<string, unknown> {
-    const isReasoning = /^o\d/.test(this.model);
+    // o-series (o1, o3, o4-mini…) and all gpt-5 variants are reasoning models
+    // and do not support the temperature parameter.
+    const isReasoning = /^o\d|^gpt-5/.test(this.model);
     return {
       ...(input.previousResponseId ? { previous_response_id: input.previousResponseId } : {}),
       ...(input.systemPrompt ? { instructions: input.systemPrompt } : {}),
@@ -31,6 +33,7 @@ export class OpenAIAdapter implements LLMAdapter {
         : {}),
       ...(input.maxTokens !== undefined ? { max_output_tokens: input.maxTokens } : {}),
       ...(input.reasoningEffort ? { reasoning: { effort: input.reasoningEffort } } : {}),
+      ...(input.verbosity ? { text: { verbosity: input.verbosity } } : {}),
     };
   }
 
