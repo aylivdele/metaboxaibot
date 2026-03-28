@@ -20,6 +20,8 @@ const mediaGroupBuffer = new Map<string, MediaGroupEntry>();
 const DEFAULT_GPT_MODEL = "gpt-4o";
 /** Minimum ms between Telegram message edits (rate-limit safety). */
 const EDIT_THROTTLE_MS = 1200;
+/** Finalize current message and start a new one when accumulated text reaches this length. */
+const MSG_SPLIT_AT = 3800;
 
 /**
  * Closes any unclosed Markdown markers so that a partial streaming response
@@ -63,9 +65,20 @@ async function streamGptResponse(
   content: string,
   imageUrls?: string[],
 ): Promise<void> {
-  const placeholder = await ctx.reply("⏳");
+  let placeholder = await ctx.reply("⏳");
   let accumulated = "";
   let lastEdit = Date.now();
+
+  const finalizeMessage = async (msgId: number, text: string) => {
+    await ctx.api
+      .editMessageText(chatId, msgId, text, { parse_mode: "Markdown" })
+      .catch(async (err) => {
+        logger.warn(err, "GPT finalize: markdown parse failed, retrying as plain text");
+        await ctx.api
+          .editMessageText(chatId, msgId, text)
+          .catch((e) => logger.error(e, "GPT finalize: plain text fallback also failed"));
+      });
+  };
 
   try {
     const stream = chatService.sendMessageStream({
@@ -77,37 +90,42 @@ async function streamGptResponse(
 
     for await (const chunk of stream) {
       accumulated += chunk;
+
+      // Split into a new message when approaching Telegram's 4096-char limit
+      if (accumulated.length >= MSG_SPLIT_AT) {
+        await finalizeMessage(placeholder.message_id, closeOpenMarkdown(accumulated));
+        placeholder = await ctx.reply("⏳");
+        accumulated = "";
+        lastEdit = Date.now();
+        continue;
+      }
+
       const now = Date.now();
       if (now - lastEdit >= EDIT_THROTTLE_MS && accumulated.trim()) {
         const preview = closeOpenMarkdown(accumulated) + " ▌";
         await ctx.api
           .editMessageText(chatId, placeholder.message_id, preview, { parse_mode: "Markdown" })
-          .catch(() =>
-            ctx.api
+          .catch(async (err) => {
+            logger.warn(err, "GPT stream: markdown preview failed, retrying as plain text");
+            await ctx.api
               .editMessageText(chatId, placeholder.message_id, accumulated + " ▌")
-              .catch(() => void 0),
-          );
+              .catch((e) => logger.error(e, "GPT stream: plain text preview also failed"));
+          });
         lastEdit = now;
       }
     }
 
     if (accumulated.trim()) {
-      // Try to render with Markdown; fall back to plain text if the response
-      // contains characters that break the parser (e.g. unbalanced symbols).
-      await ctx.api
-        .editMessageText(chatId, placeholder.message_id, accumulated, { parse_mode: "Markdown" })
-        .catch(() =>
-          ctx.api.editMessageText(chatId, placeholder.message_id, accumulated).catch(() => void 0),
-        );
+      await finalizeMessage(placeholder.message_id, accumulated);
     } else {
       await ctx.api.deleteMessage(chatId, placeholder.message_id).catch(() => void 0);
     }
   } catch (err: unknown) {
+    logger.error(err, "GPT message error");
     await ctx.api.deleteMessage(chatId, placeholder.message_id).catch(() => void 0);
     if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
       await ctx.reply(ctx.t.errors.insufficientTokens);
     } else {
-      logger.error(err, "GPT message error");
       await ctx.reply(ctx.t.errors.noTool);
     }
   }
