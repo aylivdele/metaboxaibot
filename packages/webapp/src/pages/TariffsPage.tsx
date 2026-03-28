@@ -106,8 +106,7 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
         } else if (status !== "cancelled") {
           setNotice({ text: t("tariffs.failed"), ok: false });
         }
-        });
-      }
+      });
     } catch {
       setNotice({ text: t("tariffs.invoiceError"), ok: false });
     } finally {
