@@ -48,6 +48,17 @@ import { logger } from "./logger.js";
 export function createBot(token: string): Bot<BotContext> {
   const bot = new Bot<BotContext>(token);
 
+  // ── Raw update logger (debug payments) ──────────────────────────────────
+  bot.use(async (ctx, next) => {
+    const updateType = Object.keys(ctx.update)
+      .filter((k) => k !== "update_id")
+      .join(",");
+    if (updateType.includes("pre_checkout") || updateType.includes("payment")) {
+      logger.info({ updateType, updateId: ctx.update.update_id }, "RAW UPDATE (payment-related)");
+    }
+    return next();
+  });
+
   // ── Global middlewares ───────────────────────────────────────────────────
   bot.use(authMiddleware);
   bot.use(i18nMiddleware);

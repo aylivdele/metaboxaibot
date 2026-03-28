@@ -89,35 +89,42 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
         modal.name,
       );
 
-      // Test mode: payment processed instantly without Telegram Invoice
-      if ((result as { testMode?: boolean }).testMode) {
-        setNotice({ text: `✅ ${modal.tokens} ${t("tariffs.success")}`, ok: true });
+      // Invoice sent to chat — close modal and show notice
+      if ((result as { sentToChat?: boolean }).sentToChat) {
+        setNotice({
+          text: "✅ Счёт отправлен в чат. Закройте приложение и оплатите в диалоге с ботом.",
+          ok: true,
+        });
         setModal(null);
-        api.profile
-          .get()
-          .then((p) => setBalance(p.tokenBalance))
-          .catch(() => void 0);
+        // Try to close mini app so user sees the chat
+        const tg = getTgWebApp();
+        if ((tg as { close?: () => void })?.close) {
+          setTimeout(() => (tg as { close: () => void }).close(), 2000);
+        }
         return;
       }
 
-      const { invoiceUrl } = result;
-      const tg = getTgWebApp();
-      if (!tg?.openInvoice) {
-        setNotice({ text: t("tariffs.openInTg"), ok: false });
-        return;
-      }
-      tg.openInvoice(invoiceUrl, (status) => {
-        if (status === "paid") {
-          setNotice({ text: `✅ ${modal.tokens} ${t("tariffs.success")}`, ok: true });
-          setModal(null);
-          api.profile
-            .get()
-            .then((p) => setBalance(p.tokenBalance))
-            .catch(() => void 0);
-        } else if (status !== "cancelled") {
-          setNotice({ text: t("tariffs.failed"), ok: false });
+      // Legacy: openInvoice flow (fallback)
+      const { invoiceUrl } = result as { invoiceUrl: string };
+      if (invoiceUrl) {
+        const tg = getTgWebApp();
+        if (!tg?.openInvoice) {
+          setNotice({ text: t("tariffs.openInTg"), ok: false });
+          return;
         }
-      });
+        tg.openInvoice(invoiceUrl, (status) => {
+          if (status === "paid") {
+            setNotice({ text: `✅ ${modal.tokens} ${t("tariffs.success")}`, ok: true });
+            setModal(null);
+            api.profile
+              .get()
+              .then((p) => setBalance(p.tokenBalance))
+              .catch(() => void 0);
+          } else if (status !== "cancelled") {
+            setNotice({ text: t("tariffs.failed"), ok: false });
+          }
+        });
+      }
     } catch {
       setNotice({ text: t("tariffs.invoiceError"), ok: false });
     } finally {
