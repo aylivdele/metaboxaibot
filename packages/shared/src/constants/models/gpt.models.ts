@@ -683,8 +683,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
 };
 
 // ── Apply settings ────────────────────────────────────────────────────────────
-// LLM section — assign base settings plus model-specific extras
-const OPENAI_REASONING_IDS = new Set(["o4-mini", "o3", "o3-mini"]);
+// Models with explicitly defined settings (e.g. gpt-5 family, o-series) are skipped.
+// All other LLM models get LLM_SETTINGS + provider-specific extras.
 const GROK_REASONING_IDS = new Set(["grok-4", "grok-4-fast"]);
 const ANTHROPIC_THINKING_IDS = new Set([
   "claude-opus",
@@ -701,13 +701,12 @@ const GEMINI_THINKING_IDS = new Set([
 ]);
 
 for (const [id, model] of Object.entries(GPT_MODELS)) {
+  if (model.settings) continue; // already explicitly set — do not overwrite
+
   const extras: ModelSettingDef[] = [];
 
   if (id.startsWith("perplexity")) {
     extras.push(PERPLEXITY_EXTRA, PERPLEXITY_SEARCH_CONTEXT, PERPLEXITY_DOMAIN_FILTER);
-  }
-  if (OPENAI_REASONING_IDS.has(id)) {
-    extras.push(REASONING_EFFORT);
   }
   if (id === "grok-3-mini") {
     extras.push(GROK_MINI_REASONING);
