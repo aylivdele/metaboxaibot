@@ -39,7 +39,7 @@ export const paymentsRoutes: FastifyPluginAsync = async (fastify) => {
     });
     const rate = await getRate();
 
-    const isTestMode = config.env !== "production";
+    const isTestMode = false; // Always use real Telegram Stars payments
     const { userId } = request as AuthRequest;
     const user = await db.user.findUnique({
       where: { id: userId },
