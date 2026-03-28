@@ -82,12 +82,25 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
     setNotice(null);
 
     try {
-      const { invoiceUrl } = await api.payments.createInvoice(
+      const result = await api.payments.createInvoice(
         modal.type,
         modal.id,
         modal.period,
         modal.name,
       );
+
+      // Test mode: payment processed instantly without Telegram Invoice
+      if ((result as { testMode?: boolean }).testMode) {
+        setNotice({ text: `✅ ${modal.tokens} ${t("tariffs.success")}`, ok: true });
+        setModal(null);
+        api.profile
+          .get()
+          .then((p) => setBalance(p.tokenBalance))
+          .catch(() => void 0);
+        return;
+      }
+
+      const { invoiceUrl } = result;
       const tg = getTgWebApp();
       if (!tg?.openInvoice) {
         setNotice({ text: t("tariffs.openInTg"), ok: false });

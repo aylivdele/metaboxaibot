@@ -2,6 +2,7 @@ export interface UserProfile {
   id: string;
   username: string | null;
   firstName: string | null;
+  lastName: string | null;
   language: string;
   role: "USER" | "MODERATOR" | "ADMIN";
   tokenBalance: string;

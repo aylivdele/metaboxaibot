@@ -197,4 +197,118 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
       return { activated: !!user };
     },
   );
+
+  /**
+   * POST /internal/save-subscription
+   * Called by Metabox when admin disconnects TG and chooses "keep in bot".
+   * Saves subscription data locally so bot can check it independently.
+   * Body: { telegramId, planName, period, tokensGranted, endDate, startDate }
+   */
+  fastify.post("/save-subscription", async (request, reply) => {
+    const { telegramId, planName, period, tokensGranted, endDate, startDate } = request.body as {
+      telegramId: string;
+      planName: string;
+      period: string;
+      tokensGranted: number;
+      endDate: string;
+      startDate: string;
+    };
+
+    if (!telegramId || !planName || !endDate) {
+      return reply.code(400).send({ error: "telegramId, planName, endDate required" });
+    }
+
+    const user = await db.user.findUnique({ where: { id: BigInt(telegramId) } });
+    if (!user) return { ok: true };
+
+    await db.localSubscription.upsert({
+      where: { userId: BigInt(telegramId) },
+      create: {
+        userId: BigInt(telegramId),
+        planName,
+        period: period || "M1",
+        tokensGranted: tokensGranted || 0,
+        endDate: new Date(endDate),
+        startDate: new Date(startDate || Date.now()),
+        isActive: new Date(endDate) > new Date(),
+      },
+      update: {
+        planName,
+        period: period || "M1",
+        tokensGranted: tokensGranted || 0,
+        endDate: new Date(endDate),
+        startDate: new Date(startDate || Date.now()),
+        isActive: new Date(endDate) > new Date(),
+      },
+    });
+
+    return { ok: true };
+  });
+
+  /**
+   * GET /internal/get-local-subscription?telegramId=<id>
+   * Returns local subscription data if exists and active.
+   */
+  fastify.get<{ Querystring: { telegramId?: string } }>(
+    "/get-local-subscription",
+    async (request, reply) => {
+      const { telegramId } = request.query;
+      if (!telegramId) {
+        return reply.code(400).send({ error: "telegramId is required" });
+      }
+
+      const sub = await db.localSubscription.findUnique({
+        where: { userId: BigInt(telegramId) },
+      });
+
+      if (!sub || !sub.isActive || new Date(sub.endDate) <= new Date()) {
+        return { subscription: null };
+      }
+
+      return {
+        subscription: {
+          planName: sub.planName,
+          period: sub.period,
+          tokensGranted: sub.tokensGranted,
+          endDate: sub.endDate.toISOString(),
+          startDate: sub.startDate.toISOString(),
+          daysLeft: Math.max(0, Math.ceil((sub.endDate.getTime() - Date.now()) / 86400000)),
+        },
+      };
+    },
+  );
+
+  /**
+   * POST /internal/consume-local-subscription
+   * Called by Metabox when bot reconnects to a new site account.
+   * Returns and deletes the local subscription data.
+   * Body: { telegramId }
+   */
+  fastify.post("/consume-local-subscription", async (request, reply) => {
+    const { telegramId } = request.body as { telegramId: string };
+    if (!telegramId) {
+      return reply.code(400).send({ error: "telegramId is required" });
+    }
+
+    const sub = await db.localSubscription.findUnique({
+      where: { userId: BigInt(telegramId) },
+    });
+
+    if (!sub || !sub.isActive || new Date(sub.endDate) <= new Date()) {
+      return { subscription: null };
+    }
+
+    // Delete after consuming
+    await db.localSubscription.delete({ where: { id: sub.id } });
+
+    return {
+      subscription: {
+        planName: sub.planName,
+        period: sub.period,
+        tokensGranted: sub.tokensGranted,
+        endDate: sub.endDate.toISOString(),
+        startDate: sub.startDate.toISOString(),
+      },
+    };
+  });
 };

@@ -45,7 +45,7 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (!user) throw new Error("User not found");
 
-    // Fetch subscription status from Metabox
+    // Fetch subscription: check local first, then Metabox
     let subscription: {
       planName: string;
       period: string;
@@ -53,18 +53,42 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       totalDays: number;
       endDate: string;
     } | null = null;
-    try {
-      const { getSubscriptionStatus } = await import("../services/metabox-bridge.service.js");
-      const subData = await getSubscriptionStatus(userId);
-      subscription = subData.subscription;
-    } catch {
-      // Non-fatal: subscription info unavailable
+
+    // 1. Check local subscription (saved during TG disconnect)
+    const localSub = await db.localSubscription.findUnique({
+      where: { userId },
+    });
+    if (localSub && localSub.isActive && new Date(localSub.endDate) > new Date()) {
+      const daysLeft = Math.max(0, Math.ceil((localSub.endDate.getTime() - Date.now()) / 86400000));
+      const totalDays = Math.max(
+        1,
+        Math.ceil((localSub.endDate.getTime() - localSub.startDate.getTime()) / 86400000),
+      );
+      subscription = {
+        planName: localSub.planName,
+        period: localSub.period,
+        daysLeft,
+        totalDays,
+        endDate: localSub.endDate.toISOString(),
+      };
+    }
+
+    // 2. If no local, try Metabox
+    if (!subscription) {
+      try {
+        const { getSubscriptionStatus } = await import("../services/metabox-bridge.service.js");
+        const subData = await getSubscriptionStatus(userId);
+        subscription = subData.subscription;
+      } catch {
+        // Non-fatal: subscription info unavailable
+      }
     }
 
     return {
       id: user.id.toString(),
       username: user.username ?? null,
       firstName: user.firstName ?? null,
+      lastName: user.lastName ?? null,
       language: user.language,
       role: user.role,
       metaboxUserId: user.metaboxUserId ?? null,

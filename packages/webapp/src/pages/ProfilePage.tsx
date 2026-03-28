@@ -49,7 +49,8 @@ export function ProfilePage({ initialSection }: { initialSection?: ProfileTab })
   if (error) return <div className="page-error">{error}</div>;
   if (!profile) return null;
 
-  const displayName = profile.firstName ?? profile.username ?? `User ${profile.id.slice(-4)}`;
+  const firstName = profile.firstName ?? profile.username ?? `User ${profile.id.slice(-4)}`;
+  const displayName = profile.lastName ? `${firstName} ${profile.lastName}` : firstName;
 
   return (
     <div className="page">
