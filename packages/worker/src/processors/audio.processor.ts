@@ -4,7 +4,7 @@ import type { AudioJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createAudioAdapter } from "@metabox/api/ai/audio";
 import { deductTokens, calculateCost } from "@metabox/api/services";
-import { buildS3Key, uploadBuffer, uploadFromUrl } from "@metabox/api/services/s3";
+import { buildS3Key, uploadBuffer, uploadFromUrl, getFileUrl } from "@metabox/api/services/s3";
 import { logger } from "../logger.js";
 import { config, AI_MODELS } from "@metabox/shared";
 
@@ -51,53 +51,78 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
   const adapter = createAudioAdapter(modelId);
 
   try {
-    let audioResult: { buffer?: Buffer; url?: string; ext: string; contentType: string };
-
-    if (!adapter.isAsync && adapter.generate) {
-      // Sync adapter (should not normally end up in queue, but handle gracefully)
-      audioResult = await adapter.generate({ prompt, voiceId, sourceAudioUrl, modelSettings });
-    } else {
-      // Async adapter (Suno)
-      if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
-      const providerJobId = await adapter.submit({
-        prompt,
-        voiceId,
-        sourceAudioUrl,
-        modelSettings,
-      });
-
-      let polled = null;
-      for (let i = 0; i < MAX_POLLS; i++) {
-        await sleep(POLL_INTERVAL_MS);
-        polled = await adapter.poll!(providerJobId);
-        if (polled) break;
-      }
-
-      if (!polled) throw new Error(`Timed out waiting for ${modelId} job ${providerJobId}`);
-      audioResult = polled;
-    }
-
-    const audioKey = buildS3Key("audio", userIdStr, dbJobId, audioResult.ext ?? "mp3");
-    const s3Key = await (
-      audioResult.buffer
-        ? uploadBuffer(audioKey, audioResult.buffer, `audio/${audioResult.ext ?? "mpeg"}`)
-        : audioResult.url
-          ? uploadFromUrl(audioKey, audioResult.url, `audio/${audioResult.ext ?? "mpeg"}`)
-          : Promise.resolve(null)
-    ).catch(() => null);
-
-    await db.generationJob.update({
+    // On retry: if generation already completed, skip submit/poll
+    const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
-      data: { status: "done", outputUrl: audioResult.url ?? null, s3Key, completedAt: new Date() },
+      select: { outputUrl: true, s3Key: true },
     });
 
-    const model = AI_MODELS[modelId];
-    if (model) {
-      await deductTokens(
-        BigInt(userIdStr),
-        calculateCost(model, 0, 0, undefined, undefined, modelSettings, undefined, prompt.length),
-        modelId,
-      );
+    let audioResult: { buffer?: Buffer; url?: string; ext: string; contentType: string };
+    let s3Key: string | null;
+
+    if (existingJob?.outputUrl || existingJob?.s3Key) {
+      logger.info({ dbJobId }, "Generation already done, skipping to send");
+      // Reconstruct a minimal audioResult to pass to sendAudio
+      const ext = existingJob.s3Key?.split(".").pop() ?? "mp3";
+      const resolvedUrl = existingJob.s3Key
+        ? ((await getFileUrl(existingJob.s3Key).catch(() => null)) ??
+          existingJob.outputUrl ??
+          undefined)
+        : (existingJob.outputUrl ?? undefined);
+      audioResult = { url: resolvedUrl, ext, contentType: `audio/${ext}` };
+      s3Key = existingJob.s3Key ?? null;
+    } else {
+      if (!adapter.isAsync && adapter.generate) {
+        // Sync adapter (should not normally end up in queue, but handle gracefully)
+        audioResult = await adapter.generate({ prompt, voiceId, sourceAudioUrl, modelSettings });
+      } else {
+        // Async adapter (Suno)
+        if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
+        const providerJobId = await adapter.submit({
+          prompt,
+          voiceId,
+          sourceAudioUrl,
+          modelSettings,
+        });
+
+        let polled = null;
+        for (let i = 0; i < MAX_POLLS; i++) {
+          await sleep(POLL_INTERVAL_MS);
+          polled = await adapter.poll!(providerJobId);
+          if (polled) break;
+        }
+
+        if (!polled) throw new Error(`Timed out waiting for ${modelId} job ${providerJobId}`);
+        audioResult = polled;
+      }
+
+      const audioKey = buildS3Key("audio", userIdStr, dbJobId, audioResult.ext ?? "mp3");
+      s3Key = await (
+        audioResult.buffer
+          ? uploadBuffer(audioKey, audioResult.buffer, `audio/${audioResult.ext ?? "mpeg"}`)
+          : audioResult.url
+            ? uploadFromUrl(audioKey, audioResult.url, `audio/${audioResult.ext ?? "mpeg"}`)
+            : Promise.resolve(null)
+      ).catch(() => null);
+
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: {
+          status: "done",
+          outputUrl: audioResult.url ?? null,
+          s3Key,
+          completedAt: new Date(),
+        },
+      });
+
+      const model = AI_MODELS[modelId];
+      if (model) {
+        await deductTokens(
+          BigInt(userIdStr),
+          calculateCost(model, 0, 0, undefined, undefined, modelSettings, undefined, prompt.length),
+          modelId,
+        );
+      }
     }
 
     await sendAudio(telegramChatId, audioResult, `✅ ${modelId}: ${prompt.slice(0, 200)}`);
@@ -106,14 +131,21 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
   } catch (err) {
     logger.error({ dbJobId, err }, "Audio job failed");
 
-    await db.generationJob.update({
-      where: { id: dbJobId },
-      data: { status: "failed", error: String(err) },
-    });
+    const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 1) - 1;
 
-    await telegram
-      .sendMessage(telegramChatId, `❌ Audio generation failed: ${String(err).slice(0, 200)}`)
-      .catch(() => void 0);
+    if (isLastAttempt) {
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "failed", error: String(err) },
+      });
+
+      await telegram
+        .sendMessage(
+          telegramChatId,
+          "❌ Ошибка при генерации, попробуйте позже или обратитесь в поддержку.",
+        )
+        .catch(() => void 0);
+    }
 
     throw err;
   }

@@ -4,7 +4,8 @@ import type { ImageJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createImageAdapter } from "@metabox/api/ai/image";
 import { deductTokens, calculateCost } from "@metabox/api/services";
-import { buildS3Key, sectionMeta, uploadFromUrl } from "@metabox/api/services/s3";
+import { buildS3Key, sectionMeta, uploadFromUrl, getFileUrl } from "@metabox/api/services/s3";
+import { InputFile } from "grammy";
 import { logger } from "../logger.js";
 import { config, AI_MODELS } from "@metabox/shared";
 
@@ -37,71 +38,101 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
   const adapter = createImageAdapter(modelId);
 
   try {
-    if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
-    const providerJobId = await adapter.submit({
-      prompt,
-      negativePrompt,
-      imageUrl: job.data.sourceImageUrl,
-      aspectRatio,
-      modelSettings,
-    });
-
-    let imageResult = null;
-    for (let i = 0; i < MAX_POLLS; i++) {
-      await sleep(POLL_INTERVAL_MS);
-      imageResult = await adapter.poll!(providerJobId);
-      if (imageResult) break;
-    }
-
-    if (!imageResult) {
-      throw new Error(`Timed out waiting for ${modelId} job ${providerJobId}`);
-    }
-
-    const isSvg = imageResult.filename?.endsWith(".svg") ?? false;
-    const { ext, contentType } = isSvg
-      ? { ext: "svg", contentType: "image/svg+xml" }
-      : sectionMeta("image");
-    const s3Key = await uploadFromUrl(
-      buildS3Key("image", userIdStr, dbJobId, ext),
-      imageResult.url,
-      contentType,
-    ).catch(() => null);
-
-    await db.generationJob.update({
+    // On retry: check if generation already completed and skip re-submitting to provider
+    const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
-      data: { status: "done", outputUrl: imageResult.url, s3Key, completedAt: new Date() },
+      select: { outputUrl: true, s3Key: true },
     });
 
-    const model = AI_MODELS[modelId];
-    if (model) {
-      const megapixels =
-        model.costUsdPerMPixel && imageResult.width && imageResult.height
-          ? (imageResult.width * imageResult.height) / 1_000_000
-          : undefined;
-      await deductTokens(
-        BigInt(userIdStr),
-        calculateCost(model, 0, 0, megapixels, undefined, modelSettings),
-        modelId,
-      );
+    let outputUrl: string;
+    let s3Key: string | null;
+
+    if (existingJob?.outputUrl) {
+      // Generation succeeded on a previous attempt — skip submit/poll
+      logger.info({ dbJobId }, "Generation already done, skipping to send");
+      outputUrl = existingJob.outputUrl;
+      s3Key = existingJob.s3Key ?? null;
+    } else {
+      if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
+      const providerJobId = await adapter.submit({
+        prompt,
+        negativePrompt,
+        imageUrl: job.data.sourceImageUrl,
+        aspectRatio,
+        modelSettings,
+      });
+
+      let imageResult = null;
+      for (let i = 0; i < MAX_POLLS; i++) {
+        await sleep(POLL_INTERVAL_MS);
+        imageResult = await adapter.poll!(providerJobId);
+        if (imageResult) break;
+      }
+
+      if (!imageResult) {
+        throw new Error(`Timed out waiting for ${modelId} job ${providerJobId}`);
+      }
+
+      const isSvg = imageResult.filename?.endsWith(".svg") ?? false;
+      const { ext, contentType } = isSvg
+        ? { ext: "svg", contentType: "image/svg+xml" }
+        : sectionMeta("image");
+      s3Key = await uploadFromUrl(
+        buildS3Key("image", userIdStr, dbJobId, ext),
+        imageResult.url,
+        contentType,
+      ).catch(() => null);
+
+      outputUrl = imageResult.url;
+
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "done", outputUrl, s3Key, completedAt: new Date() },
+      });
+
+      const model = AI_MODELS[modelId];
+      if (model) {
+        const megapixels =
+          model.costUsdPerMPixel && imageResult.width && imageResult.height
+            ? (imageResult.width * imageResult.height) / 1_000_000
+            : undefined;
+        await deductTokens(
+          BigInt(userIdStr),
+          calculateCost(model, 0, 0, megapixels, undefined, modelSettings),
+          modelId,
+        );
+      }
     }
+
+    const imageResult = { url: outputUrl, filename: s3Key?.split(".").pop() ?? "png" };
+    const model = AI_MODELS[modelId];
 
     // Save messages to dialog and get assistantMessageId for Refine button
+    // (only on first attempt — skip if messages already exist for this job)
     let assistantMessageId: string | undefined;
     if (dialogId) {
-      await db.message.create({
-        data: { dialogId, role: "user", content: prompt, tokensUsed: 0 },
+      const existingMsg = await db.message.findFirst({
+        where: { dialogId, mediaUrl: outputUrl },
+        select: { id: true },
       });
-      const assistantMsg = await db.message.create({
-        data: {
-          dialogId,
-          role: "assistant",
-          content: "",
-          mediaUrl: imageResult.url,
-          mediaType: "image",
-          tokensUsed: 0,
-        },
-      });
-      assistantMessageId = assistantMsg.id;
+      if (existingMsg) {
+        assistantMessageId = existingMsg.id;
+      } else {
+        await db.message.create({
+          data: { dialogId, role: "user", content: prompt, tokensUsed: 0 },
+        });
+        const assistantMsg = await db.message.create({
+          data: {
+            dialogId,
+            role: "assistant",
+            content: "",
+            mediaUrl: outputUrl,
+            mediaType: "image",
+            tokensUsed: 0,
+          },
+        });
+        assistantMessageId = assistantMsg.id;
+      }
     }
 
     // Build inline keyboard: optional Refine row + optional Send as file row
@@ -118,13 +149,18 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     }[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
+    // Prefer S3 URL (always accessible by Telegram); fall back to downloading
+    // the provider URL as a buffer (some providers like fal.media block Telegram's fetcher).
+    const tgImageSource = await resolveTelegramSource(s3Key, imageResult.url);
+
+    const isSvg = imageResult.filename?.endsWith("svg") ?? false;
     if (isSvg) {
-      await telegram.sendDocument(telegramChatId, imageResult.url, {
+      await telegram.sendDocument(telegramChatId, tgImageSource, {
         caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
         reply_markup: replyMarkup,
       });
     } else {
-      await telegram.sendPhoto(telegramChatId, imageResult.url, {
+      await telegram.sendPhoto(telegramChatId, tgImageSource, {
         caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
         reply_markup: replyMarkup,
       });
@@ -156,4 +192,25 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Returns the best source to send to Telegram:
+ * 1. S3 public/presigned URL if available (always reachable by Telegram).
+ * 2. Downloaded buffer wrapped in InputFile (for providers like fal.media that
+ *    block Telegram's HTTP fetcher).
+ */
+async function resolveTelegramSource(
+  s3Key: string | null,
+  providerUrl: string,
+): Promise<string | InstanceType<typeof InputFile>> {
+  if (s3Key) {
+    const s3Url = await getFileUrl(s3Key).catch(() => null);
+    if (s3Url) return s3Url;
+  }
+  // Download the image ourselves and send as a buffer
+  const res = await fetch(providerUrl);
+  if (!res.ok) throw new Error(`Failed to fetch image from provider: ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return new InputFile(buffer, "image.png");
 }

@@ -72,9 +72,9 @@ export class ReplicateAdapter implements ImageAdapter {
     const stylePreset = ms.style_preset && ms.style_preset !== "None" ? ms.style_preset : undefined;
     if (stylePreset) {
       msExtras.style_preset = stylePreset;
-      // Ideogram requires style_type to be AUTO or GENERAL when style_preset is set
+      // Ideogram requires style_type to be Auto or General when style_preset is set
       const styleType = ms.style_type && ms.style_type !== "None" ? (ms.style_type as string) : "";
-      msExtras.style_type = styleType === "GENERAL" || styleType === "AUTO" ? styleType : "AUTO";
+      msExtras.style_type = styleType === "General" || styleType === "Auto" ? styleType : "Auto";
     } else if (ms.style_type && ms.style_type !== "None") {
       msExtras.style_type = ms.style_type;
     }
