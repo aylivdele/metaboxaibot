@@ -126,6 +126,8 @@ export default {
       "⚠️ No tool selected for working with the bot.\nPlease use the navigation to activate the desired function (see photo) ↕️\n*If the ☰ menu button (highlighted in red in the photo) has disappeared, type /start to restart the bot* 🔄",
     insufficientTokens:
       "❌ Insufficient tokens. Please top up your balance in the Profile section.",
+    noSubscription: "❌ An active subscription is required to use the bot.",
+    noSubscriptionForPurchase: "❌ Token packages are only available with an active subscription.",
     userBlocked: "❌ Your account has been blocked. Contact support.",
   },
   common: {

@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import { config, PLANS } from "@metabox/shared";
 import { recordSale } from "./metabox-bridge.service.js";
+import { checkSubscription } from "./token.service.js";
 import { add } from "date-fns";
 
 export interface SaleUserInfo {
@@ -140,42 +141,79 @@ export const paymentService = {
     period: string | undefined,
     userInfo: SaleUserInfo,
     productName?: string,
+    endDateOverride?: Date,
   ): Promise<void> {
     const periodStr = period || "M1";
     const months = parseInt(periodStr.substring(1), 10);
     const startDate = new Date();
-    const endDate = add(startDate, {months});
     const desc =
       productType === "subscription"
         ? `Подписка ${productName || productId} (${periodStr})`
         : `Пакет токенов ${productName || productId}`;
 
-    await db.$transaction([
-      db.user.update({
+    if (productType === "subscription") {
+      // Extend from current endDate if subscription is still active, otherwise from now
+      const currentUser = await db.user.findUniqueOrThrow({
         where: { id: userId },
-        data: { tokenBalance: { increment: tokens } },
-      }),
-      db.tokenTransaction.create({
-        data: {
-          userId,
-          amount: tokens,
-          type: "credit",
-          reason: "purchase",
-          description: desc,
-          modelId: productId,
-        },
-      }),
-      ...(productType === "subscription" ? ([db.localSubscription.create({
-        data: {
-          userId,
-          planName: productName ?? desc,
-          period: period || "undefined",
-          tokensGranted: tokens,
-          startDate,
-          endDate,
-        }
-      })]) : [])
-    ]);
+        select: { subscriptionEndDate: true },
+      });
+      const baseDate =
+        currentUser.subscriptionEndDate && currentUser.subscriptionEndDate > startDate
+          ? currentUser.subscriptionEndDate
+          : startDate;
+      const endDate = endDateOverride ?? add(baseDate, { months });
+
+      await db.$transaction([
+        db.user.update({
+          where: { id: userId },
+          data: {
+            subscriptionTokenBalance: { increment: tokens },
+            subscriptionEndDate: endDate,
+            subscriptionPlanName: productName ?? productId,
+          },
+        }),
+        db.tokenTransaction.create({
+          data: {
+            userId,
+            amount: tokens,
+            type: "credit",
+            reason: "purchase",
+            description: desc,
+            modelId: productId,
+          },
+        }),
+        db.localSubscription.create({
+          data: {
+            userId,
+            planName: productName ?? desc,
+            period: period || "undefined",
+            tokensGranted: tokens,
+            startDate,
+            endDate,
+          },
+        }),
+      ]);
+    } else {
+      // Token package — requires active subscription
+      await checkSubscription(userId);
+
+      await db.$transaction([
+        db.user.update({
+          where: { id: userId },
+          data: { tokenBalance: { increment: tokens } },
+        }),
+        db.tokenTransaction.create({
+          data: {
+            userId,
+            amount: tokens,
+            type: "credit",
+            reason: "purchase",
+            description: desc,
+            modelId: productId,
+          },
+        }),
+      ]);
+    }
 
     // Notify Metabox for MLM bonus + order tracking (always, even for unlinked users)
     recordSale({
@@ -204,3 +242,23 @@ export const paymentService = {
       });
   },
 };
+
+/**
+ * Zero out subscription balance and clear subscription fields when a subscription expires.
+ */
+export async function expireSubscription(userId: bigint): Promise<void> {
+  await db.$transaction([
+    db.user.update({
+      where: { id: userId },
+      data: {
+        subscriptionTokenBalance: 0,
+        subscriptionEndDate: null,
+        subscriptionPlanName: null,
+      },
+    }),
+    db.localSubscription.updateMany({
+      where: { userId, isActive: true },
+      data: { isActive: false },
+    }),
+  ]);
+}

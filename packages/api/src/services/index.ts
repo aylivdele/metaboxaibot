@@ -11,7 +11,13 @@ export { audioGenerationService } from "./audio-generation.service.js";
 export type { SubmitAudioParams, SubmitAudioResult } from "./audio-generation.service.js";
 export { paymentService } from "./payment.service.js";
 export type { SaleUserInfo } from "./payment.service.js";
-export { deductTokens, checkBalance, calculateCost, computeVideoTokens } from "./token.service.js";
+export {
+  deductTokens,
+  checkBalance,
+  checkSubscription,
+  calculateCost,
+  computeVideoTokens,
+} from "./token.service.js";
 export { s3Service, getFileUrl } from "./s3.service.js";
 export {
   verifyLinkToken,

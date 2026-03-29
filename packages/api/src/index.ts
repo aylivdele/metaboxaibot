@@ -36,6 +36,7 @@ import { uploadsRoutes } from "./routes/uploads.js";
 import { higgsfieldMotionsRoutes } from "./routes/higgsfield-motions.js";
 import { userAvatarsRoutes } from "./routes/user-avatars.js";
 import { startRateScheduler } from "./services/exchange-rate.service.js";
+import { startSubscriptionScheduler } from "./services/subscription.service.js";
 import { config } from "@metabox/shared";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -118,6 +119,8 @@ await server.register(userAvatarsRoutes);
 
 // Start USDT/RUB exchange rate scheduler (fetches from Binance 4× daily)
 startRateScheduler();
+// Expire subscription tokens for users whose subscriptions have ended
+startSubscriptionScheduler();
 
 const port = config.api.port;
 await server.listen({ port, host: "0.0.0.0" });

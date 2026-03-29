@@ -1,15 +1,27 @@
 import type { BotContext } from "../types/context.js";
-import { paymentService, getRate, STAR_PRICE_USD } from "@metabox/api/services";
+import { paymentService, getRate, STAR_PRICE_USD, checkSubscription } from "@metabox/api/services";
 import type { SaleUserInfo } from "@metabox/api/services";
 import { logger } from "../logger.js";
+import { getT } from "@metabox/shared";
 
 /** Answer Telegram's pre-checkout query — must respond within 10 seconds. */
 export async function handlePreCheckoutQuery(ctx: BotContext): Promise<void> {
-  logger.info(
-    { userId: ctx.from?.id, payload: ctx.preCheckoutQuery?.invoice_payload },
-    "pre_checkout_query received",
-  );
+  const payload = ctx.preCheckoutQuery?.invoice_payload ?? "";
+  logger.info({ userId: ctx.from?.id, payload }, "pre_checkout_query received");
+
   try {
+    // Token packages require an active subscription
+    if (payload.startsWith("product:") && ctx.from?.id) {
+      try {
+        await checkSubscription(BigInt(ctx.from.id));
+      } catch {
+        const t = ctx.t ?? getT("en");
+        await ctx.answerPreCheckoutQuery(false, t.errors.noSubscriptionForPurchase);
+        logger.info({ userId: ctx.from.id, payload }, "pre_checkout_query denied: no subscription");
+        return;
+      }
+    }
+
     await ctx.answerPreCheckoutQuery(true);
     logger.info("pre_checkout_query answered OK");
   } catch (err) {

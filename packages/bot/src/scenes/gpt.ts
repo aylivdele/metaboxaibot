@@ -138,7 +138,9 @@ async function streamGptResponse(
   } catch (err: unknown) {
     logger.error(err, "GPT message error");
     await ctx.api.deleteMessage(chatId, placeholder.message_id).catch(() => void 0);
-    if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
+    if (err instanceof Error && err.message === "NO_SUBSCRIPTION") {
+      await ctx.reply(ctx.t.errors.noSubscription);
+    } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
       await ctx.reply(ctx.t.errors.insufficientTokens);
     } else {
       await ctx.reply(ctx.t.errors.noTool);

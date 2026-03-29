@@ -44,10 +44,18 @@ export const userService = {
   },
 
   async creditWelcomeBonus(userId: bigint): Promise<void> {
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialEndDate.getDate() + 3);
+
     await db.$transaction([
       db.user.update({
         where: { id: userId },
-        data: { isNew: false },
+        data: {
+          isNew: false,
+          subscriptionTokenBalance: { increment: WELCOME_BONUS_TOKENS },
+          subscriptionEndDate: trialEndDate,
+          subscriptionPlanName: "Trial",
+        },
       }),
       db.tokenTransaction.create({
         data: {

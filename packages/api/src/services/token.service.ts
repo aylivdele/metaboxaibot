@@ -3,8 +3,8 @@ import { config } from "@metabox/shared";
 import type { AIModel } from "@metabox/shared";
 
 /**
- * Deduct tokens for AI usage.
- * Atomically decrements user balance and records the transaction.
+ * Deduct tokens for AI usage. Subscription tokens are spent first, then regular tokens.
+ * Atomically updates balances and records the transaction.
  */
 export async function deductTokens(
   userId: bigint,
@@ -12,10 +12,21 @@ export async function deductTokens(
   modelId: string,
   dialogId?: string,
 ): Promise<void> {
+  const user = await db.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { subscriptionTokenBalance: true, tokenBalance: true },
+  });
+
+  const fromSub = Math.min(Number(user.subscriptionTokenBalance), amount);
+  const fromRegular = amount - fromSub;
+
   await db.$transaction([
     db.user.update({
       where: { id: userId },
-      data: { tokenBalance: { decrement: amount } },
+      data: {
+        ...(fromSub > 0 ? { subscriptionTokenBalance: { decrement: fromSub } } : {}),
+        ...(fromRegular > 0 ? { tokenBalance: { decrement: fromRegular } } : {}),
+      },
     }),
     db.tokenTransaction.create({
       data: {
@@ -31,11 +42,32 @@ export async function deductTokens(
 }
 
 /**
- * Throw INSUFFICIENT_TOKENS if the user's balance is below the required amount.
+ * Throw NO_SUBSCRIPTION if the user has no active subscription,
+ * or INSUFFICIENT_TOKENS if combined balance is below required amount.
  */
 export async function checkBalance(userId: bigint, required: number): Promise<void> {
-  const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
-  if (Number(user.tokenBalance) < required) throw new Error("INSUFFICIENT_TOKENS");
+  const user = await db.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { tokenBalance: true, subscriptionTokenBalance: true, subscriptionEndDate: true },
+  });
+  const hasActiveSub = user.subscriptionEndDate && user.subscriptionEndDate > new Date();
+  if (!hasActiveSub) throw new Error("NO_SUBSCRIPTION");
+  const total = Number(user.subscriptionTokenBalance) + Number(user.tokenBalance);
+  if (total < required) throw new Error("INSUFFICIENT_TOKENS");
+}
+
+/**
+ * Throw NO_SUBSCRIPTION if the user has no active subscription.
+ * Used in payment flow to gate token package purchases.
+ */
+export async function checkSubscription(userId: bigint): Promise<void> {
+  const user = await db.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { subscriptionEndDate: true },
+  });
+  if (!user.subscriptionEndDate || user.subscriptionEndDate <= new Date()) {
+    throw new Error("NO_SUBSCRIPTION");
+  }
 }
 
 /**

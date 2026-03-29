@@ -197,6 +197,13 @@ export function createBot(token: string): Bot<BotContext> {
 
   // ── Error handler ─────────────────────────────────────────────────────────
   bot.catch((err) => {
+    const message = err.error instanceof Error ? err.error.message : String(err.error);
+    if (
+      message.includes("bot was blocked by the user") ||
+      message.includes("user is deactivated")
+    ) {
+      return;
+    }
     logger.error({ err, update: err.ctx.update }, "Unhandled bot error");
     const t = err.ctx.t ?? getT("en");
     err.ctx.reply(t.errors.unexpected).catch(() => void 0);

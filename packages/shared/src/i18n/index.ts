@@ -103,6 +103,8 @@ export interface Translations {
     noTool: string;
     unexpected: string;
     insufficientTokens: string;
+    noSubscription: string;
+    noSubscriptionForPurchase: string;
     userBlocked: string;
     sendOriginalFailed: string;
   };
