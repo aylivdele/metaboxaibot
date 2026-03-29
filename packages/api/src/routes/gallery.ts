@@ -2,6 +2,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
 import { getFileUrl } from "../services/s3.service.js";
+import { generateDownloadToken } from "../utils/download-token.js";
 import { config } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
@@ -61,7 +62,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       ...(section ? { section } : {}),
     };
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       db.generationJob.findMany({
         where,
         orderBy: { completedAt: "desc" },
@@ -79,6 +80,19 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       }),
       db.generationJob.count({ where }),
     ]);
+
+    // Resolve a stable previewUrl for each item.
+    // Prefer /download/:token (auto-refreshes presigned URL, no CORS issues).
+    // Fall back to provider outputUrl for items without an S3 key.
+    const items = rawItems.map((item) => {
+      let previewUrl: string | null = null;
+      if (item.s3Key && config.api.publicUrl) {
+        previewUrl = `${config.api.publicUrl}/download/${generateDownloadToken(item.s3Key, userId)}`;
+      } else {
+        previewUrl = item.outputUrl;
+      }
+      return { ...item, previewUrl };
+    });
 
     return { items, total, page: parseInt(page, 10), limit: take };
   });

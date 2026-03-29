@@ -48,6 +48,10 @@
       "types": "./src/utils/mp4-duration.ts",
       "default": "./dist/utils/mp4-duration.js"
     },
+    "./utils/download-token": {
+      "types": "./src/utils/download-token.ts",
+      "default": "./dist/utils/download-token.js"
+    },
     "./services/user-avatar": {
       "types": "./src/services/user-avatar.service.ts",
       "default": "./dist/services/user-avatar.service.js"

@@ -129,6 +129,7 @@ export default {
     noSubscription: "❌ An active subscription is required to use the bot.",
     noSubscriptionForPurchase: "❌ Token packages are only available with an active subscription.",
     userBlocked: "❌ Your account has been blocked. Contact support.",
+    fileTooLargeForTelegram: "The file is too large to send via Telegram.",
   },
   common: {
     backToMain: "🏠 Back to Main Menu",
@@ -139,6 +140,7 @@ export default {
     comingSoon: " — coming soon.",
     tokens: "tokens",
     sendOriginal: "📎 Send as file",
+    downloadFile: "⬇️ Download",
     costPerRequest: "💰 {cost} ✦ per request",
     costPerMPixel: "💰 {cost} ✦ per megapixel",
     costPerSecond: "💰 {cost} ✦ per second",

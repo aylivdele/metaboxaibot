@@ -243,6 +243,8 @@ export interface GalleryItem {
   prompt: string;
   s3Key: string | null;
   outputUrl: string | null;
+  /** Resolved preview URL — /download/:token when S3 key available, else outputUrl. */
+  previewUrl: string | null;
   completedAt: string | null;
 }
 

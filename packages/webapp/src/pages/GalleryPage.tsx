@@ -45,7 +45,7 @@ function GalleryCard({
     }
   };
 
-  const previewUrl = item.outputUrl;
+  const previewUrl = item.previewUrl;
   const isImage = item.section === "image";
   const isVideo = item.section === "video";
   const isAudio = item.section === "audio";

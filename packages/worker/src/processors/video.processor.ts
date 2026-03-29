@@ -5,10 +5,12 @@ import { db } from "@metabox/api/db";
 import { createVideoAdapter } from "@metabox/api/ai/video";
 import { deductTokens, calculateCost, computeVideoTokens } from "@metabox/api/services";
 import { buildS3Key, sectionMeta, uploadBuffer, getFileUrl } from "@metabox/api/services/s3";
+import { generateDownloadToken } from "@metabox/api/utils/download-token";
 import { InputFile } from "grammy";
+import type { InlineKeyboardButton } from "grammy/types";
 import { parseMp4Duration } from "@metabox/api/utils/mp4-duration";
 import { logger } from "../logger.js";
-import { config, AI_MODELS } from "@metabox/shared";
+import { config, AI_MODELS, getT } from "@metabox/shared";
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_POLLS = 144; // 12 minutes max
@@ -30,6 +32,11 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
   } = job.data;
 
   logger.info({ dbJobId, modelId }, "Processing video job");
+
+  const userLang = (await db.user
+    .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
+    .then((u) => u?.language ?? "ru")) as Parameters<typeof getT>[0];
+  const t = getT(userLang);
 
   await db.generationJob.update({
     where: { id: dbJobId },
@@ -118,17 +125,40 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       }
     }
 
-    const replyMarkup = sendOriginalLabel
-      ? { inline_keyboard: [[{ text: sendOriginalLabel, callback_data: `orig_${dbJobId}` }]] }
-      : undefined;
+    const origRow: InlineKeyboardButton[] | null = sendOriginalLabel
+      ? [{ text: sendOriginalLabel, callback_data: `orig_${dbJobId}` }]
+      : null;
+    const downloadRow: InlineKeyboardButton[] | null =
+      s3Key && config.api.publicUrl
+        ? [
+            {
+              text: t.common.downloadFile,
+              url: `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userIdStr)}`,
+            },
+          ]
+        : null;
+    const rows = [origRow, downloadRow].filter(Boolean) as InlineKeyboardButton[][];
+    const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
-    // Prefer already-downloaded buffer, then S3 URL, then download fresh from provider URL
-    const tgVideoSource = await resolveTelegramVideoSource(s3Key, outputUrl, videoBuffer);
+    const videoByteSize = videoBuffer?.byteLength ?? 0;
+    const VIDEO_MAX_BYTES = 50 * 1024 * 1024; // 50 MB — Telegram sendVideo limit
+    const tooLargeForTelegram = videoByteSize > VIDEO_MAX_BYTES;
 
-    await telegram.sendVideo(telegramChatId, tgVideoSource, {
-      caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
-      reply_markup: replyMarkup,
-    });
+    if (tooLargeForTelegram && downloadRow) {
+      // File exceeds Telegram's video limit — send a download link instead
+      await telegram.sendMessage(
+        telegramChatId,
+        `✅ ${modelId}: ${prompt.slice(0, 200)}\n\n${t.errors.fileTooLargeForTelegram}`,
+        { reply_markup: { inline_keyboard: [downloadRow] } },
+      );
+    } else {
+      // Prefer already-downloaded buffer, then S3 URL, then download fresh from provider URL
+      const tgVideoSource = await resolveTelegramVideoSource(s3Key, outputUrl, videoBuffer);
+      await telegram.sendVideo(telegramChatId, tgVideoSource, {
+        caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
+        reply_markup: replyMarkup,
+      });
+    }
 
     logger.info({ dbJobId }, "Video job completed");
   } catch (err) {

@@ -1,5 +1,7 @@
 import "dotenv/config";
-import { config } from "@metabox/shared";
+import { config, preloadLocales } from "@metabox/shared";
+
+await preloadLocales(["ru", "en"]);
 import { Worker } from "bullmq";
 import { Redis } from "ioredis";
 import type { ImageJobData, VideoJobData, AudioJobData, AvatarJobData } from "@metabox/api/queues";

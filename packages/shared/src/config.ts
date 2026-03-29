@@ -62,6 +62,8 @@ export const config = {
   api: {
     port: optInt("API_PORT", 3001),
     adminSecret: opt("ADMIN_SECRET"),
+    /** Public base URL for this API server, used to generate download links (e.g. https://api.meta-box.ru). */
+    publicUrl: opt("API_PUBLIC_URL"),
   },
 
   /** Observability */

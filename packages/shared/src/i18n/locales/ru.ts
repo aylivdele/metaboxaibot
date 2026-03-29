@@ -129,6 +129,7 @@ export default {
     noSubscription: "❌ Для использования бота необходима активная подписка.",
     noSubscriptionForPurchase: "❌ Пакеты токенов доступны только при наличии активной подписки.",
     userBlocked: "❌ Ваш аккаунт заблокирован. Свяжитесь с поддержкой.",
+    fileTooLargeForTelegram: "Файл слишком большой для отправки через Telegram.",
   },
   common: {
     backToMain: "🏠 В главное меню",
@@ -139,6 +140,7 @@ export default {
     comingSoon: " — скоро будет.",
     tokens: "токенов",
     sendOriginal: "📎 Отправить оригинал",
+    downloadFile: "⬇️ Скачать",
     costPerRequest: "💰 {cost} ✦ за запрос",
     costPerMPixel: "💰 {cost} ✦ за мегапиксель",
     costPerSecond: "💰 {cost} ✦ за секунду",

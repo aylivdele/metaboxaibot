@@ -107,6 +107,7 @@ export interface Translations {
     noSubscriptionForPurchase: string;
     userBlocked: string;
     sendOriginalFailed: string;
+    fileTooLargeForTelegram: string;
   };
   common: {
     backToMain: string;
@@ -117,6 +118,7 @@ export interface Translations {
     comingSoon: string;
     tokens: string;
     sendOriginal: string;
+    downloadFile: string;
     costPerRequest: string;
     costPerMPixel: string;
     costPerSecond: string;

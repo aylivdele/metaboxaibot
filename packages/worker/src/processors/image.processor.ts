@@ -1,13 +1,15 @@
 import type { Job } from "bullmq";
 import { Api } from "grammy";
+import type { InlineKeyboardButton } from "grammy/types";
 import type { ImageJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createImageAdapter } from "@metabox/api/ai/image";
 import { deductTokens, calculateCost } from "@metabox/api/services";
 import { buildS3Key, sectionMeta, uploadFromUrl, getFileUrl } from "@metabox/api/services/s3";
+import { generateDownloadToken } from "@metabox/api/utils/download-token";
 import { InputFile } from "grammy";
 import { logger } from "../logger.js";
-import { config, AI_MODELS } from "@metabox/shared";
+import { config, AI_MODELS, getT } from "@metabox/shared";
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLLS = 120; // 6 minutes max
@@ -29,6 +31,11 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
   } = job.data;
 
   logger.info({ dbJobId, modelId }, "Processing image job");
+
+  const userLang = (await db.user
+    .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
+    .then((u) => u?.language ?? "ru")) as Parameters<typeof getT>[0];
+  const t = getT(userLang);
 
   await db.generationJob.update({
     where: { id: dbJobId },
@@ -139,7 +146,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       }
     }
 
-    // Build inline keyboard: optional Refine row + optional Send as file row
+    // Build inline keyboard: optional Refine row + optional Send as file row + optional Download row
     const refineRow =
       model?.supportsImages && assistantMessageId
         ? [{ text: "🔄 Доработать", callback_data: `design_ref_${assistantMessageId}` }]
@@ -147,22 +154,40 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     const origRow = sendOriginalLabel
       ? [{ text: sendOriginalLabel, callback_data: `orig_${dbJobId}` }]
       : null;
-    const rows = [refineRow, origRow].filter(Boolean) as {
-      text: string;
-      callback_data: string;
-    }[][];
+    const downloadRow =
+      s3Key && config.api.publicUrl
+        ? [
+            {
+              text: t.common.downloadFile,
+              url: `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userIdStr)}`,
+            },
+          ]
+        : null;
+    const rows = [refineRow, origRow, downloadRow].filter(Boolean) as InlineKeyboardButton[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
     // Prefer S3 URL (always accessible by Telegram); fall back to downloading
     // the provider URL as a buffer (some providers like fal.media block Telegram's fetcher).
-    const tgImageSource = await resolveTelegramSource(
+    const { source: tgImageSource, byteSize } = await resolveTelegramSource(
       s3Key,
       imageResult.url,
       imageResult.filename ?? "image.png",
     );
 
+    const PHOTO_MAX_BYTES = 10 * 1024 * 1024; // 10 MB — Telegram sendPhoto limit
+    const DOCUMENT_MAX_BYTES = 50 * 1024 * 1024; // 50 MB — Telegram sendDocument limit
     const isSvg = imageResult.filename?.endsWith("svg") ?? false;
-    if (isSvg) {
+    const useDocument = isSvg || byteSize > PHOTO_MAX_BYTES;
+    const tooLargeForTelegram = byteSize > DOCUMENT_MAX_BYTES;
+
+    if (tooLargeForTelegram && downloadRow) {
+      // File exceeds Telegram's document limit — send a download link instead
+      await telegram.sendMessage(
+        telegramChatId,
+        `✅ ${modelId}: ${prompt.slice(0, 200)}\n\n${t.errors.fileTooLargeForTelegram}`,
+        { reply_markup: { inline_keyboard: [downloadRow] } },
+      );
+    } else if (useDocument) {
       await telegram.sendDocument(telegramChatId, tgImageSource, {
         caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
         reply_markup: replyMarkup,
@@ -212,15 +237,15 @@ async function resolveTelegramSource(
   s3Key: string | null,
   providerUrl: string,
   filename: string,
-): Promise<string | InstanceType<typeof InputFile>> {
+): Promise<{ source: string | InstanceType<typeof InputFile>; byteSize: number }> {
   // Only use S3 URL when it's a public URL — presigned URLs are not reachable by Telegram's servers
   if (s3Key && config.s3.publicUrl) {
     const s3Url = await getFileUrl(s3Key).catch(() => null);
-    if (s3Url) return s3Url;
+    if (s3Url) return { source: s3Url, byteSize: 0 };
   }
   // Download the image ourselves and send as a buffer
   const res = await fetch(providerUrl);
   if (!res.ok) throw new Error(`Failed to fetch image from provider: ${res.status}`);
   const buffer = Buffer.from(await res.arrayBuffer());
-  return new InputFile(buffer, filename);
+  return { source: new InputFile(buffer, filename), byteSize: buffer.byteLength };
 }
