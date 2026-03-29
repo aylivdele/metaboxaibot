@@ -41,6 +41,16 @@ const LLM_SETTINGS: ModelSettingDef[] = [
   },
 ];
 
+const PERPLEXITY_SYSTEM_PROMPT: ModelSettingDef = {
+  key: "system_prompt",
+  label: "Системный промпт",
+  description:
+    "Скрытая инструкция, которую ИИ всегда соблюдает: задайте роль, стиль или ограничения для всего диалога.",
+  type: "text",
+  default:
+    "Отвечай на языке пользователя. Используй только Telegram Markdown: *жирный*, _курсив_, `код`, ```блок кода```. Не используй заголовки (##) и двойные звёздочки (**). Ссылки на источники указывай в конце ответа нумерованным списком с полными URL.",
+};
+
 /** Extra setting for Perplexity search models. */
 const PERPLEXITY_EXTRA: ModelSettingDef = {
   key: "search_recency_filter",
@@ -720,7 +730,8 @@ for (const [id, model] of Object.entries(GPT_MODELS)) {
   if (id.startsWith("perplexity")) {
     model.settings = [
       TEMPERATURE_SETTING_CAPPED,
-      ...LLM_SETTINGS.slice(1),
+      LLM_SETTINGS[1], // max_tokens
+      PERPLEXITY_SYSTEM_PROMPT,
       PERPLEXITY_EXTRA,
       PERPLEXITY_SEARCH_CONTEXT,
       PERPLEXITY_DOMAIN_FILTER,

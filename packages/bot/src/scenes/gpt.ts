@@ -26,34 +26,31 @@ const MSG_SPLIT_AT = 3800;
 /**
  * Closes any unclosed Markdown markers so that a partial streaming response
  * is always valid for Telegram's Markdown parser.
+ * Returns { closed, opener } where opener must be prepended to the next message
+ * to continue the same formatting context.
  * Priority: ``` → ` → * → _
  */
-function closeOpenMarkdown(text: string): string {
-  // 1. Close unclosed triple-backtick code block
+function closeOpenMarkdown(text: string): { closed: string; opener: string } {
   if ((text.match(/```/g) ?? []).length % 2 !== 0) {
-    return text + "\n```";
+    return { closed: text + "\n```", opener: "```\n" };
   }
 
-  // Strip complete code blocks/inline code before counting remaining markers
   const noBlocks = text.replace(/```[\s\S]*?```/g, "");
   const noInline = noBlocks.replace(/`[^`\n]*`/g, "");
 
-  // 2. Close unclosed inline backtick
   if ((noBlocks.match(/`/g) ?? []).length % 2 !== 0) {
-    return text + "`";
+    return { closed: text + "`", opener: "`" };
   }
 
-  // 3. Close unclosed bold/italic asterisk
   if ((noInline.match(/\*/g) ?? []).length % 2 !== 0) {
-    return text + "*";
+    return { closed: text + "*", opener: "*" };
   }
 
-  // 4. Close unclosed italic underscore
   if ((noInline.match(/_/g) ?? []).length % 2 !== 0) {
-    return text + "_";
+    return { closed: text + "_", opener: "_" };
   }
 
-  return text;
+  return { closed: text, opener: "" };
 }
 
 /** Strip <think>...</think> blocks. During streaming, also hides an unclosed partial block. */
@@ -101,12 +98,15 @@ async function streamGptResponse(
 
       // Split into a new message when approaching Telegram's 4096-char limit
       if (accumulated.length >= MSG_SPLIT_AT) {
-        await finalizeMessage(
-          placeholder.message_id,
-          closeOpenMarkdown(stripThinkingBlocks(accumulated)),
-        );
+        // Prefer splitting at a newline; fall back to hard cut if none found in the latter half
+        const newlineIdx = accumulated.lastIndexOf("\n", MSG_SPLIT_AT);
+        const splitAt = newlineIdx > MSG_SPLIT_AT / 2 ? newlineIdx + 1 : MSG_SPLIT_AT;
+        const firstPart = accumulated.slice(0, splitAt);
+        const remainder = accumulated.slice(splitAt);
+        const { closed, opener } = closeOpenMarkdown(stripThinkingBlocks(firstPart));
+        await finalizeMessage(placeholder.message_id, closed);
         placeholder = await ctx.reply("⏳");
-        accumulated = "";
+        accumulated = opener + remainder;
         lastEdit = Date.now();
         continue;
       }
@@ -115,7 +115,7 @@ async function streamGptResponse(
       if (now - lastEdit >= EDIT_THROTTLE_MS && accumulated.trim()) {
         const visible = stripThinkingBlocks(accumulated);
         if (visible) {
-          const preview = closeOpenMarkdown(visible) + " ▌";
+          const preview = closeOpenMarkdown(visible).closed + " ▌";
           await ctx.api
             .editMessageText(chatId, placeholder.message_id, preview, { parse_mode: "Markdown" })
             .catch(async (err) => {
