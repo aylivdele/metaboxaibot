@@ -163,7 +163,8 @@ async function resolveTelegramVideoSource(
   providerUrl: string,
   cachedBuffer: Buffer | null,
 ): Promise<string | InstanceType<typeof InputFile>> {
-  if (s3Key) {
+  // Only use S3 URL when it's a public URL — presigned URLs are not reachable by Telegram's servers
+  if (s3Key && config.s3.publicUrl) {
     const s3Url = await getFileUrl(s3Key).catch(() => null);
     if (s3Url) return s3Url;
   }

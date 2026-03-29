@@ -90,9 +90,11 @@ export async function getFileUrl(key: string): Promise<string | null> {
   const client = makeClient();
   if (!client) return null;
 
-  return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), {
-    expiresIn: PRESIGN_TTL,
-  });
+  return getSignedUrl(
+    client,
+    new GetObjectCommand({ Bucket: bucket, Key: key, ChecksumMode: undefined }),
+    { expiresIn: PRESIGN_TTL, unhoistableHeaders: new Set(["x-amz-checksum-mode"]) },
+  );
 }
 
 export const s3Service = { buildS3Key, sectionMeta, uploadBuffer, uploadFromUrl, getFileUrl };

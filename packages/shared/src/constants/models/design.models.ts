@@ -338,6 +338,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: [
+      "auto",
       "21:9",
       "16:9",
       "3:2",
@@ -350,7 +351,19 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       "9:16",
     ],
     settings: [
-      mkAspectRatio(["21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"]),
+      mkAspectRatio([
+        "auto",
+        "21:9",
+        "16:9",
+        "3:2",
+        "4:3",
+        "5:4",
+        "1:1",
+        "4:5",
+        "3:4",
+        "2:3",
+        "9:16",
+      ]),
       {
         key: "safety_tolerance",
         label: "Допустимый контент",
