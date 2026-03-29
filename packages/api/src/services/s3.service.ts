@@ -78,8 +78,10 @@ export async function uploadFromUrl(
  * - public URL (if S3_PUBLIC_URL is configured)
  * - presigned GET URL (valid for PRESIGN_TTL seconds)
  * Returns null if S3 is not configured.
+ *
+ * Pass `downloadFilename` to force browser download via Content-Disposition: attachment.
  */
-export async function getFileUrl(key: string): Promise<string | null> {
+export async function getFileUrl(key: string, downloadFilename?: string): Promise<string | null> {
   const { bucket, publicUrl } = config.s3;
   if (!bucket) return null;
 
@@ -92,7 +94,14 @@ export async function getFileUrl(key: string): Promise<string | null> {
 
   return getSignedUrl(
     client,
-    new GetObjectCommand({ Bucket: bucket, Key: key, ChecksumMode: undefined }),
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ChecksumMode: undefined,
+      ...(downloadFilename
+        ? { ResponseContentDisposition: `attachment; filename="${downloadFilename}"` }
+        : {}),
+    }),
     { expiresIn: PRESIGN_TTL, unsignableHeaders: new Set(["x-amz-checksum-mode"]) },
   );
 }

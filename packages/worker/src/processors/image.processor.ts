@@ -174,8 +174,12 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       imageResult.filename ?? "image.png",
     );
 
-    const PHOTO_MAX_BYTES = 10 * 1024 * 1024; // 10 MB — Telegram sendPhoto limit
-    const DOCUMENT_MAX_BYTES = 50 * 1024 * 1024; // 50 MB — Telegram sendDocument limit
+    // Telegram limits differ for URL vs uploaded buffer.
+    // When source is a URL (byteSize known via HEAD), use URL limits: 5 MB photo, 20 MB document.
+    // When source is a buffer (InputFile), limits are 10 MB photo, 50 MB document.
+    const isUrl = typeof tgImageSource === "string";
+    const PHOTO_MAX_BYTES = isUrl ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+    const DOCUMENT_MAX_BYTES = isUrl ? 20 * 1024 * 1024 : 50 * 1024 * 1024;
     const isSvg = imageResult.filename?.endsWith("svg") ?? false;
     const useDocument = isSvg || byteSize > PHOTO_MAX_BYTES;
     const tooLargeForTelegram = byteSize > DOCUMENT_MAX_BYTES;
@@ -238,10 +242,15 @@ async function resolveTelegramSource(
   providerUrl: string,
   filename: string,
 ): Promise<{ source: string | InstanceType<typeof InputFile>; byteSize: number }> {
-  // Only use S3 URL when it's a public URL — presigned URLs are not reachable by Telegram's servers
-  if (s3Key && config.s3.publicUrl) {
+  // Prefer S3 URL (public or presigned) — Telegram can fetch both without buffering.
+  // HEAD request to get actual byte size so size-based routing (photo vs document) works correctly.
+  if (s3Key) {
     const s3Url = await getFileUrl(s3Key).catch(() => null);
-    if (s3Url) return { source: s3Url, byteSize: 0 };
+    if (s3Url) {
+      const head = await fetch(s3Url, { method: "HEAD" }).catch(() => null);
+      const byteSize = head?.ok ? parseInt(head.headers.get("content-length") ?? "0", 10) : 0;
+      return { source: s3Url, byteSize };
+    }
   }
   // Download the image ourselves and send as a buffer
   const res = await fetch(providerUrl);

@@ -17,7 +17,9 @@ export async function downloadRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: (err as Error).message });
       }
 
-      const presignedUrl = await getFileUrl(payload.k).catch(() => null);
+      // Extract filename from s3Key (e.g. "image/123/abc.png" → "abc.png")
+      const filename = payload.k.split("/").pop() ?? "file";
+      const presignedUrl = await getFileUrl(payload.k, filename).catch(() => null);
       if (!presignedUrl) {
         return reply.status(404).send({ error: "File not found or S3 not configured" });
       }

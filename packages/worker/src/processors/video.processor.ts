@@ -140,8 +140,19 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     const rows = [origRow, downloadRow].filter(Boolean) as InlineKeyboardButton[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
-    const videoByteSize = videoBuffer?.byteLength ?? 0;
-    const VIDEO_MAX_BYTES = 50 * 1024 * 1024; // 50 MB — Telegram sendVideo limit
+    // Prefer already-downloaded buffer, then S3 URL, then download fresh from provider URL
+    const tgVideoSource = await resolveTelegramVideoSource(s3Key, outputUrl, videoBuffer);
+
+    // Determine actual byte size: buffer is exact; for S3 URL do a HEAD request.
+    let videoByteSize = videoBuffer?.byteLength ?? 0;
+    if (!videoByteSize && typeof tgVideoSource === "string") {
+      const head = await fetch(tgVideoSource, { method: "HEAD" }).catch(() => null);
+      videoByteSize = head?.ok ? parseInt(head.headers.get("content-length") ?? "0", 10) : 0;
+    }
+
+    // Telegram limits: 20 MB via URL, 50 MB via buffer upload
+    const isUrl = typeof tgVideoSource === "string";
+    const VIDEO_MAX_BYTES = isUrl ? 20 * 1024 * 1024 : 50 * 1024 * 1024;
     const tooLargeForTelegram = videoByteSize > VIDEO_MAX_BYTES;
 
     if (tooLargeForTelegram && downloadRow) {
@@ -152,8 +163,6 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
         { reply_markup: { inline_keyboard: [downloadRow] } },
       );
     } else {
-      // Prefer already-downloaded buffer, then S3 URL, then download fresh from provider URL
-      const tgVideoSource = await resolveTelegramVideoSource(s3Key, outputUrl, videoBuffer);
       await telegram.sendVideo(telegramChatId, tgVideoSource, {
         caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
         reply_markup: replyMarkup,
@@ -193,8 +202,8 @@ async function resolveTelegramVideoSource(
   providerUrl: string,
   cachedBuffer: Buffer | null,
 ): Promise<string | InstanceType<typeof InputFile>> {
-  // Only use S3 URL when it's a public URL — presigned URLs are not reachable by Telegram's servers
-  if (s3Key && config.s3.publicUrl) {
+  // Prefer S3 URL (public or presigned) — Telegram can fetch both without buffering
+  if (s3Key) {
     const s3Url = await getFileUrl(s3Key).catch(() => null);
     if (s3Url) return s3Url;
   }
