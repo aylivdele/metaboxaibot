@@ -683,26 +683,26 @@ export const GPT_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 40,
   },
-  "qwen-3": {
-    id: "qwen-3",
-    name: "🏮 Qwen 3",
-    description: "Быстрая модель Alibaba, отличная для мультиязычных задач.",
-    section: "gpt",
-    provider: "alibaba",
-    costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 0.18,
-    outputCostUsdPerMToken: 2.1, // thinking on (default); off=$0.70
-    costVariants: {
-      settingKey: "enable_thinking",
-      map: { true: { outputCostUsdPerMToken: 2.1 }, false: { outputCostUsdPerMToken: 0.7 } },
-    },
-    supportsImages: false,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    contextStrategy: "db_history",
-    contextMaxMessages: 40,
-  },
+  // "qwen-3": {
+  //   id: "qwen-3",
+  //   name: "🏮 Qwen 3",
+  //   description: "Быстрая модель Alibaba, отличная для мультиязычных задач.",
+  //   section: "gpt",
+  //   provider: "alibaba",
+  //   costUsdPerRequest: 0,
+  //   inputCostUsdPerMToken: 0.18,
+  //   outputCostUsdPerMToken: 2.1, // thinking on (default); off=$0.70
+  //   costVariants: {
+  //     settingKey: "enable_thinking",
+  //     map: { true: { outputCostUsdPerMToken: 2.1 }, false: { outputCostUsdPerMToken: 0.7 } },
+  //   },
+  //   supportsImages: false,
+  //   supportsVoice: false,
+  //   supportsWeb: false,
+  //   isAsync: false,
+  //   contextStrategy: "db_history",
+  //   contextMaxMessages: 40,
+  // },
 };
 
 // ── Apply settings ────────────────────────────────────────────────────────────

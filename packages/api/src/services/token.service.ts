@@ -48,8 +48,16 @@ export async function deductTokens(
 export async function checkBalance(userId: bigint, required: number): Promise<void> {
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { tokenBalance: true, subscriptionTokenBalance: true, subscriptionEndDate: true },
+    select: {
+      tokenBalance: true,
+      subscriptionTokenBalance: true,
+      subscriptionEndDate: true,
+      role: true,
+    },
   });
+  if (user.role === "ADMIN") {
+    return;
+  }
   const hasActiveSub = user.subscriptionEndDate && user.subscriptionEndDate > new Date();
   if (!hasActiveSub) throw new Error("NO_SUBSCRIPTION");
   const total = Number(user.subscriptionTokenBalance) + Number(user.tokenBalance);
