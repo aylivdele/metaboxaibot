@@ -69,8 +69,15 @@ export class ReplicateAdapter implements ImageAdapter {
     if (ms.guidance_scale !== undefined) msExtras.guidance_scale = ms.guidance_scale;
     if (ms.cfg !== undefined) msExtras.cfg = ms.cfg;
     if (ms.num_inference_steps !== undefined) msExtras.num_inference_steps = ms.num_inference_steps;
-    if (ms.style_type && ms.style_type !== "None") msExtras.style_type = ms.style_type;
-    if (ms.style_preset && ms.style_preset !== "None") msExtras.style_preset = ms.style_preset;
+    const stylePreset = ms.style_preset && ms.style_preset !== "None" ? ms.style_preset : undefined;
+    if (stylePreset) {
+      msExtras.style_preset = stylePreset;
+      // Ideogram requires style_type to be AUTO or GENERAL when style_preset is set
+      const styleType = ms.style_type && ms.style_type !== "None" ? (ms.style_type as string) : "";
+      msExtras.style_type = styleType === "GENERAL" || styleType === "AUTO" ? styleType : "AUTO";
+    } else if (ms.style_type && ms.style_type !== "None") {
+      msExtras.style_type = ms.style_type;
+    }
     if (ms.magic_prompt_option) msExtras.magic_prompt_option = ms.magic_prompt_option;
     if (ms.go_fast !== undefined) msExtras.go_fast = ms.go_fast;
     if (ms.output_format) msExtras.output_format = ms.output_format;

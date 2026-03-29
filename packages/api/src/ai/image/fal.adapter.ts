@@ -31,6 +31,11 @@ const EDIT_ENDPOINTS: Record<string, string> = {
  */
 const ASPECT_RATIO_MODELS = new Set(["nano-banana-pro", "nano-banana-2"]);
 
+/**
+ * Edit endpoints for these models expect `image_urls` (array) instead of `image_url` (string).
+ */
+const IMAGE_URLS_ARRAY_MODELS = new Set(["nano-banana-pro", "nano-banana-2"]);
+
 /** Separator used to pack endpoint+requestId into a single opaque string. */
 const SEP = "||";
 
@@ -85,7 +90,11 @@ export class FalAdapter implements ImageAdapter {
       ...(useAspectRatio
         ? { aspect_ratio: input.aspectRatio ?? "1:1" }
         : { image_size: this.resolveSize(input) }),
-      ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
+      ...(input.imageUrl
+        ? IMAGE_URLS_ARRAY_MODELS.has(this.modelId)
+          ? { image_urls: [input.imageUrl] }
+          : { image_url: input.imageUrl }
+        : {}),
       ...msExtras,
     };
     logCall(endpoint, "submit", falInput as Record<string, unknown>);

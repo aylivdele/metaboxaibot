@@ -42,6 +42,8 @@ export interface Dialog {
 export interface ModelSettingOption {
   value: string | number | boolean;
   label: string;
+  /** When this rule evaluates to true the option is shown disabled in the UI. */
+  unavailableIf?: UnavailableRule;
 }
 
 export interface SettingCondition {
@@ -67,6 +69,7 @@ export interface ModelSettingDef {
   description?: string;
   type:
     | "select"
+    | "dropdown"
     | "slider"
     | "toggle"
     | "text"

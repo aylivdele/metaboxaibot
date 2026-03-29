@@ -2167,6 +2167,14 @@ input::placeholder {
   font-style: italic;
 }
 
+
+.ratio-btn--disabled,
+.ratio-btn[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* ── Family cards (image model selection) ─────────────────────────────────── */
 
 .family-card {

@@ -31,6 +31,7 @@ export type UnavailableRule = SettingCondition | AndCondition | OrCondition;
 
 export type ModelSettingType =
   | "select"
+  | "dropdown"
   | "slider"
   | "toggle"
   | "text"
@@ -44,6 +45,8 @@ export type ModelSettingType =
 export interface ModelSettingOption {
   value: string | number | boolean;
   label: string;
+  /** When this rule evaluates to true the option is shown disabled in the UI. */
+  unavailableIf?: UnavailableRule;
 }
 
 /**

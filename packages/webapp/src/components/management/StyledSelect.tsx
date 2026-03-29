@@ -1,7 +1,7 @@
 interface StyledSelectProps {
   value: string;
   onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
+  options: Array<{ value: string; label: string; disabled?: boolean }>;
   /** Extra class applied to the outer wrapper div */
   className?: string;
 }
@@ -15,7 +15,7 @@ export function StyledSelect({ value, onChange, options, className }: StyledSele
         onChange={(e) => onChange(e.target.value)}
       >
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
+          <option key={opt.value} value={opt.value} disabled={opt.disabled}>
             {opt.label}
           </option>
         ))}

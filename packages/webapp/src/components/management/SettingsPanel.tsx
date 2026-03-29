@@ -1,4 +1,5 @@
 import type { ModelSettingDef, UnavailableRule } from "../../types.js";
+import { StyledSelect } from "./StyledSelect.js";
 import { CustomSlider } from "./CustomSlider.js";
 import { HeyGenVoicePicker } from "./HeyGenVoicePicker.js";
 import { DIDVoicePicker } from "./DIDVoicePicker.js";
@@ -31,27 +32,51 @@ interface SettingsPanelProps {
 
 export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps) {
   if (!settings || settings.length === 0) return null;
+
+  // Resolve effective values: fill in defaults for any setting not yet saved by the user.
+  // This ensures unavailableIf conditions work correctly even before the user interacts.
+  const effectiveValues: Record<string, unknown> = {};
+  for (const def of settings) {
+    effectiveValues[def.key] = values[def.key] !== undefined ? values[def.key] : def.default;
+  }
+
   return (
     <div className="settings-panel">
       {settings.map((def) => {
-        if (def.unavailableIf && evalRule(def.unavailableIf, values)) return null;
-        const val = values[def.key] !== undefined ? values[def.key] : def.default;
+        if (def.unavailableIf && evalRule(def.unavailableIf, effectiveValues)) return null;
+        const val = effectiveValues[def.key];
         return (
           <div key={def.key} className="settings-panel__row">
             <span className="settings-panel__label">{def.label}</span>
             {def.description && <span className="settings-panel__desc">{def.description}</span>}
             {def.type === "select" && (
               <div className="image-settings-ratios">
-                {def.options!.map((opt) => (
-                  <button
-                    key={String(opt.value)}
-                    className={`ratio-btn${val === opt.value ? " ratio-btn--active" : ""}`}
-                    onClick={() => onChange(def.key, opt.value)}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+                {def.options!.map((opt) => {
+                  const optDisabled =
+                    !!opt.unavailableIf && evalRule(opt.unavailableIf, effectiveValues);
+                  return (
+                    <button
+                      key={String(opt.value)}
+                      disabled={optDisabled}
+                      className={`ratio-btn${val === opt.value ? " ratio-btn--active" : ""}${optDisabled ? " ratio-btn--disabled" : ""}`}
+                      onClick={() => !optDisabled && onChange(def.key, opt.value)}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
+            )}
+            {def.type === "dropdown" && (
+              <StyledSelect
+                value={String(val ?? def.default ?? "")}
+                onChange={(v) => onChange(def.key, v)}
+                options={def.options!.map((opt) => ({
+                  value: String(opt.value),
+                  label: opt.label,
+                  disabled: !!opt.unavailableIf && evalRule(opt.unavailableIf, effectiveValues),
+                }))}
+              />
             )}
             {def.type === "slider" && (
               <div className="settings-panel__slider-row">

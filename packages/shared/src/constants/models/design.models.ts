@@ -170,8 +170,12 @@ const IDEOGRAM_SETTINGS: ModelSettingDef[] = [
       { value: "None", label: "None" },
       { value: "Auto", label: "Auto" },
       { value: "General", label: "General" },
-      { value: "Realistic", label: "Realistic" },
-      { value: "Design", label: "Design" },
+      {
+        value: "Realistic",
+        label: "Realistic",
+        unavailableIf: { key: "style_preset", neq: "None" },
+      },
+      { value: "Design", label: "Design", unavailableIf: { key: "style_preset", neq: "None" } },
     ],
     default: "None",
   },
@@ -179,7 +183,13 @@ const IDEOGRAM_SETTINGS: ModelSettingDef[] = [
     key: "style_preset",
     label: "Художественный пресет",
     description: "Готовый художественный стиль для изображения (только модели V3).",
-    type: "select",
+    type: "dropdown",
+    unavailableIf: {
+      or: [
+        { key: "style_type", eq: "Realistic" },
+        { key: "style_type", eq: "Design" },
+      ],
+    },
     options: [
       { value: "None", label: "None" },
       { value: "80s Illustration", label: "80s Illustration" },
