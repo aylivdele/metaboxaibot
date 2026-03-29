@@ -7,6 +7,7 @@ import {
   s3Service,
 } from "@metabox/api/services";
 import { buildCostLine } from "../utils/cost-line.js";
+import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { HeyGenAvatarAdapter } from "@metabox/api/ai/avatar/heygen";
 import {
   MODELS_BY_SECTION,
@@ -176,9 +177,9 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     if (err instanceof Error && err.message === "NO_SUBSCRIPTION") {
-      await ctx.reply(ctx.t.errors.noSubscription);
+      await replyNoSubscription(ctx);
     } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
-      await ctx.reply(ctx.t.errors.insufficientTokens);
+      await replyInsufficientTokens(ctx);
     } else {
       logger.error(err, "Video message error");
       await ctx.reply(ctx.t.video.generationFailed);
@@ -315,7 +316,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     } catch (err: unknown) {
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
       if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
-        await ctx.reply(ctx.t.errors.insufficientTokens);
+        await replyInsufficientTokens(ctx);
       } else {
         logger.error(err, "Video photo+caption error");
         await ctx.reply(ctx.t.video.generationFailed);

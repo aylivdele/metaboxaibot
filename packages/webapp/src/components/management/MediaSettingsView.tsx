@@ -193,17 +193,22 @@ function FamilyCard({
 }: FamilyCardProps) {
   const { t } = useI18n();
 
-  const belongsHere = members.some((m) => m.id === activeModelId);
-  const defaultMember = members[0];
+  const belongsHere = activeModelId !== "" && members.some((m) => m.id === activeModelId);
+  // Default selection: active model if it belongs here, else familyDefaultModelId, else first member
+  const familyDefaultId = members[0]?.familyDefaultModelId ?? null;
+  const defaultMember =
+    (familyDefaultId ? members.find((m) => m.id === familyDefaultId) : null) ?? members[0];
   const [localId, setLocalId] = useState<string>(
     belongsHere ? activeModelId : (defaultMember?.id ?? ""),
   );
 
   useEffect(() => {
-    if (members.some((m) => m.id === activeModelId)) {
+    if (activeModelId !== "" && members.some((m) => m.id === activeModelId)) {
       setLocalId(activeModelId);
+    } else {
+      setLocalId(defaultMember?.id ?? "");
     }
-  }, [activeModelId, members]);
+  }, [activeModelId, members, defaultMember]);
 
   const selected = members.find((m) => m.id === localId) ?? defaultMember;
   if (!selected) return null;
@@ -451,10 +456,13 @@ export function MediaSettingsView({ section }: { section: MediaSection }) {
         setModels(ms);
         setAllModelSettings(ms2);
         const fromSection = (state[SECTION_ACTIVE_KEY[section]] as string | null) ?? undefined;
-        const initial =
-          fromSection && ms.some((m) => m.id === fromSection) ? fromSection : (ms[0]?.id ?? "");
+        // Only set active model if the user actually chose one; "" means "no model activated yet"
+        const initial = fromSection && ms.some((m) => m.id === fromSection) ? fromSection : "";
         setActiveModelId(initial);
-        setSelectedPickerId(getPickerIdForModel(initial, ms));
+        // For picker: if no active model, show the first picker option
+        setSelectedPickerId(
+          initial ? getPickerIdForModel(initial, ms) : (buildPickerOptions(ms)[0]?.id ?? ""),
+        );
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -530,6 +538,7 @@ export function MediaSettingsView({ section }: { section: MediaSection }) {
 
       {familyMembers && (
         <FamilyCard
+          key={pickerId}
           familyId={pickerId}
           members={familyMembers}
           activeModelId={activeModelId}

@@ -519,7 +519,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       "Создаёт самые красивые и стильные изображения. Лучший выбор для арта, иллюстраций и эффектных визуалов.",
     section: "design",
     provider: "midjourney",
-    costUsdPerRequest: 0.089,
+    costUsdPerRequest: 0.0085,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -916,9 +916,9 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-  ideogram: {
-    id: "ideogram",
-    name: "✍️ Ideogram v3.0",
+  "ideogram-quality": {
+    id: "ideogram-quality",
+    name: "✍️ Ideogram v3.0 Quality",
     description:
       "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров, обложек и рекламы. Максимальное качество.",
     section: "design",
@@ -955,7 +955,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
   },
   "ideogram-balanced": {
     id: "ideogram-balanced",
-    name: "✍️ Ideogram v3.0",
+    name: "✍️ Ideogram v3.0 Balanced",
     description:
       "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров, обложек и рекламы. Баланс качества и скорости.",
     section: "design",
@@ -992,7 +992,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
   },
   "ideogram-turbo": {
     id: "ideogram-turbo",
-    name: "✍️ Ideogram v3.0",
+    name: "✍️ Ideogram v3.0 Turbo",
     description:
       "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров, обложек и рекламы. Быстрая и бюджетная версия.",
     section: "design",

@@ -1,6 +1,7 @@
 import type { BotContext } from "../types/context.js";
 import { dialogService, generationService, userStateService } from "@metabox/api/services";
 import { buildCostLine } from "../utils/cost-line.js";
+import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import {
   MODELS_BY_SECTION,
   AI_MODELS,
@@ -175,9 +176,9 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     if (err instanceof Error && err.message === "NO_SUBSCRIPTION") {
-      await ctx.reply(ctx.t.errors.noSubscription);
+      await replyNoSubscription(ctx);
     } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
-      await ctx.reply(ctx.t.errors.insufficientTokens);
+      await replyInsufficientTokens(ctx);
     } else {
       logger.error(err, "Design message error");
       await ctx.reply(ctx.t.design.generationFailed);
@@ -255,7 +256,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     } catch (err: unknown) {
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
       if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
-        await ctx.reply(ctx.t.errors.insufficientTokens);
+        await replyInsufficientTokens(ctx);
       } else {
         logger.error(err, "Design photo+caption error");
         await ctx.reply(ctx.t.design.generationFailed);

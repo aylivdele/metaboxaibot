@@ -2,6 +2,7 @@ import type { BotContext } from "../types/context.js";
 import { chatService, dialogService, userStateService } from "@metabox/api/services";
 import { logger } from "../logger.js";
 import { config } from "@metabox/shared";
+import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { InlineKeyboard } from "grammy";
 
 /** Media group buffer: groups multiple photos sent at once before processing. */
@@ -139,9 +140,9 @@ async function streamGptResponse(
     logger.error(err, "GPT message error");
     await ctx.api.deleteMessage(chatId, placeholder.message_id).catch(() => void 0);
     if (err instanceof Error && err.message === "NO_SUBSCRIPTION") {
-      await ctx.reply(ctx.t.errors.noSubscription);
+      await replyNoSubscription(ctx);
     } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
-      await ctx.reply(ctx.t.errors.insufficientTokens);
+      await replyInsufficientTokens(ctx);
     } else {
       await ctx.reply(ctx.t.errors.noTool);
     }

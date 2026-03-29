@@ -17,7 +17,7 @@ const DIRECT_ASPECT_RATIO_MODELS = new Set(["midjourney"]);
 const MODEL_IDS: Record<string, string> = {
   // Use deployment endpoint (no pinned version) — always resolves to latest published version
   "stable-diffusion": "stability-ai/stable-diffusion-3.5-large",
-  ideogram: "ideogram-ai/ideogram-v3-quality",
+  "ideogram-quality": "ideogram-ai/ideogram-v3-quality",
   "ideogram-balanced": "ideogram-ai/ideogram-v3-balanced",
   "ideogram-turbo": "ideogram-ai/ideogram-v3-turbo",
   midjourney:
@@ -145,7 +145,10 @@ export class ReplicateAdapter implements ImageAdapter {
       const output = prediction.output as string[] | string | undefined;
       const url = Array.isArray(output) ? output[0] : output;
       if (!url) throw new Error("Replicate returned no image URL");
-      return { url, filename: `${this.modelId}.png` };
+      // Detect format from URL (Replicate URLs end with .png, .jpg, .webp, etc.)
+      const urlExt = url.split("?")[0].split(".").pop()?.toLowerCase() ?? "png";
+      const contentType = urlExt === "jpg" || urlExt === "jpeg" ? "image/jpeg" : `image/${urlExt}`;
+      return { url, filename: `${this.modelId}.${urlExt}`, contentType };
     }
 
     if (prediction.status === "failed" || prediction.status === "canceled") {

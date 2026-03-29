@@ -119,6 +119,7 @@ export interface Translations {
     tokens: string;
     sendOriginal: string;
     downloadFile: string;
+    tariffs: string;
     costPerRequest: string;
     costPerMPixel: string;
     costPerSecond: string;

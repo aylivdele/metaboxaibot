@@ -22,6 +22,8 @@ function serializeModel(m: AIModel) {
     familyId: m.familyId ?? null,
     /** Display name of the family (includes emoji), null for standalone models. */
     familyName: m.familyId ? (MODEL_FAMILIES[m.familyId]?.name ?? null) : null,
+    /** Default model ID for the family (used to pre-select variant before activation). */
+    familyDefaultModelId: m.familyId ? (MODEL_FAMILIES[m.familyId]?.defaultModelId ?? null) : null,
     /** Version label within the family, e.g. "v3", "v4". */
     versionLabel: m.versionLabel ?? null,
     /** Variant label within the family, e.g. "Standard", "Pro". */

@@ -149,6 +149,8 @@ export interface Model {
   familyId: string | null;
   /** Display name of the family (includes emoji), null for standalone models. */
   familyName: string | null;
+  /** Default model ID for this family (used to pre-select variant/version before activation). */
+  familyDefaultModelId: string | null;
   /** Version label within the family, e.g. "v3", "v4". */
   versionLabel: string | null;
   /** Variant label within the family, e.g. "Standard", "Pro", "Vector". */

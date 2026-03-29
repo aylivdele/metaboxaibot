@@ -124,8 +124,7 @@ export default {
     sendOriginalFailed: "Failed to send the file. Please try again later or contact support.",
     noTool:
       "⚠️ No tool selected for working with the bot.\nPlease use the navigation to activate the desired function (see photo) ↕️\n*If the ☰ menu button (highlighted in red in the photo) has disappeared, type /start to restart the bot* 🔄",
-    insufficientTokens:
-      "❌ Insufficient tokens. Please top up your balance in the Profile section.",
+    insufficientTokens: "❌ Insufficient tokens. Please top up your balance in the Plans section.",
     noSubscription: "❌ An active subscription is required to use the bot.",
     noSubscriptionForPurchase: "❌ Token packages are only available with an active subscription.",
     userBlocked: "❌ Your account has been blocked. Contact support.",
@@ -141,6 +140,7 @@ export default {
     tokens: "tokens",
     sendOriginal: "📎 Send as file",
     downloadFile: "⬇️ Download",
+    tariffs: "💳 Plans",
     costPerRequest: "💰 {cost} ✦ per request",
     costPerMPixel: "💰 {cost} ✦ per megapixel",
     costPerSecond: "💰 {cost} ✦ per second",
