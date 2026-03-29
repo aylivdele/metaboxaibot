@@ -139,6 +139,9 @@ export async function handleStart(ctx: BotContext): Promise<void> {
       .reply("ℹ️ У вас уже есть наставник, поэтому реферальная ссылка не была применена.")
       .catch(() => {});
   }
+  // Store resolved referrer info for registerBotUser
+  let resolvedReferrerUserId: string | null = null;
+
   if (param?.startsWith("ref_") && ctx.user && !ctx.user.referredById) {
     const refParam = param.slice("ref_".length);
 
@@ -166,7 +169,6 @@ export async function handleStart(ctx: BotContext): Promise<void> {
         if (resolved?.telegramId) {
           const resolvedId = BigInt(resolved.telegramId);
           if (resolvedId !== ctx.user.id) {
-            // Ensure referrer exists in bot DB (create if needed)
             const exists = await db.user.findUnique({
               where: { id: resolvedId },
               select: { id: true },
@@ -175,6 +177,10 @@ export async function handleStart(ctx: BotContext): Promise<void> {
               referrerId = resolvedId;
             }
           }
+        }
+        // Save userId even if telegramId is null (referrer has no bot)
+        if (!referrerId && resolved?.userId) {
+          resolvedReferrerUserId = resolved.userId;
         }
       } catch {
         // Metabox API unavailable — skip referral
@@ -208,6 +214,7 @@ export async function handleStart(ctx: BotContext): Promise<void> {
             lastName: freshUser?.lastName ?? ctx.user!.lastName,
             username: freshUser?.username ?? ctx.user!.username,
             referrerTelegramId: freshUser?.referredById ?? ctx.user!.referredById,
+            referrerUserId: resolvedReferrerUserId ?? undefined,
           });
           if (result?.ok) {
             if (!result.isStub) {
