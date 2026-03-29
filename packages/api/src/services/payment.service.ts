@@ -144,7 +144,7 @@ export const paymentService = {
     const periodStr = period || "M1";
     const months = parseInt(periodStr.substring(1), 10);
     const startDate = new Date();
-    const endDate = add(startDate, {months});
+    const endDate = add(startDate, { months });
     const desc =
       productType === "subscription"
         ? `Подписка ${productName || productId} (${periodStr})`
@@ -165,16 +165,20 @@ export const paymentService = {
           modelId: productId,
         },
       }),
-      ...(productType === "subscription" ? ([db.localSubscription.create({
-        data: {
-          userId,
-          planName: productName ?? desc,
-          period: period || "undefined",
-          tokensGranted: tokens,
-          startDate,
-          endDate,
-        }
-      })]) : [])
+      ...(productType === "subscription"
+        ? [
+            db.localSubscription.create({
+              data: {
+                userId,
+                planName: productName ?? desc,
+                period: period || "undefined",
+                tokensGranted: tokens,
+                startDate,
+                endDate,
+              },
+            }),
+          ]
+        : []),
     ]);
 
     // Notify Metabox for MLM bonus + order tracking (always, even for unlinked users)
