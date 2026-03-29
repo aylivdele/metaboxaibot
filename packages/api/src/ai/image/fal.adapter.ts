@@ -117,14 +117,24 @@ export class FalAdapter implements ImageAdapter {
 
     const result = await fal.queue.result(endpoint, { requestId });
     const images = (
-      result.data as { images?: Array<{ url: string; width?: number; height?: number }> }
+      result.data as {
+        images?: Array<{
+          url: string;
+          width?: number;
+          height?: number;
+          content_type?: string;
+          file_name?: string;
+        }>;
+      }
     ).images;
     const img = images?.[0];
     if (!img?.url) throw new Error("FAL returned no image URL");
-    const ext = "png";
+    const contentType = img.content_type ?? "image/png";
+    const ext = contentType.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
     return {
       url: img.url,
-      filename: `${this.modelId}.${ext}`,
+      filename: img.file_name ?? `${this.modelId}.${ext}`,
+      contentType,
       width: img.width,
       height: img.height,
     };

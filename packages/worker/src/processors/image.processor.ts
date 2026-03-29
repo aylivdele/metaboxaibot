@@ -74,13 +74,16 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       }
 
       const isSvg = imageResult.filename?.endsWith(".svg") ?? false;
-      const { ext, contentType } = isSvg
-        ? { ext: "svg", contentType: "image/svg+xml" }
-        : sectionMeta("image");
+      const resolvedContentType = isSvg
+        ? "image/svg+xml"
+        : (imageResult.contentType ?? sectionMeta("image").contentType);
+      const resolvedExt = isSvg
+        ? "svg"
+        : (resolvedContentType.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg");
       s3Key = await uploadFromUrl(
-        buildS3Key("image", userIdStr, dbJobId, ext),
+        buildS3Key("image", userIdStr, dbJobId, resolvedExt),
         imageResult.url,
-        contentType,
+        resolvedContentType,
       ).catch(() => null);
 
       outputUrl = imageResult.url;
@@ -104,7 +107,8 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       }
     }
 
-    const imageResult = { url: outputUrl, filename: s3Key?.split(".").pop() ?? "png" };
+    const retryExt = s3Key?.split(".").pop() ?? "png";
+    const imageResult = { url: outputUrl, filename: retryExt, contentType: `image/${retryExt}` };
     const model = AI_MODELS[modelId];
 
     // Save messages to dialog and get assistantMessageId for Refine button
@@ -151,7 +155,11 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
     // Prefer S3 URL (always accessible by Telegram); fall back to downloading
     // the provider URL as a buffer (some providers like fal.media block Telegram's fetcher).
-    const tgImageSource = await resolveTelegramSource(s3Key, imageResult.url);
+    const tgImageSource = await resolveTelegramSource(
+      s3Key,
+      imageResult.url,
+      imageResult.filename ?? "image.png",
+    );
 
     const isSvg = imageResult.filename?.endsWith("svg") ?? false;
     if (isSvg) {
@@ -203,6 +211,7 @@ function sleep(ms: number) {
 async function resolveTelegramSource(
   s3Key: string | null,
   providerUrl: string,
+  filename: string,
 ): Promise<string | InstanceType<typeof InputFile>> {
   if (s3Key) {
     const s3Url = await getFileUrl(s3Key).catch(() => null);
@@ -212,5 +221,5 @@ async function resolveTelegramSource(
   const res = await fetch(providerUrl);
   if (!res.ok) throw new Error(`Failed to fetch image from provider: ${res.status}`);
   const buffer = Buffer.from(await res.arrayBuffer());
-  return new InputFile(buffer, "image.png");
+  return new InputFile(buffer, filename);
 }

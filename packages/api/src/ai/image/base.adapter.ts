@@ -16,6 +16,8 @@ export interface ImageResult {
   url: string;
   /** Original filename hint for S3 upload */
   filename?: string;
+  /** MIME content type, e.g. "image/png". Defaults to "image/jpeg" when absent. */
+  contentType?: string;
   /** Actual output width in pixels (used for per-megapixel billing). */
   width?: number;
   /** Actual output height in pixels (used for per-megapixel billing). */
