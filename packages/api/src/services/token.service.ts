@@ -63,8 +63,11 @@ export async function checkBalance(userId: bigint, required: number): Promise<vo
 export async function checkSubscription(userId: bigint): Promise<void> {
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { subscriptionEndDate: true },
+    select: { subscriptionEndDate: true, role: true },
   });
+  if (user.role === "ADMIN") {
+    return;
+  }
   if (!user.subscriptionEndDate || user.subscriptionEndDate <= new Date()) {
     throw new Error("NO_SUBSCRIPTION");
   }
