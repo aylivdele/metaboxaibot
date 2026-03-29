@@ -21,7 +21,7 @@ export async function downloadRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: "File not found or S3 not configured" });
       }
 
-      return reply.redirect(302, presignedUrl);
+      return reply.redirect(presignedUrl, 302);
     },
   );
 }
