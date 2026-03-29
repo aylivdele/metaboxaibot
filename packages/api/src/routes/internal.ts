@@ -140,6 +140,29 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * POST /internal/reset-token-balance
+   * Sets user token balance to exactly 0. Used when admin disconnects TG
+   * and transfers all tokens to site. More reliable than decrement.
+   * Body: { telegramId: string }
+   */
+  fastify.post("/reset-token-balance", async (request, reply) => {
+    const { telegramId } = request.body as { telegramId: string };
+    if (!telegramId) {
+      return reply.code(400).send({ error: "telegramId is required" });
+    }
+
+    const user = await db.user.findUnique({ where: { id: BigInt(telegramId) } });
+    if (!user) return { ok: true };
+
+    await db.user.update({
+      where: { id: BigInt(telegramId) },
+      data: { tokenBalance: 0 },
+    });
+
+    return { ok: true, previousBalance: Number(user.tokenBalance) };
+  });
+
+  /**
    * POST /internal/unlink-metabox
    * Called by Metabox admin when an admin disconnects a user's Telegram account.
    * Clears metaboxUserId and metaboxReferralCode from the AI Box user record.
