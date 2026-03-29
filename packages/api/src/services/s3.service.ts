@@ -93,7 +93,7 @@ export async function getFileUrl(key: string): Promise<string | null> {
   return getSignedUrl(
     client,
     new GetObjectCommand({ Bucket: bucket, Key: key, ChecksumMode: undefined }),
-    { expiresIn: PRESIGN_TTL, unhoistableHeaders: new Set(["x-amz-checksum-mode"]) },
+    { expiresIn: PRESIGN_TTL, unsignableHeaders: new Set(["x-amz-checksum-mode"]) },
   );
 }
 
