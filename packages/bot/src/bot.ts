@@ -158,6 +158,10 @@ export function createBot(token: string): Bot<BotContext> {
     return next();
   });
 
+  // ── Telegram Stars payments ───────────────────────────────────────────────
+  bot.on("pre_checkout_query", handlePreCheckoutQuery);
+  bot.on("message:successful_payment", handleSuccessfulPayment);
+
   // ── State-based message routing ───────────────────────────────────────────
   bot.on("message", async (ctx, next) => {
     if (!ctx.user) return next();
@@ -187,10 +191,6 @@ export function createBot(token: string): Bot<BotContext> {
 
     return next();
   });
-
-  // ── Telegram Stars payments ───────────────────────────────────────────────
-  bot.on("pre_checkout_query", handlePreCheckoutQuery);
-  bot.on("message:successful_payment", handleSuccessfulPayment);
 
   // ── Fallback: no tool selected ────────────────────────────────────────────
   bot.on("message", handleNoTool);

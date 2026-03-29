@@ -41,7 +41,7 @@ export async function handleSuccessfulPayment(ctx: BotContext): Promise<void> {
       starRate,
     };
 
-    // New format: "product:{id}:{tokens}:{priceRub}" or "subscription:{planId}:{period}:{tokens}:{priceRub}"
+    // New format: "product:{id}:{tokens}:{priceRub}:{name}" or "subscription:{planId}:{period}:{tokens}:{priceRub}"
     if (payload.startsWith("product:") || payload.startsWith("subscription:")) {
       const parts = payload.split(":");
       const isSubscription = payload.startsWith("subscription:");
