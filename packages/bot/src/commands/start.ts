@@ -122,7 +122,8 @@ export async function handleStart(ctx: BotContext): Promise<void> {
 
       let msg = "❌ Не удалось привязать аккаунт. Попробуйте ещё раз.";
       if (apiErr.code === "TELEGRAM_MISMATCH") {
-        msg = `⚠️ Этот аккаунт на Metabox уже привязан к другому Telegram.\n\nПереключитесь на нужный Telegram-аккаунт и попробуйте снова.\n\nЕсли это ошибка — напишите в поддержку: @${config.supportTg}`;
+        const linkedTg = apiErr.data?.linkedUsername ? ` (@${apiErr.data.linkedUsername})` : "";
+        msg = `⚠️ Невозможно привязать AI Box.\n\nВаш аккаунт на сайте уже привязан к другому Telegram${linkedTg}.\n\nИспользуйте тот же Telegram-аккаунт для привязки.\n\nЕсли это ошибка — напишите в поддержку: @${config.supportTg}`;
       } else if (apiErr.code === "TELEGRAM_ALREADY_LINKED") {
         const email = apiErr.data?.linkedEmail ? String(apiErr.data.linkedEmail) : "";
         msg = `⚠️ Этот Telegram уже привязан к другому аккаунту на Metabox${email ? ` (${email})` : ""}.\n\nЕсли это ошибка — напишите в поддержку: @${config.supportTg}`;
