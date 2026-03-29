@@ -45,12 +45,15 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
   const [buying, setBuying] = useState(false);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
+  const [hasSubscription, setHasSubscription] = useState(false);
+  const [showSubRequired, setShowSubRequired] = useState(false);
 
   useEffect(() => {
     Promise.all([api.tariffs.catalog(), api.profile.get()])
       .then(([cat, prof]) => {
         setCatalog(cat);
         setBalance(prof.tokenBalance);
+        setHasSubscription(!!prof.subscription);
       })
       .catch(() => void 0);
   }, []);
@@ -152,6 +155,10 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
   };
 
   const openPkgModal = (pkg: CatalogTokenPackage) => {
+    if (!hasSubscription) {
+      setShowSubRequired(true);
+      return;
+    }
     openModal({
       type: "product",
       id: pkg.id,
@@ -335,9 +342,17 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
                   </span>
                 </button>
               ) : (
-                <div className="payment-modal__link-hint">
-                  <p>{t("tariffs.linkRequired")}</p>
-                </div>
+                <button
+                  className="payment-modal__option payment-modal__option--link"
+                  onClick={() => {
+                    setModal(null);
+                    onLinkMetabox();
+                  }}
+                >
+                  <span className="payment-modal__option-icon">{"🔗"}</span>
+                  <span className="payment-modal__option-label">{t("tariffs.linkRequired")}</span>
+                  <span className="payment-modal__option-price">→</span>
+                </button>
               )}
 
               <button
@@ -350,6 +365,39 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
                 <span className="payment-modal__option-price">{modal.stars} Stars</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subscription required modal */}
+      {showSubRequired && (
+        <div className="payment-modal" onClick={() => setShowSubRequired(false)}>
+          <div className="payment-modal__card" onClick={(e) => e.stopPropagation()}>
+            <button className="payment-modal__close" onClick={() => setShowSubRequired(false)}>
+              ×
+            </button>
+            <h3 className="payment-modal__title">Подписка обязательна</h3>
+            <p
+              style={{
+                fontSize: 14,
+                color: "var(--text-secondary)",
+                marginBottom: 16,
+                lineHeight: 1.5,
+              }}
+            >
+              Покупка дополнительных токенов доступна только при активной подписке. Оформите
+              подписку, чтобы получить доступ к пакетам токенов.
+            </p>
+            <button
+              className="payment-modal__option payment-modal__option--card"
+              onClick={() => {
+                setShowSubRequired(false);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              <span className="payment-modal__option-label">Перейти к подпискам</span>
+              <span className="payment-modal__option-price">↑</span>
+            </button>
           </div>
         </div>
       )}
