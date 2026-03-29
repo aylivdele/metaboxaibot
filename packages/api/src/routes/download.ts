@@ -1,13 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import { verifyDownloadToken } from "../utils/download-token.js";
-import { getFileUrl } from "@metabox/api/services/s3";
+import { getFileUrl } from "../services/s3.service.js";
 
 export async function downloadRoutes(fastify: FastifyInstance) {
-  fastify.get<{ Params: { token: string } }>(
-    "/download/:token",
+  // Use wildcard to avoid dot-in-param routing issues (token contains "payload.hmac")
+  fastify.get<{ Params: { "*": string } }>(
+    "/download/*",
     { schema: { hide: true } },
     async (request, reply) => {
-      const { token } = request.params;
+      const token = request.params["*"];
 
       let payload: { k: string; u: string; e: number };
       try {

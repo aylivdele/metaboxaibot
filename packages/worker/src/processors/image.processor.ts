@@ -25,7 +25,6 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     negativePrompt,
     telegramChatId,
     dialogId,
-    sendOriginalLabel,
     aspectRatio,
     modelSettings,
   } = job.data;
@@ -115,7 +114,11 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     }
 
     const retryExt = s3Key?.split(".").pop() ?? "png";
-    const imageResult = { url: outputUrl, filename: retryExt, contentType: `image/${retryExt}` };
+    const imageResult = {
+      url: outputUrl,
+      filename: `${dbJobId}.${retryExt}`,
+      contentType: `image/${retryExt}`,
+    };
     const model = AI_MODELS[modelId];
 
     // Save messages to dialog and get assistantMessageId for Refine button
@@ -146,15 +149,12 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       }
     }
 
-    // Build inline keyboard: optional Refine row + optional Send as file row + optional Download row
+    // Build inline keyboard: optional Refine row + optional Download row
     const refineRow =
       model?.supportsImages && assistantMessageId
         ? [{ text: "🔄 Доработать", callback_data: `design_ref_${assistantMessageId}` }]
         : null;
-    const origRow = sendOriginalLabel
-      ? [{ text: sendOriginalLabel, callback_data: `orig_${dbJobId}` }]
-      : null;
-    const downloadRow =
+    const downloadRow: InlineKeyboardButton[] | null =
       s3Key && config.api.publicUrl
         ? [
             {
@@ -163,7 +163,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
             },
           ]
         : null;
-    const rows = [refineRow, origRow, downloadRow].filter(Boolean) as InlineKeyboardButton[][];
+    const rows = [refineRow, downloadRow].filter(Boolean) as InlineKeyboardButton[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
     // Prefer S3 URL (always accessible by Telegram); fall back to downloading
@@ -180,12 +180,12 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     const useDocument = isSvg || byteSize > PHOTO_MAX_BYTES;
     const tooLargeForTelegram = byteSize > DOCUMENT_MAX_BYTES;
 
-    if (tooLargeForTelegram && downloadRow) {
+    if (tooLargeForTelegram) {
       // File exceeds Telegram's document limit — send a download link instead
       await telegram.sendMessage(
         telegramChatId,
         `✅ ${modelId}: ${prompt.slice(0, 200)}\n\n${t.errors.fileTooLargeForTelegram}`,
-        { reply_markup: { inline_keyboard: [downloadRow] } },
+        { reply_markup: downloadRow ? { inline_keyboard: [downloadRow] } : undefined },
       );
     } else if (useDocument) {
       await telegram.sendDocument(telegramChatId, tgImageSource, {
