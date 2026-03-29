@@ -363,6 +363,7 @@ export async function registerBotUser(params: {
   lastName?: string;
   username?: string;
   referrerTelegramId?: bigint | null;
+  referrerUserId?: string;
 }): Promise<{
   ok: boolean;
   userId: string;
@@ -377,5 +378,6 @@ export async function registerBotUser(params: {
     lastName: params.lastName,
     username: params.username,
     referrerTelegramId: params.referrerTelegramId?.toString(),
+    referrerUserId: params.referrerUserId,
   });
 }
