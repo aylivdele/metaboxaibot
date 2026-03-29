@@ -134,9 +134,25 @@ export async function handleStart(ctx: BotContext): Promise<void> {
 
   // ── Referral deep link ─────────────────────────────────────────────────────
   if (param?.startsWith("ref_") && ctx.user && ctx.user.referredById) {
-    // User already has a referrer — notify and skip
+    // User already has a referrer — notify with mentor name
+    let mentorName = "";
+    try {
+      const mentor = await db.user.findUnique({
+        where: { id: ctx.user.referredById },
+        select: { firstName: true, lastName: true, username: true },
+      });
+      if (mentor) {
+        const name = mentor.firstName
+          ? `${mentor.firstName}${mentor.lastName ? ` ${mentor.lastName}` : ""}`
+          : mentor.username || "";
+        const contact = mentor.username ? ` (@${mentor.username})` : "";
+        mentorName = name ? `: ${name}${contact}` : "";
+      }
+    } catch {
+      /* ignore */
+    }
     await ctx
-      .reply("ℹ️ У вас уже есть наставник, поэтому реферальная ссылка не была применена.")
+      .reply(`ℹ️ У вас уже есть наставник${mentorName}. Реферальная ссылка не была применена.`)
       .catch(() => {});
   }
   // Store resolved referrer info for registerBotUser
