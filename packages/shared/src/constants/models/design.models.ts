@@ -1171,6 +1171,17 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         step: 1,
         default: 2,
       },
+      {
+        key: "strength",
+        label: "Сила изменения",
+        description:
+          "Применяется при редактировании изображения. 0 — почти не изменять оригинал, 1 — следовать только промпту.",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.5,
+      },
     ],
   },
   "recraft-v4": {
@@ -1196,11 +1207,15 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     settings: [
       mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
       {
-        key: "no_text",
-        label: "Без текста",
-        description: "Запретить модели добавлять текст, надписи и леттеринг в изображение.",
-        type: "toggle",
-        default: false,
+        key: "strength",
+        label: "Сила изменения",
+        description:
+          "Применяется при редактировании изображения. 0 — почти не изменять оригинал, 1 — следовать только промпту.",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.5,
       },
       {
         key: "seed",
@@ -1244,6 +1259,17 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         default: false,
       },
       {
+        key: "strength",
+        label: "Сила изменения",
+        description:
+          "Применяется при редактировании изображения. 0 — почти не изменять оригинал, 1 — следовать только промпту.",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.5,
+      },
+      {
         key: "seed",
         label: "Seed",
         description:
@@ -1277,6 +1303,17 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
       {
+        key: "strength",
+        label: "Сила изменения",
+        description:
+          "Применяется при редактировании изображения. 0 — почти не изменять оригинал, 1 — следовать только промпту.",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.5,
+      },
+      {
         key: "seed",
         label: "Seed",
         description:
@@ -1309,6 +1346,17 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
+      {
+        key: "strength",
+        label: "Сила изменения",
+        description:
+          "Применяется при редактировании изображения. 0 — почти не изменять оригинал, 1 — следовать только промпту.",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.5,
+      },
       {
         key: "seed",
         label: "Seed",

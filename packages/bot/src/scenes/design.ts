@@ -305,7 +305,7 @@ export async function handleNewDesignDialog(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "DESIGN_SECTION", "design");
   const state = await userStateService.get(ctx.user.id);
-  await ctx.reply(ctx.t.design.sectionTitle, {
+  await ctx.reply(ctx.t.design.sectionTooltip, {
     reply_markup: buildDesignModelKeyboard(state?.designModelId),
   });
 }

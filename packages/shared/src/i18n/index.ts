@@ -42,6 +42,7 @@ export interface Translations {
   };
   design: {
     sectionTitle: string;
+    sectionTooltip: string;
     management: string;
     newDialog: string;
     backToMain: string;
@@ -74,6 +75,7 @@ export interface Translations {
   };
   video: {
     sectionTitle: string;
+    sectionTooltip: string;
     avatars: string;
     lipSync: string;
     newDialog: string;

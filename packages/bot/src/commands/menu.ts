@@ -89,7 +89,7 @@ export async function handleDesign(ctx: BotContext): Promise<void> {
       is_persistent: true,
     },
   });
-  await ctx.reply(ctx.t.design.sectionTitle, {
+  await ctx.reply(ctx.t.design.sectionTooltip, {
     reply_markup: buildDesignModelKeyboard(state?.designModelId),
   });
 }
@@ -136,7 +136,7 @@ export async function handleVideo(ctx: BotContext): Promise<void> {
       is_persistent: true,
     },
   });
-  await ctx.reply(ctx.t.video.sectionTitle, {
+  await ctx.reply(ctx.t.video.sectionTooltip, {
     reply_markup: buildVideoModelKeyboard(state?.videoModelId),
   });
 }

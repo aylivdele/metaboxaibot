@@ -189,7 +189,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       await telegram.sendMessage(
         telegramChatId,
         `✅ ${modelId}: ${prompt.slice(0, 200)}\n\n${t.errors.fileTooLargeForTelegram}`,
-        { reply_markup: downloadRow ? { inline_keyboard: [downloadRow] } : undefined },
+        { reply_markup: replyMarkup },
       );
     } else if (useDocument) {
       await telegram.sendDocument(telegramChatId, tgImageSource, {

@@ -34,7 +34,7 @@ const ASPECT_RATIO_MODELS = new Set(["nano-banana-pro", "nano-banana-2"]);
 /**
  * Edit endpoints for these models expect `image_urls` (array) instead of `image_url` (string).
  */
-const IMAGE_URLS_ARRAY_MODELS = new Set(["nano-banana-pro", "nano-banana-2"]);
+const IMAGE_URLS_ARRAY_MODELS = new Set(["nano-banana-pro", "nano-banana-2", "flux", "flux-pro"]);
 
 /** Separator used to pack endpoint+requestId into a single opaque string. */
 const SEP = "||";

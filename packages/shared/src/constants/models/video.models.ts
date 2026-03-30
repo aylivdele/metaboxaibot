@@ -484,7 +484,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     // $0.0167/s Engine III (public/standard avatar) ≈ $1.00/min
     // $0.10/s Engine IV (Avatar IV — custom photo upload) ≈ $6.00/min
     costUsdPerRequest: 0,
-    costUsdPerSecond: 0.1,
+    costUsdPerSecond: 0.8, //actual price is 0.1
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,

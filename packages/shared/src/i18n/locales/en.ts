@@ -47,7 +47,8 @@ export default {
     dialogSelected: "✅ Dialog selected: {title}\nModel: {model}",
   },
   design: {
-    sectionTitle: "🎨 AI Design\nChoose a section to work with images 👇",
+    sectionTitle: "🎨 AI Design",
+    sectionTooltip: "Choose a section to work with images 👇",
     management: "⚙ Management",
     newDialog: "🎨 New Image",
     backToMain: "🏠 Back to Main Menu",
@@ -82,7 +83,8 @@ export default {
     generationFailed: "❌ Audio generation failed. Please try again.",
   },
   video: {
-    sectionTitle: "🎬 Video of the Future\nChoose a section to work with video 👇",
+    sectionTitle: "🎬 Video of the Future",
+    sectionTooltip: "Choose a section to work with video 👇",
     avatars: "👾 Avatars",
     lipSync: "🔄 Lip Sync",
     newDialog: "🎬 New Video",

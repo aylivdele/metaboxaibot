@@ -47,7 +47,8 @@ export default {
     dialogSelected: "✅ Выбран диалог: {title}\nМодель: {model}",
   },
   design: {
-    sectionTitle: "🎨 Дизайн с ИИ\nВыберите раздел для работы с изображением 👇",
+    sectionTitle: "🎨 Дизайн с ИИ",
+    sectionTooltip: "Выберите раздел для работы с изображением 👇",
     management: "⚙ Управление",
     newDialog: "🎨 Новое изображение",
     backToMain: "🏠 В главное меню",
@@ -82,7 +83,8 @@ export default {
     generationFailed: "❌ Ошибка генерации аудио. Пожалуйста, попробуйте ещё раз.",
   },
   video: {
-    sectionTitle: "🎬 Видео будущего\nВыберите раздел для работы с видео 👇",
+    sectionTitle: "🎬 Видео будущего",
+    sectionTooltip: "Выберите раздел для работы с видео 👇",
     avatars: "👾 Аватары",
     lipSync: "🔄 Синхронизатор губ",
     newDialog: "🎬 Новое видео",

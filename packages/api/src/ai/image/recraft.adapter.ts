@@ -7,10 +7,10 @@ const RECRAFT_API_BASE = "https://external.api.recraft.ai/v1";
 /** Maps our internal model IDs to Recraft API model IDs. */
 const MODEL_MAP: Record<string, string> = {
   "recraft-v3": "recraftv3",
-  "recraft-v4": "recraft20b",
-  "recraft-v4-pro": "recraft20b",
-  "recraft-v4-vector": "recraft20b",
-  "recraft-v4-pro-vector": "recraft20b",
+  "recraft-v4": "recraftv4",
+  "recraft-v4-pro": "recraftv4_pro",
+  "recraft-v4-vector": "recraftv4_vector",
+  "recraft-v4-pro-vector": "recraftv4_pro_vector",
 };
 
 /** Maps aspect ratios to Recraft-supported pixel dimensions. */
@@ -41,9 +41,10 @@ export class RecraftAdapter implements ImageAdapter {
     if (!apiKey) throw new Error("RECRAFT_API_KEY not configured");
 
     const ms = input.modelSettings ?? {};
-    const recraftModel = MODEL_MAP[this.modelId] ?? "recraft20b";
+    const recraftModel = MODEL_MAP[this.modelId] ?? "recraftv4";
     const isVector = VECTOR_MODELS.has(this.modelId);
     const isV3 = this.modelId === "recraft-v3";
+    const isV4 = this.modelId.startsWith("recraft-v4");
     const defaultStyle = isVector ? "vector_illustration" : "realistic_image";
     const style = (ms.style as string | undefined) ?? defaultStyle;
 
@@ -60,11 +61,14 @@ export class RecraftAdapter implements ImageAdapter {
       if (!imgResp.ok) throw new Error(`Failed to fetch source image: ${imgResp.status}`);
       const blob = await imgResp.blob();
 
+      const strength = ms.strength != null ? Number(ms.strength) : 0.5;
+
       const form = new FormData();
       form.append("image", blob, "input.png");
       form.append("prompt", input.prompt);
       form.append("model", recraftModel);
-      form.append("style", style);
+      if (!isV4) form.append("style", style);
+      form.append("strength", String(strength));
       if (isV3 && ms.substyle) form.append("substyle", ms.substyle as string);
       if (ms.seed != null) form.append("random_seed", String(ms.seed));
       if (Object.keys(controls).length) form.append("controls", JSON.stringify(controls));
@@ -87,7 +91,7 @@ export class RecraftAdapter implements ImageAdapter {
         prompt: input.prompt,
         model: recraftModel,
         size,
-        style,
+        ...(!isV4 ? { style } : {}),
       };
       if (isV3 && ms.substyle) body.substyle = ms.substyle;
       if (ms.seed != null) body.random_seed = ms.seed;

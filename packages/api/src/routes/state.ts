@@ -12,6 +12,7 @@ import {
   type Translations,
 } from "@metabox/shared";
 import type { Language } from "@metabox/shared";
+import { logger } from "../logger.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
@@ -160,7 +161,7 @@ async function sendModelActivatedNotification(
       text,
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     }),
-  }).catch(() => void 0);
+  }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
 }
 
 export const stateRoutes: FastifyPluginAsync = async (fastify) => {
