@@ -248,14 +248,14 @@ async function resolveTelegramSource(
     const s3Url = await getFileUrl(s3Key).catch(() => null);
     if (s3Url) {
       const head = await fetch(s3Url, { method: "HEAD" }).catch(() => null);
-      let byteSize = Number.MAX_SAFE_INTEGER;
       if (head?.ok) {
         const contentLength = head.headers.get("content-length");
-        if (contentLength) {
-          byteSize = parseInt(contentLength, 10) || byteSize;
+        const byteSize = contentLength ? parseInt(contentLength, 10) : NaN;
+        if (!isNaN(byteSize) && byteSize > 0) {
+          return { source: s3Url, byteSize };
         }
       }
-      return { source: s3Url, byteSize };
+      // HEAD missing or no Content-Length — fall through to download for exact size
     }
   }
   // Download the image ourselves and send as a buffer

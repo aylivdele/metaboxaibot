@@ -48,6 +48,16 @@ export function fetchWithLog(url: string | URL | Request, init?: RequestInit): P
       bodyLog = `<binary ${body.byteLength} bytes>`;
     } else if (ArrayBuffer.isView(body)) {
       bodyLog = `<binary ${(body as ArrayBufferView).byteLength} bytes>`;
+    } else if (body instanceof FormData) {
+      const obj: Record<string, unknown> = {};
+      for (const [key, val] of body.entries()) {
+        if (val instanceof Blob) {
+          obj[key] = `<blob ${val.size} bytes>`;
+        } else {
+          obj[key] = truncateStrings(val);
+        }
+      }
+      bodyLog = obj;
     } else {
       bodyLog = "<body>";
     }

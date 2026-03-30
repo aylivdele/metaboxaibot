@@ -35,6 +35,9 @@ export { BOT_STATES, SECTION_BY_STATE, WELCOME_BONUS_TOKENS } from "./constants/
 export { PLANS } from "./constants/plans.js";
 export type { Plan } from "./constants/plans.js";
 
+// Errors
+export { UserFacingError } from "./errors.js";
+
 // Web token (URL-based auth for KeyboardButtonWebApp where initData is unavailable)
 export { generateWebToken, verifyWebToken } from "./webtoken.js";
 

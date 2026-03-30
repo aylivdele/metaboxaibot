@@ -1,5 +1,13 @@
 import type { BotContext } from "../types/context.js";
-import { dialogService, generationService, userStateService } from "@metabox/api/services";
+import {
+  dialogService,
+  generationService,
+  userStateService,
+  getFileUrl,
+} from "@metabox/api/services";
+import type { SubmitImageResult } from "@metabox/api/services";
+import { generateDownloadToken } from "@metabox/api/utils/download-token";
+import { InputFile } from "grammy";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import {
@@ -9,9 +17,87 @@ import {
   FAMILIES_BY_SECTION,
   config,
   generateWebToken,
+  UserFacingError,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
+
+// ── Sync image delivery (mirrors image.processor.ts logic) ───────────────────
+
+const PHOTO_MAX_URL = 5 * 1024 * 1024;
+const PHOTO_MAX_BUFFER = 10 * 1024 * 1024;
+const DOC_MAX_URL = 20 * 1024 * 1024;
+const DOC_MAX_BUFFER = 50 * 1024 * 1024;
+
+async function resolveSyncSource(
+  s3Key: string | undefined,
+  imageUrl: string,
+  filename: string,
+): Promise<{ source: string | InstanceType<typeof InputFile>; byteSize: number }> {
+  if (s3Key) {
+    const s3Url = await getFileUrl(s3Key).catch(() => null);
+    if (s3Url) {
+      const head = await fetch(s3Url, { method: "HEAD" }).catch(() => null);
+      if (head?.ok) {
+        const contentLength = head.headers.get("content-length");
+        const byteSize = contentLength ? parseInt(contentLength, 10) : NaN;
+        if (!isNaN(byteSize) && byteSize > 0) {
+          return { source: s3Url, byteSize };
+        }
+      }
+      // HEAD missing or no Content-Length — fall through to download for exact size
+    }
+  }
+  const res = await fetch(imageUrl);
+  if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return { source: new InputFile(buffer, filename), byteSize: buffer.byteLength };
+}
+
+async function sendSyncImageResult(
+  ctx: BotContext,
+  modelId: string,
+  result: SubmitImageResult,
+  caption: string,
+): Promise<void> {
+  const { imageUrl, filename = "image.png", s3Key, dbJobId, assistantMessageId } = result;
+  if (!imageUrl) return;
+
+  const model = AI_MODELS[modelId];
+  const userId = ctx.user!.id;
+
+  const { source, byteSize } = await resolveSyncSource(s3Key, imageUrl, filename);
+
+  const isUrl = typeof source === "string";
+  const photoMax = isUrl ? PHOTO_MAX_URL : PHOTO_MAX_BUFFER;
+  const docMax = isUrl ? DOC_MAX_URL : DOC_MAX_BUFFER;
+  const isSvg = filename.endsWith(".svg");
+  const useDocument = isSvg || byteSize > photoMax;
+  const tooLarge = byteSize > docMax;
+
+  // Build keyboard
+  const kb = new InlineKeyboard();
+  if (model?.supportsImages && assistantMessageId) {
+    kb.text(ctx.t.design.refine, `design_ref_${assistantMessageId}`).row();
+  }
+  if (s3Key && config.api.publicUrl) {
+    kb.url(
+      ctx.t.common.downloadFile,
+      `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userId.toString())}`,
+    ).row();
+  }
+  kb.text(ctx.t.common.sendOriginal, `orig_${dbJobId}`);
+
+  if (tooLarge) {
+    await ctx.reply(`${caption}\n\n${ctx.t.errors.fileTooLargeForTelegram}`, {
+      reply_markup: kb,
+    });
+  } else if (useDocument) {
+    await ctx.replyWithDocument(source, { caption, reply_markup: kb });
+  } else {
+    await ctx.replyWithPhoto(source, { caption, reply_markup: kb });
+  }
+}
 
 // ── Model selection keyboard ──────────────────────────────────────────────────
 
@@ -160,15 +246,8 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
 
     if (!result.isPending && result.imageUrl) {
-      // Sync result (DALL-E 3) — send immediately with optional Refine + Send as file buttons
-      const model = AI_MODELS[modelId];
       const caption = `🎨 ${prompt.slice(0, 200)}${sourceImageUrl ? ` ${ctx.t.design.withReference}` : ""}`;
-      const kb = new InlineKeyboard();
-      if (model?.supportsImages && result.assistantMessageId) {
-        kb.text(ctx.t.design.refine, `design_ref_${result.assistantMessageId}`);
-      }
-      kb.text(ctx.t.common.sendOriginal, `orig_${result.dbJobId}`);
-      await ctx.replyWithPhoto(result.imageUrl, { caption, reply_markup: kb });
+      await sendSyncImageResult(ctx, modelId, result, caption);
     } else {
       // Async — worker will notify when done
       await ctx.reply(ctx.t.design.asyncPending);
@@ -179,6 +258,8 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
       await replyNoSubscription(ctx);
     } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
       await replyInsufficientTokens(ctx);
+    } else if (err instanceof UserFacingError) {
+      await ctx.reply(err.message);
     } else {
       logger.error(err, "Design message error");
       await ctx.reply(ctx.t.design.generationFailed);
@@ -242,14 +323,8 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
 
       if (!result.isPending && result.imageUrl) {
-        const model = AI_MODELS[modelId];
         const captionText = `🎨 ${caption.slice(0, 200)} ${ctx.t.design.withReference}`;
-        const kb = new InlineKeyboard();
-        if (model?.supportsImages && result.assistantMessageId) {
-          kb.text(ctx.t.design.refine, `design_ref_${result.assistantMessageId}`);
-        }
-        kb.text(ctx.t.common.sendOriginal, `orig_${result.dbJobId}`);
-        await ctx.replyWithPhoto(result.imageUrl, { caption: captionText, reply_markup: kb });
+        await sendSyncImageResult(ctx, modelId, result, captionText);
       } else {
         await ctx.reply(ctx.t.design.asyncPending);
       }
@@ -257,6 +332,8 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
       if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
         await replyInsufficientTokens(ctx);
+      } else if (err instanceof UserFacingError) {
+        await ctx.reply(err.message);
       } else {
         logger.error(err, "Design photo+caption error");
         await ctx.reply(ctx.t.design.generationFailed);

@@ -26,6 +26,10 @@ export interface SubmitImageResult {
   dbJobId: string;
   /** Populated immediately for sync models (dall-e). */
   imageUrl?: string;
+  /** Original filename with extension (e.g. "recraft-v4.svg"). Set for sync models. */
+  filename?: string;
+  /** S3 key for the uploaded image. Set for sync models when upload succeeded. */
+  s3Key?: string;
   isPending: boolean;
   /** Message.id of the saved assistant result (for "Refine" button). Only set for sync models when dialogId provided. */
   assistantMessageId?: string;
@@ -126,20 +130,28 @@ export const generationService = {
           assistantMessageId = assistantMsg.id;
         }
 
-        // Upload to S3 in background for non-base64 providers
+        // Upload to S3 for non-base64 providers (synchronous so caller can use the S3 key)
         if (!result.base64Data && finalUrl) {
-          const { ext, contentType } = sectionMeta("image");
+          const isSvg = result.filename?.endsWith(".svg") ?? false;
+          const { ext: defaultExt, contentType: defaultContentType } = sectionMeta("image");
+          const ext = isSvg ? "svg" : defaultExt;
+          const contentType = isSvg ? "image/svg+xml" : defaultContentType;
           const key = buildS3Key("image", userId.toString(), job.id, ext);
-          uploadFromUrl(key, finalUrl, contentType)
-            .then((s3Key) => {
-              if (s3Key) {
-                return db.generationJob.update({ where: { id: job.id }, data: { s3Key } });
-              }
-            })
-            .catch(() => void 0);
+          const uploadedKey = await uploadFromUrl(key, finalUrl, contentType).catch(() => null);
+          if (uploadedKey) {
+            s3KeySync = uploadedKey;
+            await db.generationJob.update({ where: { id: job.id }, data: { s3Key: s3KeySync } });
+          }
         }
 
-        return { dbJobId: job.id, imageUrl: finalUrl, isPending: false, assistantMessageId };
+        return {
+          dbJobId: job.id,
+          imageUrl: finalUrl,
+          filename: result.filename,
+          s3Key: s3KeySync ?? undefined,
+          isPending: false,
+          assistantMessageId,
+        };
       } catch (err) {
         await db.generationJob.update({
           where: { id: job.id },
