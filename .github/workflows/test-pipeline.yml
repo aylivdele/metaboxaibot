@@ -248,7 +248,8 @@ jobs:
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
 
             echo "Updating repo (compose file, nginx config)..."
-            git -c "url.https://x-access-token:${GHCR_TOKEN}@github.com/.insteadOf=https://github.com/" pull origin develop
+            git -c "url.https://x-access-token:${GHCR_TOKEN}@github.com/.insteadOf=https://github.com/" fetch origin develop
+            git reset --hard origin/develop
 
             # Only update IMAGE_TAG if at least one service was rebuilt
             if [ "$BUILT_API" = "true" ] || [ "$BUILT_BOT" = "true" ] || [ "$BUILT_WORKER" = "true" ]; then
