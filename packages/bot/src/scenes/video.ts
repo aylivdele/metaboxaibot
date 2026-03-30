@@ -255,11 +255,14 @@ export async function handleVideoLipSync(ctx: BotContext): Promise<void> {
 // D-ID: saves as one-shot reference image URL
 
 export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
-  if (!ctx.user || !ctx.message?.photo) return;
+  const isPhoto = !!ctx.message?.photo;
+  const isImageDoc =
+    !!ctx.message?.document && ctx.message.document.mime_type?.startsWith("image/");
+  if (!ctx.user || (!isPhoto && !isImageDoc)) return;
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.videoModelId ?? "kling";
-  const photo = ctx.message.photo.at(-1)!;
-  const file = await ctx.api.getFile(photo.file_id);
+  const fileId = isPhoto ? ctx.message!.photo!.at(-1)!.file_id : ctx.message!.document!.file_id;
+  const file = await ctx.api.getFile(fileId);
   const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
 
   if (modelId === "heygen") {

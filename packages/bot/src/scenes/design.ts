@@ -268,10 +268,13 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
   }
 }
 
-// ── Incoming photo in DESIGN_ACTIVE state — set as reference ──────────────────
+// ── Incoming photo or image document in DESIGN_ACTIVE state — set as reference ─
 
 export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
-  if (!ctx.user || !ctx.message?.photo) return;
+  const isPhoto = !!ctx.message?.photo;
+  const isImageDoc =
+    !!ctx.message?.document && ctx.message.document.mime_type?.startsWith("image/");
+  if (!ctx.user || (!isPhoto && !isImageDoc)) return;
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
@@ -288,9 +291,9 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     dialogId = dialog.id;
   }
 
-  // Get highest-resolution photo
-  const photo = ctx.message.photo.at(-1)!;
-  const file = await ctx.api.getFile(photo.file_id);
+  // Resolve file_id: highest-res photo or image document
+  const fileId = isPhoto ? ctx.message!.photo!.at(-1)!.file_id : ctx.message!.document!.file_id;
+  const file = await ctx.api.getFile(fileId);
   const fileUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
 
   // Save as a user message with mediaUrl

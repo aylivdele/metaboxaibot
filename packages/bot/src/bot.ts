@@ -173,12 +173,14 @@ export function createBot(token: string): Bot<BotContext> {
       return handleGptMessage(ctx);
     }
     if (state?.state === "DESIGN_ACTIVE") {
-      // Photo sent in design state → set as img2img reference
+      // Photo or image file sent in design state → set as img2img reference
       if (ctx.message?.photo) return handleDesignPhoto(ctx);
+      if (ctx.message?.document?.mime_type?.startsWith("image/")) return handleDesignPhoto(ctx);
       return handleDesignMessage(ctx);
     }
     if (state?.state === "VIDEO_ACTIVE") {
       if (ctx.message?.photo) return handleVideoPhoto(ctx);
+      if (ctx.message?.document?.mime_type?.startsWith("image/")) return handleVideoPhoto(ctx);
       if (ctx.message?.video) return handleVideoVideo(ctx);
       if (ctx.message?.voice) return handleVideoVoice(ctx);
       return handleVideoMessage(ctx);
