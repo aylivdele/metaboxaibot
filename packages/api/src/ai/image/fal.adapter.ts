@@ -75,13 +75,11 @@ export class FalAdapter implements ImageAdapter {
     if (ms.style_type) msExtras.style_type = ms.style_type;
     if (ms.magic_prompt_option) msExtras.magic_prompt_option = ms.magic_prompt_option;
     if (ms.resolution) msExtras.resolution = ms.resolution;
-    if (ms.safety_tolerance != null) msExtras.safety_tolerance = String(ms.safety_tolerance);
     if (ms.enable_web_search != null) msExtras.enable_web_search = ms.enable_web_search;
     if (ms.thinking_level) msExtras.thinking_level = ms.thinking_level;
     if (ms.acceleration) msExtras.acceleration = ms.acceleration;
     if (ms.enable_prompt_expansion != null)
       msExtras.enable_prompt_expansion = ms.enable_prompt_expansion;
-    if (ms.enable_safety_checker != null) msExtras.enable_safety_checker = ms.enable_safety_checker;
 
     const useAspectRatio = ASPECT_RATIO_MODELS.has(this.modelId);
     const falInput = {

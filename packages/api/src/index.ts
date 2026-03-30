@@ -38,7 +38,9 @@ import { userAvatarsRoutes } from "./routes/user-avatars.js";
 import { downloadRoutes } from "./routes/download.js";
 import { startRateScheduler } from "./services/exchange-rate.service.js";
 import { startSubscriptionScheduler } from "./services/subscription.service.js";
-import { config } from "@metabox/shared";
+import { config, preloadLocales, SUPPORTED_LANGUAGES } from "@metabox/shared";
+
+await preloadLocales(SUPPORTED_LANGUAGES);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

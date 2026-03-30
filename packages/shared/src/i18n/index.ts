@@ -110,6 +110,7 @@ export interface Translations {
     userBlocked: string;
     sendOriginalFailed: string;
     fileTooLargeForTelegram: string;
+    contentPolicyViolation: string;
   };
   common: {
     backToMain: string;

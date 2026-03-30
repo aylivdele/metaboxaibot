@@ -131,6 +131,8 @@ export default {
     noSubscriptionForPurchase: "❌ Token packages are only available with an active subscription.",
     userBlocked: "❌ Your account has been blocked. Contact support.",
     fileTooLargeForTelegram: "The file is too large to send via Telegram.",
+    contentPolicyViolation:
+      "❌ Your request was rejected due to a content policy violation. Please modify your prompt and try again.",
   },
   common: {
     backToMain: "🏠 Back to Main Menu",

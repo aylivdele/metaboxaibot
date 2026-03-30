@@ -1,3 +1,4 @@
+import { UnrecoverableError } from "bullmq";
 import type { Job } from "bullmq";
 import { Api } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
@@ -205,6 +206,28 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Image job completed");
   } catch (err) {
+    // Content policy violation — notify user immediately and skip retries
+    const isContentPolicy =
+      err !== null &&
+      typeof err === "object" &&
+      "body" in err &&
+      Array.isArray((err as { body?: { detail?: unknown[] } }).body?.detail) &&
+      (err as { body: { detail: Array<{ type?: string }> } }).body.detail.some(
+        (d) => d?.type === "content_policy_violation",
+      );
+
+    if (isContentPolicy) {
+      logger.warn({ dbJobId }, "Image job rejected: content policy violation");
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "failed", error: "content_policy_violation" },
+      });
+      await telegram
+        .sendMessage(telegramChatId, t.errors.contentPolicyViolation)
+        .catch(() => void 0);
+      throw new UnrecoverableError("content_policy_violation");
+    }
+
     logger.error({ dbJobId, err }, "Image job failed");
 
     const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 1) - 1;

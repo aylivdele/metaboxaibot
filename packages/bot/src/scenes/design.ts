@@ -84,9 +84,10 @@ async function sendSyncImageResult(
     kb.url(
       ctx.t.common.downloadFile,
       `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userId.toString())}`,
-    ).row();
+    );
+  } else {
+    kb.text(ctx.t.common.sendOriginal, `orig_${dbJobId}`);
   }
-  kb.text(ctx.t.common.sendOriginal, `orig_${dbJobId}`);
 
   if (tooLarge) {
     await ctx.reply(`${caption}\n\n${ctx.t.errors.fileTooLargeForTelegram}`, {

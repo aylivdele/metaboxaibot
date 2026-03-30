@@ -46,13 +46,6 @@ const FLUX_SETTINGS: ModelSettingDef[] = [
     default: false,
   },
   {
-    key: "enable_safety_checker",
-    label: "Фильтр безопасности",
-    description: "Фильтрация нежелательного контента.",
-    type: "toggle",
-    default: true,
-  },
-  {
     key: "output_format",
     label: "Формат файла",
     description: "Формат результирующего изображения.",
@@ -76,27 +69,6 @@ const FLUX_SETTINGS: ModelSettingDef[] = [
 
 /** FLUX.2 [pro] generation controls. */
 const FLUX_PRO_SETTINGS: ModelSettingDef[] = [
-  {
-    key: "safety_tolerance",
-    label: "Уровень допустимости",
-    description: "Строгость фильтрации контента: 1 — максимальная строгость, 5 — минимальная.",
-    type: "select",
-    options: [
-      { value: "1", label: "1 — Strict" },
-      { value: "2", label: "2" },
-      { value: "3", label: "3" },
-      { value: "4", label: "4" },
-      { value: "5", label: "5 — Permissive" },
-    ],
-    default: "2",
-  },
-  {
-    key: "enable_safety_checker",
-    label: "Фильтр безопасности",
-    description: "Фильтрация нежелательного контента.",
-    type: "toggle",
-    default: true,
-  },
   {
     key: "output_format",
     label: "Формат файла",
@@ -365,16 +337,6 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         "9:16",
       ]),
       {
-        key: "safety_tolerance",
-        label: "Допустимый контент",
-        description: "1 — строгая фильтрация, 6 — минимальная. По умолчанию 4.",
-        type: "slider",
-        min: 1,
-        max: 6,
-        step: 1,
-        default: 4,
-      },
-      {
         key: "resolution",
         label: "Разрешение",
         description:
@@ -452,16 +414,6 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     ],
     settings: [
       mkAspectRatio(["21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"]),
-      {
-        key: "safety_tolerance",
-        label: "Допустимый контент",
-        description: "1 — строгая фильтрация, 6 — минимальная. По умолчанию 4.",
-        type: "slider",
-        min: 1,
-        max: 6,
-        step: 1,
-        default: 4,
-      },
       {
         key: "resolution",
         label: "Разрешение",
@@ -1124,7 +1076,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     costUsdPerRequest: 0.04,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
-    supportsImages: false,
+    supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
@@ -1282,7 +1234,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     costUsdPerRequest: 0.04,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
-    supportsImages: false,
+    supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
@@ -1327,7 +1279,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     costUsdPerRequest: 0.25,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
-    supportsImages: false,
+    supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
@@ -1372,7 +1324,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     costUsdPerRequest: 0.08,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
-    supportsImages: false,
+    supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
@@ -1416,7 +1368,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     costUsdPerRequest: 0.3,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
-    supportsImages: false,
+    supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
