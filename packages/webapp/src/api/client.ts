@@ -242,7 +242,17 @@ export const api = {
   },
 
   heygenAvatars: {
-    list: () => request<HeyGenAvatar[]>("/heygen-avatars"),
+    list: (params: { token?: string; limit?: number; gender?: string; search?: string } = {}) => {
+      const qs = new URLSearchParams();
+      if (params.token) qs.set("token", params.token);
+      if (params.limit) qs.set("limit", String(params.limit));
+      if (params.gender && params.gender !== "all") qs.set("gender", params.gender);
+      if (params.search) qs.set("search", params.search);
+      const query = qs.toString();
+      return request<{ items: HeyGenAvatar[]; has_more: boolean; next_token: string | null }>(
+        `/heygen-avatars${query ? `?${query}` : ""}`,
+      );
+    },
   },
 
   higgsfieldMotions: {

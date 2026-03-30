@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
 import type { HeyGenAvatar, UserAvatar } from "../../types.js";
+
+const PAGE_SIZE = 20;
 
 interface HeyGenAvatarPickerProps {
   /** Currently selected official avatar_id (empty string = none) */
@@ -15,21 +17,50 @@ interface HeyGenAvatarPickerProps {
 export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenAvatarPickerProps) {
   const { t } = useI18n();
   const [tab, setTab] = useState<"official" | "myAvatars">(imageAssetId ? "myAvatars" : "official");
+
+  // Official avatars state
   const [avatars, setAvatars] = useState<HeyGenAvatar[]>([]);
-  const [avatarsLoading, setAvatarsLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextToken, setNextToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [genderFilter, setGenderFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track the filter state for which current avatars were fetched
+  const fetchedFilterRef = useRef({ gender: "all", search: "" });
+
+  // My avatars state
   const [myAvatars, setMyAvatars] = useState<UserAvatar[]>([]);
   const [myAvatarsLoading, setMyAvatarsLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [genderFilter, setGenderFilter] = useState("all");
 
+  const fetchAvatars = (gender: string, searchVal: string, token?: string) => {
+    const isLoadMore = !!token;
+    if (isLoadMore) setLoadingMore(true);
+    else setLoading(true);
+
+    api.heygenAvatars
+      .list({ token, limit: PAGE_SIZE, gender, search: searchVal || undefined })
+      .then((res) => {
+        setAvatars((prev) => (isLoadMore ? [...prev, ...res.items] : res.items));
+        setHasMore(res.has_more);
+        setNextToken(res.next_token);
+        fetchedFilterRef.current = { gender, search: searchVal };
+      })
+      .catch(() => {
+        if (!isLoadMore) setAvatars([]);
+      })
+      .finally(() => {
+        if (isLoadMore) setLoadingMore(false);
+        else setLoading(false);
+      });
+  };
+
+  // Initial load / tab switch
   useEffect(() => {
     if (tab === "official" && avatars.length === 0) {
-      setAvatarsLoading(true);
-      api.heygenAvatars
-        .list()
-        .then(setAvatars)
-        .catch(() => setAvatars([]))
-        .finally(() => setAvatarsLoading(false));
+      fetchAvatars(genderFilter, search);
     }
     if (tab === "myAvatars") {
       setMyAvatarsLoading(true);
@@ -39,7 +70,31 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
         .catch(() => setMyAvatars([]))
         .finally(() => setMyAvatarsLoading(false));
     }
-  }, [tab, avatars.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  // Refetch when gender filter changes
+  const handleGenderChange = (g: string) => {
+    setGenderFilter(g);
+    setAvatars([]);
+    fetchAvatars(g, search);
+  };
+
+  // Debounced search
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearch(val);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setAvatars([]);
+      fetchAvatars(genderFilter, val);
+    }, 400);
+  };
+
+  const handleLoadMore = () => {
+    if (!nextToken || loadingMore) return;
+    fetchAvatars(genderFilter, search, nextToken);
+  };
 
   const selectOfficial = (id: string) => {
     onChange({
@@ -75,7 +130,6 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
     e.stopPropagation();
     await api.userAvatars.delete(id).catch(() => void 0);
     setMyAvatars((prev) => prev.filter((a) => a.id !== id));
-    // Clear selection if the deleted avatar was selected
     const deleted = myAvatars.find((a) => a.id === id);
     if (deleted?.externalId && deleted.externalId === imageAssetId) {
       onChange({
@@ -87,8 +141,6 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
       });
     }
   };
-
-  const filtered = avatars.filter((a) => genderFilter === "all" || a.gender === genderFilter);
 
   return (
     <div className="voice-picker">
@@ -107,52 +159,73 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
         </button>
       </div>
 
-      {tab === "official" &&
-        (avatarsLoading ? (
-          <div className="voice-picker__loading">Загрузка аватаров…</div>
-        ) : (
-          <>
-            <div className="voice-picker__filters">
-              <div className="voice-picker__gender-btns">
-                {(["all", "male", "female"] as const).map((g) => (
-                  <button
-                    key={g}
-                    className={`voice-picker__gender-btn${genderFilter === g ? " voice-picker__gender-btn--active" : ""}`}
-                    onClick={() => setGenderFilter(g)}
-                  >
-                    {g === "all" ? "Все" : g === "male" ? "М" : "Ж"}
-                  </button>
-                ))}
+      {tab === "official" && (
+        <>
+          <div className="voice-picker__filters">
+            <input
+              className="voice-picker__search"
+              type="text"
+              placeholder="Поиск…"
+              value={search}
+              onChange={handleSearchChange}
+            />
+            <div className="voice-picker__gender-btns">
+              {(["all", "male", "female"] as const).map((g) => (
+                <button
+                  key={g}
+                  className={`voice-picker__gender-btn${genderFilter === g ? " voice-picker__gender-btn--active" : ""}`}
+                  onClick={() => handleGenderChange(g)}
+                >
+                  {g === "all" ? "Все" : g === "male" ? "М" : "Ж"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="voice-picker__loading">Загрузка аватаров…</div>
+          ) : (
+            <>
+              <div className="avatar-picker__grid">
+                {avatars.map((avatar) => {
+                  const isSelected = avatarId === avatar.avatar_id && !imageAssetId;
+                  return (
+                    <div
+                      key={avatar.avatar_id}
+                      className={`avatar-picker__item${isSelected ? " avatar-picker__item--selected" : ""}`}
+                      onClick={() => selectOfficial(avatar.avatar_id)}
+                    >
+                      {avatar.preview_image_url ? (
+                        <img
+                          className="avatar-picker__img"
+                          src={avatar.preview_image_url}
+                          alt={avatar.avatar_name}
+                        />
+                      ) : (
+                        <div className="avatar-picker__img avatar-picker__img--placeholder">👤</div>
+                      )}
+                      <span className="avatar-picker__name">{avatar.avatar_name}</span>
+                    </div>
+                  );
+                })}
+                {!loading && avatars.length === 0 && (
+                  <div className="voice-picker__empty">Аватары не найдены</div>
+                )}
               </div>
-            </div>
-            <div className="avatar-picker__grid">
-              {filtered.map((avatar) => {
-                const isSelected = avatarId === avatar.avatar_id && !imageAssetId;
-                return (
-                  <div
-                    key={avatar.avatar_id}
-                    className={`avatar-picker__item${isSelected ? " avatar-picker__item--selected" : ""}`}
-                    onClick={() => selectOfficial(avatar.avatar_id)}
-                  >
-                    {avatar.preview_image_url ? (
-                      <img
-                        className="avatar-picker__img"
-                        src={avatar.preview_image_url}
-                        alt={avatar.avatar_name}
-                      />
-                    ) : (
-                      <div className="avatar-picker__img avatar-picker__img--placeholder">👤</div>
-                    )}
-                    <span className="avatar-picker__name">{avatar.avatar_name}</span>
-                  </div>
-                );
-              })}
-              {filtered.length === 0 && (
-                <div className="voice-picker__empty">Аватары не найдены</div>
+
+              {hasMore && (
+                <button
+                  className="voice-picker__load-more"
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? "Загрузка…" : "Загрузить ещё"}
+                </button>
               )}
-            </div>
-          </>
-        ))}
+            </>
+          )}
+        </>
+      )}
 
       {tab === "myAvatars" && (
         <>

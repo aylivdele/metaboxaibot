@@ -15,18 +15,34 @@ interface HeyGenLooksPage {
   next_token?: string | null;
 }
 
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-let avatarsCache: { data: object[]; at: number } | null = null;
+export const heygenAvatarsRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.addHook("preHandler", telegramAuthHook);
 
-/** Fetch all looks with cursor-based pagination. */
-async function fetchAllLooks(apiKey: string): Promise<HeyGenLookItem[]> {
-  const results: HeyGenLookItem[] = [];
-  let nextToken: string | null | undefined = undefined;
+  /**
+   * GET /heygen-avatars — proxy to HeyGen /v3/avatars/looks (public only) with cursor pagination.
+   * Query params:
+   *   token  — opaque cursor for the next page (omit for first page)
+   *   limit  — items per page (default 20, max 50)
+   *   gender — filter: male | female (omit for all)
+   *   search — name substring filter (case-insensitive, applied before returning)
+   *
+   * Response: { items, has_more, next_token }
+   */
+  fastify.get<{
+    Querystring: { token?: string; limit?: string; gender?: string; search?: string };
+  }>("/heygen-avatars", async (request, reply) => {
+    const apiKey = config.ai.heygen;
+    if (!apiKey) {
+      return reply.status(503).send({ error: "HeyGen API key not configured" });
+    }
 
-  do {
+    const { token, gender, search } = request.query;
+    const limit = Math.min(50, Math.max(1, parseInt(request.query.limit ?? "20", 10) || 20));
+
     const url = new URL("https://api.heygen.com/v3/avatars/looks");
-    url.searchParams.set("limit", "50");
-    if (nextToken) url.searchParams.set("token", nextToken);
+    url.searchParams.set("ownership", "public");
+    url.searchParams.set("limit", String(limit));
+    if (token) url.searchParams.set("token", token);
 
     const res = await fetch(url.toString(), {
       headers: { "X-Api-Key": apiKey, Accept: "application/json" },
@@ -34,47 +50,30 @@ async function fetchAllLooks(apiKey: string): Promise<HeyGenLookItem[]> {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`HeyGen /v3/avatars/looks error: ${res.status} ${text}`);
+      return reply.status(502).send({ error: `HeyGen error: ${res.status} ${text}` });
     }
 
     const page = (await res.json()) as HeyGenLooksPage;
-    results.push(...(page.data ?? []));
-    nextToken = page.has_more ? page.next_token : null;
-  } while (nextToken);
-
-  return results;
-}
-
-export const heygenAvatarsRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.addHook("preHandler", telegramAuthHook);
-
-  /** GET /heygen-avatars — proxy to HeyGen /v3/avatars/looks, returns simplified avatar list */
-  fastify.get("/heygen-avatars", async (_request, reply) => {
-    if (avatarsCache && Date.now() - avatarsCache.at < CACHE_TTL_MS) {
-      return avatarsCache.data;
-    }
-
-    const apiKey = config.ai.heygen;
-    if (!apiKey) {
-      return reply.status(503).send({ error: "HeyGen API key not configured" });
-    }
-
-    let looks: HeyGenLookItem[];
-    try {
-      looks = await fetchAllLooks(apiKey);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return reply.status(502).send({ error: msg });
-    }
-
-    const data = looks.map((l) => ({
+    let items = (page.data ?? []).map((l) => ({
       avatar_id: l.id,
       avatar_name: l.name,
       gender: l.gender ?? "",
       preview_image_url: l.preview_image_url ?? null,
     }));
 
-    avatarsCache = { data, at: Date.now() };
-    return data;
+    // Apply client-requested filters on the server before returning
+    if (gender && gender !== "all") {
+      items = items.filter((a) => a.gender === gender);
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      items = items.filter((a) => a.avatar_name.toLowerCase().includes(q));
+    }
+
+    return {
+      items,
+      has_more: page.has_more ?? false,
+      next_token: page.next_token ?? null,
+    };
   });
 };
