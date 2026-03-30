@@ -144,16 +144,18 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     const tgVideoSource = await resolveTelegramVideoSource(s3Key, outputUrl, videoBuffer);
 
     // Determine actual byte size: buffer is exact; for S3 URL do a HEAD request.
-    let videoByteSize = videoBuffer?.byteLength ?? 0;
+    let videoByteSize = videoBuffer?.byteLength;
     if (!videoByteSize && typeof tgVideoSource === "string") {
       const head = await fetch(tgVideoSource, { method: "HEAD" }).catch(() => null);
-      videoByteSize = head?.ok ? parseInt(head.headers.get("content-length") ?? "0", 10) : 0;
+      if (head?.ok) {
+        videoByteSize = parseInt(head.headers.get("content-length") ?? "NaN", 10);
+      }
     }
 
     // Telegram limits: 20 MB via URL, 50 MB via buffer upload
     const isUrl = typeof tgVideoSource === "string";
     const VIDEO_MAX_BYTES = isUrl ? 20 * 1024 * 1024 : 50 * 1024 * 1024;
-    const tooLargeForTelegram = videoByteSize > VIDEO_MAX_BYTES;
+    const tooLargeForTelegram = (videoByteSize || Number.MAX_SAFE_INTEGER) > VIDEO_MAX_BYTES;
 
     if (tooLargeForTelegram && downloadRow) {
       // File exceeds Telegram's video limit — send a download link instead

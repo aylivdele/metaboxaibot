@@ -121,8 +121,10 @@ export interface Translations {
     downloadFile: string;
     tariffs: string;
     costPerRequest: string;
+    costRangePerRequest: string;
     costPerMPixel: string;
     costPerSecond: string;
+    costRangePerSecond: string;
     costPerKChar: string;
   };
   payments: {

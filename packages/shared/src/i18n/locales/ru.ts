@@ -143,8 +143,10 @@ export default {
     downloadFile: "⬇️ Скачать",
     tariffs: "💳 Тарифы",
     costPerRequest: "💰 {cost} ✦ за запрос",
+    costRangePerRequest: "💰 {min} – {max} ✦ за запрос",
     costPerMPixel: "💰 {cost} ✦ за мегапиксель",
     costPerSecond: "💰 {cost} ✦ за секунду",
+    costRangePerSecond: "💰 {min} – {max} ✦ за секунду",
     costPerKChar: "💰 {cost} ✦ за 1К символов",
   },
   payments: {

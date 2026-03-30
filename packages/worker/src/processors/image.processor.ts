@@ -242,13 +242,19 @@ async function resolveTelegramSource(
   providerUrl: string,
   filename: string,
 ): Promise<{ source: string | InstanceType<typeof InputFile>; byteSize: number }> {
-  // Prefer S3 URL (public or presigned) — Telegram can fetch both without buffering.
+  // Prefer S3 URL (public) — Telegram can fetch without buffering.
   // HEAD request to get actual byte size so size-based routing (photo vs document) works correctly.
   if (s3Key) {
     const s3Url = await getFileUrl(s3Key).catch(() => null);
     if (s3Url) {
       const head = await fetch(s3Url, { method: "HEAD" }).catch(() => null);
-      const byteSize = head?.ok ? parseInt(head.headers.get("content-length") ?? "0", 10) : 0;
+      let byteSize = Number.MAX_SAFE_INTEGER;
+      if (head?.ok) {
+        const contentLength = head.headers.get("content-length");
+        if (contentLength) {
+          byteSize = parseInt(contentLength, 10) || byteSize;
+        }
+      }
       return { source: s3Url, byteSize };
     }
   }

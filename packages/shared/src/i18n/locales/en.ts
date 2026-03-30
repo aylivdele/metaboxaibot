@@ -142,8 +142,10 @@ export default {
     downloadFile: "⬇️ Download",
     tariffs: "💳 Plans",
     costPerRequest: "💰 {cost} ✦ per request",
+    costRangePerRequest: "💰 {min} – {max} ✦ per request",
     costPerMPixel: "💰 {cost} ✦ per megapixel",
     costPerSecond: "💰 {cost} ✦ per second",
+    costRangePerSecond: "💰 {min} – {max} ✦ per second",
     costPerKChar: "💰 {cost} ✦ per 1K characters",
   },
   payments: {

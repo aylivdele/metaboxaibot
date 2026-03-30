@@ -3,6 +3,8 @@ import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { userStateService, dialogService } from "@metabox/api/services";
 import { config, generateWebToken } from "@metabox/shared";
 import type { Section } from "@metabox/shared";
+import { buildDesignModelKeyboard } from "../scenes/design.js";
+import { buildVideoModelKeyboard } from "../scenes/video.js";
 
 /** Returns the active dialog name for a section, or undefined. */
 async function activeDialogLabel(userId: bigint, section: string): Promise<string | undefined> {
@@ -58,7 +60,10 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
 
 export async function handleDesign(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
-  const dialogLabel = await activeDialogLabel(ctx.user.id, "design");
+  const [dialogLabel, state] = await Promise.all([
+    activeDialogLabel(ctx.user.id, "design"),
+    userStateService.get(ctx.user.id),
+  ]);
   await userStateService.setState(ctx.user.id, "DESIGN_SECTION", "design");
   const text = dialogLabel
     ? `${ctx.t.design.sectionTitle}\n\n💬 ${dialogLabel}`
@@ -84,6 +89,9 @@ export async function handleDesign(ctx: BotContext): Promise<void> {
       is_persistent: true,
     },
   });
+  await ctx.reply(ctx.t.design.sectionTitle, {
+    reply_markup: buildDesignModelKeyboard(state?.designModelId),
+  });
 }
 
 export async function handleAudio(ctx: BotContext): Promise<void> {
@@ -104,6 +112,7 @@ export async function handleAudio(ctx: BotContext): Promise<void> {
 
 export async function handleVideo(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
+  const state = await userStateService.get(ctx.user.id);
   await userStateService.setState(ctx.user.id, "VIDEO_SECTION", "video");
 
   const webappUrl = config.bot.webappUrl;
@@ -126,5 +135,8 @@ export async function handleVideo(ctx: BotContext): Promise<void> {
       resize_keyboard: true,
       is_persistent: true,
     },
+  });
+  await ctx.reply(ctx.t.video.sectionTitle, {
+    reply_markup: buildVideoModelKeyboard(state?.videoModelId),
   });
 }
