@@ -17,8 +17,10 @@ export async function deductTokens(
     select: { subscriptionTokenBalance: true, tokenBalance: true },
   });
 
-  const fromSub = Math.min(Number(user.subscriptionTokenBalance), amount);
-  const fromRegular = amount - fromSub;
+  // Regular (purchased) tokens are spent first, then subscription tokens.
+  // This way, when subscription expires, only unused subscription tokens are lost.
+  const fromRegular = Math.min(Number(user.tokenBalance), amount);
+  const fromSub = amount - fromRegular;
 
   await db.$transaction([
     db.user.update({
