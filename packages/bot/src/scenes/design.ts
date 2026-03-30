@@ -38,10 +38,14 @@ async function resolveSyncSource(
     const s3Url = await getFileUrl(s3Key).catch(() => null);
     if (s3Url) {
       const head = await fetch(s3Url, { method: "HEAD" }).catch(() => null);
-      const byteSize = head?.ok
-        ? parseInt(head.headers.get("content-length") ?? "NaN", 10) || Number.MAX_SAFE_INTEGER
-        : Number.MAX_SAFE_INTEGER;
-      return { source: s3Url, byteSize };
+      if (head?.ok) {
+        const contentLength = head.headers.get("content-length");
+        const byteSize = contentLength ? parseInt(contentLength, 10) : NaN;
+        if (!isNaN(byteSize) && byteSize > 0) {
+          return { source: s3Url, byteSize };
+        }
+      }
+      // HEAD missing or no Content-Length — fall through to download for exact size
     }
   }
   const res = await fetch(imageUrl);
@@ -86,13 +90,7 @@ async function sendSyncImageResult(
 
   if (tooLarge) {
     await ctx.reply(`${caption}\n\n${ctx.t.errors.fileTooLargeForTelegram}`, {
-      reply_markup:
-        s3Key && config.api.publicUrl
-          ? new InlineKeyboard().url(
-              ctx.t.common.downloadFile,
-              `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userId.toString())}`,
-            )
-          : undefined,
+      reply_markup: kb,
     });
   } else if (useDocument) {
     await ctx.replyWithDocument(source, { caption, reply_markup: kb });
