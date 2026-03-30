@@ -70,7 +70,6 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
         .catch(() => setMyAvatars([]))
         .finally(() => setMyAvatarsLoading(false));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   // Refetch when gender filter changes
