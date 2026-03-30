@@ -2613,6 +2613,10 @@ input::placeholder {
 }
 
 /* Avatar picker grid */
+.avatar-picker__load-more {
+  grid-column: 1 / -1;
+}
+
 .avatar-picker__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

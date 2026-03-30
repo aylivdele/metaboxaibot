@@ -169,13 +169,13 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
               onChange={handleSearchChange}
             />
             <div className="voice-picker__gender-btns">
-              {(["all", "male", "female"] as const).map((g) => (
+              {(["all", "Man", "Woman"] as const).map((g) => (
                 <button
                   key={g}
                   className={`voice-picker__gender-btn${genderFilter === g ? " voice-picker__gender-btn--active" : ""}`}
                   onClick={() => handleGenderChange(g)}
                 >
-                  {g === "all" ? "Все" : g === "male" ? "М" : "Ж"}
+                  {g === "all" ? "Все" : g === "Man" ? "М" : "Ж"}
                 </button>
               ))}
             </div>
@@ -210,17 +210,16 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
                 {!loading && avatars.length === 0 && (
                   <div className="voice-picker__empty">Аватары не найдены</div>
                 )}
+                {hasMore && (
+                  <button
+                    className="voice-picker__load-more avatar-picker__load-more"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? "Загрузка…" : "Загрузить ещё"}
+                  </button>
+                )}
               </div>
-
-              {hasMore && (
-                <button
-                  className="voice-picker__load-more"
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? "Загрузка…" : "Загрузить ещё"}
-                </button>
-              )}
             </>
           )}
         </>
