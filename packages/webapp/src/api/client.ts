@@ -55,6 +55,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       Record<string, unknown>;
     if (err.code) error.code = err.code;
     if (err.linkedTo) error.linkedTo = err.linkedTo;
+    if (err.siteMentor) error.siteMentor = err.siteMentor;
+    if (err.botMentor) error.botMentor = err.botMentor;
+    if (err.linkedEmail) error.linkedEmail = err.linkedEmail;
+    if (err.linkedUsername) error.linkedUsername = err.linkedUsername;
     throw error;
   }
 
