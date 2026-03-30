@@ -87,24 +87,30 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-input {
+input,
+textarea,
+select {
   background: var(--bg-secondary);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
   padding: 10px 14px;
-  font-size: 14px;
+  /* 16px prevents iOS Safari from auto-zooming on focus */
+  font-size: 16px;
   outline: none;
   width: 100%;
   transition:
     border-color 0.2s var(--ease),
     box-shadow 0.2s var(--ease);
 }
-input:focus {
+input:focus,
+textarea:focus,
+select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-lighter);
 }
-input::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: var(--text-hint);
 }
 

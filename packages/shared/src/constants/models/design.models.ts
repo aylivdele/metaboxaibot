@@ -492,7 +492,6 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       "5:4",
       "21:9",
       "9:21",
-      "custom",
     ],
     settings: [
       mkAspectRatio([
@@ -507,7 +506,6 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         "5:4",
         "21:9",
         "9:21",
-        "custom",
       ]),
       {
         key: "model",
@@ -563,11 +561,11 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         description: "Формат результирующего изображения.",
         type: "select",
         options: [
-          { value: "webp", label: "WebP" },
-          { value: "jpg", label: "JPG" },
           { value: "png", label: "PNG" },
+          { value: "jpg", label: "JPG" },
+          { value: "webp", label: "WebP" },
         ],
-        default: "webp",
+        default: "png",
       },
       {
         key: "output_quality",
@@ -679,8 +677,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       {
         key: "quality",
         label: "Качество",
-        description:
-          "low ($0.009–$0.013) — быстро, medium ($0.034–$0.05) — баланс, high ($0.133–$0.20) — максимум.",
+        description: "low — быстро, medium — баланс, high — максимум. Влияет на цену",
         type: "select",
         options: [
           { value: "low", label: "Low" },
@@ -794,11 +791,11 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         description: "Формат результирующего изображения.",
         type: "select",
         options: [
-          { value: "webp", label: "WebP" },
-          { value: "jpg", label: "JPG" },
           { value: "png", label: "PNG" },
+          { value: "jpg", label: "JPG" },
+          { value: "webp", label: "WebP" },
         ],
-        default: "webp",
+        default: "png",
       },
       {
         key: "seed",

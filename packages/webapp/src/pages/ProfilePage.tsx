@@ -16,7 +16,7 @@ export type ProfileTab = "overview" | "gallery";
 function formatTokens(value: string | number): string {
   const n = Number(value);
   const abs = Math.abs(n);
-  const sign = n < 0 ? "-" : "";
+  const sign = n < 0 ? "−" : "";
   if (abs === 0) return "0.00";
   if (abs >= 0.01) return sign + abs.toFixed(2);
   if (abs >= 0.001) return sign + abs.toFixed(3);
@@ -140,7 +140,7 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
                 <span className="tx-item__date">{new Date(tx.createdAt).toLocaleDateString()}</span>
               </div>
               <span className={`tx-item__amount tx-item__amount--${tx.type}`}>
-                {tx.type === "credit" ? "+" : "−"}
+                {tx.type === "credit" ? "+" : ""}
                 {formatTokens(tx.amount)}
               </span>
             </li>

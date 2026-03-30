@@ -16,12 +16,6 @@ import { logger } from "../logger.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
-const SECTION_EMOJI: Record<string, string> = {
-  design: "🎨",
-  video: "🎬",
-  audio: "🎵",
-};
-
 /**
  * Build localised cost line with optional min–max range.
  * Range is derived from costVariants or costMatrix when they differ.
@@ -136,8 +130,7 @@ async function sendModelActivatedNotification(
       : undefined;
 
   const costLine = buildActivationCostLine(model, modelSettings, t, defaultDuration);
-  const emoji = SECTION_EMOJI[section] ?? "🤖";
-  const text = `${emoji} ${model.name}\n\n${model.description}\n\n${costLine}`;
+  const text = `${model.name}\n\n${model.description}\n\n${costLine}`;
 
   const webappUrl = config.bot.webappUrl;
   const replyMarkup = webappUrl

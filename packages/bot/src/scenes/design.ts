@@ -361,7 +361,8 @@ export async function handleDesignRefSelect(ctx: BotContext): Promise<void> {
   }
   const messageId = ctx.callbackQuery!.data!.replace("design_ref_", "");
   await userStateService.setDesignRefMessage(ctx.user.id, messageId);
-  await ctx.answerCallbackQuery(ctx.t.design.refSelected);
+  await ctx.answerCallbackQuery();
+  await ctx.reply(ctx.t.design.photoSaved);
 }
 
 // ── Management — opens Mini App ───────────────────────────────────────────────

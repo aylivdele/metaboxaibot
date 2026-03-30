@@ -7,7 +7,7 @@ import { logCall } from "../../utils/fetch.js";
  * Models that accept a raw `aspect_ratio` string (e.g. "16:9") instead of
  * explicit width/height dimensions.
  */
-const DIRECT_ASPECT_RATIO_MODELS = new Set(["midjourney"]);
+const DIRECT_ASPECT_RATIO_MODELS = new Set(["midjourney", "stable-diffusion"]);
 
 /**
  * Maps modelId → Replicate model string.

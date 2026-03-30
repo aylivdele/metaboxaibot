@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
@@ -11,7 +11,7 @@ const COST_TABLE: Record<string, Record<string, number>> = {
 };
 
 /**
- * GPT Image adapter — uses OpenAI Responses API with image_generation tool.
+ * GPT Image adapter — uses OpenAI Images API.
  * Returns raw base64 data (no public URL) so generation.service uploads to S3.
  */
 export class GptImageAdapter implements ImageAdapter {
@@ -33,51 +33,65 @@ export class GptImageAdapter implements ImageAdapter {
     const background = ms.background as string | undefined;
     const moderation = ms.moderation as string | undefined;
 
-    const tool: Record<string, unknown> = {
-      type: "image_generation",
-      quality,
-      size,
-      output_format: outputFormat,
-    };
-    if (outputCompression !== undefined) tool.output_compression = outputCompression;
-    if (background && background !== "auto") tool.background = background;
-    if (moderation && moderation !== "auto") tool.moderation = moderation;
-
-    // When a source image is provided, include it as reference for editing/refining
-    const apiInput: unknown = input.imageUrl
-      ? [
-          { type: "input_image", image_url: input.imageUrl, detail: "high" },
-          { type: "input_text", text: input.prompt },
-        ]
-      : input.prompt;
-
-    logCall("gpt-image-1", "generate", {
+    logCall("gpt-image-1.5", input.imageUrl ? "edit" : "generate", {
       quality,
       size,
       output_format: outputFormat,
       has_image: !!input.imageUrl,
     });
-    const response = await (
-      this.client.responses.create as (p: unknown) => Promise<{
-        output: Array<{ type: string; result?: string }>;
-      }>
-    )({
-      model: "gpt-image-1",
-      input: apiInput,
-      tools: [tool],
-    });
 
-    const imageItem = response.output.find((item) => item.type === "image_generation_call");
-    if (!imageItem?.result) throw new Error("gpt-image: no image_generation_call in response");
+    const baseParams = {
+      model: "gpt-image-1" as const,
+      prompt: input.prompt,
+      n: 1 as const,
+      size: size as "1024x1024" | "1024x1536" | "1536x1024",
+      quality: quality as "low" | "medium" | "high",
+      output_format: outputFormat as "png" | "jpeg" | "webp",
+      ...(outputCompression !== undefined && { output_compression: outputCompression }),
+      response_format: "b64_json" as const,
+    };
 
-    const base64Data = imageItem.result;
+    let b64: string | null | undefined;
+
+    if (input.imageUrl) {
+      // Image-to-image via Images Edit API
+      const imgResp = await fetch(input.imageUrl);
+      if (!imgResp.ok) throw new Error(`Failed to fetch source image: ${imgResp.status}`);
+      const buffer = Buffer.from(await imgResp.arrayBuffer());
+      const imageFile = await toFile(buffer, "image.png", { type: "image/png" });
+
+      const response = await (
+        this.client.images.edit as (p: unknown) => Promise<{ data: Array<{ b64_json?: string }> }>
+      )({
+        ...baseParams,
+        image: imageFile,
+        ...(background && background !== "auto" && { background }),
+        ...(moderation && moderation !== "auto" && { moderation }),
+      });
+      b64 = response.data[0]?.b64_json;
+    } else {
+      // Text-to-image via Images Generate API
+      const response = await (
+        this.client.images.generate as (
+          p: unknown,
+        ) => Promise<{ data: Array<{ b64_json?: string }> }>
+      )({
+        ...baseParams,
+        ...(background && background !== "auto" && { background }),
+        ...(moderation && moderation !== "auto" && { moderation }),
+      });
+      b64 = response.data[0]?.b64_json;
+    }
+
+    if (!b64) throw new Error("gpt-image: no image data in response");
+
     const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
     const providerUsdCost = COST_TABLE[quality]?.[size] ?? COST_TABLE.medium["1024x1024"];
 
     return {
-      url: `data:image/${ext};base64,${base64Data}`,
+      url: `data:image/${ext};base64,${b64}`,
       filename: `gpt-image.${ext}`,
-      base64Data,
+      base64Data: b64,
       providerUsdCost,
     };
   }
