@@ -142,22 +142,44 @@ export class RecraftAdapter implements ImageAdapter {
       if (!imgResp.ok) throw new Error(`Failed to fetch source image: ${imgResp.status}`);
       const blob = await imgResp.blob();
 
-      if (blob.size > RECRAFT_IMG2IMG_MAX_BYTES) {
+      // Recraft imageToImage only accepts raster formats (PNG/JPEG/WebP)
+      const isSvgMime = blob.type === "image/svg+xml";
+      const isSvgUrl = input.imageUrl.split("?")[0].toLowerCase().endsWith(".svg");
+      if (isSvgMime || isSvgUrl) {
         throw new UserFacingError(
-          `Image is too large for Recraft img2img: ${(blob.size / 1024 / 1024).toFixed(1)} MB (max 5 MB).`,
+          "SVG is not supported as a reference image for Recraft img2img.",
+          {
+            key: "recraftImg2imgSvgUnsupported",
+          },
         );
+      }
+
+      if (blob.size > RECRAFT_IMG2IMG_MAX_BYTES) {
+        throw new UserFacingError("Reference image is too large for Recraft img2img.", {
+          key: "recraftImg2imgFileTooLarge",
+          params: {
+            sizeMb: (blob.size / 1024 / 1024).toFixed(1),
+            maxMb: (RECRAFT_IMG2IMG_MAX_BYTES / 1024 / 1024).toFixed(0),
+          },
+        });
       }
       const dims = await readImageDimensions(blob);
       if (dims) {
         if (dims.width > RECRAFT_IMG2IMG_MAX_DIM || dims.height > RECRAFT_IMG2IMG_MAX_DIM) {
-          throw new UserFacingError(
-            `Image dimensions ${dims.width}×${dims.height} exceed the Recraft img2img limit of ${RECRAFT_IMG2IMG_MAX_DIM}px per side.`,
-          );
+          throw new UserFacingError("Reference image dimensions too large for Recraft img2img.", {
+            key: "recraftImg2imgDimensionsTooLarge",
+            params: { width: dims.width, height: dims.height, max: RECRAFT_IMG2IMG_MAX_DIM },
+          });
         }
         if (dims.width * dims.height > RECRAFT_IMG2IMG_MAX_MP) {
-          throw new UserFacingError(
-            `Image resolution ${dims.width}×${dims.height} (${((dims.width * dims.height) / 1_000_000).toFixed(1)} MP) exceeds the Recraft img2img limit of 16 MP.`,
-          );
+          throw new UserFacingError("Reference image resolution too large for Recraft img2img.", {
+            key: "recraftImg2imgResolutionTooLarge",
+            params: {
+              width: dims.width,
+              height: dims.height,
+              mp: ((dims.width * dims.height) / 1_000_000).toFixed(1),
+            },
+          });
         }
       }
 

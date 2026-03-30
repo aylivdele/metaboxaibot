@@ -134,6 +134,14 @@ export default {
     fileTooLargeForTelegram: "Файл слишком большой для отправки через Telegram.",
     contentPolicyViolation:
       "❌ Запрос отклонён из-за нарушения политики допустимого использования. Измените запрос и попробуйте снова.",
+    recraftImg2imgSvgUnsupported:
+      "❌ SVG-изображения нельзя использовать как референс для Recraft img2img. Отправьте растровое изображение (PNG, JPEG или WebP).",
+    recraftImg2imgFileTooLarge:
+      "❌ Референсное изображение слишком большое ({sizeMb} МБ). Recraft img2img принимает файлы до {maxMb} МБ.",
+    recraftImg2imgDimensionsTooLarge:
+      "❌ Размер референсного изображения {width}×{height} пкс превышает лимит Recraft img2img в {max} пкс по одной стороне.",
+    recraftImg2imgResolutionTooLarge:
+      "❌ Разрешение референсного изображения {width}×{height} ({mp} МП) превышает лимит Recraft img2img в 16 МП.",
   },
   common: {
     backToMain: "🏠 В главное меню",

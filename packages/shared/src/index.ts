@@ -36,7 +36,7 @@ export { PLANS } from "./constants/plans.js";
 export type { Plan } from "./constants/plans.js";
 
 // Errors
-export { UserFacingError } from "./errors.js";
+export { UserFacingError, resolveUserFacingError } from "./errors.js";
 
 // Web token (URL-based auth for KeyboardButtonWebApp where initData is unavailable)
 export { generateWebToken, verifyWebToken } from "./webtoken.js";

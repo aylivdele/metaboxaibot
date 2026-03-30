@@ -18,6 +18,7 @@ import {
   config,
   generateWebToken,
   UserFacingError,
+  resolveUserFacingError,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -260,7 +261,7 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
     } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
       await replyInsufficientTokens(ctx);
     } else if (err instanceof UserFacingError) {
-      await ctx.reply(err.message);
+      await ctx.reply(resolveUserFacingError(err, ctx.t.errors));
     } else {
       logger.error(err, "Design message error");
       await ctx.reply(ctx.t.design.generationFailed);

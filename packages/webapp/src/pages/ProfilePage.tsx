@@ -14,11 +14,13 @@ export type ProfileTab = "overview" | "gallery";
  * < 0.001 → 4 decimal places  (e.g. 0.0003)
  */
 function formatTokens(value: string | number): string {
-  const n = Math.abs(Number(value));
-  if (n === 0) return "0.00";
-  if (n >= 0.01) return n.toFixed(2);
-  if (n >= 0.001) return n.toFixed(3);
-  return n.toFixed(4);
+  const n = Number(value);
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs === 0) return "0.00";
+  if (abs >= 0.01) return sign + abs.toFixed(2);
+  if (abs >= 0.001) return sign + abs.toFixed(3);
+  return sign + abs.toFixed(4);
 }
 
 const REASON_KEYS: Record<string, string> = {

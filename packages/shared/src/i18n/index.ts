@@ -111,6 +111,10 @@ export interface Translations {
     sendOriginalFailed: string;
     fileTooLargeForTelegram: string;
     contentPolicyViolation: string;
+    recraftImg2imgSvgUnsupported: string;
+    recraftImg2imgFileTooLarge: string;
+    recraftImg2imgDimensionsTooLarge: string;
+    recraftImg2imgResolutionTooLarge: string;
   };
   common: {
     backToMain: string;
