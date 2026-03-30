@@ -203,12 +203,12 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const user = await db.user.findUnique({
       where: { id: BigInt(telegramId) },
-      select: { tokenBalance: true },
+      select: { tokenBalance: true, subscriptionTokenBalance: true },
     });
     if (!user) {
       return reply.code(404).send({ error: "User not found" });
     }
-    return { tokens: Number(user.tokenBalance) };
+    return { tokens: Number(user.tokenBalance) + Number(user.subscriptionTokenBalance) };
   });
 
   /**

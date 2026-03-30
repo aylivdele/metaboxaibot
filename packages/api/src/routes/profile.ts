@@ -93,7 +93,7 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       role: user.role,
       metaboxUserId: user.metaboxUserId ?? null,
       metaboxReferralCode: user.metaboxReferralCode ?? null,
-      tokenBalance: user.tokenBalance.toString(),
+      tokenBalance: (Number(user.tokenBalance) + Number(user.subscriptionTokenBalance)).toString(),
       referralCount,
       createdAt: user.createdAt.toISOString(),
       subscription,
