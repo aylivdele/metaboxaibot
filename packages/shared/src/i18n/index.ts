@@ -115,6 +115,7 @@ export interface Translations {
     recraftImg2imgFileTooLarge: string;
     recraftImg2imgDimensionsTooLarge: string;
     recraftImg2imgResolutionTooLarge: string;
+    gptImageModerationBlocked: string;
   };
   common: {
     backToMain: string;

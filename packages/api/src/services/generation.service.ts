@@ -7,6 +7,19 @@ import { buildS3Key, sectionMeta, uploadFromUrl, uploadBuffer, getFileUrl } from
 import { dialogService } from "./dialog.service.js";
 import { userStateService } from "./user-state.service.js";
 
+/** Parse megapixels from modelSettings.size ("WxH") or width/height fields. */
+function parseMegapixels(modelSettings: Record<string, unknown>): number | undefined {
+  const size = modelSettings.size as string | undefined;
+  if (size) {
+    const [w, h] = size.split("x").map(Number);
+    if (w && h) return (w * h) / 1_000_000;
+  }
+  const w = modelSettings.width as number | undefined;
+  const h = modelSettings.height as number | undefined;
+  if (w && h) return (w * h) / 1_000_000;
+  return undefined;
+}
+
 export interface SubmitImageParams {
   userId: bigint;
   modelId: string;
@@ -113,9 +126,10 @@ export const generationService = {
           },
         });
 
+        const outputMegapixels = parseMegapixels(modelSettings);
         await deductTokens(
           userId,
-          result.providerUsdCost ?? calculateCost(model, 0, 0, undefined, undefined, modelSettings),
+          calculateCost(model, 0, 0, outputMegapixels, undefined, modelSettings),
           modelId,
         );
 

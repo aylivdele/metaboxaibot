@@ -522,9 +522,9 @@ const translations = {
 
     // Image settings
     "imageSettings.title": "Настройки изображений",
-    "imageSettings.subtitle": "Соотношение сторон для каждой модели",
+    "imageSettings.subtitle": "Выбор и настройка модели и ее версий",
     "imageSettings.model": "Модель",
-    "imageSettings.noSupport": "Эта модель не поддерживает выбор соотношения сторон",
+    "imageSettings.noSupport": "Эта модель не поддерживает настройки",
     "imageSettings.saved": "✓ Сохранено",
     "imageSettings.active": "Активна",
     "imageSettings.activate": "Активировать",
@@ -541,7 +541,7 @@ const translations = {
 
     // Video settings
     "videoSettings.title": "Настройки видео",
-    "videoSettings.subtitle": "Соотношение сторон и длительность для каждой модели",
+    "videoSettings.subtitle": "Выбор и настройка модели и ее версий",
     "videoSettings.model": "Модель",
     "videoSettings.aspectRatio": "Соотношение сторон",
     "videoSettings.duration": "Длительность",

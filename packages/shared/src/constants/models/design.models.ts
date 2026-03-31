@@ -764,17 +764,6 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         default: "",
       },
       {
-        key: "cfg",
-        label: "Следование промпту (CFG)",
-        description:
-          "Насколько строго ИИ следует тексту. Высокие значения — буквально, низкие — с творческой интерпретацией.",
-        type: "slider",
-        min: 1,
-        max: 10,
-        step: 0.5,
-        default: 5,
-      },
-      {
         key: "prompt_strength",
         label: "Сила промпта (img2img)",
         description:
@@ -791,11 +780,11 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         description: "Формат результирующего изображения.",
         type: "select",
         options: [
-          { value: "png", label: "PNG" },
-          { value: "jpg", label: "JPG" },
           { value: "webp", label: "WebP" },
+          { value: "png", label: "PNG" },
+          { value: "jpeg", label: "JPEG" },
         ],
-        default: "png",
+        default: "webp",
       },
       {
         key: "seed",

@@ -142,6 +142,8 @@ export default {
       "❌ Размер референсного изображения {width}×{height} пкс превышает лимит Recraft img2img в {max} пкс по одной стороне.",
     recraftImg2imgResolutionTooLarge:
       "❌ Разрешение референсного изображения {width}×{height} ({mp} МП) превышает лимит Recraft img2img в 16 МП.",
+    gptImageModerationBlocked:
+      "❌ Запрос отклонён системой безопасности. Нарушения: {violations}. Измените запрос и попробуйте снова.",
   },
   common: {
     backToMain: "🏠 В главное меню",

@@ -190,7 +190,12 @@ export function calculateCost(
     addonCost +
     (inputTokens * inputCostPerMToken) / 1_000_000 +
     (outputTokens * outputCostPerMToken) / 1_000_000;
-  return (providerUsdCost / config.billing.usdPerToken) * config.billing.targetMargin;
+  return usdToTokens(providerUsdCost);
+}
+
+/** Convert a USD cost to internal tokens using the billing config. */
+export function usdToTokens(usd: number): number {
+  return (usd / config.billing.usdPerToken) * config.billing.targetMargin;
 }
 
 /**

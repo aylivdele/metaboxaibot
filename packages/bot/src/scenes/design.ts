@@ -338,7 +338,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
       if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
         await replyInsufficientTokens(ctx);
       } else if (err instanceof UserFacingError) {
-        await ctx.reply(err.message);
+        await ctx.reply(resolveUserFacingError(err, ctx.t.errors));
       } else {
         logger.error(err, "Design photo+caption error");
         await ctx.reply(ctx.t.design.generationFailed);
