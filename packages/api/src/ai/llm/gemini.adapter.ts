@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, type Content } from "@google/generative-ai";
+import { GoogleGenAI, type Content, type GenerateContentResponse, type Part } from "@google/genai";
 import type {
   LLMAdapter,
   LLMInput,
@@ -7,7 +7,7 @@ import type {
   StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
-import { fetchWithLog } from "../../utils/fetch.js";
+import { fetchWithLog, logCall } from "../../utils/fetch.js";
 
 const MODEL_MAP: Record<string, string> = {
   "gemini-2-flash": "gemini-2.5-flash",
@@ -25,7 +25,7 @@ export class GeminiAdapter implements LLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
 
-  private genai: GoogleGenerativeAI;
+  private ai: GoogleGenAI;
   private apiModel: string;
 
   constructor(
@@ -33,7 +33,7 @@ export class GeminiAdapter implements LLMAdapter {
     contextMaxMessages = 50,
     apiKey = config.ai.google,
   ) {
-    this.genai = new GoogleGenerativeAI(apiKey!);
+    this.ai = new GoogleGenAI({ apiKey: apiKey! });
     this.apiModel = MODEL_MAP[modelId] ?? modelId;
     this.contextMaxMessages = contextMaxMessages;
   }
@@ -47,28 +47,27 @@ export class GeminiAdapter implements LLMAdapter {
   }
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
-    const model = this.genai.getGenerativeModel({
-      model: this.apiModel,
-      ...(input.systemPrompt ? { systemInstruction: input.systemPrompt } : {}),
-      generationConfig: {
-        ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
-        ...(input.maxTokens !== undefined ? { maxOutputTokens: input.maxTokens } : {}),
-        ...(input.thinkingBudget !== undefined
-          ? { thinkingConfig: { thinkingBudget: input.thinkingBudget } }
-          : {}),
-      } as Record<string, unknown>,
-    });
-
     const history: Content[] = (input.history ?? []).map((m: MessageRecord) => ({
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],
     }));
 
-    const chat = model.startChat({ history });
+    const chat = this.ai.chats.create({
+      model: this.apiModel,
+      history,
+      config: {
+        ...(input.systemPrompt ? { systemInstruction: input.systemPrompt } : {}),
+        ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+        ...(input.maxTokens !== undefined ? { maxOutputTokens: input.maxTokens } : {}),
+        ...(input.thinkingBudget !== undefined
+          ? { thinkingConfig: { thinkingBudget: input.thinkingBudget } }
+          : {}),
+      },
+    });
 
     const urls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
 
-    const userParts: Content["parts"] = urls.length
+    const userParts: Part[] = urls.length
       ? [
           ...(input.prompt ? [{ text: input.prompt }] : []),
           ...(await Promise.all(
@@ -82,14 +81,26 @@ export class GeminiAdapter implements LLMAdapter {
         ]
       : [{ text: input.prompt }];
 
-    const result = await chat.sendMessageStream(userParts);
-    for await (const chunk of result.stream) {
-      const text = chunk.text();
+    logCall(this.apiModel, "chatStream", {
+      systemPrompt: input.systemPrompt,
+      temperature: input.temperature,
+      maxTokens: input.maxTokens,
+      thinkingBudget: input.thinkingBudget,
+      historyLength: history.length,
+      imageCount: urls.length,
+    });
+
+    const stream = await chat.sendMessageStream({ message: userParts });
+
+    let lastChunk: GenerateContentResponse | undefined;
+
+    for await (const chunk of stream) {
+      lastChunk = chunk;
+      const text = chunk.text;
       if (text) yield text;
     }
 
-    const aggregated = await result.response;
-    const usage = aggregated.usageMetadata;
+    const usage = lastChunk?.usageMetadata;
     return {
       inputTokensUsed: usage?.promptTokenCount ?? 0,
       outputTokensUsed: usage?.candidatesTokenCount ?? 0,

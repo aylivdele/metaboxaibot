@@ -137,7 +137,7 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     name: "📽️ Veo 3",
     section: "video",
     description:
-      "Видео от Google со звуком и голосами. Standard — максимальное качество, Fast — быстрее и дешевле. Поддерживает фото/видео как референс.",
+      "Видео от Google со звуком и голосами. Standard — максимальное качество, Fast — быстрее и дешевле. Поддерживает фото как референс.",
     defaultModelId: "veo-fast",
     members: [
       { modelId: "veo-fast", variantLabel: "Fast" },

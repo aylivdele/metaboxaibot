@@ -1,103 +1,81 @@
+import {
+  GoogleGenAI,
+  type GenerateVideosOperation,
+  type GenerateVideosParameters,
+} from "@google/genai";
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
-import { fetchWithLog } from "../../utils/fetch.js";
-
-const BASE = "https://generativelanguage.googleapis.com/v1beta";
+import { fetchWithLog, logCall } from "../../utils/fetch.js";
 
 const API_MODELS: Record<string, string> = {
   veo: "veo-3.0-generate-001",
   "veo-fast": "veo-3.0-fast-generate-001",
 };
 
-interface VeoOperation {
-  name: string;
-  done?: boolean;
-  response?: {
-    generateVideoResponse?: {
-      generatedSamples?: Array<{
-        video?: { uri?: string; encoding?: string };
-      }>;
-    };
-  };
-  error?: { code: number; message: string };
-}
-
 /**
- * Google Veo 3 adapter — Gemini API (predictLongRunning + operation polling).
+ * Google Veo 3 adapter — @google/genai SDK (generateVideos + getVideosOperation).
  *
  * referenceImages and video are passed via input.imageUrl (user sends a photo/video in chat).
  * aspectRatio, durationSeconds, personGeneration, resolution are configured in the mini-app.
  */
 export class VeoAdapter implements VideoAdapter {
   readonly modelId: string;
+  private readonly ai: GoogleGenAI;
   private readonly apiKey: string;
   private readonly apiModel: string;
 
   constructor(modelId = "veo", apiKey = config.ai.google ?? "") {
     this.modelId = modelId;
     this.apiKey = apiKey;
+    this.ai = new GoogleGenAI({ apiKey });
     this.apiModel = API_MODELS[modelId] ?? API_MODELS["veo"];
-  }
-
-  private headers() {
-    return {
-      "Content-Type": "application/json",
-      "x-goog-api-key": this.apiKey,
-    };
   }
 
   async submit(input: VideoInput): Promise<string> {
     const ms = input.modelSettings ?? {};
 
-    const instance: Record<string, unknown> = { prompt: input.prompt };
+    const params: GenerateVideosParameters = {
+      model: this.apiModel,
+      prompt: input.prompt,
+      config: {
+        generateAudio: true,
+        ...(input.aspectRatio ? { aspectRatio: input.aspectRatio } : {}),
+        ...(input.duration ? { durationSeconds: input.duration } : {}),
+        ...(ms.person_generation ? { personGeneration: String(ms.person_generation) } : {}),
+        ...(ms.resolution ? { resolution: String(ms.resolution) } : {}),
+        ...(ms.negative_prompt ? { negativePrompt: String(ms.negative_prompt) } : {}),
+      },
+    };
 
-    // Reference image or video passed by the user alongside the prompt
     if (input.imageUrl) {
-      // Detect video by extension; everything else is treated as a first-frame image
       const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(input.imageUrl);
       if (isVideo) {
-        instance.video = { fileUri: input.imageUrl };
+        params.video = { uri: input.imageUrl };
       } else {
-        // Gemini API requires image as inlineData — download and encode as base64
-        const imgResp = await fetch(input.imageUrl);
+        const imgResp = await fetchWithLog(input.imageUrl);
         if (!imgResp.ok) throw new Error(`Veo: failed to fetch reference image: ${imgResp.status}`);
         const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
         const mimeType = imgResp.headers.get("content-type") ?? "image/jpeg";
-        instance.image = {
-          inlineData: {
-            mimeType,
-            data: imgBuffer.toString("base64"),
-          },
+        params.image = {
+          imageBytes: imgBuffer.toString("base64"),
+          mimeType,
         };
       }
     }
 
-    const parameters: Record<string, unknown> = {
-      generateAudio: true,
-    };
-    if (input.aspectRatio) parameters.aspectRatio = input.aspectRatio;
-    if (input.duration) parameters.durationSeconds = input.duration;
-    if (ms.person_generation) parameters.personGeneration = ms.person_generation;
-    if (ms.resolution) parameters.resolution = ms.resolution;
-    if (ms.negative_prompt) parameters.negativePrompt = ms.negative_prompt;
+    logCall(this.apiModel, "generateVideos", {
+      prompt: input.prompt,
+      aspectRatio: input.aspectRatio,
+      duration: input.duration,
+      personGeneration: ms.person_generation,
+      resolution: ms.resolution,
+      negativePrompt: ms.negative_prompt,
+      hasImage: !!input.imageUrl,
+    });
 
-    const res = await fetchWithLog(
-      `${BASE}/models/${this.apiModel}:predictLongRunning?key=${this.apiKey}`,
-      {
-        method: "POST",
-        headers: this.headers(),
-        body: JSON.stringify({ instances: [instance], parameters }),
-      },
-    );
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Veo submit failed: ${res.status} ${text}`);
-    }
-
-    const op = (await res.json()) as VeoOperation;
-    if (!op.name) throw new Error("Veo: no operation name in response");
-    return op.name;
+    const operation = await this.ai.models.generateVideos(params);
+    if (!operation.name) throw new Error("Veo: no operation name in response");
+    return operation.name;
   }
 
   async fetchBuffer(url: string): Promise<Buffer> {
@@ -107,22 +85,16 @@ export class VeoAdapter implements VideoAdapter {
   }
 
   async poll(operationName: string): Promise<VideoResult | null> {
-    const res = await fetchWithLog(`${BASE}/${operationName}?key=${this.apiKey}`, {
-      headers: this.headers(),
+    logCall(this.apiModel, "getVideosOperation", { operationName });
+
+    const operation = await this.ai.operations.getVideosOperation({
+      operation: { name: operationName } as GenerateVideosOperation,
     });
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Veo poll failed: ${res.status} ${text}`);
-    }
+    if (operation.error) throw new Error(`Veo operation error: ${JSON.stringify(operation.error)}`);
+    if (!operation.done) return null;
 
-    const op = (await res.json()) as VeoOperation;
-
-    if (op.error) throw new Error(`Veo operation error: ${op.error.message}`);
-    if (!op.done) return null;
-
-    const sample = op.response?.generateVideoResponse?.generatedSamples?.[0];
-    const uri = sample?.video?.uri;
+    const uri = operation.response?.generatedVideos?.[0]?.video?.uri;
     if (!uri) throw new Error("Veo: no video URI in completed operation");
     return { url: uri, filename: "veo.mp4" };
   }
