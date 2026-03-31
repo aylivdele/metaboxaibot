@@ -202,24 +202,34 @@ export function usdToTokens(usd: number): number {
  * Compute video tokens for per-video-token billing models (e.g. Seedance).
  * videoTokens = (width × height × fps × duration) / 1024
  *
- * Resolution is derived from the aspect ratio using the model's typical output resolution.
+ * Prefer actual dimensions (parsed from the generated MP4) over aspect-ratio estimates.
  */
 export function computeVideoTokens(
   model: AIModel,
   aspectRatio: string | undefined,
   duration: number,
+  actualWidth?: number,
+  actualHeight?: number,
 ): number {
   if (!model.videoFps) return 0;
 
-  // Typical output resolution per aspect ratio for video-token models
-  const RESOLUTION: Record<string, [number, number]> = {
-    "16:9": [1280, 720],
-    "9:16": [720, 1280],
-    "1:1": [720, 720],
-    "4:3": [960, 720],
-    "3:4": [720, 960],
-  };
+  let w: number;
+  let h: number;
 
-  const [w, h] = RESOLUTION[aspectRatio ?? "16:9"] ?? [1280, 720];
+  if (actualWidth && actualHeight) {
+    w = actualWidth;
+    h = actualHeight;
+  } else {
+    // Fallback: estimate from aspect ratio at the model's default resolution
+    const RESOLUTION: Record<string, [number, number]> = {
+      "16:9": [1280, 720],
+      "9:16": [720, 1280],
+      "1:1": [720, 720],
+      "4:3": [960, 720],
+      "3:4": [720, 960],
+    };
+    [w, h] = RESOLUTION[aspectRatio ?? "16:9"] ?? [1280, 720];
+  }
+
   return (w * h * (model.videoFps ?? 30) * duration) / 1024;
 }

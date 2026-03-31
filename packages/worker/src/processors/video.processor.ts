@@ -8,7 +8,7 @@ import { buildS3Key, sectionMeta, uploadBuffer, getFileUrl } from "@metabox/api/
 import { generateDownloadToken } from "@metabox/api/utils/download-token";
 import { InputFile } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
-import { parseMp4Duration } from "@metabox/api/utils/mp4-duration";
+import { parseMp4Info } from "@metabox/api/utils/mp4-duration";
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT } from "@metabox/shared";
 
@@ -46,10 +46,10 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
   const adapter = createVideoAdapter(modelId);
 
   try {
-    // On retry: if generation already completed, skip submit/poll
+    // On retry: resume from the furthest completed stage
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
-      select: { outputUrl: true, s3Key: true },
+      select: { outputUrl: true, s3Key: true, providerJobId: true },
     });
 
     let outputUrl: string;
@@ -57,20 +57,34 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     let videoBuffer: Buffer | null = null;
 
     if (existingJob?.outputUrl) {
+      // Stage 3 already done — skip submit + poll
       logger.info({ dbJobId }, "Generation already done, skipping to send");
       outputUrl = existingJob.outputUrl;
       s3Key = existingJob.s3Key ?? null;
     } else {
-      const providerJobId = await adapter.submit({
-        prompt,
-        imageUrl,
-        aspectRatio,
-        duration,
-        modelSettings,
-        userId: BigInt(userIdStr),
-      });
-      logger.info({ dbJobId, modelId, providerJobId }, "Submitted video generation task");
+      // Stage 1: submit (or resume with saved providerJobId)
+      let providerJobId: string;
+      if (existingJob?.providerJobId) {
+        providerJobId = existingJob.providerJobId;
+        logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
+      } else {
+        providerJobId = await adapter.submit({
+          prompt,
+          imageUrl,
+          aspectRatio,
+          duration,
+          modelSettings,
+          userId: BigInt(userIdStr),
+        });
+        logger.info({ dbJobId, modelId, providerJobId }, "Submitted video generation task");
+        // Persist providerJobId immediately so poll can resume if worker restarts
+        await db.generationJob.update({
+          where: { id: dbJobId },
+          data: { providerJobId },
+        });
+      }
 
+      // Stage 2: poll
       let videoResult = null;
       for (let i = 0; i < MAX_POLLS; i++) {
         await sleep(POLL_INTERVAL_MS);
@@ -84,9 +98,11 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
       const { ext, contentType } = sectionMeta("video");
 
-      // Fetch video to buffer — needed for S3 upload and duration detection.
+      // Fetch video to buffer — needed for S3 upload, duration and resolution detection.
       // Use adapter.fetchBuffer when available (e.g. Veo URLs require auth).
       let actualDuration: number | null = null;
+      let actualWidth: number | null = null;
+      let actualHeight: number | null = null;
       try {
         const buf = adapter.fetchBuffer
           ? await adapter.fetchBuffer(videoResult.url)
@@ -96,9 +112,12 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
                 : Promise.reject(new Error(`HTTP ${r.status}`)),
             );
         videoBuffer = buf;
-        actualDuration = parseMp4Duration(buf);
+        const info = parseMp4Info(buf);
+        actualDuration = info.duration;
+        actualWidth = info.width;
+        actualHeight = info.height;
       } catch {
-        // non-fatal: fall back to estimated duration
+        // non-fatal: fall back to estimated duration/resolution
       }
 
       s3Key = videoBuffer
@@ -120,7 +139,13 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       if (model) {
         const effectiveDuration = actualDuration ?? duration ?? 5;
         const videoTokens = model.costUsdPerMVideoToken
-          ? computeVideoTokens(model, aspectRatio, effectiveDuration)
+          ? computeVideoTokens(
+              model,
+              aspectRatio,
+              effectiveDuration,
+              actualWidth ?? undefined,
+              actualHeight ?? undefined,
+            )
           : undefined;
         await deductTokens(
           BigInt(userIdStr),

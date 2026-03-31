@@ -45,30 +45,44 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
   const adapter = createImageAdapter(modelId);
 
   try {
-    // On retry: check if generation already completed and skip re-submitting to provider
+    // On retry: resume from the furthest completed stage
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
-      select: { outputUrl: true, s3Key: true },
+      select: { outputUrl: true, s3Key: true, providerJobId: true },
     });
 
     let outputUrl: string;
     let s3Key: string | null;
 
     if (existingJob?.outputUrl) {
-      // Generation succeeded on a previous attempt — skip submit/poll
+      // Stage 3 already done — skip submit + poll
       logger.info({ dbJobId }, "Generation already done, skipping to send");
       outputUrl = existingJob.outputUrl;
       s3Key = existingJob.s3Key ?? null;
     } else {
       if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
-      const providerJobId = await adapter.submit({
-        prompt,
-        negativePrompt,
-        imageUrl: job.data.sourceImageUrl,
-        aspectRatio,
-        modelSettings,
-      });
 
+      // Stage 1: submit (or resume with saved providerJobId)
+      let providerJobId: string;
+      if (existingJob?.providerJobId) {
+        providerJobId = existingJob.providerJobId;
+        logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
+      } else {
+        providerJobId = await adapter.submit({
+          prompt,
+          negativePrompt,
+          imageUrl: job.data.sourceImageUrl,
+          aspectRatio,
+          modelSettings,
+        });
+        // Persist providerJobId immediately so poll can resume if worker restarts
+        await db.generationJob.update({
+          where: { id: dbJobId },
+          data: { providerJobId },
+        });
+      }
+
+      // Stage 2: poll
       let imageResult = null;
       for (let i = 0; i < MAX_POLLS; i++) {
         await sleep(POLL_INTERVAL_MS);
