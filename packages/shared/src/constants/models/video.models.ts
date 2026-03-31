@@ -274,10 +274,10 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
-    durationRange: { min: 5, max: 8 },
+    supportedDurations: [6, 8],
     settings: [
       mkAspectRatio(["16:9", "9:16"]),
-      mkDurationSelect([5, 6, 7, 8]),
+      mkDurationSelect([6, 8]),
       {
         key: "resolution",
         label: "Разрешение",
@@ -336,10 +336,10 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
-    durationRange: { min: 5, max: 8 },
+    supportedDurations: [6, 8],
     settings: [
       mkAspectRatio(["16:9", "9:16"]),
-      mkDurationSelect([5, 6, 7, 8]),
+      mkDurationSelect([6, 8]),
       {
         key: "resolution",
         label: "Разрешение",

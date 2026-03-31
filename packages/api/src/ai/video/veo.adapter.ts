@@ -53,18 +53,28 @@ export class VeoAdapter implements VideoAdapter {
 
     // Reference image or video passed by the user alongside the prompt
     if (input.imageUrl) {
-      // Detect video by extension; everything else is treated as a reference image
+      // Detect video by extension; everything else is treated as a first-frame image
       const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(input.imageUrl);
       if (isVideo) {
         instance.video = { fileUri: input.imageUrl };
       } else {
-        instance.referenceImages = [
-          { referenceType: "REFERENCE_TYPE_STYLE", referenceImage: { fileUri: input.imageUrl } },
-        ];
+        // Gemini API requires image as inlineData — download and encode as base64
+        const imgResp = await fetch(input.imageUrl);
+        if (!imgResp.ok) throw new Error(`Veo: failed to fetch reference image: ${imgResp.status}`);
+        const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+        const mimeType = imgResp.headers.get("content-type") ?? "image/jpeg";
+        instance.image = {
+          inlineData: {
+            mimeType,
+            data: imgBuffer.toString("base64"),
+          },
+        };
       }
     }
 
-    const parameters: Record<string, unknown> = {};
+    const parameters: Record<string, unknown> = {
+      generateAudio: true,
+    };
     if (input.aspectRatio) parameters.aspectRatio = input.aspectRatio;
     if (input.duration) parameters.durationSeconds = input.duration;
     if (ms.person_generation) parameters.personGeneration = ms.person_generation;
