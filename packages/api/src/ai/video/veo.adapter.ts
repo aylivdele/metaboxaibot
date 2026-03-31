@@ -64,9 +64,7 @@ export class VeoAdapter implements VideoAdapter {
       }
     }
 
-    const parameters: Record<string, unknown> = {
-      numberOfVideos: 1,
-    };
+    const parameters: Record<string, unknown> = {};
     if (input.aspectRatio) parameters.aspectRatio = input.aspectRatio;
     if (input.duration) parameters.durationSeconds = input.duration;
     if (ms.person_generation) parameters.personGeneration = ms.person_generation;
