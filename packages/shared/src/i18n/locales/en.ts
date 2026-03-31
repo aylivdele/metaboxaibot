@@ -106,6 +106,8 @@ export default {
       "📸 Optionally send a photo with a face — it will become the avatar.\n✉️ Then send the text to be spoken.\n🎬 You can also send a driver video to control face movements.\n⚙ Voice and other settings are available on the Management page.",
     hintHiggsfield:
       "📸 Send a photo to create an animation.\nYou can also pick several motion presets in Management section of Mini App.\n✉️ Once ready — send a text describing a video you want to generate.",
+    higgsfieldRequiresImage:
+      "❌ Higgsfield requires an image to generate video. Please send a photo first, then your text prompt.",
     hintVideoDefault:
       "✉️ Send a text prompt to generate a video.\n🖼 Optionally attach an image — the video will start from it.",
     videoPhotoSaved: "📸 Photo saved. Now send the text for voice-over.",

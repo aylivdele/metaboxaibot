@@ -150,6 +150,13 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
 
   const prompt = ctx.message.text;
 
+  // Higgsfield DoP is image-to-video only — reject text-only requests
+  const HIGGSFIELD_MODELS = new Set(["higgsfield-lite", "higgsfield", "higgsfield-preview"]);
+  if (HIGGSFIELD_MODELS.has(modelId) && !imageUrl) {
+    await ctx.reply(ctx.t.video.higgsfieldRequiresImage);
+    return;
+  }
+
   const pendingMsg = await ctx.reply(ctx.t.video.queuing);
 
   try {

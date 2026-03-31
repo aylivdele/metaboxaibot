@@ -12,8 +12,9 @@ const DOP_MODEL: Record<string, string> = {
 
 interface HiggsFieldStatus {
   status: "queued" | "in_progress" | "nsfw" | "failed" | "completed" | "canceled";
-  video?: { url: string };
-  error?: string;
+  request_id: string;
+  status_url: string;
+  cancel_url: string;
 }
 
 /**
@@ -74,7 +75,7 @@ export class HiggsFieldAdapter implements VideoAdapter {
       throw new Error(`Higgsfield submit failed: ${res.status} ${text}`);
     }
 
-    const data = (await res.json()) as { request_id: string };
+    const data = (await res.json()) as HiggsFieldStatus;
     return data.request_id;
   }
 
@@ -91,11 +92,11 @@ export class HiggsFieldAdapter implements VideoAdapter {
     const data = (await res.json()) as HiggsFieldStatus;
 
     if (data.status === "failed" || data.status === "nsfw" || data.status === "canceled") {
-      throw new Error(`Higgsfield generation failed: ${data.error ?? data.status}`);
+      throw new Error(`Higgsfield generation failed: ${JSON.stringify(data)}`);
     }
     if (data.status !== "completed") return null;
 
-    const url = data.video?.url;
+    const url = data.status_url;
     if (!url)
       throw new Error(`Higgsfield: no video URL in completed generation: ${JSON.stringify(data)}`);
     return { url, filename: "higgsfield.mp4" };
