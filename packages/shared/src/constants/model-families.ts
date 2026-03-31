@@ -76,6 +76,20 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     ],
   },
 
+  imagen: {
+    id: "imagen",
+    name: "🔮 Imagen 4",
+    section: "design",
+    description:
+      "Модели генерации изображений от Google. Высокая фотореалистичность и точное следование текстовым описаниям. Fast — быстро и дёшево, Standard — баланс, Ultra — максимальное качество.",
+    defaultModelId: "imagen-4",
+    members: [
+      { modelId: "imagen-4-fast", versionLabel: "4", variantLabel: "Fast" },
+      { modelId: "imagen-4", versionLabel: "4", variantLabel: "Standard" },
+      { modelId: "imagen-4-ultra", versionLabel: "4", variantLabel: "Ultra" },
+    ],
+  },
+
   seedream: {
     id: "seedream",
     name: "🛍️ Seedream",

@@ -7,7 +7,13 @@ import { logCall } from "../../utils/fetch.js";
  * Models that accept a raw `aspect_ratio` string (e.g. "16:9") instead of
  * explicit width/height dimensions.
  */
-const DIRECT_ASPECT_RATIO_MODELS = new Set(["midjourney", "stable-diffusion"]);
+const DIRECT_ASPECT_RATIO_MODELS = new Set([
+  "midjourney",
+  "stable-diffusion",
+  "imagen-4",
+  "imagen-4-fast",
+  "imagen-4-ultra",
+]);
 
 /**
  * Maps modelId → Replicate model string.
@@ -22,6 +28,9 @@ const MODEL_IDS: Record<string, string> = {
   "ideogram-turbo": "ideogram-ai/ideogram-v3-turbo",
   midjourney:
     "adminconteudosflix/midjourney-allcraft:40ab9b32cc4584bc069e22027fffb97e79ed550d4e7c20ed6d5d7ef89e8f08f5",
+  "imagen-4-fast": "google/imagen-4-fast",
+  "imagen-4": "google/imagen-4",
+  "imagen-4-ultra": "google/imagen-4-ultra",
 };
 
 /** Ideogram model IDs — accept `style_reference_images` array instead of `image`. */
@@ -92,6 +101,8 @@ export class ReplicateAdapter implements ImageAdapter {
     if (ms.disable_safety_checker !== undefined)
       msExtras.disable_safety_checker = ms.disable_safety_checker;
     if (ms.model) msExtras.model = ms.model;
+    if (ms.image_size) msExtras.image_size = ms.image_size;
+    if (ms.safety_filter_level) msExtras.safety_filter_level = ms.safety_filter_level;
 
     const useDirectAspectRatio =
       DIRECT_ASPECT_RATIO_MODELS.has(this.modelId) || IDEOGRAM_MODELS.has(this.modelId);

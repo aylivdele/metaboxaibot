@@ -816,7 +816,6 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     provider: "openai",
     // Base: standard 1024×1024. Exact cost = quality × size (see costMatrix).
     costUsdPerRequest: 0.04,
-    costVariants: { settingKey: "quality", map: { standard: 0.04, hd: 0.08 } },
     costMatrix: {
       dims: ["quality", "aspect_ratio"],
       table: {
@@ -976,15 +975,17 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     ],
     settings: IDEOGRAM_SETTINGS,
   },
-  "imagen-4": {
-    id: "imagen-4",
-    name: "🔮 Imagen 4",
+  "imagen-4-fast": {
+    id: "imagen-4-fast",
+    name: "🔮 Imagen 4 Fast",
     description:
-      "Новая модель генерации изображений от Google. Высокая фотореалистичность и точное следование текстовым описаниям.",
+      "Быстрая версия Imagen 4 от Google. Высокая фотореалистичность и точное следование текстовым описаниям при минимальном времени ожидания.",
     section: "design",
     provider: "google",
-    costUsdPerRequest: 0.04, // default: standard tier; fast=$0.02, ultra=$0.06
-    costVariants: { settingKey: "mode", map: { fast: 0.02, standard: 0.04, ultra: 0.06 } },
+    familyId: "imagen",
+    versionLabel: "4",
+    variantLabel: "Fast",
+    costUsdPerRequest: 0.02,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
@@ -997,17 +998,146 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     settings: [
       mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
       {
-        key: "mode",
-        label: "Качество / скорость",
-        description:
-          "fast — быстро и дёшево, standard — стандарт, ultra — максимальное разрешение до 2.8K. Влияет на цену.",
+        key: "output_format",
+        label: "Формат",
+        description: "Формат результирующего изображения.",
         type: "select",
         options: [
-          { value: "fast", label: "Fast" },
-          { value: "standard", label: "Standard" },
-          { value: "ultra", label: "Ultra" },
+          { value: "jpg", label: "JPG" },
+          { value: "png", label: "PNG" },
         ],
-        default: "standard",
+        default: "jpg",
+      },
+      {
+        key: "safety_filter_level",
+        label: "Фильтр безопасности",
+        description:
+          "block_only_high — наиболее мягкий, block_medium_and_above — средний, block_low_and_above — строгий.",
+        type: "select",
+        options: [
+          { value: "block_only_high", label: "Мягкий" },
+          { value: "block_medium_and_above", label: "Средний" },
+          { value: "block_low_and_above", label: "Строгий" },
+        ],
+        default: "block_only_high",
+      },
+    ],
+  },
+  "imagen-4": {
+    id: "imagen-4",
+    name: "🔮 Imagen 4",
+    description:
+      "Стандартная версия Imagen 4 от Google. Высокая фотореалистичность и точное следование текстовым описаниям.",
+    section: "design",
+    provider: "google",
+    familyId: "imagen",
+    versionLabel: "4",
+    variantLabel: "Standard",
+    costUsdPerRequest: 0.04,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: false,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      {
+        key: "image_size",
+        label: "Разрешение",
+        description: "1K — стандартное разрешение, 2K — повышенное. Влияет на время генерации.",
+        type: "select",
+        options: [
+          { value: "1K", label: "1K" },
+          { value: "2K", label: "2K" },
+        ],
+        default: "1K",
+      },
+      {
+        key: "output_format",
+        label: "Формат",
+        description: "Формат результирующего изображения.",
+        type: "select",
+        options: [
+          { value: "jpg", label: "JPG" },
+          { value: "png", label: "PNG" },
+        ],
+        default: "jpg",
+      },
+      {
+        key: "safety_filter_level",
+        label: "Фильтр безопасности",
+        description:
+          "block_only_high — наиболее мягкий, block_medium_and_above — средний, block_low_and_above — строгий.",
+        type: "select",
+        options: [
+          { value: "block_only_high", label: "Мягкий" },
+          { value: "block_medium_and_above", label: "Средний" },
+          { value: "block_low_and_above", label: "Строгий" },
+        ],
+        default: "block_only_high",
+      },
+    ],
+  },
+  "imagen-4-ultra": {
+    id: "imagen-4-ultra",
+    name: "🔮 Imagen 4 Ultra",
+    description:
+      "Максимальное качество Imagen 4 от Google. Наивысшая детализация и фотореалистичность для профессиональных задач.",
+    section: "design",
+    provider: "google",
+    familyId: "imagen",
+    versionLabel: "4",
+    variantLabel: "Ultra",
+    costUsdPerRequest: 0.06,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: false,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    settings: [
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      {
+        key: "image_size",
+        label: "Разрешение",
+        description: "1K — стандартное разрешение, 2K — повышенное. Влияет на время генерации.",
+        type: "select",
+        options: [
+          { value: "1K", label: "1K" },
+          { value: "2K", label: "2K" },
+        ],
+        default: "1K",
+      },
+      {
+        key: "output_format",
+        label: "Формат",
+        description: "Формат результирующего изображения.",
+        type: "select",
+        options: [
+          { value: "jpg", label: "JPG" },
+          { value: "png", label: "PNG" },
+        ],
+        default: "jpg",
+      },
+      {
+        key: "safety_filter_level",
+        label: "Фильтр безопасности",
+        description:
+          "block_only_high — наиболее мягкий, block_medium_and_above — средний, block_low_and_above — строгий.",
+        type: "select",
+        options: [
+          { value: "block_only_high", label: "Мягкий" },
+          { value: "block_medium_and_above", label: "Средний" },
+          { value: "block_low_and_above", label: "Строгий" },
+        ],
+        default: "block_only_high",
       },
     ],
   },

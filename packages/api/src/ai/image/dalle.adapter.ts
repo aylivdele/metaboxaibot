@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
-import { config } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 
 const DALLE_SIZES: Record<string, "1024x1024" | "1792x1024" | "1024x1792"> = {
@@ -42,15 +42,27 @@ export class DalleAdapter implements ImageAdapter {
     const size = DALLE_SIZES[aspectRatio] ?? "1024x1024";
     const providerUsdCost = DALLE_COST[quality]?.[size] ?? 0.04;
 
-    const response = await this.client.images.generate({
-      model: "dall-e-3",
-      prompt: input.prompt,
-      n: 1,
-      size,
-      quality,
-      style: (ms.style as "vivid" | "natural" | undefined) ?? "vivid",
-      response_format: "url",
-    });
+    let response;
+    try {
+      response = await this.client.images.generate({
+        model: "dall-e-3",
+        prompt: input.prompt,
+        n: 1,
+        size,
+        quality,
+        style: (ms.style as "vivid" | "natural" | undefined) ?? "vivid",
+        response_format: "url",
+      });
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        "code" in err &&
+        (err as { code?: string }).code === "content_policy_violation"
+      ) {
+        throw new UserFacingError(err.message, { key: "contentPolicyViolation" });
+      }
+      throw err;
+    }
 
     const url = response.data?.[0]?.url;
     if (!url) throw new Error("DALL-E returned no image URL");
