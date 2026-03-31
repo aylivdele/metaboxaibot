@@ -24,8 +24,11 @@ interface SubmitResponse {
 
 /** Response from GET /requests/{id}/status */
 interface PollResponse {
-  id: string;
   status: "queued" | "in_progress" | "nsfw" | "failed" | "completed" | "canceled";
+  request_id: string;
+  status_url?: string;
+  cancel_url?: string;
+  video?: { url: string };
   jobs?: Array<{
     status: string;
     results: null | { url?: string; raw?: { url?: string } };
@@ -114,17 +117,12 @@ export class HiggsFieldAdapter implements VideoAdapter {
     const data = (await res.json()) as PollResponse;
     logger.info({ data }, "Higgsfield poll response");
 
-    // Status may be on the top-level or inside jobs[0] depending on the endpoint
-    const job = data.jobs?.[0];
-    const status = job?.status ?? data.status;
-    const results = job?.results ?? data.results;
-
-    if (status === "failed" || status === "nsfw" || status === "canceled") {
-      throw new Error(`Higgsfield generation ${status}: ${JSON.stringify(data)}`);
+    if (data.status === "failed" || data.status === "nsfw" || data.status === "canceled") {
+      throw new Error(`Higgsfield generation ${data.status}: ${JSON.stringify(data)}`);
     }
-    if (status !== "completed") return null;
+    if (data.status !== "completed") return null;
 
-    const url = results?.url ?? results?.raw?.url;
+    const url = data.video?.url;
     if (!url) throw new Error(`Higgsfield: no video URL in completed job: ${JSON.stringify(data)}`);
     return { url, filename: "higgsfield.mp4" };
   }
