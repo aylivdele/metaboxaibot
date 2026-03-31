@@ -759,7 +759,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     costUsdPerRequest: 0.25,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
-    supportsImages: true,
+    supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,

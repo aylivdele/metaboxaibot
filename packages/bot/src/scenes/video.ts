@@ -163,6 +163,14 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
     return;
   }
 
+  // Warn and drop the image if the model doesn't support image input
+  const model = AI_MODELS[modelId];
+  let effectiveImageUrl = imageUrl;
+  if (imageUrl && model && !model.supportsImages) {
+    await ctx.reply(ctx.t.video.imageIgnoredUnsupported);
+    effectiveImageUrl = undefined;
+  }
+
   const pendingMsg = await ctx.reply(ctx.t.video.queuing);
 
   try {
@@ -170,7 +178,7 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
       userId: ctx.user.id,
       modelId,
       prompt,
-      imageUrl,
+      imageUrl: effectiveImageUrl,
       telegramChatId: chatId,
       sendOriginalLabel: ctx.t.common.sendOriginal,
       aspectRatio: modelSettings?.aspectRatio,

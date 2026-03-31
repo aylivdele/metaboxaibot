@@ -210,6 +210,7 @@ export function computeVideoTokens(
   duration: number,
   actualWidth?: number,
   actualHeight?: number,
+  actualFps?: number,
 ): number {
   if (!model.videoFps) return 0;
 
@@ -231,5 +232,6 @@ export function computeVideoTokens(
     [w, h] = RESOLUTION[aspectRatio ?? "16:9"] ?? [1280, 720];
   }
 
-  return (w * h * (model.videoFps ?? 30) * duration) / 1024;
+  const fps = actualFps ?? model.videoFps;
+  return (w * h * fps * duration) / 1024;
 }

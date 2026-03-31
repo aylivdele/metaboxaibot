@@ -110,10 +110,12 @@ export default {
       "❌ Higgsfield requires an image to generate video. Please send a photo first, then your text prompt.",
     runwayRequiresImage:
       "❌ Runway requires an image to generate video. Please send a photo first, then your text prompt.",
+    imageIgnoredUnsupported:
+      "⚠️ This model does not support image input — your photo will be ignored.",
     hintVideoDefault:
       "✉️ Send a text prompt to generate a video.\n🖼 Optionally attach an image — the video will start from it.",
-    videoPhotoSaved: "📸 Photo saved. Now send the text for voice-over.",
-    videoDriverSaved: "🎬 Driver video saved. Now send the text for voice-over.",
+    videoPhotoSaved: "📸 Photo saved for use in next generation.",
+    videoDriverSaved: "🎬 Driver video saved for use in next generation.",
     videoVoiceSaved: "🎙 Voice sample saved. Now send the text for the avatar to speak.",
     avatarPhotoSaved:
       "📸 Avatar photo saved and selected. Send the text for the avatar to speak.\nYou can change the photo in Management → HeyGen → Avatar.",

@@ -103,6 +103,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       let actualDuration: number | null = null;
       let actualWidth: number | null = null;
       let actualHeight: number | null = null;
+      let actualFps: number | null = null;
       try {
         const buf = adapter.fetchBuffer
           ? await adapter.fetchBuffer(videoResult.url)
@@ -116,8 +117,9 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
         actualDuration = info.duration;
         actualWidth = info.width;
         actualHeight = info.height;
+        actualFps = info.fps;
       } catch {
-        // non-fatal: fall back to estimated duration/resolution
+        // non-fatal: fall back to estimated duration/resolution/fps
       }
 
       s3Key = videoBuffer
@@ -145,6 +147,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
               effectiveDuration,
               actualWidth ?? undefined,
               actualHeight ?? undefined,
+              actualFps ?? undefined,
             )
           : undefined;
         await deductTokens(

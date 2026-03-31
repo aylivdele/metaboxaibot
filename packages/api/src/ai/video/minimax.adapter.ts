@@ -11,6 +11,9 @@ const MODEL_MAP: Record<string, string> = {
   "hailuo-fast": "MiniMax-Hailuo-2.3-Fast",
 };
 
+/** Models that support image-to-video (first_frame_image). T2V-01 is text-only. */
+const SUPPORTS_IMAGE = new Set(["hailuo", "hailuo-fast"]);
+
 /** Valid resolutions per model. */
 const SUPPORTED_RESOLUTIONS: Record<string, string[]> = {
   minimax: ["720P"],
@@ -82,7 +85,7 @@ export class MinimaxVideoAdapter implements VideoAdapter {
       prompt_optimizer: true,
     };
 
-    if (input.imageUrl) {
+    if (input.imageUrl && SUPPORTS_IMAGE.has(this.modelId)) {
       body.first_frame_image = input.imageUrl;
     }
 

@@ -1,10 +1,12 @@
 /**
  * Lightweight MP4 metadata parser.
- * Walks the ISO Base Media box tree to extract duration and video resolution
+ * Walks the ISO Base Media box tree to extract duration, video resolution and FPS
  * without any external dependencies.
  *
- * Duration: moov → mvhd (supports version 0 with 32-bit and version 1 with 64-bit fields)
- * Resolution: moov → trak → tkhd (width/height as 16.16 fixed-point; audio tracks have 0×0)
+ * Duration  : moov → mvhd        (version 0: 32-bit fields, version 1: 64-bit)
+ * Resolution: moov → trak → tkhd (width/height as 16.16 fixed-point; audio tracks = 0×0)
+ * FPS       : moov → trak → mdia → mdhd (timescale) + minf → stbl → stts (sample_delta)
+ *             fps = timescale / sample_delta
  */
 export interface Mp4Info {
   /** Video duration in seconds, or null if moov/mvhd not found. */
@@ -13,15 +15,22 @@ export interface Mp4Info {
   width: number | null;
   /** Video height in pixels, or null if not found. */
   height: number | null;
+  /** Frame rate, or null if not found. */
+  fps: number | null;
 }
 
 export function parseMp4Info(buf: Buffer): Mp4Info {
   const moov = findBox(buf, 0, buf.length, "moov");
-  if (!moov) return { duration: null, width: null, height: null };
+  if (!moov) return { duration: null, width: null, height: null, fps: null };
 
   const duration = parseMvhd(buf, moov.start, moov.end);
-  const dims = parseVideoTrackDimensions(buf, moov.start, moov.end);
-  return { duration, width: dims?.width ?? null, height: dims?.height ?? null };
+  const track = parseVideoTrack(buf, moov.start, moov.end);
+  return {
+    duration,
+    width: track?.width ?? null,
+    height: track?.height ?? null,
+    fps: track?.fps ?? null,
+  };
 }
 
 /** Backward-compatible wrapper — returns duration in seconds, or null. */
@@ -32,8 +41,8 @@ export function parseMp4Duration(buf: Buffer): number | null {
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 /**
- * Scan boxes within [start, end) for a box of the given type.
- * Returns the content range [contentStart, contentEnd) (i.e. after the 8-byte header).
+ * Scan boxes within [start, end) for the first box of the given type.
+ * Returns the content range [contentStart, contentEnd) — i.e. past the 8-byte header.
  */
 function findBox(
   buf: Buffer,
@@ -56,13 +65,9 @@ function findBox(
 /**
  * Walk moov content for mvhd and return duration in seconds.
  *
- * mvhd v0 layout (offsets from box start):
- *   [0-3] size  [4-7] type  [8] version  [9-11] flags
- *   [12-15] ctime  [16-19] mtime  [20-23] timescale  [24-27] duration  …
- *
- * mvhd v1 layout:
- *   [0-3] size  [4-7] type  [8] version  [9-11] flags
- *   [12-19] ctime  [20-27] mtime  [28-31] timescale  [32-39] duration  …
+ * mvhd v0: [8 hdr][1 ver][3 flags][4 ctime][4 mtime][4 timescale][4 duration] …
+ * mvhd v1: [8 hdr][1 ver][3 flags][8 ctime][8 mtime][4 timescale][8 duration] …
+ * (offset counts from box start, i.e. including the 8-byte header)
  */
 function parseMvhd(buf: Buffer, start: number, end: number): number | null {
   let offset = start;
@@ -92,14 +97,14 @@ function parseMvhd(buf: Buffer, start: number, end: number): number | null {
 }
 
 /**
- * Walk moov content for trak boxes, then parse each tkhd to find the video track.
- * Audio tracks have width=0 and height=0 in tkhd; the video track has non-zero values.
+ * Walk moov content for trak boxes and return the first video track's metadata.
+ * Audio tracks have width=0 / height=0 in tkhd, so they are skipped.
  */
-function parseVideoTrackDimensions(
+function parseVideoTrack(
   buf: Buffer,
   moovStart: number,
   moovEnd: number,
-): { width: number; height: number } | null {
+): { width: number; height: number; fps: number | null } | null {
   let offset = moovStart;
   while (offset + 8 <= moovEnd) {
     const size = buf.readUInt32BE(offset);
@@ -110,7 +115,10 @@ function parseVideoTrackDimensions(
       const trakStart = offset + 8;
       const trakEnd = Math.min(offset + size, buf.length);
       const dims = parseTkhd(buf, trakStart, trakEnd);
-      if (dims) return dims; // first video track (non-zero dims)
+      if (dims) {
+        const fps = parseTrackFps(buf, trakStart, trakEnd);
+        return { ...dims, fps };
+      }
     }
 
     offset += size;
@@ -119,21 +127,17 @@ function parseVideoTrackDimensions(
 }
 
 /**
- * Parse the tkhd box inside a trak to get width/height of the video track.
+ * Parse tkhd inside a trak to get video width/height (audio tracks return null).
  *
- * tkhd v0 layout (offsets from box start):
- *   [0-3] size  [4-7] type  [8] version  [9-11] flags
- *   [12-15] ctime  [16-19] mtime  [20-23] track_ID  [24-27] reserved  [28-31] duration
- *   [32-39] reserved  [40-41] layer  [42-43] alt_grp  [44-45] volume  [46-47] reserved
- *   [48-83] matrix (36 bytes)
- *   [84-87] width (16.16 fixed-point)  [88-91] height (16.16 fixed-point)
+ * tkhd v0 (offsets from box start):
+ *   [8] ver  [12] ctime  [16] mtime  [20] track_ID  [24] reserved  [28] duration
+ *   [32] reserved×2  [40] layer  [42] alt_grp  [44] volume  [46] reserved
+ *   [48] matrix (36 B)  [84] width 16.16  [88] height 16.16
  *
- * tkhd v1 layout:
- *   [0-3] size  [4-7] type  [8] version  [9-11] flags
- *   [12-19] ctime  [20-27] mtime  [28-31] track_ID  [32-35] reserved  [36-43] duration
- *   [44-51] reserved  [52-53] layer  [54-55] alt_grp  [56-57] volume  [58-59] reserved
- *   [60-95] matrix (36 bytes)
- *   [96-99] width (16.16 fixed-point)  [100-103] height (16.16 fixed-point)
+ * tkhd v1:
+ *   [8] ver  [12] ctime×8  [20] mtime×8  [28] track_ID  [32] reserved  [36] duration×8
+ *   [44] reserved×2  [52] layer  [54] alt_grp  [56] volume  [58] reserved
+ *   [60] matrix (36 B)  [96] width 16.16  [100] height 16.16
  *
  * Width/height are 16.16 fixed-point: upper 16 bits = integer pixels.
  */
@@ -164,4 +168,50 @@ function parseTkhd(
     offset += size;
   }
   return null;
+}
+
+/**
+ * Derive frame rate for a track by parsing:
+ *   trak → mdia → mdhd   (timescale: ticks per second)
+ *   trak → mdia → minf → stbl → stts  (sample_delta: ticks per frame)
+ *
+ * fps = timescale / sample_delta
+ *
+ * mdhd v0 content: [ver][flags][ctime 4B][mtime 4B][timescale 4B][duration 4B]…
+ * mdhd v1 content: [ver][flags][ctime 8B][mtime 8B][timescale 4B][duration 8B]…
+ * (findBox returns content start, so index 0 = version byte)
+ *
+ * stts content: [ver][flags][entry_count 4B][ (sample_count 4B, sample_delta 4B)… ]
+ */
+function parseTrackFps(buf: Buffer, trakStart: number, trakEnd: number): number | null {
+  const mdia = findBox(buf, trakStart, trakEnd, "mdia");
+  if (!mdia) return null;
+
+  // timescale from mdhd
+  const mdhd = findBox(buf, mdia.start, mdia.end, "mdhd");
+  if (!mdhd) return null;
+  const mdhdVersion = buf.readUInt8(mdhd.start);
+  const timescaleOff = mdhd.start + (mdhdVersion === 1 ? 20 : 12);
+  if (timescaleOff + 4 > buf.length) return null;
+  const timescale = buf.readUInt32BE(timescaleOff);
+  if (timescale === 0) return null;
+
+  // sample_delta from stts
+  const minf = findBox(buf, mdia.start, mdia.end, "minf");
+  if (!minf) return null;
+  const stbl = findBox(buf, minf.start, minf.end, "stbl");
+  if (!stbl) return null;
+  const stts = findBox(buf, stbl.start, stbl.end, "stts");
+  if (!stts) return null;
+
+  // stts content: [1B ver][3B flags][4B entry_count][4B sample_count][4B sample_delta]…
+  if (stts.start + 16 > buf.length) return null;
+  const entryCount = buf.readUInt32BE(stts.start + 4);
+  if (entryCount === 0) return null;
+  const sampleDelta = buf.readUInt32BE(stts.start + 12); // first entry's delta
+  if (sampleDelta === 0) return null;
+
+  const fps = timescale / sampleDelta;
+  // Sanity-check: realistic video FPS
+  return fps >= 1 && fps <= 120 ? Math.round(fps * 1000) / 1000 : null;
 }
