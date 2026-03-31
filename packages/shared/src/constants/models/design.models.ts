@@ -780,11 +780,11 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         description: "Формат результирующего изображения.",
         type: "select",
         options: [
-          { value: "webp", label: "WebP" },
           { value: "png", label: "PNG" },
+          { value: "webp", label: "WebP" },
           { value: "jpeg", label: "JPEG" },
         ],
-        default: "webp",
+        default: "png",
       },
       {
         key: "seed",
