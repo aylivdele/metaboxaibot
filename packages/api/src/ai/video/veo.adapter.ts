@@ -90,6 +90,12 @@ export class VeoAdapter implements VideoAdapter {
     return op.name;
   }
 
+  async fetchBuffer(url: string): Promise<Buffer> {
+    const res = await fetch(url, { headers: { "x-goog-api-key": this.apiKey } });
+    if (!res.ok) throw new Error(`Veo: failed to download video: ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
+  }
+
   async poll(operationName: string): Promise<VideoResult | null> {
     const res = await fetchWithLog(`${BASE}/${operationName}?key=${this.apiKey}`, {
       headers: this.headers(),

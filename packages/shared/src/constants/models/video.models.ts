@@ -277,15 +277,19 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     durationRange: { min: 5, max: 8 },
     settings: [
       mkAspectRatio(["16:9", "9:16"]),
-      mkDurationSlider(5, 8),
+      mkDurationSelect([5, 6, 7, 8]),
       {
         key: "resolution",
         label: "Разрешение",
-        description: "Качество видео: 720p — быстрее, 1080p — максимальное качество.",
+        description: "Качество видео: 720p — любая длительность, 1080p — только 8 секунд.",
         type: "select",
         options: [
           { value: "720p", label: "720p" },
-          { value: "1080p", label: "1080p" },
+          {
+            value: "1080p",
+            label: "1080p",
+            unavailableIf: { key: "duration", neq: 8 },
+          },
         ],
         default: "720p",
       },
@@ -335,15 +339,19 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     durationRange: { min: 5, max: 8 },
     settings: [
       mkAspectRatio(["16:9", "9:16"]),
-      mkDurationSlider(5, 8),
+      mkDurationSelect([5, 6, 7, 8]),
       {
         key: "resolution",
         label: "Разрешение",
-        description: "Качество видео: 720p — быстрее, 1080p — максимальное качество.",
+        description: "Качество видео: 720p — любая длительность, 1080p — только 8 секунд.",
         type: "select",
         options: [
           { value: "720p", label: "720p" },
-          { value: "1080p", label: "1080p" },
+          {
+            value: "1080p",
+            label: "1080p",
+            unavailableIf: { key: "duration", neq: 8 },
+          },
         ],
         default: "720p",
       },

@@ -84,14 +84,18 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
       const { ext, contentType } = sectionMeta("video");
 
-      // Fetch video to buffer — needed for S3 upload and duration detection
+      // Fetch video to buffer — needed for S3 upload and duration detection.
+      // Use adapter.fetchBuffer when available (e.g. Veo URLs require auth).
       let actualDuration: number | null = null;
       try {
-        const videoResp = await fetch(videoResult.url);
-        if (videoResp.ok) {
-          videoBuffer = Buffer.from(await videoResp.arrayBuffer());
-          actualDuration = parseMp4Duration(videoBuffer);
-        }
+        videoBuffer = adapter.fetchBuffer
+          ? await adapter.fetchBuffer(videoResult.url)
+          : await fetch(videoResult.url).then((r) =>
+              r.ok
+                ? r.arrayBuffer().then(Buffer.from)
+                : Promise.reject(new Error(`HTTP ${r.status}`)),
+            );
+        actualDuration = parseMp4Duration(videoBuffer);
       } catch {
         // non-fatal: fall back to estimated duration
       }
@@ -137,7 +141,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
             },
           ]
         : null;
-    const rows = [downloadRow ?? origRow].filter(Boolean) as InlineKeyboardButton[][];
+    const rows = [downloadRow, origRow].filter(Boolean) as InlineKeyboardButton[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
     // Prefer already-downloaded buffer, then S3 URL, then download fresh from provider URL

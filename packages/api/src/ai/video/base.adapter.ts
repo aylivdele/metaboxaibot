@@ -30,4 +30,10 @@ export interface VideoAdapter {
   submit(input: VideoInput): Promise<string>;
   /** Poll async result. Returns null if still processing. */
   poll(providerJobId: string): Promise<VideoResult | null>;
+  /**
+   * Optional: fetch video bytes from the provider URL.
+   * Implement when the URL requires authentication headers that the worker doesn't have.
+   * If absent, the worker performs a plain unauthenticated fetch.
+   */
+  fetchBuffer?(url: string): Promise<Buffer>;
 }
