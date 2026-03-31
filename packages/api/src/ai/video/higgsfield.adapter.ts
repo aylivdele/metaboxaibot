@@ -1,6 +1,7 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
+import { logger } from "../../logger.js";
 
 const HIGGSFIELD_API = "https://platform.higgsfield.ai";
 
@@ -76,6 +77,7 @@ export class HiggsFieldAdapter implements VideoAdapter {
     }
 
     const data = (await res.json()) as HiggsFieldStatus;
+    logger.info({ data }, `Response from dop image to image generation`);
     return data.request_id;
   }
 
