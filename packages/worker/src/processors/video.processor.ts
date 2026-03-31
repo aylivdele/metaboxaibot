@@ -88,14 +88,15 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       // Use adapter.fetchBuffer when available (e.g. Veo URLs require auth).
       let actualDuration: number | null = null;
       try {
-        videoBuffer = adapter.fetchBuffer
+        const buf = adapter.fetchBuffer
           ? await adapter.fetchBuffer(videoResult.url)
           : await fetch(videoResult.url).then((r) =>
               r.ok
                 ? r.arrayBuffer().then(Buffer.from)
                 : Promise.reject(new Error(`HTTP ${r.status}`)),
             );
-        actualDuration = parseMp4Duration(videoBuffer);
+        videoBuffer = buf;
+        actualDuration = parseMp4Duration(buf);
       } catch {
         // non-fatal: fall back to estimated duration
       }
