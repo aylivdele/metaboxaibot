@@ -11,11 +11,21 @@ const DOP_MODEL: Record<string, string> = {
   "higgsfield-preview": "dop-preview",
 };
 
-interface HiggsFieldStatus {
+/** Response from POST /v1/image2video/dop — job set containing one or more jobs. */
+interface SubmitResponse {
+  id: string; // job set ID
+  jobs: Array<{
+    id: string; // individual job ID — use this for polling
+    status: string;
+    results: null | { url?: string; raw?: { url?: string } };
+  }>;
+}
+
+/** Response from GET /requests/{jobId}/status */
+interface PollResponse {
+  id: string;
   status: "queued" | "in_progress" | "nsfw" | "failed" | "completed" | "canceled";
-  request_id: string;
-  status_url: string;
-  cancel_url: string;
+  results: null | { url?: string; raw?: { url?: string } };
 }
 
 /**
@@ -76,13 +86,17 @@ export class HiggsFieldAdapter implements VideoAdapter {
       throw new Error(`Higgsfield submit failed: ${res.status} ${text}`);
     }
 
-    const data = (await res.json()) as HiggsFieldStatus;
-    logger.info({ data }, `Response from dop image to image generation`);
-    return data.request_id;
+    const data = (await res.json()) as SubmitResponse;
+    logger.info({ data }, "Higgsfield submit response");
+
+    const jobId = data.jobs?.[0]?.id;
+    if (!jobId)
+      throw new Error(`Higgsfield: no job ID in submit response: ${JSON.stringify(data)}`);
+    return jobId;
   }
 
-  async poll(requestId: string): Promise<VideoResult | null> {
-    const res = await fetchWithLog(`${HIGGSFIELD_API}/requests/${requestId}/status`, {
+  async poll(jobId: string): Promise<VideoResult | null> {
+    const res = await fetchWithLog(`${HIGGSFIELD_API}/requests/${jobId}/status`, {
       headers: this.headers(),
     });
 
@@ -91,16 +105,15 @@ export class HiggsFieldAdapter implements VideoAdapter {
       throw new Error(`Higgsfield poll failed: ${res.status} ${text}`);
     }
 
-    const data = (await res.json()) as HiggsFieldStatus;
+    const data = (await res.json()) as PollResponse;
 
     if (data.status === "failed" || data.status === "nsfw" || data.status === "canceled") {
-      throw new Error(`Higgsfield generation failed: ${JSON.stringify(data)}`);
+      throw new Error(`Higgsfield generation ${data.status}: ${JSON.stringify(data)}`);
     }
     if (data.status !== "completed") return null;
 
-    const url = data.status_url;
-    if (!url)
-      throw new Error(`Higgsfield: no video URL in completed generation: ${JSON.stringify(data)}`);
+    const url = data.results?.url ?? data.results?.raw?.url;
+    if (!url) throw new Error(`Higgsfield: no video URL in completed job: ${JSON.stringify(data)}`);
     return { url, filename: "higgsfield.mp4" };
   }
 }
