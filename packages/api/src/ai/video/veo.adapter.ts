@@ -38,7 +38,6 @@ export class VeoAdapter implements VideoAdapter {
       model: this.apiModel,
       prompt: input.prompt,
       config: {
-        generateAudio: true,
         ...(input.aspectRatio ? { aspectRatio: input.aspectRatio } : {}),
         ...(input.duration ? { durationSeconds: input.duration } : {}),
         ...(ms.person_generation ? { personGeneration: String(ms.person_generation) } : {}),

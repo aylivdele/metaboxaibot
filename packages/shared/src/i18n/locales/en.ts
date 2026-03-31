@@ -108,6 +108,8 @@ export default {
       "📸 Send a photo to create an animation.\nYou can also pick several motion presets in Management section of Mini App.\n✉️ Once ready — send a text describing a video you want to generate.",
     higgsfieldRequiresImage:
       "❌ Higgsfield requires an image to generate video. Please send a photo first, then your text prompt.",
+    runwayRequiresImage:
+      "❌ Runway requires an image to generate video. Please send a photo first, then your text prompt.",
     hintVideoDefault:
       "✉️ Send a text prompt to generate a video.\n🖼 Optionally attach an image — the video will start from it.",
     videoPhotoSaved: "📸 Photo saved. Now send the text for voice-over.",

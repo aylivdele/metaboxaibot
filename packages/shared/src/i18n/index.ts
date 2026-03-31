@@ -97,6 +97,7 @@ export interface Translations {
     hintDid: string;
     hintHiggsfield: string;
     higgsfieldRequiresImage: string;
+    runwayRequiresImage: string;
     hintVideoDefault: string;
     avatarCreationCancelled: string;
     avatarCreationStarted: string;

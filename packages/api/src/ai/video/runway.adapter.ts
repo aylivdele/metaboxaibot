@@ -1,5 +1,5 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
-import { config } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 
 const RUNWAY_API = "https://api.dev.runwayml.com/v1";
@@ -32,16 +32,26 @@ export class RunwayAdapter implements VideoAdapter {
   }
 
   async submit(input: VideoInput): Promise<string> {
+    if (!input.imageUrl) {
+      throw new UserFacingError("Runway requires an image", { key: "runwayRequiresImage" });
+    }
+
+    // Runway rejects Telegram URLs (application/octet-stream) — download and encode as data URL
+    const imgResp = await fetchWithLog(input.imageUrl);
+    if (!imgResp.ok) throw new Error(`Runway: failed to fetch reference image: ${imgResp.status}`);
+    const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+    const mimeType = imgResp.headers.get("content-type") ?? "image/jpeg";
+    const safeType = mimeType.startsWith("image/") ? mimeType : "image/jpeg";
+    const promptImage = `data:${safeType};base64,${imgBuffer.toString("base64")}`;
+
     const ms = input.modelSettings ?? {};
     const body: Record<string, unknown> = {
       promptText: input.prompt,
       model: "gen4.5",
-      ratio: input.aspectRatio ?? "1280:768",
+      ratio: input.aspectRatio ?? "1280:720",
       duration: input.duration ?? 5,
+      promptImage,
     };
-    if (input.imageUrl) {
-      body.promptImage = input.imageUrl;
-    }
     if (ms.seed != null) body.seed = ms.seed;
     if (
       ms.camera_horizontal !== undefined ||

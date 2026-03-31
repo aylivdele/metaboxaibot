@@ -157,6 +157,12 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
     return;
   }
 
+  // Runway is image-to-video only — reject text-only requests
+  if (modelId === "runway" && !imageUrl) {
+    await ctx.reply(ctx.t.video.runwayRequiresImage);
+    return;
+  }
+
   const pendingMsg = await ctx.reply(ctx.t.video.queuing);
 
   try {
