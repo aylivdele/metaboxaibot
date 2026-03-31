@@ -11,21 +11,26 @@ const DOP_MODEL: Record<string, string> = {
   "higgsfield-preview": "dop-preview",
 };
 
-/** Response from POST /v1/image2video/dop — job set containing one or more jobs. */
+/** Response from POST /v1/image2video/dop — job set. */
 interface SubmitResponse {
-  id: string; // job set ID
+  id: string; // job-set ID — used to construct status URL
+  status_url?: string; // full status URL if provided by API
   jobs: Array<{
-    id: string; // individual job ID — use this for polling
+    id: string;
     status: string;
     results: null | { url?: string; raw?: { url?: string } };
   }>;
 }
 
-/** Response from GET /requests/{jobId}/status */
+/** Response from GET /requests/{id}/status */
 interface PollResponse {
   id: string;
   status: "queued" | "in_progress" | "nsfw" | "failed" | "completed" | "canceled";
-  results: null | { url?: string; raw?: { url?: string } };
+  jobs?: Array<{
+    status: string;
+    results: null | { url?: string; raw?: { url?: string } };
+  }>;
+  results?: null | { url?: string; raw?: { url?: string } };
 }
 
 /**
@@ -89,14 +94,15 @@ export class HiggsFieldAdapter implements VideoAdapter {
     const data = (await res.json()) as SubmitResponse;
     logger.info({ data }, "Higgsfield submit response");
 
-    const jobId = data.jobs?.[0]?.id;
-    if (!jobId)
-      throw new Error(`Higgsfield: no job ID in submit response: ${JSON.stringify(data)}`);
-    return jobId;
+    // Use status_url from response if provided; otherwise build from top-level id (job-set ID).
+    // Do NOT use jobs[0].id — that's a job-level ID, not valid for /requests/{id}/status.
+    if (!data.id) throw new Error(`Higgsfield: no ID in submit response: ${JSON.stringify(data)}`);
+    const statusUrl = data.status_url ?? `${HIGGSFIELD_API}/requests/${data.id}/status`;
+    return statusUrl;
   }
 
-  async poll(jobId: string): Promise<VideoResult | null> {
-    const res = await fetchWithLog(`${HIGGSFIELD_API}/requests/${jobId}/status`, {
+  async poll(statusUrl: string): Promise<VideoResult | null> {
+    const res = await fetchWithLog(statusUrl, {
       headers: this.headers(),
     });
 
@@ -106,13 +112,19 @@ export class HiggsFieldAdapter implements VideoAdapter {
     }
 
     const data = (await res.json()) as PollResponse;
+    logger.info({ data }, "Higgsfield poll response");
 
-    if (data.status === "failed" || data.status === "nsfw" || data.status === "canceled") {
-      throw new Error(`Higgsfield generation ${data.status}: ${JSON.stringify(data)}`);
+    // Status may be on the top-level or inside jobs[0] depending on the endpoint
+    const job = data.jobs?.[0];
+    const status = job?.status ?? data.status;
+    const results = job?.results ?? data.results;
+
+    if (status === "failed" || status === "nsfw" || status === "canceled") {
+      throw new Error(`Higgsfield generation ${status}: ${JSON.stringify(data)}`);
     }
-    if (data.status !== "completed") return null;
+    if (status !== "completed") return null;
 
-    const url = data.results?.url ?? data.results?.raw?.url;
+    const url = results?.url ?? results?.raw?.url;
     if (!url) throw new Error(`Higgsfield: no video URL in completed job: ${JSON.stringify(data)}`);
     return { url, filename: "higgsfield.mp4" };
   }
