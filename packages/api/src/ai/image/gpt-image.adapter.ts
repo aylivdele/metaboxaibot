@@ -48,7 +48,6 @@ export class GptImageAdapter implements ImageAdapter {
       quality: quality as "low" | "medium" | "high",
       output_format: outputFormat as "png" | "jpeg" | "webp",
       ...(outputCompression !== undefined && { output_compression: outputCompression }),
-      response_format: "b64_json" as const,
     };
 
     let b64: string | null | undefined;
