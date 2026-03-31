@@ -185,21 +185,24 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     const useDocument = isSvg || byteSize > PHOTO_MAX_BYTES;
     const tooLargeForTelegram = byteSize > DOCUMENT_MAX_BYTES;
 
+    let slicedPrompt = prompt.slice(0, 200);
+    slicedPrompt = slicedPrompt.concat(slicedPrompt.length < 200 ? "" : "...");
+
     if (tooLargeForTelegram) {
       // File exceeds Telegram's document limit — send a download link instead
       await telegram.sendMessage(
         telegramChatId,
-        `✅ ${modelId}: ${prompt.slice(0, 200)}\n\n${t.errors.fileTooLargeForTelegram}`,
+        `✅ ${modelId}: ${slicedPrompt}\n\n${t.errors.fileTooLargeForTelegram}`,
         { reply_markup: replyMarkup },
       );
     } else if (useDocument) {
       await telegram.sendDocument(telegramChatId, tgImageSource, {
-        caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
+        caption: `✅ ${modelId}: ${slicedPrompt}`,
         reply_markup: replyMarkup,
       });
     } else {
       await telegram.sendPhoto(telegramChatId, tgImageSource, {
-        caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
+        caption: `✅ ${modelId}: ${slicedPrompt}`,
         reply_markup: replyMarkup,
       });
     }

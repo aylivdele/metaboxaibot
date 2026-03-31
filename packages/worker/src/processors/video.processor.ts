@@ -137,7 +137,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
             },
           ]
         : null;
-    const rows = [origRow, downloadRow].filter(Boolean) as InlineKeyboardButton[][];
+    const rows = [downloadRow ?? origRow].filter(Boolean) as InlineKeyboardButton[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
     // Prefer already-downloaded buffer, then S3 URL, then download fresh from provider URL
@@ -156,17 +156,20 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     const isUrl = typeof tgVideoSource === "string";
     const VIDEO_MAX_BYTES = isUrl ? 20 * 1024 * 1024 : 50 * 1024 * 1024;
     const tooLargeForTelegram = (videoByteSize || Number.MAX_SAFE_INTEGER) > VIDEO_MAX_BYTES;
+    let slicedPrompt = prompt.slice(0, 200);
+    slicedPrompt = slicedPrompt.concat(slicedPrompt.length < 200 ? "" : "...");
+    const model = AI_MODELS[modelId];
 
     if (tooLargeForTelegram && downloadRow) {
       // File exceeds Telegram's video limit — send a download link instead
       await telegram.sendMessage(
         telegramChatId,
-        `✅ ${modelId}: ${prompt.slice(0, 200)}\n\n${t.errors.fileTooLargeForTelegram}`,
+        `✅ ${model.name ?? modelId}: ${slicedPrompt}\n\n${t.errors.fileTooLargeForTelegram}`,
         { reply_markup: { inline_keyboard: [downloadRow] } },
       );
     } else {
       await telegram.sendVideo(telegramChatId, tgVideoSource, {
-        caption: `✅ ${modelId}: ${prompt.slice(0, 200)}`,
+        caption: `✅ ${model.name ?? modelId}: ${slicedPrompt}`,
         reply_markup: replyMarkup,
       });
     }

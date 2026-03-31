@@ -3,15 +3,24 @@ import { mkAspectRatio, mkDurationSelect, mkDurationSlider } from "./_helpers.js
 
 const KLING_SETTINGS: ModelSettingDef[] = [
   mkAspectRatio(["16:9", "9:16", "1:1"]),
-  mkDurationSelect([5, 10]),
+  {
+    key: "duration",
+    label: "Длительность",
+    description: "Продолжительность видеоклипа в секундах.",
+    type: "slider",
+    default: 5,
+    min: 3,
+    max: 15,
+    step: 1,
+  },
   {
     key: "cfg_scale",
     label: "Следование промпту (CFG)",
     description:
-      "Насколько точно видео передаёт ваше описание: ближе к 2 — строже по тексту, ближе к 0 — больше свободы.",
+      "Насколько точно видео передаёт ваше описание: ближе к 1 — строже по тексту, ближе к 0 — больше свободы.",
     type: "slider",
     min: 0,
-    max: 2,
+    max: 1,
     step: 0.1,
     default: 0.5,
   },
@@ -36,8 +45,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
   kling: {
     id: "kling",
     name: "🎥 Kling 3.0",
-    description:
-      "Генерирует самые длинные видео — до 2 минут сразу, со звуком. Лучше всех передаёт движения людей.",
+    description: "Генерирует видео до 10 секунд со звуком. Лучше всех передаёт движения людей.",
     section: "video",
     provider: "fal",
     familyId: "kling",
@@ -58,15 +66,14 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    supportedDurations: [5, 10],
+    durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
 
   "kling-pro": {
     id: "kling-pro",
     name: "🎥 Kling 3.0 Pro",
-    description:
-      "Генерирует самые длинные видео — до 2 минут сразу, со звуком. Лучше всех передаёт движения людей.",
+    description: "Генерирует видео до 10 секунд со звуком. Лучше всех передаёт движения людей.",
     section: "video",
     provider: "fal",
     familyId: "kling",
@@ -87,7 +94,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    supportedDurations: [5, 10],
+    durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
 
@@ -250,7 +257,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "veo",
     name: "📽️ Veo 3",
     description:
-      "Видео от Google в качестве 4K со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Отправьте фото или видео вместе с текстом — фото станет стилевым референсом, видео — основой для продолжения.",
+      "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Отправьте фото или видео вместе с текстом — фото станет стилевым референсом, видео — основой для продолжения.",
     section: "video",
     provider: "google",
     familyId: "veo",
@@ -308,7 +315,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "veo-fast",
     name: "📽️ Veo 3 Fast",
     description:
-      "Быстрая версия Veo 3 от Google. Та же высокая скорость и голоса, за меньшую цену. Отправьте фото или видео вместе с текстом — фото станет стилевым референсом, видео — основой для продолжения.",
+      "Быстрая и более доступная версия Veo 3 от Google. Со звуком и голосами. Отправьте фото или видео вместе с текстом — фото станет стилевым референсом, видео — основой для продолжения.",
     section: "video",
     provider: "google",
     familyId: "veo",
