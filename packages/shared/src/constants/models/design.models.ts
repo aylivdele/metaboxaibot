@@ -739,7 +739,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "stable-diffusion",
     name: "🌊 Stable Diffusion 3.5",
     description:
-      "Генерирует детальные изображения в любом стиле: от фотореализма до аниме и фэнтези. Отличается гибкостью.",
+      "Генерирует детальные изображения в любом стиле: от фотореализма до аниме и фэнтези. Отличается гибкостью. Работает только с промптами на анлгийском языке!",
     section: "design",
     provider: "replicate",
     costUsdPerRequest: 0.065,
@@ -762,6 +762,17 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           "Что НЕ должно быть на картинке: перечислите нежелательные объекты, стили или черты.",
         type: "text",
         default: "",
+      },
+      {
+        key: "cfg",
+        label: "Следование промпту (CFG)",
+        description:
+          "Насколько строго ИИ следует тексту. Высокие значения — буквально, низкие — с творческой интерпретацией.",
+        type: "slider",
+        min: 1,
+        max: 10,
+        step: 0.5,
+        default: 5,
       },
       {
         key: "prompt_strength",
