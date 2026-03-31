@@ -41,7 +41,7 @@ export class GptImageAdapter implements ImageAdapter {
     });
 
     const baseParams = {
-      model: "gpt-image-1" as const,
+      model: "gpt-image-1.5" as const,
       prompt: input.prompt,
       n: 1 as const,
       size: size as "1024x1024" | "1024x1536" | "1536x1024",

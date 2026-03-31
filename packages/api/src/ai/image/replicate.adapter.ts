@@ -82,7 +82,9 @@ export class ReplicateAdapter implements ImageAdapter {
     if (ms.go_fast !== undefined) msExtras.go_fast = ms.go_fast;
     if (ms.output_format) msExtras.output_format = ms.output_format;
     if (ms.output_quality !== undefined) msExtras.output_quality = ms.output_quality;
-    if (ms.prompt_strength !== undefined) msExtras.prompt_strength = ms.prompt_strength;
+    // prompt_strength is img2img-only — skip for text-to-image to avoid API rejection
+    if (ms.prompt_strength !== undefined && input.imageUrl)
+      msExtras.prompt_strength = ms.prompt_strength;
     if (ms.lora_scale !== undefined) msExtras.lora_scale = ms.lora_scale;
     if (ms.extra_lora) msExtras.extra_lora = ms.extra_lora;
     if (ms.extra_lora_scale !== undefined) msExtras.extra_lora_scale = ms.extra_lora_scale;
