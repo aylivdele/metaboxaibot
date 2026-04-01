@@ -6,7 +6,14 @@ import type { ImageJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createImageAdapter } from "@metabox/api/ai/image";
 import { deductTokens, calculateCost } from "@metabox/api/services";
-import { buildS3Key, sectionMeta, uploadFromUrl, getFileUrl } from "@metabox/api/services/s3";
+import {
+  buildS3Key,
+  buildThumbnailKey,
+  sectionMeta,
+  uploadBuffer,
+  getFileUrl,
+  generateThumbnail,
+} from "@metabox/api/services/s3";
 import { generateDownloadToken } from "@metabox/api/utils/download-token";
 import { InputFile } from "grammy";
 import { logger } from "../logger.js";
@@ -101,17 +108,39 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       const resolvedExt = isSvg
         ? "svg"
         : (resolvedContentType.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg");
-      s3Key = await uploadFromUrl(
-        buildS3Key("image", userIdStr, dbJobId, resolvedExt),
-        imageResult.url,
-        resolvedContentType,
-      ).catch(() => null);
+
+      // Download into buffer so we can generate a thumbnail alongside the original
+      let imageBuffer: Buffer | null = null;
+      try {
+        const res = await fetch(imageResult.url);
+        if (res.ok) imageBuffer = Buffer.from(await res.arrayBuffer());
+      } catch {
+        // non-fatal — fall back to URL-only upload below
+      }
+
+      const mainKey = buildS3Key("image", userIdStr, dbJobId, resolvedExt);
+      s3Key = imageBuffer
+        ? await uploadBuffer(mainKey, imageBuffer, resolvedContentType).catch(() => null)
+        : null;
+
+      // Generate and upload thumbnail (WebP 400px) — skipped for SVG
+      let thumbnailS3Key: string | null = null;
+      if (imageBuffer && s3Key) {
+        const thumbBuf = await generateThumbnail(imageBuffer, resolvedContentType);
+        if (thumbBuf) {
+          thumbnailS3Key = await uploadBuffer(
+            buildThumbnailKey(s3Key),
+            thumbBuf,
+            "image/webp",
+          ).catch(() => null);
+        }
+      }
 
       outputUrl = imageResult.url;
 
       await db.generationJob.update({
         where: { id: dbJobId },
-        data: { status: "done", outputUrl, s3Key, completedAt: new Date() },
+        data: { status: "done", outputUrl, s3Key, thumbnailS3Key, completedAt: new Date() },
       });
 
       const model = AI_MODELS[modelId];

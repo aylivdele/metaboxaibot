@@ -3,7 +3,15 @@ import { createImageAdapter } from "../ai/image/factory.js";
 import { getImageQueue } from "../queues/image.queue.js";
 import { AI_MODELS } from "@metabox/shared";
 import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
-import { buildS3Key, sectionMeta, uploadFromUrl, uploadBuffer, getFileUrl } from "./s3.service.js";
+import {
+  buildS3Key,
+  buildThumbnailKey,
+  sectionMeta,
+  uploadFromUrl,
+  uploadBuffer,
+  getFileUrl,
+  generateThumbnail,
+} from "./s3.service.js";
 import { dialogService } from "./dialog.service.js";
 import { userStateService } from "./user-state.service.js";
 
@@ -103,6 +111,7 @@ export const generationService = {
         // Resolve final URL — for base64 providers, upload buffer to S3 synchronously
         let finalUrl = result.url;
         let s3KeySync: string | null = null;
+        let thumbnailS3KeySync: string | null = null;
         if (result.base64Data) {
           const fmt = (modelSettings.output_format as string | undefined) ?? "png";
           const ext = fmt === "jpeg" ? "jpg" : fmt;
@@ -113,6 +122,14 @@ export const generationService = {
           s3KeySync = await uploadBuffer(key, buffer, contentType).catch(() => null);
           if (s3KeySync) {
             finalUrl = (await getFileUrl(s3KeySync)) ?? result.url;
+            const thumbBuf = await generateThumbnail(buffer, contentType);
+            if (thumbBuf) {
+              thumbnailS3KeySync = await uploadBuffer(
+                buildThumbnailKey(s3KeySync),
+                thumbBuf,
+                "image/webp",
+              ).catch(() => null);
+            }
           }
         }
 
@@ -122,6 +139,7 @@ export const generationService = {
             status: "done",
             outputUrl: finalUrl,
             s3Key: s3KeySync ?? undefined,
+            thumbnailS3Key: thumbnailS3KeySync ?? undefined,
             completedAt: new Date(),
           },
         });
@@ -151,10 +169,29 @@ export const generationService = {
           const ext = isSvg ? "svg" : defaultExt;
           const contentType = isSvg ? "image/svg+xml" : defaultContentType;
           const key = buildS3Key("image", userId.toString(), job.id, ext);
-          const uploadedKey = await uploadFromUrl(key, finalUrl, contentType).catch(() => null);
+          // Download into buffer to enable thumbnail generation
+          let imageBuffer: Buffer | null = null;
+          try {
+            const res = await fetch(finalUrl);
+            if (res.ok) imageBuffer = Buffer.from(await res.arrayBuffer());
+          } catch {
+            /* non-fatal */
+          }
+          const uploadedKey = imageBuffer
+            ? await uploadBuffer(key, imageBuffer, contentType).catch(() => null)
+            : await uploadFromUrl(key, finalUrl, contentType).catch(() => null);
           if (uploadedKey) {
             s3KeySync = uploadedKey;
-            await db.generationJob.update({ where: { id: job.id }, data: { s3Key: s3KeySync } });
+            const thumbBuf = imageBuffer ? await generateThumbnail(imageBuffer, contentType) : null;
+            thumbnailS3KeySync = thumbBuf
+              ? await uploadBuffer(buildThumbnailKey(s3KeySync), thumbBuf, "image/webp").catch(
+                  () => null,
+                )
+              : null;
+            await db.generationJob.update({
+              where: { id: job.id },
+              data: { s3Key: s3KeySync, thumbnailS3Key: thumbnailS3KeySync ?? undefined },
+            });
           }
         }
 

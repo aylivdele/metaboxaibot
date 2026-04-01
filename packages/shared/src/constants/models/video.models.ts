@@ -1037,6 +1037,18 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         default: "neutral",
       },
       {
+        key: "emotion_intensity",
+        label: "Интенсивность эмоции",
+        description:
+          "Насколько ярко выражена эмоция на лице аватара. Применяется только при настроении, отличном от нейтрального.",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.1,
+        default: 0.7,
+        unavailableIf: { key: "sentiment", eq: "neutral" },
+      },
+      {
         key: "driver_url",
         label: "URL видео-драйвера",
         description: "URL видео, задающего движения лица/головы аватара.",

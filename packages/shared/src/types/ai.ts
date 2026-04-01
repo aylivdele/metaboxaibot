@@ -132,6 +132,7 @@ export interface AIModel {
   supportsImages: boolean;
   supportsVoice: boolean;
   supportsWeb: boolean; // выход в интернет
+  supportsVideo?: boolean;
   isAsync: boolean; // требует очереди (для image/video/audio)
   contextStrategy: ContextStrategy;
   contextMaxMessages: number; // актуально для db_history: сколько сообщений отправлять

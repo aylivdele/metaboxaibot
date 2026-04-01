@@ -2,22 +2,47 @@ import type { FastifyPluginAsync } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { config } from "@metabox/shared";
 
+interface DIDLanguageConfig {
+  modelId?: string;
+  availableModels?: string[];
+}
+
+interface DIDLanguage {
+  language: string;
+  locale: string;
+  accent: string;
+  config?: DIDLanguageConfig;
+  previewUrl?: string;
+}
+
 interface DIDVoice {
   id: string;
   name: string;
+  access: "public" | "premium" | "private" | "external-private";
   gender: string;
-  language: string;
+  languages: DIDLanguage[];
   provider: string;
   styles?: string[];
   description?: string;
+  isLegacy: boolean;
 }
 
-interface DIDVoicesResponse {
-  voices?: DIDVoice[];
-}
+type DIDVoicesResponse = DIDVoice[];
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 let voicesCache: { data: object[]; at: number } | null = null;
+
+const SAFE_MODELS = ["eleven_multilingual_v2", "eleven_turbo_v2"];
+
+const filterSafeLanguages = (voice: DIDVoice) => {
+  if (voice.provider === "microsoft") return voice.languages;
+
+  return voice.languages.filter(
+    (l) =>
+      SAFE_MODELS.includes(l.config?.modelId ?? "") ||
+      l.config?.availableModels?.some((m) => SAFE_MODELS.includes(m)),
+  );
+};
 
 export const didVoicesRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", telegramAuthHook);
@@ -44,17 +69,29 @@ export const didVoicesRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const json = (await res.json()) as DIDVoicesResponse;
-    const voices = json.voices ?? [];
+    const voices = json ?? [];
 
-    const data = voices.map((v) => ({
-      id: v.id,
-      name: v.name,
-      gender: v.gender ?? "",
-      language: v.language ?? "",
-      provider: v.provider ?? "microsoft",
-      styles: v.styles ?? [],
-      description: v.description ?? "",
-    }));
+    const data = voices.reduce(
+      (acc, v) => {
+        if (v.access === "public") {
+          const languages = filterSafeLanguages(v);
+          if (!languages) {
+            return acc;
+          }
+          acc.push({
+            id: v.id,
+            name: v.name,
+            gender: v.gender ?? "",
+            languages: languages,
+            provider: v.provider ?? "microsoft",
+            styles: v.styles ?? [],
+            description: v.description ?? "",
+          });
+        }
+        return acc;
+      },
+      [] as Omit<DIDVoice, "isLegacy" | "access">[],
+    );
 
     voicesCache = { data, at: Date.now() };
     return data;

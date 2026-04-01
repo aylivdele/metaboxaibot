@@ -110,11 +110,18 @@ export interface HiggsFieldMotion {
   category?: string;
 }
 
+export interface DIDLanguage {
+  language: string;
+  locale: string;
+  accent: string;
+  previewUrl?: string;
+}
+
 export interface DIDVoice {
   id: string;
   name: string;
   gender: string;
-  language: string;
+  languages: DIDLanguage[];
   provider: string;
   styles: string[];
   description: string;
@@ -245,8 +252,10 @@ export interface GalleryItem {
   prompt: string;
   s3Key: string | null;
   outputUrl: string | null;
-  /** Resolved preview URL — /download/:token when S3 key available, else outputUrl. */
+  /** Resolved full-res URL — /download/:token when S3 key available, else outputUrl. */
   previewUrl: string | null;
+  /** Thumbnail WebP (400px wide) — available for images only, null otherwise. */
+  thumbnailUrl: string | null;
   completedAt: string | null;
 }
 

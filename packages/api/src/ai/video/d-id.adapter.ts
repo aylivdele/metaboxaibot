@@ -43,7 +43,11 @@ export class DIDAdapter implements VideoAdapter {
 
   async submit(input: VideoInput): Promise<string> {
     const sentiment = (input.modelSettings?.sentiment as string | undefined) ?? "neutral";
-    const driverUrl = input.modelSettings?.driver_url as string | undefined;
+    const emotionIntensity =
+      input.modelSettings?.emotion_intensity != null
+        ? Number(input.modelSettings.emotion_intensity)
+        : 0.7;
+    // const driverUrl = input.modelSettings?.driver_url as string | undefined;
 
     const voiceS3Key = input.modelSettings?.voice_s3key as string | undefined;
     const voiceUrlStored = input.modelSettings?.voice_url as string | undefined;
@@ -66,10 +70,10 @@ export class DIDAdapter implements VideoAdapter {
         fluent: true,
         pad_audio: 0,
         ...(sentiment !== "neutral" && {
-          expressions: [{ start_frame: 0, expression: sentiment, intensity: 1.0 }],
+          expressions: [{ start_frame: 0, expression: sentiment, intensity: emotionIntensity }],
         }),
       },
-      ...(driverUrl ? { driver_url: driverUrl } : {}),
+      // ...(driverUrl ? { driver_url: driverUrl } : {}),
     };
 
     const res = await fetchWithLog(`${DID_API}/talks`, {

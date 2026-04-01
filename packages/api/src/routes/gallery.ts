@@ -3,7 +3,7 @@ import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
 import { getFileUrl } from "../services/s3.service.js";
 import { generateDownloadToken } from "../utils/download-token.js";
-import { config } from "@metabox/shared";
+import { config, getT } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
@@ -18,6 +18,7 @@ async function sendFileToUser(
   section: string,
   fileUrl: string,
   caption: string,
+  replyMarkup?: object,
 ): Promise<void> {
   const method = SECTION_SEND_METHOD[section] ?? "sendDocument";
   const paramKey = section === "image" ? "photo" : section === "audio" ? "audio" : "video";
@@ -26,6 +27,7 @@ async function sendFileToUser(
     chat_id: userId.toString(),
     [paramKey]: fileUrl,
     caption,
+    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
   };
 
   const res = await fetch(`https://api.telegram.org/bot${config.bot.token}/${method}`, {
@@ -74,6 +76,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           modelId: true,
           prompt: true,
           s3Key: true,
+          thumbnailS3Key: true,
           outputUrl: true,
           completedAt: true,
         },
@@ -81,17 +84,20 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       db.generationJob.count({ where }),
     ]);
 
-    // Resolve a stable previewUrl for each item.
-    // Prefer /download/:token (auto-refreshes presigned URL, no CORS issues).
-    // Fall back to provider outputUrl for items without an S3 key.
+    // Resolve stable URLs for each item via signed download tokens.
+    // thumbnailUrl: thumbnail WebP when available (images only), else null.
+    // previewUrl: full-res file — S3 token when available, else provider URL.
     const items = rawItems.map((item) => {
-      let previewUrl: string | null = null;
-      if (item.s3Key && config.api.publicUrl) {
-        previewUrl = `${config.api.publicUrl}/download/${generateDownloadToken(item.s3Key, userId)}`;
-      } else {
-        previewUrl = item.outputUrl;
-      }
-      return { ...item, previewUrl };
+      const base = config.api.publicUrl;
+      const previewUrl =
+        item.s3Key && base
+          ? `${base}/download/${generateDownloadToken(item.s3Key, userId)}`
+          : item.outputUrl;
+      const thumbnailUrl =
+        item.thumbnailS3Key && base
+          ? `${base}/download/${generateDownloadToken(item.thumbnailS3Key, userId)}`
+          : null;
+      return { ...item, previewUrl, thumbnailUrl };
     });
 
     return { items, total, page: parseInt(page, 10), limit: take };
@@ -137,7 +143,51 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const caption = `${job.modelId}: ${job.prompt.slice(0, 200)}`;
-    await sendFileToUser(userId, job.section, fileUrl, caption);
+
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { language: true },
+    });
+    const t = getT((user?.language ?? "ru") as Parameters<typeof getT>[0]);
+
+    const downloadMarkup =
+      job.s3Key && config.api.publicUrl
+        ? {
+            inline_keyboard: [
+              [
+                {
+                  text: t.common.downloadFile,
+                  url: `${config.api.publicUrl}/download/${generateDownloadToken(job.s3Key, userId)}`,
+                },
+              ],
+            ],
+          }
+        : undefined;
+
+    try {
+      await sendFileToUser(userId, job.section, fileUrl, caption, downloadMarkup);
+    } catch (err) {
+      // If Telegram rejected the file (e.g. too large), send a download link instead
+      const isTooLarge =
+        err instanceof Error &&
+        (err.message.includes("Request Entity Too Large") ||
+          err.message.includes("file is too big") ||
+          err.message.includes("wrong file identifier"));
+
+      if (isTooLarge && downloadMarkup) {
+        await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: userId.toString(),
+            text: `${caption}\n\n${t.errors.fileTooLargeForTelegram}`,
+            reply_markup: downloadMarkup,
+          }),
+        });
+      } else {
+        throw err;
+      }
+    }
 
     return { success: true };
   });

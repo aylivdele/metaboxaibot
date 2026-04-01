@@ -72,6 +72,8 @@ export class FalVideoAdapter implements VideoAdapter {
       requestId = providerJobId;
     }
 
+    logCall(this.modelId, "poll", { requestId, endpoint });
+
     const status = await fal.queue.status(endpoint, {
       requestId,
       logs: false,

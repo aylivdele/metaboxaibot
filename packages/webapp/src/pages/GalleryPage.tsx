@@ -30,6 +30,7 @@ function GalleryCard({
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
+  const [videoActive, setVideoActive] = useState(false);
 
   const handleSend = async () => {
     setLoading(true);
@@ -56,7 +57,7 @@ function GalleryCard({
       {isImage && previewUrl && !imgError && (
         <div className="gallery-card__preview">
           <img
-            src={previewUrl}
+            src={item.thumbnailUrl ?? previewUrl}
             alt={item.prompt}
             loading="lazy"
             onError={() => setImgError(true)}
@@ -64,9 +65,15 @@ function GalleryCard({
         </div>
       )}
       {isVideo && previewUrl && (
-        <div className="gallery-card__preview gallery-card__preview--video">
-          <video src={previewUrl} preload="metadata" controls={false} muted playsInline />
-          <div className="gallery-card__video-overlay">▶</div>
+        <div
+          className="gallery-card__preview gallery-card__preview--video"
+          onClick={() => !videoActive && setVideoActive(true)}
+        >
+          {videoActive ? (
+            <video src={previewUrl} autoPlay controls muted playsInline />
+          ) : (
+            <div className="gallery-card__video-overlay">▶</div>
+          )}
         </div>
       )}
       {isAudio && <div className="gallery-card__audio-icon">🎵</div>}

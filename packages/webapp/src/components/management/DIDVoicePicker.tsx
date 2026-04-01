@@ -22,6 +22,7 @@ export function DIDVoicePicker({ voiceId, voiceUrl, voiceS3Key, onChange }: DIDV
   const [langFilter, setLangFilter] = useState("all");
   const [genderFilter, setGenderFilter] = useState("all");
   const [providerFilter, setProviderFilter] = useState("all");
+  const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -45,6 +46,20 @@ export function DIDVoicePicker({ voiceId, voiceUrl, voiceS3Key, onChange }: DIDV
 
   const stopAudio = () => {
     audioRef.current?.pause();
+    setPlayingId(null);
+  };
+
+  const togglePreview = (voiceId: string, previewUrl: string) => {
+    if (playingId === voiceId) {
+      stopAudio();
+      return;
+    }
+    stopAudio();
+    const audio = new Audio(previewUrl);
+    audioRef.current = audio;
+    audio.play().catch(() => void 0);
+    setPlayingId(voiceId);
+    audio.onended = () => setPlayingId(null);
   };
 
   const selectOfficial = (id: string, provider: string) => {
@@ -61,17 +76,21 @@ export function DIDVoicePicker({ voiceId, voiceUrl, voiceS3Key, onChange }: DIDV
     onChange("voice_provider", "");
   };
 
+  // Collect unique language names across all voices
   const languages = [
     "all",
-    ...Array.from(new Set(voices.map((v) => v.language).filter(Boolean))).sort(),
+    ...Array.from(
+      new Set(voices.flatMap((v) => v.languages.map((l) => l.language)).filter(Boolean)),
+    ).sort(),
   ];
   const providers = [
     "all",
     ...Array.from(new Set(voices.map((v) => v.provider).filter(Boolean))).sort(),
   ];
+
   const filtered = voices.filter(
     (v) =>
-      (langFilter === "all" || v.language === langFilter) &&
+      (langFilter === "all" || v.languages.some((l) => l.language === langFilter)) &&
       (genderFilter === "all" || v.gender === genderFilter) &&
       (providerFilter === "all" || v.provider === providerFilter),
   );
@@ -140,23 +159,40 @@ export function DIDVoicePicker({ voiceId, voiceUrl, voiceS3Key, onChange }: DIDV
               </div>
             </div>
             <div className="voice-picker__list">
-              {filtered.map((voice) => (
-                <div
-                  key={voice.id}
-                  className={`voice-picker__item${voiceId === voice.id && !voiceUrl ? " voice-picker__item--selected" : ""}`}
-                  onClick={() => selectOfficial(voice.id, voice.provider)}
-                >
-                  <div className="voice-picker__item-info">
-                    <span className="voice-picker__item-name">{voice.name}</span>
-                    <span className="voice-picker__item-meta">
-                      {voice.provider} · {voice.language}
-                      {voice.gender
-                        ? ` · ${voice.gender === "male" ? "М" : voice.gender === "female" ? "Ж" : voice.gender}`
-                        : ""}
-                    </span>
+              {filtered.map((voice) => {
+                const langLabel = voice.languages.map((l) => l.language).join(", ");
+                const previewUrl = voice.languages.find((l) => l.previewUrl)?.previewUrl;
+                const isPlaying = playingId === voice.id;
+                return (
+                  <div
+                    key={voice.id}
+                    className={`voice-picker__item${voiceId === voice.id && !voiceUrl ? " voice-picker__item--selected" : ""}`}
+                    onClick={() => selectOfficial(voice.id, voice.provider)}
+                  >
+                    <div className="voice-picker__item-info">
+                      <span className="voice-picker__item-name">{voice.name}</span>
+                      <span className="voice-picker__item-meta">
+                        {voice.provider} · {langLabel}
+                        {voice.gender
+                          ? ` · ${voice.gender === "male" ? "М" : voice.gender === "female" ? "Ж" : voice.gender}`
+                          : ""}
+                      </span>
+                    </div>
+                    {previewUrl && (
+                      <button
+                        className={`voice-picker__preview-btn${isPlaying ? " voice-picker__preview-btn--playing" : ""}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePreview(voice.id, previewUrl);
+                        }}
+                        title={isPlaying ? "Стоп" : "Прослушать"}
+                      >
+                        {isPlaying ? "⏹" : "▶"}
+                      </button>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {filtered.length === 0 && (
                 <div className="voice-picker__empty">Голоса не найдены</div>
               )}

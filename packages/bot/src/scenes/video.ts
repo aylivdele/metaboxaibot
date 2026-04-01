@@ -150,27 +150,6 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
 
   const prompt = ctx.message.text;
 
-  // Higgsfield DoP is image-to-video only — reject text-only requests
-  const HIGGSFIELD_MODELS = new Set(["higgsfield-lite", "higgsfield", "higgsfield-preview"]);
-  if (HIGGSFIELD_MODELS.has(modelId) && !imageUrl) {
-    await ctx.reply(ctx.t.video.higgsfieldRequiresImage);
-    return;
-  }
-
-  // Runway is image-to-video only — reject text-only requests
-  if (modelId === "runway" && !imageUrl) {
-    await ctx.reply(ctx.t.video.runwayRequiresImage);
-    return;
-  }
-
-  // Warn and drop the image if the model doesn't support image input
-  const model = AI_MODELS[modelId];
-  let effectiveImageUrl = imageUrl;
-  if (imageUrl && model && !model.supportsImages) {
-    await ctx.reply(ctx.t.video.imageIgnoredUnsupported);
-    effectiveImageUrl = undefined;
-  }
-
   const pendingMsg = await ctx.reply(ctx.t.video.queuing);
 
   try {
@@ -178,7 +157,7 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
       userId: ctx.user.id,
       modelId,
       prompt,
-      imageUrl: effectiveImageUrl,
+      imageUrl,
       telegramChatId: chatId,
       sendOriginalLabel: ctx.t.common.sendOriginal,
       aspectRatio: modelSettings?.aspectRatio,
@@ -358,6 +337,8 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
 
 export async function handleVideoVideo(ctx: BotContext): Promise<void> {
   if (!ctx.user || !ctx.message?.video) return;
+  const modelId = await userStateService.get(ctx.user.id).then((s) => s?.videoModelId);
+  if (!modelId || !AI_MODELS[modelId]?.supportsVideo) return;
   const file = await ctx.api.getFile(ctx.message.video.file_id);
   const fileUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
   await userStateService.setVideoRefDriverUrl(ctx.user.id, fileUrl);

@@ -1,6 +1,7 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { config } from "@metabox/shared";
+import sharp from "sharp";
 
 /** Seconds until a presigned GET URL expires. */
 const PRESIGN_TTL = 3600;
@@ -106,4 +107,38 @@ export async function getFileUrl(key: string, downloadFilename?: string): Promis
   );
 }
 
-export const s3Service = { buildS3Key, sectionMeta, uploadBuffer, uploadFromUrl, getFileUrl };
+/**
+ * Derives the S3 key for a thumbnail from the original S3 key.
+ * e.g. "image/123/abc.jpg" → "image/123/abc_thumb.webp"
+ */
+export function buildThumbnailKey(s3Key: string): string {
+  const dot = s3Key.lastIndexOf(".");
+  const base = dot !== -1 ? s3Key.slice(0, dot) : s3Key;
+  return `${base}_thumb.webp`;
+}
+
+/**
+ * Generates a 400px-wide WebP thumbnail from an image buffer.
+ * Returns null for SVG or non-image content types.
+ */
+export async function generateThumbnail(buf: Buffer, contentType: string): Promise<Buffer | null> {
+  if (!contentType.startsWith("image/") || contentType === "image/svg+xml") return null;
+  try {
+    return await sharp(buf)
+      .resize({ width: 400, withoutEnlargement: true })
+      .webp({ quality: 75 })
+      .toBuffer();
+  } catch {
+    return null;
+  }
+}
+
+export const s3Service = {
+  buildS3Key,
+  buildThumbnailKey,
+  sectionMeta,
+  uploadBuffer,
+  uploadFromUrl,
+  getFileUrl,
+  generateThumbnail,
+};

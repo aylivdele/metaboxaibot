@@ -178,10 +178,11 @@ model GenerationJob {
 
   prompt    String
   inputData Json?  // доп. параметры (размер, стиль и т.д.)
-  outputUrl     String?
-  s3Key         String? // path within S3 bucket — null if upload skipped
-  providerJobId String? // external provider task ID — persisted after submit for poll resume on restart
-  error         String?
+  outputUrl      String?
+  s3Key          String? // path within S3 bucket — null if upload skipped
+  thumbnailS3Key String? // S3 key for resized WebP preview (400px wide) — images only
+  providerJobId  String? // external provider task ID — persisted after submit for poll resume on restart
+  error          String?
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
