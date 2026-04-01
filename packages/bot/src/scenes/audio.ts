@@ -1,10 +1,11 @@
-import { InputFile } from "grammy";
+import { InputFile, InlineKeyboard } from "grammy";
 import type { BotContext } from "../types/context.js";
 import { audioGenerationService, userStateService } from "@metabox/api/services";
 import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
 import { db } from "@metabox/api/db";
-import { config } from "@metabox/shared";
+import { AI_MODELS, config, generateWebToken } from "@metabox/shared";
 import { logger } from "../logger.js";
+import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 
 // ── Sub-section entry points ──────────────────────────────────────────────────
@@ -28,7 +29,29 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
     "sounds-el": ctx.t.audio.soundsActivated,
   };
 
-  await ctx.reply(instructions[modelId] ?? ctx.t.audio.activated);
+  const instruction = instructions[modelId] ?? ctx.t.audio.activated;
+
+  // For generative models (not voice-clone), append cost line + management inline button
+  if (modelId !== "voice-clone") {
+    const model = AI_MODELS[modelId];
+    if (model) {
+      const allSettings = await userStateService.getModelSettings(ctx.user.id);
+      const modelSettings = allSettings[modelId] ?? {};
+      const costLine = buildCostLine(model, modelSettings, ctx.t);
+      const webappUrl = config.bot.webappUrl;
+      const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
+      const kb = webappUrl
+        ? new InlineKeyboard().webApp(
+            ctx.t.audio.management,
+            `${webappUrl}?page=management&section=audio&wtoken=${token}`,
+          )
+        : undefined;
+      await ctx.reply(`${instruction}\n\n${costLine}`, { reply_markup: kb });
+      return;
+    }
+  }
+
+  await ctx.reply(instruction);
 }
 
 // ── Voice cloning: accepts audio/voice file, creates EL voice ────────────────

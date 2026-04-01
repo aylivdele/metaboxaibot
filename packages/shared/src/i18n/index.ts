@@ -59,6 +59,7 @@ export interface Translations {
   };
   audio: {
     sectionTitle: string;
+    management: string;
     tts: string;
     ttsEl: string;
     ttsOpenai: string;

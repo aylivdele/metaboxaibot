@@ -216,15 +216,16 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
       {
         key: "model_version",
         label: "Версия модели",
-        description:
-          "chirp-v4 — стандарт, chirp-v4.5 — улучшенное качество (до 8 мин), v5 — последняя версия.",
+        description: "V4_5 — рекомендуется (до 8 мин), V5 / V5_5 — последние версии.",
         type: "select",
         options: [
-          { value: "chirp-v4", label: "Chirp v4" },
-          { value: "chirp-v4.5", label: "Chirp v4.5 (рекомендуется)" },
-          { value: "v5", label: "v5 (последняя)" },
+          { value: "V4", label: "V4" },
+          { value: "V4_5", label: "V4.5 (рекомендуется)" },
+          { value: "V4_5PLUS", label: "V4.5 Plus" },
+          { value: "V5", label: "V5" },
+          { value: "V5_5", label: "V5.5 (последняя)" },
         ],
-        default: "chirp-v4.5",
+        default: "V4_5",
       },
       {
         key: "make_instrumental",

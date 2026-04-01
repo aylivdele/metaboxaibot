@@ -116,8 +116,9 @@ export function createBot(token: string): Bot<BotContext> {
   // ── Audio model selection callback ───────────────────────────────────────
   bot.callbackQuery(/^audio_model:/, async (ctx) => {
     const modelId = ctx.callbackQuery.data.split(":")[1];
-    await handleAudioSubSection(ctx, modelId);
     await ctx.answerCallbackQuery();
+    await ctx.deleteMessage().catch(() => void 0);
+    await handleAudioSubSection(ctx, modelId);
   });
 
   // ── Reply keyboard — menu navigation ─────────────────────────────────────

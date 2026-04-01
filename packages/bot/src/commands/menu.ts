@@ -97,11 +97,22 @@ export async function handleDesign(ctx: BotContext): Promise<void> {
 export async function handleAudio(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "AUDIO_SECTION", "audio");
+
+  const webappUrl = config.bot.webappUrl;
+  const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
+  const managementBtn = webappUrl
+    ? {
+        text: ctx.t.audio.management,
+        web_app: { url: `${webappUrl}?page=management&section=audio&wtoken=${token}` },
+      }
+    : { text: ctx.t.audio.management };
+
   await ctx.reply(ctx.t.audio.sectionTitle, {
     reply_markup: {
       keyboard: [
         [{ text: ctx.t.audio.tts }, { text: ctx.t.audio.voiceClone }],
         [{ text: ctx.t.audio.music }, { text: ctx.t.audio.sounds }],
+        [managementBtn],
         [{ text: ctx.t.common.backToMain }],
       ],
       resize_keyboard: true,

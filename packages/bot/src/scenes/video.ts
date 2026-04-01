@@ -110,6 +110,7 @@ export async function handleVideoModelSelect(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   const modelId = ctx.callbackQuery?.data?.replace("video_model_", "") ?? "";
   await ctx.answerCallbackQuery();
+  await ctx.deleteMessage().catch(() => void 0);
   await activateVideoModel(ctx, modelId);
 }
 
@@ -125,6 +126,7 @@ export async function handleVideoFamilySelect(ctx: BotContext): Promise<void> {
     return;
   }
   await ctx.answerCallbackQuery();
+  await ctx.deleteMessage().catch(() => void 0);
   await activateVideoModel(ctx, modelId);
 }
 

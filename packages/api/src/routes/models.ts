@@ -103,6 +103,7 @@ function serializeModel(m: AIModel) {
                   undefined,
                   { [m.costVariants!.settingKey]: k },
                   isPerSecond ? 1 : undefined,
+                  isPerKChar ? 1000 : undefined,
                 ),
               ]),
             ),

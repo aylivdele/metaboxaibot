@@ -65,6 +65,7 @@ export default {
   },
   audio: {
     sectionTitle: "🎧 AI Audio\nChoose a section to work with audio 👇",
+    management: "⚙ Management",
     tts: "🗣 Speech synthesis",
     ttsEl: "🔊 TTS ElevenLabs",
     ttsOpenai: "🗣 OpenAI TTS",

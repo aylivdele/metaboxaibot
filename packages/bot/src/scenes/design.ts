@@ -174,6 +174,7 @@ export async function handleDesignModelSelect(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   const modelId = ctx.callbackQuery?.data?.replace("design_model_", "") ?? "";
   await ctx.answerCallbackQuery();
+  await ctx.deleteMessage().catch(() => void 0);
   await activateDesignModel(ctx, modelId);
 }
 
@@ -192,6 +193,7 @@ export async function handleDesignFamilySelect(ctx: BotContext): Promise<void> {
     return;
   }
   await ctx.answerCallbackQuery();
+  await ctx.deleteMessage().catch(() => void 0);
   await activateDesignModel(ctx, modelId);
 }
 
