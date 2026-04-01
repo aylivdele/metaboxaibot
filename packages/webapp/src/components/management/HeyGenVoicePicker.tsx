@@ -69,12 +69,14 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
 
   const selectOfficial = (id: string) => {
     onChange("voice_id", id);
+    onChange("voice_provider", "heygen");
     onChange("voice_url", "");
     onChange("voice_s3key", "");
   };
 
   const selectClonedVoice = (voice: UserVoice) => {
     onChange("voice_id", voice.externalId ?? "");
+    onChange("voice_provider", "elevenlabs");
     onChange("voice_url", "");
     onChange("voice_s3key", "");
   };

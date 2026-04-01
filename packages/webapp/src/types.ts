@@ -147,15 +147,6 @@ export interface DIDVoice {
   description: string;
 }
 
-export interface UserUpload {
-  id: string;
-  type: string;
-  name: string;
-  url: string;
-  s3Key: string | null;
-  createdAt: string;
-}
-
 export interface UserAvatar {
   id: string;
   provider: string;

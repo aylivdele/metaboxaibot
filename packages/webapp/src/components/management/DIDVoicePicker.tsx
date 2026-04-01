@@ -63,15 +63,11 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
   const selectOfficial = (id: string, provider: string) => {
     onChange("voice_id", id);
     onChange("voice_provider", provider);
-    onChange("voice_url", "");
-    onChange("voice_s3key", "");
   };
 
   const selectClonedVoice = (voice: UserVoice) => {
     onChange("voice_id", voice.externalId ?? "");
     onChange("voice_provider", "elevenlabs");
-    onChange("voice_url", "");
-    onChange("voice_s3key", "");
   };
 
   const languages = [

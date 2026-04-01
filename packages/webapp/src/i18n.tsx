@@ -45,7 +45,7 @@ const translations = {
     "manage.tab.design": "Design",
     "manage.tab.video": "Video",
     "manage.tab.audio": "Audio",
-    "manage.tab.uploads": "Uploads",
+    "manage.tab.uploads": "Voices",
     "audioSettings.title": "Audio Settings",
     "audioSettings.subtitle": "Select a model for audio generation",
     "audioSettings.model": "Model",
@@ -266,9 +266,9 @@ const translations = {
     "videoSettings.saved": "✓ Saved",
 
     // Uploads
-    "uploads.title": "My Uploads",
-    "uploads.subtitle": "Voice recordings and audio files you've shared with the bot",
-    "uploads.empty": "No uploads yet.",
+    "uploads.title": "My voices",
+    "uploads.subtitle": 'Generated voices in the bot\'s "Voice Cloning" section',
+    "uploads.empty": "No voices yet.",
     "uploads.emptyVoices":
       "No voices yet. Clone your voice in the Voice Clone section of the audio bot.",
     "uploads.emptyPhotos": "No photos yet. Send a photo to the bot while in HeyGen mode.",
@@ -337,7 +337,7 @@ const translations = {
     "manage.tab.design": "Дизайн",
     "manage.tab.video": "Видео",
     "manage.tab.audio": "Аудио",
-    "manage.tab.uploads": "Загрузки",
+    "manage.tab.uploads": "Голоса",
     "audioSettings.title": "Настройки аудио",
     "audioSettings.subtitle": "Выберите модель для генерации аудио",
     "audioSettings.model": "Модель",
@@ -555,9 +555,9 @@ const translations = {
     "videoSettings.saved": "✓ Сохранено",
 
     // Uploads
-    "uploads.title": "Мои загрузки",
-    "uploads.subtitle": "Голосовые записи и аудиофайлы, отправленные в бота",
-    "uploads.empty": "Загрузок пока нет.",
+    "uploads.title": "Мои голоса",
+    "uploads.subtitle": 'Сгенерированные голоса в разделе бота "Клонирование голоса"',
+    "uploads.empty": "Голосов пока нет.",
     "uploads.emptyVoices":
       "Голосов пока нет. Клонируйте голос в разделе «Клонирование голоса» аудио-бота.",
     "uploads.emptyPhotos": "Фото пока нет. Отправьте фото боту в режиме HeyGen.",

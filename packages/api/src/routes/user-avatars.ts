@@ -2,6 +2,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { userAvatarService } from "../services/user-avatar.service.js";
 import { userStateService } from "../services/user-state.service.js";
+import { getFileUrl } from "../services/s3.service.js";
 import { config } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
@@ -14,15 +15,23 @@ export const userAvatarsRoutes: FastifyPluginAsync = async (fastify) => {
     const { userId } = request as AuthRequest;
     const { provider } = request.query;
     const avatars = await userAvatarService.list(userId, provider);
-    return avatars.map((a) => ({
-      id: a.id,
-      provider: a.provider,
-      name: a.name,
-      externalId: a.externalId,
-      previewUrl: a.previewUrl,
-      status: a.status,
-      createdAt: a.createdAt.toISOString(),
-    }));
+    return Promise.all(
+      avatars.map(async (a) => {
+        let previewUrl = a.previewUrl;
+        if (previewUrl && !previewUrl.startsWith("http")) {
+          previewUrl = await getFileUrl(previewUrl).catch(() => null);
+        }
+        return {
+          id: a.id,
+          provider: a.provider,
+          name: a.name,
+          externalId: a.externalId,
+          previewUrl,
+          status: a.status,
+          createdAt: a.createdAt.toISOString(),
+        };
+      }),
+    );
   });
 
   /**

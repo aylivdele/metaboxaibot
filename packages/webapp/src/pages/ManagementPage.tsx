@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useI18n } from "../i18n.js";
 import { GptManagementView } from "../components/management/GptManagementView.js";
 import { MediaSettingsView } from "../components/management/MediaSettingsView.js";
-import { UploadsView } from "../components/management/UploadsView.js";
+import { VoicesView } from "../components/management/VoicesView.js";
 
 type ManageTab = "gpt" | "design" | "video" | "audio" | "uploads";
 
@@ -36,7 +36,7 @@ export function ManagementPage({ initialSection }: { initialSection?: string }) 
         {tab === "design" && <MediaSettingsView section="design" />}
         {tab === "video" && <MediaSettingsView section="video" />}
         {tab === "audio" && <MediaSettingsView section="audio" />}
-        {tab === "uploads" && <UploadsView />}
+        {tab === "uploads" && <VoicesView />}
       </div>
     </div>
   );

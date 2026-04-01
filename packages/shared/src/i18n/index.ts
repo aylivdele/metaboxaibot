@@ -101,6 +101,9 @@ export interface Translations {
     videoPhotoSaved: string;
     videoDriverSaved: string;
     videoVoiceSaved: string;
+    videoVoiceQueuing: string;
+    elVoiceGenerating: string;
+    elVoiceTtsExtraCharge: string;
     avatarPhotoSaved: string;
     myVoiceDefaultName: string;
     myAvatarDefaultName: string;

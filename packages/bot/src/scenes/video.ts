@@ -5,10 +5,14 @@ import {
   userUploadsService,
   userAvatarService,
   s3Service,
+  calculateCost,
+  checkBalance,
+  deductTokens,
 } from "@metabox/api/services";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { HeyGenAvatarAdapter } from "@metabox/api/ai/avatar/heygen";
+import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
 import {
   MODELS_BY_SECTION,
   FAMILIES_BY_SECTION,
@@ -18,6 +22,78 @@ import {
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
+
+// ── ElevenLabs TTS pre-generation for lip-sync ────────────────────────────────
+
+const AVATAR_MODELS = new Set(["heygen", "d-id"]);
+
+/**
+ * If the video model uses an ElevenLabs voice (voice_provider === "elevenlabs")
+ * and no raw audio override is present, synthesises the prompt via ElevenLabs TTS,
+ * uploads to S3, deducts TTS tokens, and returns the S3 key.
+ * Returns null when TTS pre-generation is not needed.
+ */
+async function preGenerateELTts(
+  userId: bigint,
+  modelId: string,
+  prompt: string,
+  videoModelSettings: Record<string, unknown>,
+  rawVoiceOverride: string | undefined,
+): Promise<string | null> {
+  if (!AVATAR_MODELS.has(modelId)) return null;
+  if (rawVoiceOverride) return null; // raw audio takes priority
+  if (videoModelSettings.voice_s3key as string | undefined) return null;
+
+  const voiceId = videoModelSettings.voice_id as string | undefined;
+  const voiceProvider = videoModelSettings.voice_provider as string | undefined;
+  if (!voiceId || voiceProvider !== "elevenlabs") return null;
+
+  const ttsModel = AI_MODELS["tts-el"];
+  if (!ttsModel) return null;
+
+  // Get user's tts-el settings (model_id, stability, etc.) and override voice_id
+  const allSettings = await userStateService.getModelSettings(userId);
+  const ttsSettings: Record<string, unknown> = {
+    ...(allSettings["tts-el"] ?? {}),
+    voice_id: voiceId,
+  };
+
+  // Check balance for TTS before generating
+  const ttsCost = calculateCost(
+    ttsModel,
+    0,
+    0,
+    undefined,
+    undefined,
+    ttsSettings,
+    undefined,
+    prompt.length,
+  );
+  await checkBalance(userId, ttsCost);
+
+  // Generate TTS
+  const adapter = new ElevenLabsAdapter("tts-el");
+  const result = await adapter.generate({ prompt, modelSettings: ttsSettings });
+  if (!result.buffer) return null;
+
+  // Upload to S3
+  const s3Key = `voice/el/${userId.toString()}/${Date.now()}.mp3`;
+  const uploadedKey = await s3Service
+    .uploadBuffer(s3Key, result.buffer, "audio/mpeg")
+    .catch(() => null);
+  if (!uploadedKey) {
+    logger.warn(
+      { userId, modelId },
+      "EL TTS generated but S3 upload failed — falling back to no TTS audio",
+    );
+    return null;
+  }
+
+  // Deduct TTS tokens
+  await deductTokens(userId, ttsCost, "tts-el");
+
+  return uploadedKey;
+}
 
 // ── Model selection keyboard ──────────────────────────────────────────────────
 
@@ -147,14 +223,44 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
   const imageUrl = (await userStateService.getAndClearVideoRefImageUrl(ctx.user.id)) ?? undefined;
   // For D-ID: pick up any previously saved driver video URL (one-shot)
   const driverUrl = (await userStateService.getAndClearVideoRefDriverUrl(ctx.user.id)) ?? undefined;
-  // For HeyGen: pick up any previously saved voice recording URL (one-shot)
-  const voiceUrl = (await userStateService.getAndClearVideoRefVoiceUrl(ctx.user.id)) ?? undefined;
+  // For HeyGen/D-ID: pick up any previously saved raw voice recording (one-shot)
+  const rawVoiceS3Key =
+    (await userStateService.getAndClearVideoRefVoiceUrl(ctx.user.id)) ?? undefined;
 
   const prompt = ctx.message.text;
+
+  // Resolve full model settings (webapp-saved) for EL TTS check
+  const allModelSettings = await userStateService.getModelSettings(ctx.user.id);
+  const fullModelSettings = allModelSettings[modelId] ?? {};
 
   const pendingMsg = await ctx.reply(ctx.t.video.queuing);
 
   try {
+    // If avatar model + EL cloned voice selected + no raw audio override → pre-generate TTS
+    let elTtsS3Key: string | null = null;
+    if (AVATAR_MODELS.has(modelId) && !rawVoiceS3Key) {
+      const voiceProvider = fullModelSettings.voice_provider as string | undefined;
+      if (voiceProvider === "elevenlabs") {
+        await ctx.api
+          .editMessageText(chatId, pendingMsg.message_id, ctx.t.video.elVoiceGenerating)
+          .catch(() => void 0);
+        elTtsS3Key = await preGenerateELTts(
+          ctx.user.id,
+          modelId,
+          prompt,
+          fullModelSettings,
+          rawVoiceS3Key,
+        );
+      }
+    }
+
+    await ctx.api
+      .editMessageText(chatId, pendingMsg.message_id, ctx.t.video.queuing)
+      .catch(() => void 0);
+
+    // Build voice override: raw recording > EL TTS > nothing (adapter uses configured voice_id)
+    const effectiveVoiceS3Key = rawVoiceS3Key ?? elTtsS3Key ?? undefined;
+
     await videoGenerationService.submitVideo({
       userId: ctx.user.id,
       modelId,
@@ -165,16 +271,15 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
       aspectRatio: modelSettings?.aspectRatio,
       duration: modelSettings?.duration,
       extraModelSettings:
-        driverUrl || voiceUrl
+        driverUrl || effectiveVoiceS3Key
           ? {
               ...(driverUrl ? { driver_url: driverUrl } : {}),
-              ...(voiceUrl ? { voice_url: voiceUrl } : {}),
+              ...(effectiveVoiceS3Key ? { voice_s3key: effectiveVoiceS3Key, voice_url: "" } : {}),
             }
           : undefined,
     });
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
-
     await ctx.reply(ctx.t.video.asyncPending);
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
@@ -367,12 +472,28 @@ export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
   const adapter = new HeyGenAvatarAdapter();
   const { externalId } = await adapter.create(imageBuffer, "image/jpeg");
 
+  // Generate thumbnail and upload to S3 — store S3 key, not presigned URL
+  let previewUrl: string | undefined;
+  const thumbBuffer = await s3Service
+    .generateThumbnail(imageBuffer, "image/jpeg")
+    .catch(() => null);
+  if (thumbBuffer) {
+    const thumbKey = `avatar_photo/${userId.toString()}/${file.file_id}_thumb.webp`;
+    const uploadedThumbKey = await s3Service
+      .uploadBuffer(thumbKey, thumbBuffer, "image/webp")
+      .catch(() => null);
+    if (uploadedThumbKey) {
+      previewUrl = uploadedThumbKey; // resolved to fresh URL at serve time
+    }
+  }
+
   // Persist UserAvatar record (status ready immediately)
   await userAvatarService.create(userId, {
     provider: "heygen",
     name: ctx.t.video.myAvatarDefaultName,
     externalId,
     status: "ready",
+    previewUrl,
   });
 
   await userStateService.setState(userId, "VIDEO_ACTIVE", "video");
@@ -386,30 +507,75 @@ export async function handleHeygenAvatarCancel(ctx: BotContext): Promise<void> {
   await ctx.editMessageText(ctx.t.video.avatarCreationCancelled).catch(() => void 0);
 }
 
-// ── Voice handler in VIDEO_ACTIVE state (HeyGen audio voice) ──────────────────
+// ── Voice/audio handler in VIDEO_ACTIVE state ────────────────────────────────
+// For avatar models (HeyGen, D-ID): start generation immediately (lip-sync, no prompt needed).
+// For other models: save as one-shot reference for the next text message.
 
 export async function handleVideoVoice(ctx: BotContext): Promise<void> {
-  if (!ctx.user || !ctx.message?.voice) return;
-  const file = await ctx.api.getFile(ctx.message.voice.file_id);
+  if (!ctx.user) return;
+  const audioMsg = ctx.message?.voice ?? ctx.message?.audio;
+  if (!audioMsg) return;
+
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  const userId = ctx.user.id;
+  const state = await userStateService.get(userId);
+  const modelId = state?.videoModelId ?? "kling";
+
+  const file = await ctx.api.getFile(audioMsg.file_id);
   const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
 
-  // Upload to S3 for permanent storage; fall back to Telegram URL if S3 not configured
-  const userId = ctx.user.id;
-  const s3Key = `voice/${userId.toString()}/${file.file_id}.ogg`;
-  const uploadedKey = await s3Service.uploadFromUrl(s3Key, tgUrl, "audio/ogg").catch(() => null);
-  const publicUrl = uploadedKey
-    ? ((await s3Service.getFileUrl(uploadedKey).catch(() => null)) ?? tgUrl)
-    : tgUrl;
+  // Determine content type: voice messages are ogg, audio files vary
+  const isVoice = !!ctx.message?.voice;
+  const contentType = isVoice ? "audio/ogg" : (ctx.message?.audio?.mime_type ?? "audio/mpeg");
+  const ext = isVoice ? "ogg" : (file.file_path?.split(".").pop() ?? "mp3");
 
-  // Save to DB as a named upload
-  await userUploadsService.create(userId, {
-    type: "voice",
-    name: ctx.t.video.myVoiceDefaultName,
-    url: publicUrl,
-    s3Key: uploadedKey ?? undefined,
-  });
+  // Upload to S3 — store key, not presigned URL
+  const s3Key = `voice/${userId.toString()}/${file.file_id}.${ext}`;
+  const uploadedKey = await s3Service.uploadFromUrl(s3Key, tgUrl, contentType).catch(() => null);
 
-  // Also set as one-shot override for the next generation
-  await userStateService.setVideoRefVoiceUrl(userId, publicUrl);
-  await ctx.reply(ctx.t.video.videoVoiceSaved);
+  if (!AVATAR_MODELS.has(modelId)) {
+    // Non-avatar model: save as one-shot reference (using S3 key if available, else TG URL)
+    const refValue = uploadedKey ?? tgUrl;
+    await userStateService.setVideoRefVoiceUrl(userId, refValue);
+    await ctx.reply(ctx.t.video.videoVoiceSaved);
+    return;
+  }
+
+  // Avatar model: trigger generation immediately — raw audio is the voice, no text prompt needed
+  const pendingMsg = await ctx.reply(ctx.t.video.videoVoiceQueuing);
+
+  try {
+    const videoSettings = await userStateService.getVideoSettings(userId);
+    const modelSettings = videoSettings[modelId];
+    const imageUrl = (await userStateService.getAndClearVideoRefImageUrl(userId)) ?? undefined;
+
+    await videoGenerationService.submitVideo({
+      userId,
+      modelId,
+      prompt: "",
+      imageUrl,
+      telegramChatId: chatId,
+      sendOriginalLabel: ctx.t.common.sendOriginal,
+      aspectRatio: modelSettings?.aspectRatio,
+      duration: modelSettings?.duration,
+      extraModelSettings: uploadedKey
+        ? { voice_s3key: uploadedKey, voice_url: "" }
+        : { voice_url: tgUrl, voice_s3key: "" },
+    });
+
+    await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+    await ctx.reply(ctx.t.video.asyncPending);
+  } catch (err: unknown) {
+    await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+    if (err instanceof Error && err.message === "NO_SUBSCRIPTION") {
+      await replyNoSubscription(ctx);
+    } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
+      await replyInsufficientTokens(ctx);
+    } else {
+      logger.error(err, "Video voice error");
+      await ctx.reply(ctx.t.video.generationFailed);
+    }
+  }
 }

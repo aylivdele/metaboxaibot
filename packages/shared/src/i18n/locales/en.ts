@@ -115,10 +115,14 @@ export default {
       "Send the text you want the avatar to speak.\nCustomize the voice and background via the Management button.",
     lipSyncActivated:
       "Optionally send a photo with a face first, then send the text to be spoken.\nWithout a photo, the default avatar will be used.",
+    videoVoiceQueuing: "🎬 Audio received, queuing generation...",
+    elVoiceGenerating: "🎙 Generating speech via ElevenLabs...",
+    elVoiceTtsExtraCharge:
+      "⚠️ A cloned ElevenLabs voice is selected — an additional TTS charge will be applied.",
     hintHeygen:
-      "👾 Set up your avatar and voice in the ⚙ Management section.\n🎙 To have the avatar speak in your voice — create a voice clone in the 🎙 Audio section.\n✉️ When ready — send the text you want the avatar to speak.",
+      "👾 Set up your avatar and voice in the ⚙ Management section.\n\n✉️ Send text → the avatar will speak it. If a cloned ElevenLabs voice is selected, speech will be synthesised via ElevenLabs (extra TTS charge).\n🎙 Or send a voice message / audio file directly — the avatar will lip-sync to your recording without TTS.",
     hintDid:
-      "📸 Send a photo with a face — it will become the avatar.\n✉️ Then send the text to be spoken.\n⚙ Voice and other settings are available on the Management page.",
+      "📸 Send a photo with a face — it will become the avatar.\n\n✉️ Send text → the avatar will speak it. If a cloned ElevenLabs voice is selected, speech will be synthesised via ElevenLabs (extra TTS charge).\n🎙 Or send a voice message / audio file directly — the avatar will lip-sync to your recording without TTS.\n⚙ Voice and other settings are available on the Management page.",
     hintHiggsfield:
       "📸 Send a photo to create an animation.\nYou can also pick several motion presets in Management section of Mini App.\n✉️ Once ready — send a text describing a video you want to generate.",
     higgsfieldRequiresImage:

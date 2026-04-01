@@ -15,7 +15,13 @@ export const userAvatarService = {
 
   async create(
     userId: bigint,
-    params: { provider: string; name: string; externalId?: string; status?: string },
+    params: {
+      provider: string;
+      name: string;
+      externalId?: string;
+      status?: string;
+      previewUrl?: string;
+    },
   ): Promise<UserAvatar> {
     return db.userAvatar.create({
       data: { userId, status: "creating", ...params },
