@@ -32,7 +32,11 @@ import {
   handleAvatarPhotoCapture,
   handleHeygenAvatarCancel,
 } from "./scenes/video.js";
-import { handleAudioSubSection, handleAudioMessage } from "./scenes/audio.js";
+import {
+  handleAudioSubSection,
+  handleAudioMessage,
+  handleVoiceCloneUpload,
+} from "./scenes/audio.js";
 import { handleSendOriginal } from "./handlers/send-original.handler.js";
 import {
   handleMergeChoice,
@@ -109,6 +113,13 @@ export function createBot(token: string): Bot<BotContext> {
   bot.callbackQuery("merge:cancel", handleMergeCancel);
   bot.callbackQuery(/^merge_confirm:(site|bot):/, handleMergeConfirm);
 
+  // ── Audio model selection callback ───────────────────────────────────────
+  bot.callbackQuery(/^audio_model:/, async (ctx) => {
+    const modelId = ctx.callbackQuery.data.split(":")[1];
+    await handleAudioSubSection(ctx, modelId);
+    await ctx.answerCallbackQuery();
+  });
+
   // ── Reply keyboard — menu navigation ─────────────────────────────────────
   // Translation keys are resolved at runtime after i18n middleware runs.
   bot.on("message:text", async (ctx, next) => {
@@ -146,9 +157,21 @@ export function createBot(token: string): Bot<BotContext> {
         });
       },
       // Audio section buttons
-      [t.audio.tts]: () => handleAudioSubSection(ctx, "tts-openai"),
+      [t.audio.tts]: async () => {
+        await ctx.reply("Выберите провайдер синтеза речи:", {
+          reply_markup: new InlineKeyboard()
+            .text(t.audio.ttsOpenai, "audio_model:tts-openai")
+            .text(t.audio.ttsEl, "audio_model:tts-el"),
+        });
+      },
       [t.audio.voiceClone]: () => handleAudioSubSection(ctx, "voice-clone"),
-      [t.audio.music]: () => handleAudioSubSection(ctx, "suno"),
+      [t.audio.music]: async () => {
+        await ctx.reply("Выберите провайдер генерации музыки:", {
+          reply_markup: new InlineKeyboard()
+            .text(t.audio.musicSuno, "audio_model:suno")
+            .text(t.audio.musicEl, "audio_model:music-el"),
+        });
+      },
       [t.audio.sounds]: () => handleAudioSubSection(ctx, "sounds-el"),
     };
 
@@ -189,7 +212,14 @@ export function createBot(token: string): Bot<BotContext> {
       if (ctx.message?.photo) return handleAvatarPhotoCapture(ctx);
       return; // ignore non-photo messages while waiting for avatar photo
     }
-    if (state?.state === "AUDIO_ACTIVE") return handleAudioMessage(ctx);
+    if (state?.state === "AUDIO_ACTIVE") {
+      if (state.audioModelId === "voice-clone") {
+        if (ctx.message?.voice || ctx.message?.audio) return handleVoiceCloneUpload(ctx);
+        await ctx.reply(ctx.t.audio.voiceCloneNeedsAudio);
+        return;
+      }
+      return handleAudioMessage(ctx);
+    }
 
     return next();
   });

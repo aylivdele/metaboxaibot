@@ -35,6 +35,8 @@ import { didVoicesRoutes } from "./routes/d-id-voices.js";
 import { uploadsRoutes } from "./routes/uploads.js";
 import { higgsfieldMotionsRoutes } from "./routes/higgsfield-motions.js";
 import { userAvatarsRoutes } from "./routes/user-avatars.js";
+import { elevenlabsVoicesRoutes } from "./routes/elevenlabs-voices.js";
+import { userVoicesRoutes } from "./routes/user-voices.js";
 import { downloadRoutes } from "./routes/download.js";
 import { startRateScheduler } from "./services/exchange-rate.service.js";
 import { startSubscriptionScheduler } from "./services/subscription.service.js";
@@ -119,6 +121,8 @@ await server.register(didVoicesRoutes);
 await server.register(uploadsRoutes);
 await server.register(higgsfieldMotionsRoutes);
 await server.register(userAvatarsRoutes);
+await server.register(elevenlabsVoicesRoutes);
+await server.register(userVoicesRoutes);
 await server.register(downloadRoutes);
 
 // Start USDT/RUB exchange rate scheduler (fetches from Binance 4× daily)

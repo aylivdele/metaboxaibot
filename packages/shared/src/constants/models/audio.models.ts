@@ -98,24 +98,42 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     id: "voice-clone",
     name: "🎤 Клонирование голоса",
     description:
-      "Клонирование голоса с высокой точностью. Воспроизводит тембр и интонации исходного голоса по короткому аудиообразцу.",
+      "Создаёт ваш голосовой профиль в ElevenLabs по короткому аудиообразцу. Готовый голос доступен в TTS ElevenLabs и видео-аватарах.",
     section: "audio",
     provider: "elevenlabs",
     costUsdPerRequest: 0,
-    costUsdPerKChar: 0.24, // eleven_multilingual_v2: $0.24/1K chars (Pro-тир)
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: false,
+    supportsVoice: true,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    settings: [],
+  },
+  "tts-el": {
+    id: "tts-el",
+    name: "🔊 Синтез речи (ElevenLabs)",
+    description:
+      "Синтез речи от ElevenLabs с выбором из широкой библиотеки голосов или ваших клонированных голосов.",
+    section: "audio",
+    provider: "elevenlabs",
+    costUsdPerRequest: 0,
+    costUsdPerKChar: 0.24, // eleven_multilingual_v2: $0.24/1K chars
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     costVariants: {
       settingKey: "model_id",
       map: {
         eleven_multilingual_v2: { costUsdPerKChar: 0.24 },
-        eleven_turbo_v2_5: { costUsdPerKChar: 0.12 }, // 0.5 кредита/символ — в 2× дешевле
+        eleven_turbo_v2_5: { costUsdPerKChar: 0.12 },
       },
     },
     supportsImages: false,
-    supportsVoice: true,
+    supportsVoice: false,
     supportsWeb: false,
-    isAsync: true,
+    isAsync: false,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     settings: [
@@ -123,7 +141,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         key: "model_id",
         label: "Модель синтеза",
         description:
-          "multilingual_v2 — максимальное качество (дороже), turbo_v2_5 — быстрее и в 2× дешевле, 32 языка.",
+          "multilingual_v2 — максимальное качество (дороже), turbo_v2_5 — быстрее и в 2× дешевле.",
         type: "select",
         options: [
           { value: "eleven_multilingual_v2", label: "Multilingual v2 (макс. качество)" },
@@ -132,10 +150,17 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         default: "eleven_multilingual_v2",
       },
       {
+        key: "voice_id",
+        label: "Голос",
+        description: "Выберите голос из официальной библиотеки ElevenLabs или своих клонированных.",
+        type: "elevenlabs-voice-picker",
+        default: "21m00Tcm4TlvDq8ikWAM",
+      },
+      {
         key: "stability",
         label: "Стабильность",
         description:
-          "Однородность голоса: высокое значение — ровно и монотонно, низкое — эмоциональнее и разнообразнее.",
+          "Однородность голоса: высокое значение — ровно и монотонно, низкое — эмоциональнее.",
         type: "slider",
         min: 0,
         max: 1,
@@ -145,8 +170,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
       {
         key: "similarity_boost",
         label: "Схожесть с оригиналом",
-        description:
-          "Насколько точно воспроизводится оригинальный тембр и интонации голоса-образца.",
+        description: "Насколько точно воспроизводится тембр выбранного голоса.",
         type: "slider",
         min: 0,
         max: 1,
@@ -156,8 +180,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
       {
         key: "style",
         label: "Выразительность стиля",
-        description:
-          "Насколько актёрски и эмоционально звучит речь: 0 — нейтрально, 1 — максимально выразительно.",
+        description: "0 — нейтрально, 1 — максимально выразительно.",
         type: "slider",
         min: 0,
         max: 1,
@@ -167,7 +190,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
       {
         key: "use_speaker_boost",
         label: "Speaker Boost",
-        description: "Усиление качества и чёткости голоса. Рекомендуется оставить включённым.",
+        description: "Усиление качества и чёткости голоса.",
         type: "toggle",
         default: true,
       },
@@ -253,6 +276,48 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         label: "Влияние промпта",
         description:
           "Насколько точно звук следует описанию (0.0–1.0). Ниже — больше вариативности.",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.3,
+      },
+    ],
+  },
+  "music-el": {
+    id: "music-el",
+    name: "🎶 Музыка (ElevenLabs)",
+    description:
+      "Генерирует фоновую музыку, амбиент и музыкальные атмосферы по текстовому описанию через ElevenLabs.",
+    section: "audio",
+    provider: "elevenlabs",
+    costUsdPerRequest: 0.048, // AI-determines duration: 100 credits fallback
+    costUsdPerSecond: 0.0096, // manual duration: 20 credits/sec × $0.00048/credit
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: false,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    settings: [
+      {
+        key: "duration_seconds",
+        label: "Длительность (сек)",
+        description:
+          "Конкретная длительность в секундах (1–22). Оставьте пустым — модель выберет сама.",
+        type: "slider",
+        min: 1,
+        max: 22,
+        step: 1,
+        default: null,
+      },
+      {
+        key: "prompt_influence",
+        label: "Влияние промпта",
+        description:
+          "Насколько точно музыка следует описанию (0.0–1.0). Ниже — больше вариативности.",
         type: "slider",
         min: 0,
         max: 1,

@@ -38,6 +38,7 @@ export type ModelSettingType =
   | "number"
   | "voice-picker"
   | "did-voice-picker"
+  | "elevenlabs-voice-picker"
   | "color"
   | "avatar-picker"
   | "motion-picker";

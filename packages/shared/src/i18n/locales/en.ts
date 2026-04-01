@@ -65,16 +65,30 @@ export default {
   },
   audio: {
     sectionTitle: "🎧 AI Audio\nChoose a section to work with audio 👇",
-    tts: "🗣 Text to Speech",
+    tts: "🗣 Speech synthesis",
+    ttsEl: "🔊 TTS ElevenLabs",
+    ttsOpenai: "🗣 OpenAI TTS",
     voiceClone: "🎙 Voice Clone",
-    music: "🎵 Music Generation",
+    music: "🎵 Music generation",
+    musicEl: "🎶 Music (ElevenLabs)",
+    musicSuno: "🎵 Suno",
     sounds: "🔊 Sound Effects",
     backToMain: "🏠 Back to Main Menu",
-    ttsActivated: "🗣 Text-to-Speech activated.\nSend me any text and I will convert it to speech.",
+    ttsActivated:
+      "🗣 Text-to-Speech (OpenAI) activated.\nSend me any text and I will convert it to speech.",
+    ttsElActivated:
+      "🔊 ElevenLabs TTS activated.\nSend me any text to synthesize. Configure the voice in Management settings.",
     voiceCloneActivated:
-      "🎙 Voice synthesis activated.\nSend me a text and it will be spoken in a natural AI voice.",
+      "🎙 Voice cloning.\nSend me a voice message or audio file (MP3/WAV/OGG) — I will create your voice profile in ElevenLabs.\nThe voice will then be available in TTS ElevenLabs and video avatar settings.",
+    voiceCloneNeedsAudio: "Please send a voice message or audio file for voice cloning.",
+    voiceCloneProcessing: "⏳ Creating your voice profile...",
+    voiceCloneSuccess:
+      "✅ Voice «{name}» created! It is now available in ElevenLabs TTS and video avatar settings.",
+    voiceCloneFailed: "❌ Failed to create voice. Check the file format and try again.",
     musicActivated:
-      "🎵 Music generation activated.\nDescribe the music you want (genre, mood, style) and I will create it.",
+      "🎵 Music generation (Suno) activated.\nDescribe the music you want (genre, mood, style) and I will create it.",
+    musicElActivated:
+      "🎶 ElevenLabs music activated.\nDescribe the sound atmosphere or melody and I will generate it.",
     soundsActivated:
       '🔊 Sound effects activated.\nDescribe the sound you want (e.g. "rain on a window", "thunder") and I will generate it.',
     activated: "🎧 Audio activated.\nSend me your request.",

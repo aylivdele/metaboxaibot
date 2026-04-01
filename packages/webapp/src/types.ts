@@ -76,6 +76,7 @@ export interface ModelSettingDef {
     | "number"
     | "voice-picker"
     | "did-voice-picker"
+    | "elevenlabs-voice-picker"
     | "color"
     | "avatar-picker"
     | "motion-picker";
@@ -85,6 +86,25 @@ export interface ModelSettingDef {
   step?: number;
   default: string | number | boolean | null;
   unavailableIf?: UnavailableRule;
+}
+
+export interface ElevenLabsVoice {
+  voice_id: string;
+  name: string;
+  category: string;
+  gender: string | null;
+  language: string | null;
+  preview_url: string | null;
+}
+
+export interface UserVoice {
+  id: string;
+  provider: string;
+  name: string;
+  externalId: string | null;
+  previewUrl: string | null;
+  status: "ready" | "failed";
+  createdAt: string;
 }
 
 export interface HeyGenVoice {

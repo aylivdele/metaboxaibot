@@ -1,51 +1,41 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
-import type { DIDVoice, UserUpload, UserVoice } from "../../types.js";
+import type { ElevenLabsVoice, UserVoice } from "../../types.js";
 
-interface DIDVoicePickerProps {
+interface ElevenLabsVoicePickerProps {
   voiceId: string;
-  voiceUrl: string;
-  voiceS3Key: string;
   onChange: (key: string, value: unknown) => void;
 }
 
-export function DIDVoicePicker({ voiceId, voiceUrl, voiceS3Key, onChange }: DIDVoicePickerProps) {
+export function ElevenLabsVoicePicker({ voiceId, onChange }: ElevenLabsVoicePickerProps) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<"official" | "uploads">(
-    voiceUrl || voiceS3Key ? "uploads" : "official",
-  );
-  const [voices, setVoices] = useState<DIDVoice[]>([]);
+  const [tab, setTab] = useState<"official" | "mine">("official");
+  const [voices, setVoices] = useState<ElevenLabsVoice[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
-  const [uploads, setUploads] = useState<UserUpload[]>([]);
-  const [clonedVoices, setClonedVoices] = useState<UserVoice[]>([]);
-  const [uploadsLoading, setUploadsLoading] = useState(false);
+  const [myVoices, setMyVoices] = useState<UserVoice[]>([]);
+  const [myVoicesLoading, setMyVoicesLoading] = useState(false);
   const [langFilter, setLangFilter] = useState("all");
   const [genderFilter, setGenderFilter] = useState("all");
-  const [providerFilter, setProviderFilter] = useState("all");
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (tab === "official" && voices.length === 0) {
       setVoicesLoading(true);
-      api.didVoices
+      api.elevenlabsVoices
         .list()
         .then(setVoices)
         .catch(() => setVoices([]))
         .finally(() => setVoicesLoading(false));
     }
-    if (tab === "uploads") {
-      setUploadsLoading(true);
-      Promise.all([
-        api.uploads.list("voice").catch(() => [] as UserUpload[]),
-        api.userVoices.list("elevenlabs").catch(() => [] as UserVoice[]),
-      ])
-        .then(([u, v]) => {
-          setUploads(u);
-          setClonedVoices(v);
-        })
-        .finally(() => setUploadsLoading(false));
+    if (tab === "mine") {
+      setMyVoicesLoading(true);
+      api.userVoices
+        .list("elevenlabs")
+        .then(setMyVoices)
+        .catch(() => setMyVoices([]))
+        .finally(() => setMyVoicesLoading(false));
     }
   }, [tab, voices.length]);
 
@@ -54,8 +44,8 @@ export function DIDVoicePicker({ voiceId, voiceUrl, voiceS3Key, onChange }: DIDV
     setPlayingId(null);
   };
 
-  const togglePreview = (voiceId: string, previewUrl: string) => {
-    if (playingId === voiceId) {
+  const togglePreview = (id: string, previewUrl: string) => {
+    if (playingId === id) {
       stopAudio();
       return;
     }
@@ -63,48 +53,27 @@ export function DIDVoicePicker({ voiceId, voiceUrl, voiceS3Key, onChange }: DIDV
     const audio = new Audio(previewUrl);
     audioRef.current = audio;
     audio.play().catch(() => void 0);
-    setPlayingId(voiceId);
+    setPlayingId(id);
     audio.onended = () => setPlayingId(null);
   };
 
-  const selectOfficial = (id: string, provider: string) => {
-    onChange("voice_id", id);
-    onChange("voice_provider", provider);
-    onChange("voice_url", "");
-    onChange("voice_s3key", "");
+  const handleDeleteMyVoice = async (e: React.MouseEvent, voice: UserVoice) => {
+    e.stopPropagation();
+    if (!confirm(`Удалить голос «${voice.name}»?`)) return;
+    await api.userVoices.delete(voice.id).catch(() => void 0);
+    setMyVoices((prev) => prev.filter((v) => v.id !== voice.id));
+    if (voiceId === voice.externalId) onChange("voice_id", "");
   };
 
-  const selectUpload = (upload: UserUpload) => {
-    onChange("voice_url", upload.url);
-    onChange("voice_s3key", upload.s3Key ?? "");
-    onChange("voice_id", "");
-    onChange("voice_provider", "");
-  };
-
-  const selectClonedVoice = (voice: UserVoice) => {
-    onChange("voice_id", voice.externalId ?? "");
-    onChange("voice_provider", "elevenlabs");
-    onChange("voice_url", "");
-    onChange("voice_s3key", "");
-  };
-
-  // Collect unique language names across all voices
   const languages = [
     "all",
-    ...Array.from(
-      new Set(voices.flatMap((v) => v.languages.map((l) => l.language)).filter(Boolean)),
-    ).sort(),
-  ];
-  const providers = [
-    "all",
-    ...Array.from(new Set(voices.map((v) => v.provider).filter(Boolean))).sort(),
+    ...Array.from(new Set(voices.map((v) => v.language).filter(Boolean) as string[])).sort(),
   ];
 
   const filtered = voices.filter(
     (v) =>
-      (langFilter === "all" || v.languages.some((l) => l.language === langFilter)) &&
-      (genderFilter === "all" || v.gender === genderFilter) &&
-      (providerFilter === "all" || v.provider === providerFilter),
+      (langFilter === "all" || v.language === langFilter) &&
+      (genderFilter === "all" || v.gender === genderFilter),
   );
 
   return (
@@ -120,10 +89,10 @@ export function DIDVoicePicker({ voiceId, voiceUrl, voiceS3Key, onChange }: DIDV
           {t("uploads.officialVoices")}
         </button>
         <button
-          className={`voice-picker__tab${tab === "uploads" ? " voice-picker__tab--active" : ""}`}
+          className={`voice-picker__tab${tab === "mine" ? " voice-picker__tab--active" : ""}`}
           onClick={() => {
             stopAudio();
-            setTab("uploads");
+            setTab("mine");
           }}
         >
           {t("uploads.myVoices")}
@@ -147,17 +116,6 @@ export function DIDVoicePicker({ voiceId, voiceUrl, voiceS3Key, onChange }: DIDV
                   </option>
                 ))}
               </select>
-              <select
-                className="voice-picker__filter-select"
-                value={providerFilter}
-                onChange={(e) => setProviderFilter(e.target.value)}
-              >
-                {providers.map((p) => (
-                  <option key={p} value={p}>
-                    {p === "all" ? "Все провайдеры" : p}
-                  </option>
-                ))}
-              </select>
               <div className="voice-picker__gender-btns">
                 {(["all", "male", "female"] as const).map((g) => (
                   <button
@@ -172,30 +130,37 @@ export function DIDVoicePicker({ voiceId, voiceUrl, voiceS3Key, onChange }: DIDV
             </div>
             <div className="voice-picker__list">
               {filtered.map((voice) => {
-                const langLabel = voice.languages.map((l) => l.language).join(", ");
-                const previewUrl = voice.languages.find((l) => l.previewUrl)?.previewUrl;
-                const isPlaying = playingId === voice.id;
+                const isSelected = voiceId === voice.voice_id;
+                const isPlaying = playingId === voice.voice_id;
                 return (
                   <div
-                    key={voice.id}
-                    className={`voice-picker__item${voiceId === voice.id && !voiceUrl ? " voice-picker__item--selected" : ""}`}
-                    onClick={() => selectOfficial(voice.id, voice.provider)}
+                    key={voice.voice_id}
+                    className={`voice-picker__item${isSelected ? " voice-picker__item--selected" : ""}`}
+                    onClick={() => onChange("voice_id", voice.voice_id)}
                   >
                     <div className="voice-picker__item-info">
                       <span className="voice-picker__item-name">{voice.name}</span>
                       <span className="voice-picker__item-meta">
-                        {voice.provider} · {langLabel}
-                        {voice.gender
-                          ? ` · ${voice.gender === "male" ? "М" : voice.gender === "female" ? "Ж" : voice.gender}`
-                          : ""}
+                        {[
+                          voice.language,
+                          voice.gender
+                            ? voice.gender === "male"
+                              ? "М"
+                              : voice.gender === "female"
+                                ? "Ж"
+                                : voice.gender
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </span>
                     </div>
-                    {previewUrl && (
+                    {voice.preview_url && (
                       <button
                         className={`voice-picker__preview-btn${isPlaying ? " voice-picker__preview-btn--playing" : ""}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          togglePreview(voice.id, previewUrl);
+                          togglePreview(voice.voice_id, voice.preview_url!);
                         }}
                         title={isPlaying ? "Стоп" : "Прослушать"}
                       >
@@ -212,46 +177,34 @@ export function DIDVoicePicker({ voiceId, voiceUrl, voiceS3Key, onChange }: DIDV
           </>
         ))}
 
-      {tab === "uploads" &&
-        (uploadsLoading ? (
+      {tab === "mine" &&
+        (myVoicesLoading ? (
           <div className="voice-picker__loading">Загрузка…</div>
-        ) : clonedVoices.length === 0 && uploads.length === 0 ? (
+        ) : myVoices.length === 0 ? (
           <div className="voice-picker__empty">{t("uploads.emptyVoices")}</div>
         ) : (
           <div className="voice-picker__list">
-            {clonedVoices.map((voice) => {
+            {myVoices.map((voice) => {
               const isSelected = voiceId === voice.externalId;
               return (
                 <div
                   key={voice.id}
                   className={`voice-picker__item${isSelected ? " voice-picker__item--selected" : ""}`}
-                  onClick={() => selectClonedVoice(voice)}
+                  onClick={() => onChange("voice_id", voice.externalId ?? "")}
                 >
                   <div className="voice-picker__item-info">
                     <span className="voice-picker__item-name">{voice.name}</span>
                     <span className="voice-picker__item-meta">
-                      ElevenLabs · {new Date(voice.createdAt).toLocaleDateString()}
+                      {new Date(voice.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                </div>
-              );
-            })}
-            {uploads.map((upload) => {
-              const isSelected = upload.s3Key
-                ? voiceS3Key === upload.s3Key
-                : voiceUrl === upload.url;
-              return (
-                <div
-                  key={upload.id}
-                  className={`voice-picker__item${isSelected ? " voice-picker__item--selected" : ""}`}
-                  onClick={() => selectUpload(upload)}
-                >
-                  <div className="voice-picker__item-info">
-                    <span className="voice-picker__item-name">{upload.name}</span>
-                    <span className="voice-picker__item-meta">
-                      {new Date(upload.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
+                  <button
+                    className="voice-picker__preview-btn"
+                    onClick={(e) => handleDeleteMyVoice(e, voice)}
+                    title="Удалить"
+                  >
+                    🗑
+                  </button>
                 </div>
               );
             })}

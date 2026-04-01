@@ -60,13 +60,23 @@ export interface Translations {
   audio: {
     sectionTitle: string;
     tts: string;
+    ttsEl: string;
+    ttsOpenai: string;
     voiceClone: string;
     music: string;
+    musicEl: string;
+    musicSuno: string;
     sounds: string;
     backToMain: string;
     ttsActivated: string;
+    ttsElActivated: string;
     voiceCloneActivated: string;
+    voiceCloneNeedsAudio: string;
+    voiceCloneProcessing: string;
+    voiceCloneSuccess: string;
+    voiceCloneFailed: string;
     musicActivated: string;
+    musicElActivated: string;
     soundsActivated: string;
     activated: string;
     processing: string;

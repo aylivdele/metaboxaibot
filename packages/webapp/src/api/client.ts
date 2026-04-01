@@ -14,6 +14,8 @@ import type {
   DIDVoice,
   UserUpload,
   UserAvatar,
+  ElevenLabsVoice,
+  UserVoice,
 } from "../types.js";
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
@@ -261,6 +263,22 @@ export const api = {
 
   didVoices: {
     list: () => request<DIDVoice[]>("/d-id-voices"),
+  },
+
+  elevenlabsVoices: {
+    list: () => request<ElevenLabsVoice[]>("/elevenlabs-voices"),
+  },
+
+  userVoices: {
+    list: (provider?: string) =>
+      request<UserVoice[]>(provider ? `/user-voices?provider=${provider}` : "/user-voices"),
+    rename: (id: string, name: string) =>
+      request<UserVoice>(`/user-voices/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/user-voices/${id}`, { method: "DELETE" }),
   },
 
   userAvatars: {

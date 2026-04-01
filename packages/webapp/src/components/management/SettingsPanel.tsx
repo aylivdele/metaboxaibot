@@ -3,6 +3,7 @@ import { StyledSelect } from "./StyledSelect.js";
 import { CustomSlider } from "./CustomSlider.js";
 import { HeyGenVoicePicker } from "./HeyGenVoicePicker.js";
 import { DIDVoicePicker } from "./DIDVoicePicker.js";
+import { ElevenLabsVoicePicker } from "./ElevenLabsVoicePicker.js";
 import { HeyGenAvatarPicker } from "./HeyGenAvatarPicker.js";
 import { HiggsFieldMotionPicker } from "./HiggsFieldMotionPicker.js";
 import type { MotionEntry } from "./HiggsFieldMotionPicker.js";
@@ -145,6 +146,12 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
                 voiceId={String(values["voice_id"] ?? "")}
                 voiceUrl={String(values["voice_url"] ?? "")}
                 voiceS3Key={String(values["voice_s3key"] ?? "")}
+                onChange={onChange}
+              />
+            )}
+            {def.type === "elevenlabs-voice-picker" && (
+              <ElevenLabsVoicePicker
+                voiceId={String(values["voice_id"] ?? "")}
                 onChange={onChange}
               />
             )}

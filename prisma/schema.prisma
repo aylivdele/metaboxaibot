@@ -42,6 +42,7 @@ model User {
   userState    UserState?
   uploads           UserUpload[]
   userAvatars       UserAvatar[]
+  userVoices        UserVoice[]
   localSubscription LocalSubscription?
 
   @@map("users")
@@ -232,6 +233,28 @@ model UserAvatar {
   @@index([userId])
   @@index([userId, provider])
   @@map("user_avatars")
+}
+
+// ─────────────────────────────────────────────
+// Пользовательские голоса (клонированные через ElevenLabs)
+// ─────────────────────────────────────────────
+model UserVoice {
+  id         String   @id @default(cuid())
+  userId     BigInt
+  provider   String   // "elevenlabs"
+  name       String
+  externalId String?  // ElevenLabs voice_id
+  previewUrl String?
+  status     String   @default("ready") // "ready" | "failed"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, provider])
+  @@map("user_voices")
 }
 
 // ─────────────────────────────────────────────
