@@ -23,15 +23,22 @@ interface SunoTrack {
   id?: string;
   audioUrl?: string;
   streamAudioUrl?: string;
+  imageUrl?: string;
   title?: string;
   duration?: number;
 }
 
 interface SunoPollResponse {
-  taskId: string;
-  status: string;
-  response?: {
-    sunoData?: SunoTrack[];
+  code: number;
+  msg?: string;
+  data?: {
+    taskId?: string;
+    status?: string;
+    errorCode?: number | null;
+    errorMessage?: string | null;
+    response?: {
+      sunoData?: SunoTrack[];
+    };
   };
 }
 
@@ -111,24 +118,25 @@ export class ApipassSunoAdapter implements AudioAdapter {
 
     if (!resp.ok) throw new Error(`Suno API poll error ${resp.status}`);
 
-    const data = (await resp.json()) as SunoPollResponse;
+    const body = (await resp.json()) as SunoPollResponse;
+    const taskData = body.data;
+    const status = taskData?.status;
 
     // Terminal error statuses
     if (
-      data.status === "GENERATE_AUDIO_FAILED" ||
-      data.status === "CREATE_TASK_FAILED" ||
-      data.status === "SENSITIVE_WORD_ERROR"
+      status === "GENERATE_AUDIO_FAILED" ||
+      status === "CREATE_TASK_FAILED" ||
+      status === "SENSITIVE_WORD_ERROR"
     ) {
-      throw new Error(`Suno generation failed: ${data.status}`);
+      throw new Error(`Suno generation failed: ${status} ${taskData?.errorMessage ?? ""}`);
     }
 
     // Not ready yet
-    if (data.status !== "SUCCESS" && data.status !== "FIRST_SUCCESS") return null;
+    if (status !== "SUCCESS" && status !== "FIRST_SUCCESS") return null;
 
-    const track = data.response?.sunoData?.[0];
+    const track = taskData?.response?.sunoData?.[0];
     if (!track) return null;
 
-    // Prefer streamAudioUrl (available in ~30s) over audioUrl (~2-3 min)
     const url = track.streamAudioUrl ?? track.audioUrl;
     if (!url) return null;
 
