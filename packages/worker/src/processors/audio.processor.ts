@@ -139,12 +139,20 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
         data: { status: "failed", error: String(err) },
       });
 
-      await telegram
-        .sendMessage(
-          telegramChatId,
-          "❌ Ошибка при генерации, попробуйте позже или обратитесь в поддержку.",
-        )
-        .catch(() => void 0);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      let userMessage = "❌ Ошибка при генерации, попробуйте позже или обратитесь в поддержку.";
+      if (errMsg.includes("SENSITIVE_WORD_ERROR")) {
+        userMessage =
+          "❌ Запрос содержит запрещённый контент (авторские права или ограниченные слова). Измените описание и попробуйте снова.";
+      } else if (errMsg.includes("GENERATE_AUDIO_FAILED")) {
+        userMessage = "❌ Провайдер не смог сгенерировать аудио. Попробуйте изменить запрос.";
+      } else if (errMsg.includes("CREATE_TASK_FAILED")) {
+        userMessage = "❌ Не удалось создать задачу генерации. Попробуйте позже.";
+      } else if (errMsg.includes("Timed out")) {
+        userMessage = "❌ Генерация заняла слишком долго. Попробуйте снова.";
+      }
+
+      await telegram.sendMessage(telegramChatId, userMessage).catch(() => void 0);
     }
 
     throw err;

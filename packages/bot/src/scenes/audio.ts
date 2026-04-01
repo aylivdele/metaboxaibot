@@ -84,14 +84,19 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
     const count = await db.userVoice.count({
       where: { userId: ctx.user.id, provider: "elevenlabs" },
     });
-    const name = `Мой голос #${count + 1}`;
+    const name = `Голос ${ctx.user.id} #${count + 1}`;
 
     // 3. Clone voice on ElevenLabs
+    const allSettings = await userStateService.getModelSettings(ctx.user.id);
+    const cloneSettings = allSettings["voice-clone"] ?? {};
+    const removeBackgroundNoise = Boolean(cloneSettings.remove_background_noise ?? false);
+
     const voiceId = await ElevenLabsAdapter.cloneVoice(
       audioBuffer,
       filename,
       name,
       config.ai.elevenlabs ?? "",
+      removeBackgroundNoise,
     );
 
     // 4. Save to DB

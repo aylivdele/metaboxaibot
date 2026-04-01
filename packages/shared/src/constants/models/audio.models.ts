@@ -110,7 +110,16 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    settings: [],
+    settings: [
+      {
+        key: "remove_background_noise",
+        label: "Удалить фоновый шум",
+        description:
+          "Удаляет фоновый шум из аудиообразца перед клонированием. Не используйте, если запись чистая — может ухудшить качество.",
+        type: "toggle" as const,
+        default: false,
+      },
+    ],
   },
   "tts-el": {
     id: "tts-el",
@@ -247,7 +256,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     id: "sounds-el",
     name: "🔔 Звуковые эффекты (ElevenLabs)",
     description:
-      "Генерирует оригинальные звуковые эффекты по описанию. Подходит для видеопроизводства, игр и подкастов.",
+      "Генерирует оригинальные звуковые эффекты по описанию. Подходит для видеопроизводства, игр и подкастов. Рекомендованно задавать промпт на английском языке.",
     section: "audio",
     provider: "elevenlabs",
     costUsdPerRequest: 0.048, // fallback: AI-determines duration (100 credits)

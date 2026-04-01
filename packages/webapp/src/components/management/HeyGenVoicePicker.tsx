@@ -1,35 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
-import type { HeyGenVoice, UserUpload } from "../../types.js";
+import type { HeyGenVoice, UserVoice } from "../../types.js";
 
 interface HeyGenVoicePickerProps {
-  /** Currently selected official voice_id (empty string = none) */
   voiceId: string;
-  /** Currently selected user upload URL stored as voice_url (empty string = none) */
-  voiceUrl: string;
-  /** S3 key of the selected upload — used to identify selection reliably across URL refreshes */
-  voiceS3Key: string;
-  /** Called when user picks an official voice: sets voice_id, clears voice_url */
   onChange: (key: string, value: unknown) => void;
 }
 
-export function HeyGenVoicePicker({
-  voiceId,
-  voiceUrl,
-  voiceS3Key,
-  onChange,
-}: HeyGenVoicePickerProps) {
+export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<"official" | "uploads">(
-    voiceUrl || voiceS3Key ? "uploads" : "official",
-  );
+  const [tab, setTab] = useState<"official" | "mine">("official");
   const [voices, setVoices] = useState<HeyGenVoice[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
+  const [myVoices, setMyVoices] = useState<UserVoice[]>([]);
+  const [myVoicesLoading, setMyVoicesLoading] = useState(false);
   const [langFilter, setLangFilter] = useState("all");
   const [genderFilter, setGenderFilter] = useState("all");
-  const [uploads, setUploads] = useState<UserUpload[]>([]);
-  const [uploadsLoading, setUploadsLoading] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -43,13 +30,13 @@ export function HeyGenVoicePicker({
         .catch(() => setVoices([]))
         .finally(() => setVoicesLoading(false));
     }
-    if (tab === "uploads") {
-      setUploadsLoading(true);
-      api.uploads
-        .list("voice")
-        .then(setUploads)
-        .catch(() => setUploads([]))
-        .finally(() => setUploadsLoading(false));
+    if (tab === "mine") {
+      setMyVoicesLoading(true);
+      api.userVoices
+        .list("elevenlabs")
+        .then(setMyVoices)
+        .catch(() => setMyVoices([]))
+        .finally(() => setMyVoicesLoading(false));
     }
   }, [tab, voices.length]);
 
@@ -86,10 +73,10 @@ export function HeyGenVoicePicker({
     onChange("voice_s3key", "");
   };
 
-  const selectUpload = (upload: UserUpload) => {
-    onChange("voice_url", upload.url);
-    onChange("voice_s3key", upload.s3Key ?? "");
-    onChange("voice_id", "");
+  const selectClonedVoice = (voice: UserVoice) => {
+    onChange("voice_id", voice.externalId ?? "");
+    onChange("voice_url", "");
+    onChange("voice_s3key", "");
   };
 
   const languages = [
@@ -107,13 +94,19 @@ export function HeyGenVoicePicker({
       <div className="voice-picker__tabs">
         <button
           className={`voice-picker__tab${tab === "official" ? " voice-picker__tab--active" : ""}`}
-          onClick={() => setTab("official")}
+          onClick={() => {
+            stopAudio();
+            setTab("official");
+          }}
         >
           {t("uploads.officialVoices")}
         </button>
         <button
-          className={`voice-picker__tab${tab === "uploads" ? " voice-picker__tab--active" : ""}`}
-          onClick={() => setTab("uploads")}
+          className={`voice-picker__tab${tab === "mine" ? " voice-picker__tab--active" : ""}`}
+          onClick={() => {
+            stopAudio();
+            setTab("mine");
+          }}
         >
           {t("uploads.myVoices")}
         </button>
@@ -152,7 +145,7 @@ export function HeyGenVoicePicker({
               {filteredVoices.map((voice) => (
                 <div
                   key={voice.voice_id}
-                  className={`voice-picker__item${voiceId === voice.voice_id && !voiceUrl ? " voice-picker__item--selected" : ""}`}
+                  className={`voice-picker__item${voiceId === voice.voice_id ? " voice-picker__item--selected" : ""}`}
                   onClick={() => selectOfficial(voice.voice_id)}
                 >
                   <div className="voice-picker__item-info">
@@ -189,39 +182,39 @@ export function HeyGenVoicePicker({
           </>
         ))}
 
-      {tab === "uploads" &&
-        (uploadsLoading ? (
+      {tab === "mine" &&
+        (myVoicesLoading ? (
           <div className="voice-picker__loading">Загрузка…</div>
-        ) : uploads.length === 0 ? (
+        ) : myVoices.length === 0 ? (
           <div className="voice-picker__empty">{t("uploads.emptyVoices")}</div>
         ) : (
           <div className="voice-picker__list">
-            {uploads.map((upload) => {
-              const isSelected = upload.s3Key
-                ? voiceS3Key === upload.s3Key
-                : voiceUrl === upload.url;
+            {myVoices.map((voice) => {
+              const isSelected = voiceId === voice.externalId;
               return (
                 <div
-                  key={upload.id}
+                  key={voice.id}
                   className={`voice-picker__item${isSelected ? " voice-picker__item--selected" : ""}`}
-                  onClick={() => selectUpload(upload)}
+                  onClick={() => selectClonedVoice(voice)}
                 >
                   <div className="voice-picker__item-info">
-                    <span className="voice-picker__item-name">{upload.name}</span>
+                    <span className="voice-picker__item-name">{voice.name}</span>
                     <span className="voice-picker__item-meta">
-                      {new Date(upload.createdAt).toLocaleDateString()}
+                      ElevenLabs · {new Date(voice.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <button
-                    className={`voice-picker__play-btn${playingId === upload.id ? " voice-picker__play-btn--playing" : ""}${loadingId === upload.id ? " voice-picker__play-btn--loading" : ""}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      playPreview(upload.id, upload.url);
-                    }}
-                    title="Прослушать"
-                  >
-                    {loadingId === upload.id ? "⏳" : playingId === upload.id ? "⏹" : "▶"}
-                  </button>
+                  {voice.previewUrl && (
+                    <button
+                      className={`voice-picker__play-btn${playingId === voice.id ? " voice-picker__play-btn--playing" : ""}${loadingId === voice.id ? " voice-picker__play-btn--loading" : ""}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playPreview(voice.id, voice.previewUrl!);
+                      }}
+                      title="Прослушать"
+                    >
+                      {loadingId === voice.id ? "⏳" : playingId === voice.id ? "⏹" : "▶"}
+                    </button>
+                  )}
                 </div>
               );
             })}

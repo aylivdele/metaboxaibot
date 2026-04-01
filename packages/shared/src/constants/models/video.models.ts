@@ -523,7 +523,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       {
         key: "voice_id",
         label: "Голос",
-        description: "Выберите голос аватара из списка официальных голосов HeyGen.",
+        description: "Выберите официальный голос HeyGen или клонированный голос ElevenLabs.",
         type: "voice-picker",
         default: "",
       },
@@ -1051,7 +1051,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       {
         key: "voice_id",
         label: "Голос",
-        description: "Выберите голос для озвучки или используйте свою запись.",
+        description: "Выберите официальный голос или клонированный голос ElevenLabs.",
         type: "did-voice-picker",
         default: "",
       },

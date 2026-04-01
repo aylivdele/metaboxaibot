@@ -105,10 +105,12 @@ export class ElevenLabsAdapter implements AudioAdapter {
     filename: string,
     name: string,
     apiKey: string,
+    removeBackgroundNoise = false,
   ): Promise<string> {
     const form = new FormData();
     form.append("name", name);
     form.append("files", new Blob([audioBuffer]), filename);
+    form.append("remove_background_noise", String(removeBackgroundNoise));
 
     const res = await fetch(`${ELEVENLABS_API}/voices/add`, {
       method: "POST",

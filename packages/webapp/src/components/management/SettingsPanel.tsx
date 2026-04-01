@@ -134,12 +134,7 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
               </div>
             )}
             {def.type === "voice-picker" && (
-              <HeyGenVoicePicker
-                voiceId={String(values["voice_id"] ?? "")}
-                voiceUrl={String(values["voice_url"] ?? "")}
-                voiceS3Key={String(values["voice_s3key"] ?? "")}
-                onChange={onChange}
-              />
+              <HeyGenVoicePicker voiceId={String(values["voice_id"] ?? "")} onChange={onChange} />
             )}
             {def.type === "did-voice-picker" && (
               <DIDVoicePicker
