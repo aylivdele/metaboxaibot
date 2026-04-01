@@ -151,7 +151,23 @@ async function sendModelActivatedNotification(
       : undefined;
 
   const costLine = buildActivationCostLine(model, modelSettings, t, defaultDuration);
-  const text = `${model.name}\n\n${model.description}\n\n${costLine}`;
+
+  const audioHints: Record<string, string> = {
+    "tts-openai": t.audio.ttsActivated,
+    "tts-el": t.audio.ttsElActivated,
+    "voice-clone": t.audio.voiceCloneActivated,
+    suno: t.audio.musicActivated,
+    "music-el": t.audio.musicElActivated,
+    "sounds-el": t.audio.soundsActivated,
+  };
+  const hint = section === "audio" ? (audioHints[modelId] ?? t.audio.activated) : undefined;
+
+  const text =
+    hint && modelId !== "voice-clone"
+      ? `${model.name}\n\n${model.description}\n\n${hint}\n\n${costLine}`
+      : hint
+        ? `${model.name}\n\n${model.description}\n\n${hint}`
+        : `${model.name}\n\n${model.description}\n\n${costLine}`;
 
   const webappUrl = config.bot.webappUrl;
   const replyMarkup = webappUrl

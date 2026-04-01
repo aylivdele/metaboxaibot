@@ -95,6 +95,11 @@ await server.register(fastifyStatic, {
 // ── Routes ────────────────────────────────────────────────────────────────────
 server.get("/health", { schema: { hide: true } }, async () => ({ status: "ok" }));
 
+server.post("/suno-callback", { schema: { hide: true } }, async (request, reply) => {
+  logger.info({ body: request.body }, "Suno callback received");
+  return reply.status(200).send({ ok: true });
+});
+
 server.get("/metrics", { schema: { hide: true } }, async (_request, reply) => {
   const metrics = await registry.metrics();
   await reply.type(registry.contentType).send(metrics);

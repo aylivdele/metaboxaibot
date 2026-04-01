@@ -29,9 +29,9 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
     "sounds-el": ctx.t.audio.soundsActivated,
   };
 
-  const instruction = instructions[modelId] ?? ctx.t.audio.activated;
+  const hint = instructions[modelId] ?? ctx.t.audio.activated;
 
-  // For generative models (not voice-clone), append cost line + management inline button
+  // For generative models (not voice-clone), show full structured message + management button
   if (modelId !== "voice-clone") {
     const model = AI_MODELS[modelId];
     if (model) {
@@ -46,12 +46,14 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
             `${webappUrl}?page=management&section=audio&wtoken=${token}`,
           )
         : undefined;
-      await ctx.reply(`${instruction}\n\n${costLine}`, { reply_markup: kb });
+      await ctx.reply(`${model.name}\n\n${model.description}\n\n${hint}\n\n${costLine}`, {
+        reply_markup: kb,
+      });
       return;
     }
   }
 
-  await ctx.reply(instruction);
+  await ctx.reply(hint);
 }
 
 // ── Voice cloning: accepts audio/voice file, creates EL voice ────────────────

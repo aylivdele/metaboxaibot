@@ -203,7 +203,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
       "Генерирует полноценные музыкальные треки с вокалом и аранжировкой по текстовому описанию стиля и настроения.",
     section: "audio",
     provider: "suno",
-    costUsdPerRequest: 0.035, // ~$0.030–$0.040/track (apipass.net proxy)
+    costUsdPerRequest: 0.06, // ~$0.030–$0.040/track (apipass.net proxy)
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,

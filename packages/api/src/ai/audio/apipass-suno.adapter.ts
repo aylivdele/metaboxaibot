@@ -53,8 +53,11 @@ export class ApipassSunoAdapter implements AudioAdapter {
     const modelVersion = (ms.model_version as string | undefined) ?? "V4_5";
     const model = MODEL_MAP[modelVersion] ?? "V4_5";
 
+    // sunoapi.org requires callBackUrl — we use polling so any reachable URL works
+    const callBackUrl = `${config.api.publicUrl ?? "https://example.com"}/suno-callback`;
+
     let body: Record<string, unknown>;
-    if (lyrics) {
+    if (!instrumental && lyrics) {
       // Custom mode: user provides lyrics — prompt becomes the lyrics, style is the description
       body = {
         customMode: true,
@@ -63,6 +66,7 @@ export class ApipassSunoAdapter implements AudioAdapter {
         style: input.prompt,
         title: "Track",
         prompt: lyrics,
+        callBackUrl,
       };
     } else {
       // Non-custom mode: description-only generation
@@ -71,6 +75,7 @@ export class ApipassSunoAdapter implements AudioAdapter {
         instrumental,
         model,
         prompt: input.prompt,
+        callBackUrl,
       };
     }
 
