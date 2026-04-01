@@ -184,6 +184,8 @@ export interface Model {
   videoFps: number;
   /** Cost per second in internal tokens (>0 only for per-second billing models, e.g. Kling, Pika). */
   tokenCostPerSecond: number;
+  /** Cost per 1K characters in internal tokens (>0 only for per-kchar billing models, e.g. TTS). */
+  tokenCostPerKChar: number;
   supportedAspectRatios?: string[] | null;
   supportedDurations?: number[] | null;
   durationRange?: { min: number; max: number } | null;

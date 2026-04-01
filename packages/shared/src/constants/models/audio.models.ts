@@ -50,7 +50,6 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         options: [
           { value: "alloy", label: "Alloy" },
           { value: "ash", label: "Ash" },
-          { value: "ballad", label: "Ballad" },
           { value: "coral", label: "Coral" },
           { value: "echo", label: "Echo" },
           { value: "fable", label: "Fable" },
@@ -58,7 +57,6 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
           { value: "onyx", label: "Onyx" },
           { value: "sage", label: "Sage" },
           { value: "shimmer", label: "Shimmer" },
-          { value: "verse", label: "Verse" },
         ],
         default: "onyx",
       },

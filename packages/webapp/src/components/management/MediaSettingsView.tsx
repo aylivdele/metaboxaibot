@@ -101,6 +101,18 @@ function modelCostLabel(
     const cost = (m.tokenCostPerMVideoToken * videoTokens) / 1_000_000;
     return `~${cost.toFixed(2)} ✦${t("manage.price.perReq")}`;
   }
+  if (m.tokenCostPerKChar > 0) {
+    let costPerKChar = m.tokenCostPerKChar;
+    if (m.tokenCostVariants) {
+      const vKey = String(
+        values[m.tokenCostVariants.settingKey] ??
+          m.settings.find((s) => s.key === m.tokenCostVariants!.settingKey)?.default ??
+          "",
+      );
+      costPerKChar = m.tokenCostVariants.map[vKey] ?? costPerKChar;
+    }
+    return `${costPerKChar.toFixed(2)} ✦${t("manage.price.perKChar")}`;
+  }
   if (m.tokenCostPerSecond > 0) {
     const duration = Number(
       values["duration"] ?? m.settings.find((s) => s.key === "duration")?.default ?? 5,

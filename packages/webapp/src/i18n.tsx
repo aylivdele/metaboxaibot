@@ -71,6 +71,7 @@ const translations = {
     "manage.price.perMsg": "/msg",
     "manage.price.perMPixel": "/MP",
     "manage.price.perSec": "/sec",
+    "manage.price.perKChar": "/1K chars",
 
     // Tariffs
     "tariffs.title": "Tariffs",
@@ -360,6 +361,7 @@ const translations = {
     "manage.price.perMsg": "/сообщение",
     "manage.price.perMPixel": "/мегапиксель",
     "manage.price.perSec": "/сек",
+    "manage.price.perKChar": "/1К симв.",
 
     // Tariffs
     "tariffs.title": "Тарифы",

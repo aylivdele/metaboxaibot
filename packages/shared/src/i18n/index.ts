@@ -137,6 +137,7 @@ export interface Translations {
     costPerSecond: string;
     costRangePerSecond: string;
     costPerKChar: string;
+    costRangePerKChar: string;
   };
   payments: {
     success: string;

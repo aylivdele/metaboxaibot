@@ -167,6 +167,7 @@ export default {
     costPerSecond: "💰 {cost} ✦ per second",
     costRangePerSecond: "💰 {min} – {max} ✦ per second",
     costPerKChar: "💰 {cost} ✦ per 1K characters",
+    costRangePerKChar: "💰 {min} – {max} ✦ per 1K characters",
   },
   payments: {
     success: "✅ Payment successful! Tokens have been credited to your balance.",

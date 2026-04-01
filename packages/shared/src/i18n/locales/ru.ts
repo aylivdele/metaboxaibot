@@ -168,6 +168,7 @@ export default {
     costPerSecond: "💰 {cost} ✦ за секунду",
     costRangePerSecond: "💰 {min} – {max} ✦ за секунду",
     costPerKChar: "💰 {cost} ✦ за 1К символов",
+    costRangePerKChar: "💰 {min} – {max} ✦ за 1К символов",
   },
   payments: {
     success: "✅ Оплата прошла успешно! Токены зачислены на ваш баланс.",

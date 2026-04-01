@@ -36,6 +36,27 @@ function buildActivationCostLine(
   }
 
   if (isPerKChar) {
+    if (model.costVariants) {
+      const costs = Object.keys(model.costVariants.map).map((k) =>
+        calculateCost(
+          model,
+          0,
+          0,
+          undefined,
+          undefined,
+          { [model.costVariants!.settingKey]: k },
+          undefined,
+          1000,
+        ),
+      );
+      const min = Math.min(...costs);
+      const max = Math.max(...costs);
+      if (min < max) {
+        return t.common.costRangePerKChar
+          .replace("{min}", min.toFixed(2))
+          .replace("{max}", max.toFixed(2));
+      }
+    }
     const cost = calculateCost(model, 0, 0, undefined, undefined, modelSettings, undefined, 1000);
     return t.common.costPerKChar.replace("{cost}", cost.toFixed(2));
   }

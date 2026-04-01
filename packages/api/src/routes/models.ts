@@ -17,6 +17,7 @@ function serializeModel(m: AIModel) {
   const isPerMPixel = (m.costUsdPerMPixel ?? 0) > 0;
   const isPerMVideoToken = (m.costUsdPerMVideoToken ?? 0) > 0;
   const isPerSecond = (m.costUsdPerSecond ?? 0) > 0;
+  const isPerKChar = m.costUsdPerKChar !== undefined;
   return {
     /** Family id this model belongs to, null for standalone models. */
     familyId: m.familyId ?? null,
@@ -58,6 +59,10 @@ function serializeModel(m: AIModel) {
     /** Cost per second in internal tokens (only for per-second billing models, e.g. Kling, Pika). */
     tokenCostPerSecond: isPerSecond
       ? calculateCost(m, 0, 0, undefined, undefined, undefined, 1)
+      : 0,
+    /** Cost per 1K characters in internal tokens (only for per-kchar billing models, e.g. TTS). */
+    tokenCostPerKChar: isPerKChar
+      ? calculateCost(m, 0, 0, undefined, undefined, undefined, undefined, 1000)
       : 0,
     isLLM,
     /** Configurable generation parameters. Empty array if none. */

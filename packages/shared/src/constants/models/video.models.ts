@@ -1049,13 +1049,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         unavailableIf: { key: "sentiment", eq: "neutral" },
       },
       {
-        key: "driver_url",
-        label: "URL видео-драйвера",
-        description: "URL видео, задающего движения лица/головы аватара.",
-        type: "text",
-        default: "",
-      },
-      {
         key: "voice_id",
         label: "Голос",
         description: "Выберите голос для озвучки или используйте свою запись.",
