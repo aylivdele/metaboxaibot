@@ -83,64 +83,40 @@ export async function checkSubscription(userId: bigint): Promise<void> {
   }
 }
 
+// ─── Internal billing helpers ─────────────────────────────────────────────────
+
+interface ResolvedRates {
+  baseRequest: number;
+  inputCostPerMToken: number;
+  outputCostPerMToken: number;
+  costPerSecond?: number;
+  costPerMVideoToken?: number;
+  costPerKChar?: number;
+}
+
 /**
- * Calculate the internal token cost for a request.
- *
- * Formula: (providerUsdCost / usdPerToken) × targetMargin
- *
- * providerUsdCost = model.costUsdPerRequest
- *   + inputTokens  × model.inputCostUsdPerMToken  / 1_000_000
- *   + outputTokens × model.outputCostUsdPerMToken / 1_000_000
- *
- * For per-megapixel models (costUsdPerMPixel set): costUsdPerRequest must be 0
- * and providerUsdCost = ceil(megapixels) × costUsdPerMPixel.
- * megapixels = width × height / 1_000_000, ceiled to the nearest whole megapixel.
- *
- * For per-video-token models (costUsdPerMVideoToken set): costUsdPerRequest must be 0
- * and providerUsdCost = videoTokens / 1_000_000 × costUsdPerMVideoToken.
- * videoTokens = (width × height × fps × duration) / 1024
- *
- * For media models (image/audio/video): inputTokens and outputTokens are 0,
- * so cost is driven by costUsdPerRequest, costUsdPerMPixel, or costUsdPerMVideoToken alone.
- *
- * For LLM models: costUsdPerRequest is 0, cost is driven by per-token pricing.
+ * Apply costVariants (setting-based overrides) and contextPricingTiers (token-count
+ * multipliers) to produce a snapshot of resolved rates for this request.
  */
-export function calculateCost(
+function resolveRates(
   model: AIModel,
-  inputTokens = 0,
-  outputTokens = 0,
-  megapixels?: number,
-  videoTokens?: number,
-  modelSettings?: Record<string, unknown>,
-  durationSeconds?: number,
-  charCount?: number,
-): number {
-  // Multi-dimensional pricing table (e.g. resolution × duration for MiniMax).
-  // When all dimension values are present in modelSettings, look up the exact cost.
-  if (model.costMatrix && modelSettings) {
-    const key = model.costMatrix.dims.map((dim) => String(modelSettings[dim] ?? "")).join("__");
-    const matrixCost = model.costMatrix.table[key];
-    if (matrixCost !== undefined) {
-      return (matrixCost / config.billing.usdPerToken) * config.billing.targetMargin;
-    }
-  }
-
-  // Apply context-size-based pricing tiers (e.g. GPT-5.4 doubles input rate above 272k tokens)
-  let inputCostPerMToken = model.inputCostUsdPerMToken;
-  if (model.contextPricingTiers && inputTokens > model.contextPricingTiers.thresholdTokens) {
-    inputCostPerMToken *= model.contextPricingTiers.inputMultiplier;
-  }
-
-  // Resolve cost overrides from costVariants based on user's current settings
+  inputTokens: number,
+  modelSettings: Record<string, unknown> | undefined,
+): ResolvedRates {
   let baseRequest = model.costUsdPerRequest;
+  let inputCostPerMToken = model.inputCostUsdPerMToken;
   let outputCostPerMToken = model.outputCostUsdPerMToken;
-  if (model.contextPricingTiers && inputTokens > model.contextPricingTiers.thresholdTokens) {
-    outputCostPerMToken *= model.contextPricingTiers.outputMultiplier;
-  }
   let costPerSecond = model.costUsdPerSecond;
   let costPerMVideoToken = model.costUsdPerMVideoToken;
   let costPerKChar = model.costUsdPerKChar;
 
+  // Context-size pricing tiers (e.g. GPT-5.4 doubles rates above 272k tokens)
+  if (model.contextPricingTiers && inputTokens > model.contextPricingTiers.thresholdTokens) {
+    inputCostPerMToken *= model.contextPricingTiers.inputMultiplier;
+    outputCostPerMToken *= model.contextPricingTiers.outputMultiplier;
+  }
+
+  // Setting-based cost overrides
   if (model.costVariants && modelSettings) {
     const settingVal = modelSettings[model.costVariants.settingKey];
     const variant = model.costVariants.map[String(settingVal)];
@@ -157,40 +133,138 @@ export function calculateCost(
     }
   }
 
-  // For audio SFX: if costUsdPerSecond is set but no explicit durationSeconds,
-  // extract it from modelSettings.duration_seconds (null → AI mode → fall back to baseRequest).
-  const effectiveDuration =
-    durationSeconds ??
-    (costPerSecond !== undefined && typeof modelSettings?.duration_seconds === "number"
+  return {
+    baseRequest,
+    inputCostPerMToken,
+    outputCostPerMToken,
+    costPerSecond,
+    costPerMVideoToken,
+    costPerKChar,
+  };
+}
+
+interface MediaOpts {
+  megapixels?: number;
+  videoTokens?: number;
+  durationSeconds?: number;
+  charCount?: number;
+  modelSettings?: Record<string, unknown>;
+}
+
+/**
+ * Compute the base provider USD cost for media models (image / audio / video).
+ * Billing mode priority:
+ *   1. costMatrix  — exact lookup by setting values (returns immediately)
+ *   2. per-megapixel
+ *   3. per-video-token
+ *   4. per-second  (includes baseRequest flat fee)
+ *   5. per-kchar   (includes baseRequest flat fee)
+ *   6. fallback    — baseRequest
+ */
+function computeMediaBaseUsd(model: AIModel, rates: ResolvedRates, opts: MediaOpts): number {
+  const { megapixels, videoTokens, charCount, modelSettings } = opts;
+
+  // Resolve effective duration (explicit arg → modelSettings → undefined)
+  const durationSeconds =
+    opts.durationSeconds ??
+    (rates.costPerSecond !== undefined && typeof modelSettings?.duration_seconds === "number"
       ? modelSettings.duration_seconds
       : undefined);
 
-  const perRequestCost =
-    costPerMVideoToken && videoTokens
-      ? (videoTokens / 1_000_000) * costPerMVideoToken
-      : model.costUsdPerMPixel && megapixels
-        ? (model.costUsdPerMPixelBase ?? 0) + Math.ceil(megapixels) * model.costUsdPerMPixel
-        : costPerSecond !== undefined && effectiveDuration !== undefined
-          ? costPerSecond * effectiveDuration
-          : costPerKChar !== undefined && charCount !== undefined
-            ? (charCount / 1000) * costPerKChar
-            : baseRequest;
-
-  // Apply additive cost components (e.g. web search +$0.015, high thinking +$0.002)
-  let addonCost = 0;
-  if (model.costAddons && modelSettings) {
-    for (const addon of model.costAddons) {
-      const val = String(modelSettings[addon.settingKey] ?? "");
-      addonCost += addon.map[val] ?? 0;
-    }
+  // 1. Multi-dimensional pricing table
+  if (model.costMatrix && modelSettings) {
+    const key = model.costMatrix.dims.map((dim) => String(modelSettings[dim] ?? "")).join("__");
+    const matrixCost = model.costMatrix.table[key];
+    if (matrixCost !== undefined) return matrixCost;
   }
 
-  const providerUsdCost =
-    perRequestCost +
-    addonCost +
-    (inputTokens * inputCostPerMToken) / 1_000_000 +
-    (outputTokens * outputCostPerMToken) / 1_000_000;
-  return usdToTokens(providerUsdCost);
+  // 2. Per-megapixel
+  if (model.costUsdPerMPixel && megapixels) {
+    return (model.costUsdPerMPixelBase ?? 0) + Math.ceil(megapixels) * model.costUsdPerMPixel;
+  }
+
+  // 3. Per-video-token
+  if (rates.costPerMVideoToken && videoTokens) {
+    return (videoTokens / 1_000_000) * rates.costPerMVideoToken;
+  }
+
+  // 4. Per-second (flat fee + duration charge)
+  if (rates.costPerSecond !== undefined && durationSeconds !== undefined) {
+    return rates.baseRequest + durationSeconds * rates.costPerSecond;
+  }
+
+  // 5. Per-kchar (flat fee + character charge)
+  if (rates.costPerKChar !== undefined && charCount !== undefined) {
+    return rates.baseRequest + (charCount / 1000) * rates.costPerKChar;
+  }
+
+  // 6. Fallback: fixed per-request
+  return rates.baseRequest;
+}
+
+/**
+ * Sum additive cost components from model.costAddons (e.g. web search, high thinking).
+ */
+function computeAddonUsd(
+  model: AIModel,
+  modelSettings: Record<string, unknown> | undefined,
+): number {
+  if (!model.costAddons || !modelSettings) return 0;
+  let total = 0;
+  for (const addon of model.costAddons) {
+    const val = String(modelSettings[addon.settingKey] ?? "");
+    total += addon.map[val] ?? 0;
+  }
+  return total;
+}
+
+/**
+ * Compute LLM per-token USD cost.
+ */
+function computeLlmUsd(rates: ResolvedRates, inputTokens: number, outputTokens: number): number {
+  return (
+    (inputTokens * rates.inputCostPerMToken + outputTokens * rates.outputCostPerMToken) / 1_000_000
+  );
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+/**
+ * Calculate the internal token cost for a request.
+ *
+ * Billing mode is determined by which cost fields are set on the model:
+ *   - costMatrix              → exact table lookup (setting values → USD)
+ *   - costUsdPerMPixel        → per-megapixel (image models)
+ *   - costUsdPerMVideoToken   → per-video-token (Seedance-style)
+ *   - costUsdPerSecond        → per-second + flat costUsdPerRequest (video/audio)
+ *   - costUsdPerKChar         → per-kchar + flat costUsdPerRequest (TTS)
+ *   - costUsdPerRequest       → fixed per-request (fallback)
+ *   - inputCostUsdPerMToken   → per-token in+out (LLM)
+ *
+ * costVariants and contextPricingTiers can override any of the above.
+ * costAddons are summed on top of the base cost.
+ */
+export function calculateCost(
+  model: AIModel,
+  inputTokens = 0,
+  outputTokens = 0,
+  megapixels?: number,
+  videoTokens?: number,
+  modelSettings?: Record<string, unknown>,
+  durationSeconds?: number,
+  charCount?: number,
+): number {
+  const rates = resolveRates(model, inputTokens, modelSettings);
+  const mediaUsd = computeMediaBaseUsd(model, rates, {
+    megapixels,
+    videoTokens,
+    durationSeconds,
+    charCount,
+    modelSettings,
+  });
+  const addonUsd = computeAddonUsd(model, modelSettings);
+  const llmUsd = computeLlmUsd(rates, inputTokens, outputTokens);
+  return usdToTokens(mediaUsd + addonUsd + llmUsd);
 }
 
 /** Convert a USD cost to internal tokens using the billing config. */

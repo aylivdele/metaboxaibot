@@ -630,10 +630,6 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     provider: "openai",
     // Точная цена определяется адаптером на основе quality × size. Базовое значение: medium 1024×1024.
     costUsdPerRequest: 0.034,
-    costVariants: {
-      settingKey: "quality",
-      map: { low: 0.009, medium: 0.034, high: 0.133 },
-    },
     costMatrix: {
       dims: ["quality", "size"],
       table: {

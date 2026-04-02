@@ -239,13 +239,15 @@ model UserAvatar {
 // Пользовательские голоса (клонированные через ElevenLabs)
 // ─────────────────────────────────────────────
 model UserVoice {
-  id         String   @id @default(cuid())
-  userId     BigInt
-  provider   String   // "elevenlabs"
-  name       String
-  externalId String?  // ElevenLabs voice_id
-  previewUrl String?
-  status     String   @default("ready") // "ready" | "failed"
+  id          String   @id @default(cuid())
+  userId      BigInt
+  provider    String   // "elevenlabs"
+  name        String
+  externalId  String?  // ElevenLabs voice_id
+  previewUrl  String?
+  audioS3Key  String?  // S3 key of the original audio — used to recreate the voice if EL slot is lost
+  status      String   @default("ready") // "ready" | "failed"
+  lastUsedAt  DateTime? // updated on each TTS generation — used for LRU eviction
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

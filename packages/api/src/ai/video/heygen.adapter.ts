@@ -3,6 +3,7 @@ import { config } from "@metabox/shared";
 import { getFileUrl } from "../../services/s3.service.js";
 import { logger } from "../../logger.js";
 import { fetchWithLog } from "../../utils/fetch.js";
+import { transcodeOggToMp3 } from "../../utils/audio-transcode.js";
 
 const HEYGEN_API = "https://api.heygen.com";
 const HEYGEN_UPLOAD = "https://upload.heygen.com";
@@ -57,8 +58,14 @@ export class HeyGenAdapter implements VideoAdapter {
     const audioRes = await fetchWithLog(audioUrl);
     if (!audioRes.ok)
       throw new Error(`Failed to fetch audio for HeyGen upload: ${audioRes.status}`);
-    const audioBuffer = await audioRes.arrayBuffer();
-    const contentType = audioRes.headers.get("content-type") ?? "audio/mpeg";
+    let audioBuffer = Buffer.from(await audioRes.arrayBuffer()) as Buffer;
+    let contentType = audioRes.headers.get("content-type") ?? "audio/mpeg";
+
+    // HeyGen does not support OGG/Opus — transcode to MP3 first
+    if (contentType.includes("ogg") || contentType.includes("opus")) {
+      audioBuffer = await transcodeOggToMp3(audioBuffer);
+      contentType = "audio/mpeg";
+    }
 
     const uploadRes = await fetchWithLog(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",

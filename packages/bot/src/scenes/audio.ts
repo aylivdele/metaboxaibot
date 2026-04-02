@@ -7,6 +7,7 @@ import { AI_MODELS, config, generateWebToken } from "@metabox/shared";
 import { logger } from "../logger.js";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
+import { uploadBuffer, buildS3Key } from "@metabox/api/services/s3";
 
 // ── Sub-section entry points ──────────────────────────────────────────────────
 
@@ -86,26 +87,71 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
     });
     const name = `Голос ${ctx.user.id} #${count + 1}`;
 
-    // 3. Clone voice on ElevenLabs
+    // 3. Clone voice on ElevenLabs (with LRU eviction on limit error)
     const allSettings = await userStateService.getModelSettings(ctx.user.id);
     const cloneSettings = allSettings["voice-clone"] ?? {};
     const removeBackgroundNoise = Boolean(cloneSettings.remove_background_noise ?? false);
+    const apiKey = config.ai.elevenlabs ?? "";
 
-    const voiceId = await ElevenLabsAdapter.cloneVoice(
-      audioBuffer,
-      filename,
-      name,
+    let voiceId: string;
+    try {
+      voiceId = await ElevenLabsAdapter.cloneVoice(
+        audioBuffer,
+        filename,
+        name,
+        apiKey,
+        removeBackgroundNoise,
+      );
+    } catch (err) {
+      // ElevenLabs returns 400 with voice_limit_reached when the slot limit is exceeded
+      if (err instanceof Error && err.message.includes("voice_limit_reached")) {
+        // Evict the least recently used voice for this user
+        const lruVoice = await db.userVoice.findFirst({
+          where: { userId: ctx.user.id, provider: "elevenlabs", externalId: { not: null } },
+          orderBy: [{ lastUsedAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
+          select: { id: true, externalId: true },
+        });
+        if (!lruVoice) throw err;
+        // Delete from ElevenLabs
+        await fetch(`https://api.elevenlabs.io/v1/voices/${lruVoice.externalId}`, {
+          method: "DELETE",
+          headers: { "xi-api-key": apiKey },
+        }).catch(() => void 0);
+        // Delete from DB
+        await db.userVoice.delete({ where: { id: lruVoice.id } });
+        // Retry cloning
+        voiceId = await ElevenLabsAdapter.cloneVoice(
+          audioBuffer,
+          filename,
+          name,
+          apiKey,
+          removeBackgroundNoise,
+        );
+      } else {
+        throw err;
+      }
+    }
+
+    // 4. Upload original audio to S3 for future voice recreation
+    const ext = filename.split(".").pop() ?? "ogg";
+    const audioS3Key = buildS3Key("voices", ctx.user.id.toString(), voiceId, ext);
+    await uploadBuffer(audioS3Key, audioBuffer, `audio/${ext}`).catch(() => null);
+
+    // 5. Fetch preview URL from ElevenLabs
+    const previewUrl = await ElevenLabsAdapter.getPreviewUrl(
+      voiceId,
       config.ai.elevenlabs ?? "",
-      removeBackgroundNoise,
-    );
+    ).catch(() => null);
 
-    // 4. Save to DB
+    // 6. Save to DB
     await db.userVoice.create({
       data: {
         userId: ctx.user.id,
         provider: "elevenlabs",
         name,
         externalId: voiceId,
+        previewUrl,
+        audioS3Key,
         status: "ready",
       },
     });

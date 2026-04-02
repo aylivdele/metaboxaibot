@@ -97,7 +97,7 @@ export function VoicesView() {
               <div className="uploads-list">
                 {clonedVoices.map((voice) => (
                   <div key={voice.id} className="uploads-item">
-                    {voice.previewUrl ? (
+                    {voice.previewUrl && (
                       <button
                         className={`voice-picker__play-btn${playingId === voice.id ? " voice-picker__play-btn--playing" : ""}${loadingId === voice.id ? " voice-picker__play-btn--loading" : ""}`}
                         onClick={() => playPreview(voice.id, voice.previewUrl!)}
@@ -105,10 +105,6 @@ export function VoicesView() {
                       >
                         {loadingId === voice.id ? "⏳" : playingId === voice.id ? "⏹" : "▶"}
                       </button>
-                    ) : (
-                      <span className="voice-picker__play-btn voice-picker__play-btn--disabled">
-                        ▶
-                      </span>
                     )}
                     <div className="uploads-item__info">
                       {editingId === voice.id ? (

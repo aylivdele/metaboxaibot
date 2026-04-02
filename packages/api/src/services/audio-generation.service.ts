@@ -1,7 +1,7 @@
 import { db } from "../db.js";
-import { createAudioAdapter } from "../ai/audio/factory.js";
+import { createAudioAdapter, ElevenLabsAdapter } from "../ai/audio/factory.js";
 import { getAudioQueue } from "../queues/audio.queue.js";
-import { AI_MODELS } from "@metabox/shared";
+import { AI_MODELS, config } from "@metabox/shared";
 import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
 import { buildS3Key, uploadBuffer, uploadFromUrl } from "./s3.service.js";
 import { userStateService } from "./user-state.service.js";
@@ -56,12 +56,40 @@ export const audioGenerationService = {
       },
     });
 
+    // If tts-el is using a cloned voice, ensure the EL voice slot still exists
+    let resolvedModelSettings = modelSettings;
+    if (modelId === "tts-el") {
+      const selectedVoiceId = modelSettings.voice_id as string | undefined;
+      if (selectedVoiceId) {
+        const userVoice = await db.userVoice.findFirst({
+          where: { userId, externalId: selectedVoiceId, provider: "elevenlabs" },
+          select: { id: true, externalId: true, audioS3Key: true },
+        });
+        if (userVoice) {
+          const freshVoiceId = await ElevenLabsAdapter.ensureVoiceExists(
+            userVoice.id,
+            userVoice.externalId!,
+            userVoice.audioS3Key,
+            config.ai.elevenlabs ?? "",
+          );
+          if (freshVoiceId !== selectedVoiceId) {
+            resolvedModelSettings = { ...modelSettings, voice_id: freshVoiceId };
+          }
+        }
+      }
+    }
+
     const adapter = createAudioAdapter(modelId);
 
     if (!adapter.isAsync && adapter.generate) {
       // ── Sync generation (TTS, ElevenLabs) ───────────────────────────────
       try {
-        const result = await adapter.generate({ prompt, voiceId, sourceAudioUrl, modelSettings });
+        const result = await adapter.generate({
+          prompt,
+          voiceId,
+          sourceAudioUrl,
+          modelSettings: resolvedModelSettings,
+        });
 
         await db.generationJob.update({
           where: { id: job.id },
@@ -70,7 +98,16 @@ export const audioGenerationService = {
 
         await deductTokens(
           userId,
-          calculateCost(model, 0, 0, undefined, undefined, modelSettings, undefined, prompt.length),
+          calculateCost(
+            model,
+            0,
+            0,
+            undefined,
+            undefined,
+            resolvedModelSettings,
+            undefined,
+            prompt.length,
+          ),
           modelId,
         );
 

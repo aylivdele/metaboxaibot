@@ -129,14 +129,14 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     section: "audio",
     provider: "elevenlabs",
     costUsdPerRequest: 0,
-    costUsdPerKChar: 0.24, // eleven_multilingual_v2: $0.24/1K chars
+    costUsdPerKChar: 0.3, // eleven_multilingual_v2: $0.24/1K chars
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     costVariants: {
       settingKey: "model_id",
       map: {
-        eleven_multilingual_v2: { costUsdPerKChar: 0.24 },
-        eleven_turbo_v2_5: { costUsdPerKChar: 0.12 },
+        eleven_multilingual_v2: { costUsdPerKChar: 0.3 },
+        eleven_turbo_v2_5: { costUsdPerKChar: 0.15 },
       },
     },
     supportsImages: false,
@@ -259,8 +259,8 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
       "Генерирует оригинальные звуковые эффекты по описанию. Подходит для видеопроизводства, игр и подкастов. Рекомендованно задавать промпт на английском языке.",
     section: "audio",
     provider: "elevenlabs",
-    costUsdPerRequest: 0.048, // fallback: AI-determines duration (100 credits)
-    costUsdPerSecond: 0.0096, // manual duration: 20 credits/sec × $0.00048/credit
+    costUsdPerRequest: 0.06,
+    costUsdPerSecond: 0,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
@@ -273,8 +273,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
       {
         key: "duration_seconds",
         label: "Длительность (сек)",
-        description:
-          "Конкретная длительность в секундах (1–30). Оставьте пустым — модель выберет сама (будет дешевле).",
+        description: "Конкретная длительность в секундах (1–30).",
         type: "slider",
         min: 1,
         max: 30,
@@ -301,8 +300,8 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
       "Генерирует фоновую музыку, амбиент и музыкальные атмосферы по текстовому описанию через ElevenLabs.",
     section: "audio",
     provider: "elevenlabs",
-    costUsdPerRequest: 0.048, // AI-determines duration: 100 credits fallback
-    costUsdPerSecond: 0.0096, // manual duration: 20 credits/sec × $0.00048/credit
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.008, // manual duration: 20 credits/sec × $0.00048/credit
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
@@ -315,8 +314,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
       {
         key: "duration_seconds",
         label: "Длительность (сек)",
-        description:
-          "Конкретная длительность в секундах (1–22). Оставьте пустым — модель выберет сама.",
+        description: "Конкретная длительность в секундах (1–22).",
         type: "slider",
         min: 1,
         max: 22,

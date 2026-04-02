@@ -499,8 +499,9 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     provider: "heygen",
     // $0.0167/s Engine III (public/standard avatar) ≈ $1.00/min
     // $0.10/s Engine IV (Avatar IV — custom photo upload) ≈ $6.00/min
-    costUsdPerRequest: 0,
-    costUsdPerSecond: 0.8, //actual price is 0.1
+    // + $0.04 flat fee per request (API overhead)
+    costUsdPerRequest: 0.04,
+    costUsdPerSecond: 0.08,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1000,61 +1001,61 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     ],
   },
 
-  "d-id": {
-    id: "d-id",
-    name: "🤳 D-ID",
-    description:
-      "Оживляет фотографии и аватары. Синхронизирует речь с движением губ для создания реалистичных говорящих персонажей.",
-    section: "video",
-    provider: "d-id",
-    // $0.018/s (Pro plan, 1 credit = 15s ≈ $0.27/credit) ≈ $1.07/min
-    // API streaming users get 50% discount → ~$0.009/s ≈ $0.54/min
-    costUsdPerRequest: 0,
-    costUsdPerSecond: 0.018,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: true,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    supportedDurations: null, // script-driven
-    settings: [
-      mkAspectRatio(["16:9", "9:16", "1:1"]),
-      {
-        key: "sentiment",
-        label: "Настроение аватара",
-        description: "Эмоциональный тон выступления аватара (выражение лица).",
-        type: "select",
-        options: [
-          { value: "neutral", label: "Нейтральное" },
-          { value: "happy", label: "Радостное" },
-          { value: "surprise", label: "Удивлённое" },
-          { value: "serious", label: "Серьёзное" },
-        ],
-        default: "neutral",
-      },
-      {
-        key: "emotion_intensity",
-        label: "Интенсивность эмоции",
-        description:
-          "Насколько ярко выражена эмоция на лице аватара. Применяется только при настроении, отличном от нейтрального.",
-        type: "slider",
-        min: 0,
-        max: 1,
-        step: 0.1,
-        default: 0.7,
-        unavailableIf: { key: "sentiment", eq: "neutral" },
-      },
-      {
-        key: "voice_id",
-        label: "Голос",
-        description: "Выберите официальный голос или клонированный голос ElevenLabs.",
-        type: "did-voice-picker",
-        default: "",
-      },
-    ],
-  },
+  // "d-id": {
+  //   id: "d-id",
+  //   name: "🤳 D-ID",
+  //   description:
+  //     "Оживляет фотографии и аватары. Синхронизирует речь с движением губ для создания реалистичных говорящих персонажей.",
+  //   section: "video",
+  //   provider: "d-id",
+  //   // $0.018/s (Pro plan, 1 credit = 15s ≈ $0.27/credit) ≈ $1.07/min
+  //   // API streaming users get 50% discount → ~$0.009/s ≈ $0.54/min
+  //   costUsdPerRequest: 0,
+  //   costUsdPerSecond: 0.018,
+  //   inputCostUsdPerMToken: 0,
+  //   outputCostUsdPerMToken: 0,
+  //   supportsImages: true,
+  //   supportsVoice: true,
+  //   supportsWeb: false,
+  //   isAsync: true,
+  //   contextStrategy: "db_history",
+  //   contextMaxMessages: 0,
+  //   supportedAspectRatios: ["16:9", "9:16", "1:1"],
+  //   supportedDurations: null, // script-driven
+  //   settings: [
+  //     mkAspectRatio(["16:9", "9:16", "1:1"]),
+  //     {
+  //       key: "sentiment",
+  //       label: "Настроение аватара",
+  //       description: "Эмоциональный тон выступления аватара (выражение лица).",
+  //       type: "select",
+  //       options: [
+  //         { value: "neutral", label: "Нейтральное" },
+  //         { value: "happy", label: "Радостное" },
+  //         { value: "surprise", label: "Удивлённое" },
+  //         { value: "serious", label: "Серьёзное" },
+  //       ],
+  //       default: "neutral",
+  //     },
+  //     {
+  //       key: "emotion_intensity",
+  //       label: "Интенсивность эмоции",
+  //       description:
+  //         "Насколько ярко выражена эмоция на лице аватара. Применяется только при настроении, отличном от нейтрального.",
+  //       type: "slider",
+  //       min: 0,
+  //       max: 1,
+  //       step: 0.1,
+  //       default: 0.7,
+  //       unavailableIf: { key: "sentiment", eq: "neutral" },
+  //     },
+  //     {
+  //       key: "voice_id",
+  //       label: "Голос",
+  //       description: "Выберите официальный голос или клонированный голос ElevenLabs.",
+  //       type: "did-voice-picker",
+  //       default: "",
+  //     },
+  //   ],
+  // },
 };
