@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { createAudioAdapter, ElevenLabsAdapter } from "../ai/audio/factory.js";
 import { getAudioQueue } from "../queues/audio.queue.js";
-import { AI_MODELS, config } from "@metabox/shared";
+import { AI_MODELS } from "@metabox/shared";
 import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
 import { buildS3Key, uploadBuffer, uploadFromUrl } from "./s3.service.js";
 import { userStateService } from "./user-state.service.js";
