@@ -91,7 +91,6 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
     const allSettings = await userStateService.getModelSettings(ctx.user.id);
     const cloneSettings = allSettings["voice-clone"] ?? {};
     const removeBackgroundNoise = Boolean(cloneSettings.remove_background_noise ?? false);
-    const apiKey = config.ai.elevenlabs ?? "";
 
     let voiceId: string;
     try {
@@ -99,7 +98,6 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
         audioBuffer,
         filename,
         name,
-        apiKey,
         removeBackgroundNoise,
       );
     } catch (err) {
@@ -107,19 +105,22 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
       if (err instanceof Error && err.message.includes("voice_limit_reached")) {
         // Evict the least recently used voice for this user
         const lruVoice = await db.userVoice.findFirst({
-          where: { userId: ctx.user.id, provider: "elevenlabs", externalId: { not: null } },
+          where: { provider: "elevenlabs", externalId: { not: null } },
           orderBy: [{ lastUsedAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
           select: { id: true, externalId: true },
         });
         if (!lruVoice) throw err;
         // Delete the LRU voice slot from ElevenLabs only (keep DB record — audioS3Key lets us recreate it)
-        await ElevenLabsAdapter.deleteVoice(lruVoice.externalId!, apiKey);
+        await ElevenLabsAdapter.deleteVoice(lruVoice.externalId!);
+        await db.userVoice.update({
+          where: { id: lruVoice.id },
+          data: { externalId: null },
+        });
         // Retry cloning
         voiceId = await ElevenLabsAdapter.cloneVoice(
           audioBuffer,
           filename,
           name,
-          apiKey,
           removeBackgroundNoise,
         );
       } else {

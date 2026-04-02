@@ -70,7 +70,6 @@ export const audioGenerationService = {
             userVoice.id,
             userVoice.externalId!,
             userVoice.audioS3Key,
-            config.ai.elevenlabs ?? "",
           );
           if (freshVoiceId !== selectedVoiceId) {
             resolvedModelSettings = { ...modelSettings, voice_id: freshVoiceId };

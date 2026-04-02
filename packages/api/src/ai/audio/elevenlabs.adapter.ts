@@ -1,6 +1,7 @@
 import type { AudioAdapter, AudioInput, AudioResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
+import { logger } from "../../logger.js";
 
 const ELEVENLABS_API = "https://api.elevenlabs.io/v1";
 
@@ -104,8 +105,8 @@ export class ElevenLabsAdapter implements AudioAdapter {
     audioBuffer: Buffer,
     filename: string,
     name: string,
-    apiKey: string,
     removeBackgroundNoise = false,
+    apiKey: string = config.ai.elevenlabs ?? "",
   ): Promise<string> {
     const form = new FormData();
     form.append("name", name);
@@ -128,15 +129,21 @@ export class ElevenLabsAdapter implements AudioAdapter {
   }
 
   /** Deletes a voice from ElevenLabs. Silently ignores errors. */
-  static async deleteVoice(voiceId: string, apiKey: string): Promise<void> {
+  static async deleteVoice(
+    voiceId: string,
+    apiKey: string = config.ai.elevenlabs ?? "",
+  ): Promise<void> {
     await fetch(`${ELEVENLABS_API}/voices/${voiceId}`, {
       method: "DELETE",
       headers: { "xi-api-key": apiKey },
-    }).catch(() => void 0);
+    }).catch((reason) => logger.error({ voiceId, reason }, `Could not delete voice`));
   }
 
   /** Fetches the preview_url for a voice from ElevenLabs. Returns null on failure. */
-  static async getPreviewUrl(voiceId: string, apiKey: string): Promise<string | null> {
+  static async getPreviewUrl(
+    voiceId: string,
+    apiKey: string = config.ai.elevenlabs ?? "",
+  ): Promise<string | null> {
     const res = await fetch(`${ELEVENLABS_API}/voices/${voiceId}`, {
       headers: { "xi-api-key": apiKey },
     });
@@ -154,7 +161,7 @@ export class ElevenLabsAdapter implements AudioAdapter {
     userVoiceId: string,
     externalId: string,
     audioS3Key: string | null,
-    apiKey: string,
+    apiKey: string = config.ai.elevenlabs ?? "",
   ): Promise<string> {
     // Check if the voice still exists
     const checkRes = await fetch(`${ELEVENLABS_API}/voices/${externalId}`, {
@@ -191,12 +198,7 @@ export class ElevenLabsAdapter implements AudioAdapter {
       select: { name: true },
     });
 
-    const newVoiceId = await ElevenLabsAdapter.cloneVoice(
-      audioBuffer,
-      filename,
-      record.name,
-      apiKey,
-    );
+    const newVoiceId = await ElevenLabsAdapter.cloneVoice(audioBuffer, filename, record.name);
 
     await db.userVoice.update({
       where: { id: userVoiceId },
