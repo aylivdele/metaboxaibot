@@ -5,12 +5,7 @@ import { i18nMiddleware } from "./middlewares/i18n.middleware.js";
 import { handleStart, handleLanguageSelect } from "./commands/start.js";
 import { handleMenu, handleGpt, handleDesign, handleAudio, handleVideo } from "./commands/menu.js";
 import { handleNoTool } from "./handlers/no-tool.handler.js";
-import {
-  handleNewGptDialog,
-  handleGptMessage,
-  handleGptPhoto,
-  handleGptPrompts,
-} from "./scenes/gpt.js";
+import { handleNewGptDialog, handleGptMessage, handleGptPhoto } from "./scenes/gpt.js";
 import {
   buildDesignModelKeyboard,
   handleDesignModelSelect,
@@ -139,7 +134,7 @@ export function createBot(token: string): Bot<BotContext> {
       [t.video.backToMain]: () => handleMenu(ctx),
       // GPT section buttons
       [t.gpt.newDialog]: () => handleNewGptDialog(ctx),
-      [t.gpt.prompts]: () => handleGptPrompts(ctx),
+      // [t.gpt.prompts]: () => handleGptPrompts(ctx),
       // Design section buttons
       [t.design.chooseModel]: async () => {
         await ctx.reply(t.design.sectionTitle, { reply_markup: buildDesignModelKeyboard() });

@@ -37,8 +37,12 @@ export const dialogService = {
     });
   },
 
-  async softDelete(dialogId: string): Promise<void> {
+  async softDelete(dialogId: string, userId: bigint): Promise<void> {
     await db.dialog.update({ where: { id: dialogId }, data: { isDeleted: true } });
+    await db.userState.update({
+      where: { userId, gptDialogId: dialogId },
+      data: { gptDialogId: null },
+    });
   },
 
   async rename(dialogId: string, title: string): Promise<Dialog> {

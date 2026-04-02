@@ -1,7 +1,33 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
 import type { Dialog, Message } from "../../types.js";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+
+marked.use({
+  breaks: true, // single newline → <br>
+  gfm: true, // GitHub Flavored Markdown (tables, strikethrough, etc.)
+});
+
+function renderMarkdown(text: string): string {
+  const raw = marked.parse(text) as string;
+  return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
+}
+
+function MessageText({ content, role }: { content: string; role: "user" | "assistant" }) {
+  // User messages are plain text (no markdown conversion needed)
+  if (role === "user") {
+    return <div className="chat-bubble__text chat-bubble__text--plain">{content}</div>;
+  }
+  const html = useMemo(() => renderMarkdown(content), [content]);
+  return (
+    <div
+      className="chat-bubble__text chat-bubble__text--md"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
 
 interface ChatHistoryProps {
   dialog: Dialog;
@@ -52,7 +78,7 @@ export function ChatHistory({ dialog, onBack }: ChatHistoryProps) {
               {msg.mediaUrl && msg.mediaType === "image" && (
                 <img className="chat-bubble__image" src={msg.mediaUrl} alt="" loading="lazy" />
               )}
-              {msg.content && <div className="chat-bubble__text">{msg.content}</div>}
+              {msg.content && <MessageText content={msg.content} role={msg.role} />}
               <div className="chat-bubble__time">
                 {new Date(msg.createdAt).toLocaleTimeString([], {
                   hour: "2-digit",

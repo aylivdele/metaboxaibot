@@ -85,7 +85,8 @@ export const dialogsRoutes: FastifyPluginAsync = async (fastify) => {
     if (!dialog) return reply.code(404).send({ error: "Dialog not found" });
     if (dialog.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
 
-    await dialogService.softDelete(id);
+    await dialogService.softDelete(id, userId);
+
     return { success: true };
   });
 

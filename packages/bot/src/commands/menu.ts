@@ -49,7 +49,7 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
     reply_markup: {
       keyboard: [
         [{ text: ctx.t.gpt.newDialog }],
-        [managementBtn, { text: ctx.t.gpt.prompts }],
+        [managementBtn],
         [{ text: ctx.t.common.backToMain }],
       ],
       resize_keyboard: true,

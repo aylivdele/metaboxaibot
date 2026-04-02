@@ -4,6 +4,7 @@ import { logger } from "../logger.js";
 import { config } from "@metabox/shared";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { InlineKeyboard } from "grammy";
+import { toMarkdownV2, closeOpenMarkdownV2 } from "../utils/markdown.js";
 
 /** Media group buffer: groups multiple photos sent at once before processing. */
 interface MediaGroupEntry {
@@ -23,36 +24,6 @@ const DEFAULT_GPT_MODEL = "gpt-4o";
 const EDIT_THROTTLE_MS = 1200;
 /** Finalize current message and start a new one when accumulated text reaches this length. */
 const MSG_SPLIT_AT = 3800;
-
-/**
- * Closes any unclosed Markdown markers so that a partial streaming response
- * is always valid for Telegram's Markdown parser.
- * Returns { closed, opener } where opener must be prepended to the next message
- * to continue the same formatting context.
- * Priority: ``` → ` → * → _
- */
-function closeOpenMarkdown(text: string): { closed: string; opener: string } {
-  if ((text.match(/```/g) ?? []).length % 2 !== 0) {
-    return { closed: text + "\n```", opener: "```\n" };
-  }
-
-  const noBlocks = text.replace(/```[\s\S]*?```/g, "");
-  const noInline = noBlocks.replace(/`[^`\n]*`/g, "");
-
-  if ((noBlocks.match(/`/g) ?? []).length % 2 !== 0) {
-    return { closed: text + "`", opener: "`" };
-  }
-
-  if ((noInline.match(/\*/g) ?? []).length % 2 !== 0) {
-    return { closed: text + "*", opener: "*" };
-  }
-
-  if ((noInline.match(/_/g) ?? []).length % 2 !== 0) {
-    return { closed: text + "_", opener: "_" };
-  }
-
-  return { closed: text, opener: "" };
-}
 
 /** Strip <think>...</think> blocks. During streaming, also hides an unclosed partial block. */
 function stripThinkingBlocks(text: string): string {
@@ -76,10 +47,11 @@ async function streamGptResponse(
   let lastEdit = Date.now();
 
   const finalizeMessage = async (msgId: number, text: string) => {
+    const v2 = toMarkdownV2(text);
     await ctx.api
-      .editMessageText(chatId, msgId, text, { parse_mode: "Markdown" })
+      .editMessageText(chatId, msgId, v2, { parse_mode: "MarkdownV2" })
       .catch(async (err) => {
-        logger.warn(err, "GPT finalize: markdown parse failed, retrying as plain text");
+        logger.warn(err, "GPT finalize: MarkdownV2 parse failed, retrying as plain text");
         await ctx.api
           .editMessageText(chatId, msgId, text)
           .catch((e) => logger.error(e, "GPT finalize: plain text fallback also failed"));
@@ -104,7 +76,7 @@ async function streamGptResponse(
         const splitAt = newlineIdx > MSG_SPLIT_AT / 2 ? newlineIdx + 1 : MSG_SPLIT_AT;
         const firstPart = accumulated.slice(0, splitAt);
         const remainder = accumulated.slice(splitAt);
-        const { closed, opener } = closeOpenMarkdown(stripThinkingBlocks(firstPart));
+        const { closed, opener } = closeOpenMarkdownV2(stripThinkingBlocks(firstPart));
         await finalizeMessage(placeholder.message_id, closed);
         placeholder = await ctx.reply("⏳");
         accumulated = opener + remainder;
@@ -116,9 +88,9 @@ async function streamGptResponse(
       if (now - lastEdit >= EDIT_THROTTLE_MS && accumulated.trim()) {
         const visible = stripThinkingBlocks(accumulated);
         if (visible) {
-          const preview = closeOpenMarkdown(visible).closed + " ▌";
+          const preview = toMarkdownV2(closeOpenMarkdownV2(visible).closed) + " ▌";
           await ctx.api
-            .editMessageText(chatId, placeholder.message_id, preview, { parse_mode: "Markdown" })
+            .editMessageText(chatId, placeholder.message_id, preview, { parse_mode: "MarkdownV2" })
             .catch(async (err) => {
               logger.warn(err, "GPT stream: markdown preview failed, retrying as plain text");
               await ctx.api
@@ -151,12 +123,11 @@ async function streamGptResponse(
 
 // ── New dialog ────────────────────────────────────────────────────────────────
 
-export async function handleNewGptDialog(ctx: BotContext): Promise<void> {
-  if (!ctx.user) return;
-
-  const state = await userStateService.get(ctx.user.id);
-  const activeDialog = !!state?.gptDialogId && (await dialogService.findById(state.gptDialogId));
-  const modelId = activeDialog ? activeDialog.modelId : DEFAULT_GPT_MODEL;
+export async function createNewDialog(
+  ctx: BotContext,
+  modelId: string,
+): Promise<string | undefined> {
+  if (!ctx.user) return undefined;
 
   const dialog = await dialogService.create({
     userId: ctx.user.id,
@@ -168,6 +139,17 @@ export async function handleNewGptDialog(ctx: BotContext): Promise<void> {
   await userStateService.setDialogForSection(ctx.user.id, "gpt", dialog.id);
 
   await ctx.reply(ctx.t.gpt.newDialogCreated);
+  return dialog.id;
+}
+
+export async function handleNewGptDialog(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+
+  const state = await userStateService.get(ctx.user.id);
+  const activeDialog = !!state?.gptDialogId && (await dialogService.findById(state.gptDialogId));
+  const modelId = activeDialog ? activeDialog.modelId : DEFAULT_GPT_MODEL;
+
+  await createNewDialog(ctx, modelId);
 }
 
 // ── Incoming message in active GPT dialog ────────────────────────────────────
@@ -175,16 +157,17 @@ export async function handleNewGptDialog(ctx: BotContext): Promise<void> {
 export async function handleGptMessage(ctx: BotContext): Promise<void> {
   if (!ctx.user || !ctx.message?.text) return;
 
-  const state = await userStateService.get(ctx.user.id);
-  if (!state?.gptDialogId) {
-    await ctx.reply(ctx.t.gpt.newDialogCreated);
+  const gptDialogId: string | null | undefined =
+    (await userStateService.get(ctx.user.id))?.gptDialogId ??
+    (await createNewDialog(ctx, DEFAULT_GPT_MODEL));
+  if (!gptDialogId) {
     return;
   }
 
   const chatId = ctx.chat?.id;
   if (!chatId) return;
 
-  await streamGptResponse(ctx, chatId, state.gptDialogId, ctx.message.text);
+  await streamGptResponse(ctx, chatId, gptDialogId, ctx.message.text);
 }
 
 // ── Photo / document image in active GPT dialog ───────────────────────────────
@@ -192,9 +175,10 @@ export async function handleGptMessage(ctx: BotContext): Promise<void> {
 export async function handleGptPhoto(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
 
-  const state = await userStateService.get(ctx.user.id);
-  if (!state?.gptDialogId) {
-    await ctx.reply(ctx.t.gpt.newDialogCreated);
+  const gptDialogId: string | null | undefined =
+    (await userStateService.get(ctx.user.id))?.gptDialogId ??
+    (await createNewDialog(ctx, DEFAULT_GPT_MODEL));
+  if (!gptDialogId) {
     return;
   }
 
@@ -238,7 +222,7 @@ export async function handleGptPhoto(ctx: BotContext): Promise<void> {
       }, 800);
     } else {
       const entry: MediaGroupEntry = {
-        dialogId: state.gptDialogId,
+        dialogId: gptDialogId,
         userId: ctx.user.id,
         chatId,
         urls: [url],
@@ -246,7 +230,7 @@ export async function handleGptPhoto(ctx: BotContext): Promise<void> {
         ctx,
         timer: setTimeout(() => {
           mediaGroupBuffer.delete(key);
-          void streamGptResponse(ctx, chatId, state.gptDialogId!, caption, [url]);
+          void streamGptResponse(ctx, chatId, gptDialogId, caption, [url]);
         }, 800),
       };
       mediaGroupBuffer.set(key, entry);
@@ -254,7 +238,7 @@ export async function handleGptPhoto(ctx: BotContext): Promise<void> {
   } else {
     // Single photo — process immediately
     const prompt = caption || ctx.t.gpt.photoDefaultPrompt;
-    await streamGptResponse(ctx, chatId, state.gptDialogId, prompt, [url]);
+    await streamGptResponse(ctx, chatId, gptDialogId, prompt, [url]);
   }
 }
 
@@ -276,7 +260,7 @@ export async function handleGptManagement(ctx: BotContext): Promise<void> {
 
 // ── Prompts (stub — full implementation pending) ──────────────────────────────
 
-export async function handleGptPrompts(ctx: BotContext): Promise<void> {
-  if (!ctx.user) return;
-  await ctx.reply(ctx.t.gpt.prompts + ctx.t.common.comingSoon);
-}
+// export async function handleGptPrompts(ctx: BotContext): Promise<void> {
+//   if (!ctx.user) return;
+//   await ctx.reply(ctx.t.gpt.prompts + ctx.t.common.comingSoon);
+// }
