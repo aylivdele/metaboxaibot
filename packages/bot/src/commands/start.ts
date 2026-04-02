@@ -258,8 +258,8 @@ export async function handleStart(ctx: BotContext): Promise<void> {
               });
             }
           }
-        } catch {
-          // Silent — never block the start flow
+        } catch (registerErr) {
+          logger.error({ err: registerErr }, "[start] registerBotUser failed");
         }
       })();
     }
