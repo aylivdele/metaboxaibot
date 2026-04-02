@@ -8,6 +8,7 @@ import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { SUPPORTED_LANGUAGES, getT, config } from "@metabox/shared";
 import type { Language, Translations } from "@metabox/shared";
 import { verifyLinkToken } from "@metabox/api/services";
+import { logger } from "../logger.js";
 
 /**
  * /start — handles deep link params, resets FSM state, shows language selection.
