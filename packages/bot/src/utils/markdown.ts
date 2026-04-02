@@ -4,13 +4,14 @@
  * Handles the most common LLM output patterns:
  *   **bold** / __bold__  → *bold*
  *   *italic* / _italic_  → _italic_
+ *   ***bold+italic***    → *_bold+italic_*
  *   ~~strike~~           → ~strike~
  *   `code`               → `code`
  *   ```lang\ncode```     → ```lang\ncode```
  *   [text](url)          → [text](url)
  *   # Heading            → *Heading*
  *   ---                  → (removed)
- *   > blockquote         → >blockquote
+ *   > blockquote         → >blockquote (content recursively converted)
  *
  * All remaining special chars are escaped as required by MarkdownV2.
  * Unclosed code blocks (during streaming) are emitted verbatim so that
@@ -50,6 +51,16 @@ export function toMarkdownV2(src: string): string {
       }
     }
 
+    // ── ***bold+italic*** → *_text_* ──────────────────────────────────────
+    if (src[i] === "*" && src[i + 1] === "*" && src[i + 2] === "*" && src[i + 3] !== " ") {
+      const closeIdx = src.indexOf("***", i + 3);
+      if (closeIdx !== -1) {
+        out.push("*_" + escapeMdV2(src.slice(i + 3, closeIdx)) + "_*");
+        i = closeIdx + 3;
+        continue;
+      }
+    }
+
     // ── **bold** → *bold* ─────────────────────────────────────────────────
     if (src[i] === "*" && src[i + 1] === "*" && src[i + 2] !== " ") {
       const closeIdx = src.indexOf("**", i + 2);
@@ -80,7 +91,9 @@ export function toMarkdownV2(src: string): string {
       }
     }
 
-    // ── *italic* → _italic_ (skip list markers: "* " at line start) ───────
+    // ── *italic* → _italic_ ───────────────────────────────────────────────
+    // Skips list markers ("* " at line start).
+    // Correctly handles nested bold: *text **bold** text* by skipping ** pairs.
     if (
       src[i] === "*" &&
       src[i + 1] !== "*" &&
@@ -88,9 +101,10 @@ export function toMarkdownV2(src: string): string {
       src[i + 1] !== "\n" &&
       src[i + 1] !== undefined
     ) {
-      const closeIdx = src.indexOf("*", i + 1);
-      if (closeIdx !== -1 && !src.slice(i + 1, closeIdx).includes("\n")) {
-        out.push("_" + escapeMdV2(src.slice(i + 1, closeIdx)) + "_");
+      const closeIdx = findItalicClose(src, i + 1);
+      if (closeIdx !== -1) {
+        // Recursively convert the inner content (handles nested **bold**)
+        out.push("_" + toMarkdownV2(src.slice(i + 1, closeIdx)) + "_");
         i = closeIdx + 1;
         continue;
       }
@@ -121,7 +135,11 @@ export function toMarkdownV2(src: string): string {
           const text = src.slice(i + 1, textClose);
           const url = src.slice(textClose + 2, urlClose);
           out.push(
-            "[" + escapeMdV2(text) + "](" + url.replace(/\\/g, "\\\\").replace(/\)/g, "\\)") + ")",
+            "[" +
+              escapeMdV2(text) +
+              "](" +
+              url.replace(/\\/g, "\\\\").replace(/\)/g, "\\)") +
+              ")",
           );
           i = urlClose + 1;
           continue;
@@ -146,10 +164,10 @@ export function toMarkdownV2(src: string): string {
         continue;
       }
 
-      // > blockquote
+      // > blockquote — content is recursively converted (not just escaped)
       const quoteMatch = /^(>+) ?(.*)/.exec(src.slice(i));
       if (quoteMatch) {
-        out.push(">".repeat(quoteMatch[1].length) + escapeMdV2(quoteMatch[2]));
+        out.push(">".repeat(quoteMatch[1].length) + toMarkdownV2(quoteMatch[2]));
         i += quoteMatch[0].length;
         continue;
       }
@@ -163,6 +181,35 @@ export function toMarkdownV2(src: string): string {
   }
 
   return out.join("");
+}
+
+/**
+ * Find the closing `*` for an italic span starting just after `start`.
+ * Correctly skips over nested `**...**` (bold) pairs so that
+ * `*text **bold** text*` → close is the final `*`, not the first `*` of `**bold`.
+ * Returns the index of the closing `*`, or -1 if not found.
+ */
+function findItalicClose(src: string, start: number): number {
+  let j = start;
+  while (j < src.length) {
+    if (src[j] === "\n") return -1; // italic doesn't cross lines
+    if (src[j] === "*") {
+      if (src[j + 1] === "*") {
+        // Nested bold — skip to its closing **
+        const boldClose = src.indexOf("**", j + 2);
+        if (boldClose === -1) return -1;
+        j = boldClose + 2;
+        // If the ** close is immediately followed by * (i.e. was ***),
+        // that trailing * is our italic close
+        if (src[j] === "*" && src[j + 1] !== "*") return j;
+        continue;
+      }
+      // Lone * — this is the italic close
+      return j;
+    }
+    j++;
+  }
+  return -1;
 }
 
 const MDV2_ESCAPE = /[_*[\]()~`>#+=|{}.!\-\\]/;

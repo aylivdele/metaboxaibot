@@ -19,7 +19,7 @@ interface MediaGroupEntry {
 const mediaGroupBuffer = new Map<string, MediaGroupEntry>();
 
 /** Default model for new GPT dialogs (user can change via Management). */
-const DEFAULT_GPT_MODEL = "gpt-4o";
+const DEFAULT_GPT_MODEL = "o4-mini";
 /** Minimum ms between Telegram message edits (rate-limit safety). */
 const EDIT_THROTTLE_MS = 1200;
 /** Finalize current message and start a new one when accumulated text reaches this length. */
