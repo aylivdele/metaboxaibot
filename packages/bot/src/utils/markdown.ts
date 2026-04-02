@@ -135,11 +135,7 @@ export function toMarkdownV2(src: string): string {
           const text = src.slice(i + 1, textClose);
           const url = src.slice(textClose + 2, urlClose);
           out.push(
-            "[" +
-              escapeMdV2(text) +
-              "](" +
-              url.replace(/\\/g, "\\\\").replace(/\)/g, "\\)") +
-              ")",
+            "[" + escapeMdV2(text) + "](" + url.replace(/\\/g, "\\\\").replace(/\)/g, "\\)") + ")",
           );
           i = urlClose + 1;
           continue;
