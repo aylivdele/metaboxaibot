@@ -127,6 +127,14 @@ export class ElevenLabsAdapter implements AudioAdapter {
     return data.voice_id;
   }
 
+  /** Deletes a voice from ElevenLabs. Silently ignores errors. */
+  static async deleteVoice(voiceId: string, apiKey: string): Promise<void> {
+    await fetch(`${ELEVENLABS_API}/voices/${voiceId}`, {
+      method: "DELETE",
+      headers: { "xi-api-key": apiKey },
+    }).catch(() => void 0);
+  }
+
   /** Fetches the preview_url for a voice from ElevenLabs. Returns null on failure. */
   static async getPreviewUrl(voiceId: string, apiKey: string): Promise<string | null> {
     const res = await fetch(`${ELEVENLABS_API}/voices/${voiceId}`, {

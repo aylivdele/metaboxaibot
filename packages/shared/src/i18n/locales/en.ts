@@ -80,7 +80,7 @@ export default {
     ttsElActivated:
       "🔊 ElevenLabs TTS activated.\nSend me any text to synthesize. Configure the voice in Management settings.",
     voiceCloneActivated:
-      "🎙 Voice cloning.\nSend me a voice message or audio file (MP3/WAV/OGG) — I will create your voice profile in ElevenLabs.\nThe voice will then be available in TTS ElevenLabs and video avatar settings.",
+      "🎙 Voice cloning.\nSend me a voice message or audio file (MP3/WAV/OGG) — I will create your voice profile in ElevenLabs.\nThe recommended minimum length is 30 seconds.\nThe voice will then be available in TTS ElevenLabs and video avatar settings.\n",
     voiceCloneNeedsAudio: "Please send a voice message or audio file for voice cloning.",
     voiceCloneProcessing: "⏳ Creating your voice profile...",
     voiceCloneSuccess:

@@ -112,13 +112,8 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
           select: { id: true, externalId: true },
         });
         if (!lruVoice) throw err;
-        // Delete from ElevenLabs
-        await fetch(`https://api.elevenlabs.io/v1/voices/${lruVoice.externalId}`, {
-          method: "DELETE",
-          headers: { "xi-api-key": apiKey },
-        }).catch(() => void 0);
-        // Delete from DB
-        await db.userVoice.delete({ where: { id: lruVoice.id } });
+        // Delete the LRU voice slot from ElevenLabs only (keep DB record — audioS3Key lets us recreate it)
+        await ElevenLabsAdapter.deleteVoice(lruVoice.externalId!, apiKey);
         // Retry cloning
         voiceId = await ElevenLabsAdapter.cloneVoice(
           audioBuffer,

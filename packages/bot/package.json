@@ -12,6 +12,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@grammyjs/runner": "^2.0.3",
     "@metabox/api": "workspace:*",
     "@metabox/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.4.2",
