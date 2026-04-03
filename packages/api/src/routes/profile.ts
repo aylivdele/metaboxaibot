@@ -254,13 +254,10 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     } catch (err) {
       if (err instanceof MetaboxApiError) {
         // Parse JSON body for rich error info (e.g. TELEGRAM_LINKED with linkedTo)
-        let parsed: Record<string, unknown> = {};
-        try {
-          parsed = JSON.parse(err.body);
-        } catch {
-          parsed = { error: err.body };
-        }
-        return reply.code(err.status).send({ ...parsed, code: err.code ?? parsed.code });
+        const responseData = err.data ?? {};
+        return reply
+          .code(err.status)
+          .send({ ...responseData, code: err.code ?? responseData.code });
       }
       throw err;
     }
