@@ -7,6 +7,7 @@ import {
   AI_MODELS,
   config,
   getT,
+  resolveModelDisplay,
   type AIModel,
   type Section,
   type Translations,
@@ -239,12 +240,14 @@ async function sendModelActivatedNotification(
   };
   const hint = section === "audio" ? (audioHints[modelId] ?? t.audio.activated) : undefined;
 
+  const lang = (user?.language ?? "en") as string;
+  const { name: modelName, description: modelDesc } = resolveModelDisplay(modelId, lang, model);
   const text =
     hint && modelId !== "voice-clone"
-      ? `${model.name}\n\n${model.description}\n\n${hint}\n\n${costLine}`
+      ? `${modelName}\n\n${modelDesc}\n\n${hint}\n\n${costLine}`
       : hint
-        ? `${model.name}\n\n${model.description}\n\n${hint}`
-        : `${model.name}\n\n${model.description}\n\n${costLine}`;
+        ? `${modelName}\n\n${modelDesc}\n\n${hint}`
+        : `${modelName}\n\n${modelDesc}\n\n${costLine}`;
 
   const webappUrl = config.bot.webappUrl;
   const replyMarkup = webappUrl

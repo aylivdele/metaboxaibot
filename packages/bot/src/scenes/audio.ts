@@ -3,7 +3,7 @@ import type { BotContext } from "../types/context.js";
 import { audioGenerationService, userStateService } from "@metabox/api/services";
 import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
 import { db } from "@metabox/api/db";
-import { AI_MODELS, config, generateWebToken } from "@metabox/shared";
+import { AI_MODELS, config, generateWebToken, resolveModelDisplay } from "@metabox/shared";
 import { logger } from "../logger.js";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
@@ -47,7 +47,12 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
             `${webappUrl}?page=management&section=audio&wtoken=${token}`,
           )
         : undefined;
-      await ctx.reply(`${model.name}\n\n${model.description}\n\n${hint}\n\n${costLine}`, {
+      const { name: modelName, description: modelDesc } = resolveModelDisplay(
+        modelId,
+        ctx.user.language,
+        model,
+      );
+      await ctx.reply(`${modelName}\n\n${modelDesc}\n\n${hint}\n\n${costLine}`, {
         reply_markup: kb,
       });
       return;

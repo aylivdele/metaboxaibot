@@ -48,3 +48,9 @@ export type { Config } from "./config.js";
 // i18n
 export { getT, preloadLocales } from "./i18n/index.js";
 export type { Translations } from "./i18n/index.js";
+export {
+  MODEL_TRANSLATIONS,
+  SETTING_TRANSLATIONS,
+  resolveModelDisplay,
+} from "./i18n/model-translations.js";
+export type { ModelTranslation, SettingTranslation } from "./i18n/model-translations.js";

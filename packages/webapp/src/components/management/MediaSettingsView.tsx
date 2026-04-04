@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
+import { MODEL_TRANSLATIONS } from "@metabox/shared";
 import type { Model, UserState } from "../../types.js";
 import { SettingsPanel } from "./SettingsPanel.js";
 import { StyledSelect } from "./StyledSelect.js";
@@ -157,7 +158,10 @@ interface PickerOption {
   label: string;
 }
 
-function buildPickerOptions(models: Model[]): PickerOption[] {
+function buildPickerOptions(
+  models: Model[],
+  modelTranslations: Record<string, { name?: string }>,
+): PickerOption[] {
   const { families, standalone } = groupByFamily(models);
   const opts: PickerOption[] = [];
   for (const [fid, members] of families.entries()) {
@@ -165,7 +169,7 @@ function buildPickerOptions(models: Model[]): PickerOption[] {
     opts.push({ id: `family__${fid}`, label: familyName });
   }
   for (const m of standalone) {
-    opts.push({ id: `standalone__${m.id}`, label: m.name });
+    opts.push({ id: `standalone__${m.id}`, label: modelTranslations[m.id]?.name ?? m.name });
   }
   return opts;
 }
@@ -203,7 +207,8 @@ function FamilyCard({
   onSettingChange,
   onReset,
 }: FamilyCardProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const modelLocale = MODEL_TRANSLATIONS[locale] ?? MODEL_TRANSLATIONS["en"] ?? {};
 
   const belongsHere = activeModelId !== "" && members.some((m) => m.id === activeModelId);
   // Default selection: active model if it belongs here, else familyDefaultModelId, else first member
@@ -255,7 +260,12 @@ function FamilyCard({
     }
   };
 
-  const description = selected.descriptionOverride ?? selected.description;
+  const modelT = modelLocale[selected.id];
+  const description =
+    modelT?.descriptionOverride ??
+    selected.descriptionOverride ??
+    modelT?.description ??
+    selected.description;
   const currentValues = allModelSettings[selected.id] ?? {};
   const cost = modelCostLabel(selected, currentValues, t);
   const familyLabel =
@@ -369,7 +379,8 @@ function StandaloneCard({
   onSettingChange,
   onReset,
 }: StandaloneCardProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const modelT = (MODEL_TRANSLATIONS[locale] ?? MODEL_TRANSLATIONS["en"] ?? {})[model.id];
   const [activating, setActivating] = useState(false);
   const cost = modelCostLabel(model, allModelSettings[model.id] ?? {}, t);
 
@@ -385,10 +396,20 @@ function StandaloneCard({
   return (
     <div className={`family-card${isActive ? " family-card--active" : ""}`}>
       <div className="family-card__header">
-        <span className="family-card__name">{model.name}</span>
+        <span className="family-card__name">{modelT?.name ?? model.name}</span>
         {isActive && <span className="family-card__badge">{t("imageSettings.active")}</span>}
       </div>
-      {model.description && <p className="family-card__desc">{model.description}</p>}
+      {(modelT?.descriptionOverride ??
+        model.descriptionOverride ??
+        modelT?.description ??
+        model.description) && (
+        <p className="family-card__desc">
+          {modelT?.descriptionOverride ??
+            model.descriptionOverride ??
+            modelT?.description ??
+            model.description}
+        </p>
+      )}
       {model.settings.length > 0 && (
         <div className="family-card__row family-card__row--settings">
           <SettingsPanel
@@ -457,7 +478,8 @@ export function MediaSettingsView({
   section: MediaSection;
   initialModelId?: string;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const modelLocaleMap = MODEL_TRANSLATIONS[locale] ?? MODEL_TRANSLATIONS["en"] ?? {};
   const [models, setModels] = useState<Model[]>([]);
   const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>(
     {},
@@ -484,7 +506,9 @@ export function MediaSettingsView({
         setActiveModelId(initial);
         // For picker: if no active model, show the first picker option
         setSelectedPickerId(
-          initial ? getPickerIdForModel(initial, ms) : (buildPickerOptions(ms)[0]?.id ?? ""),
+          initial
+            ? getPickerIdForModel(initial, ms)
+            : (buildPickerOptions(ms, modelLocaleMap)[0]?.id ?? ""),
         );
       })
       .catch(console.error)
@@ -532,7 +556,10 @@ export function MediaSettingsView({
   };
 
   const { families, standalone } = useMemo(() => groupByFamily(models), [models]);
-  const pickerOptions = useMemo(() => buildPickerOptions(models), [models]);
+  const pickerOptions = useMemo(
+    () => buildPickerOptions(models, modelLocaleMap),
+    [models, modelLocaleMap],
+  );
 
   const [pickerType, pickerId] = selectedPickerId.split("__");
   const familyMembers = useMemo(

@@ -19,6 +19,7 @@ import {
   MODEL_TO_FAMILY,
   AI_MODELS,
   config,
+  resolveModelDisplay,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -157,7 +158,12 @@ async function activateVideoModel(ctx: BotContext, modelId: string): Promise<voi
           `${webappUrl}?page=management&section=video`,
         )
       : undefined;
-    await ctx.reply(`🎬 ${model.name}\n\n${model.description}\n\n${costLine}`, {
+    const { name: modelName, description: modelDesc } = resolveModelDisplay(
+      modelId,
+      ctx.user.language,
+      model,
+    );
+    await ctx.reply(`🎬 ${modelName}\n\n${modelDesc}\n\n${costLine}`, {
       reply_markup: kb,
     });
 
@@ -324,7 +330,12 @@ export async function handleVideoAvatars(ctx: BotContext): Promise<void> {
           `${webappUrl}?page=management&section=video`,
         )
       : undefined;
-    await ctx.reply(`👾 ${model.name}\n\n${model.description}\n\n${costLine}`, {
+    const { name: heygenName, description: heygenDesc } = resolveModelDisplay(
+      "heygen",
+      ctx.user.language,
+      model,
+    );
+    await ctx.reply(`👾 ${heygenName}\n\n${heygenDesc}\n\n${costLine}`, {
       reply_markup: kb,
     });
     await ctx.reply(ctx.t.video.hintHeygen);
@@ -350,7 +361,12 @@ export async function handleVideoLipSync(ctx: BotContext): Promise<void> {
           `${webappUrl}?page=management&section=video`,
         )
       : undefined;
-    await ctx.reply(`🔄 ${model.name}\n\n${model.description}\n\n${costLine}`, {
+    const { name: didName, description: didDesc } = resolveModelDisplay(
+      "d-id",
+      ctx.user.language,
+      model,
+    );
+    await ctx.reply(`🔄 ${didName}\n\n${didDesc}\n\n${costLine}`, {
       reply_markup: kb,
     });
     await ctx.reply(ctx.t.video.hintDid);

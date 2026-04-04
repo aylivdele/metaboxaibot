@@ -19,6 +19,7 @@ import {
   generateWebToken,
   UserFacingError,
   resolveUserFacingError,
+  resolveModelDisplay,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -160,7 +161,12 @@ export async function activateDesignModel(ctx: BotContext, modelId: string): Pro
           `${webappUrl}?page=management&section=design`,
         )
       : undefined;
-    await ctx.reply(`🎨 ${model.name}\n\n${model.description}\n\n${costLine}`, {
+    const { name: modelName, description: modelDesc } = resolveModelDisplay(
+      modelId,
+      ctx.user.language,
+      model,
+    );
+    await ctx.reply(`🎨 ${modelName}\n\n${modelDesc}\n\n${costLine}`, {
       reply_markup: kb,
     });
   } else {

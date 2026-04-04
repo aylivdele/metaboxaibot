@@ -1,4 +1,6 @@
 import type { ModelSettingDef, UnavailableRule } from "../../types.js";
+import { useI18n } from "../../i18n.js";
+import { SETTING_TRANSLATIONS } from "@metabox/shared";
 import { StyledSelect } from "./StyledSelect.js";
 import { CustomSlider } from "./CustomSlider.js";
 import { HeyGenVoicePicker } from "./HeyGenVoicePicker.js";
@@ -32,6 +34,9 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps) {
+  const { locale } = useI18n();
+  const settingLocale = SETTING_TRANSLATIONS[locale] ?? SETTING_TRANSLATIONS["en"] ?? {};
+
   if (!settings || settings.length === 0) return null;
 
   // Resolve effective values: fill in defaults for any setting not yet saved by the user.
@@ -46,15 +51,19 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
       {settings.map((def) => {
         if (def.unavailableIf && evalRule(def.unavailableIf, effectiveValues)) return null;
         const val = effectiveValues[def.key];
+        const settingT = settingLocale[def.key];
+        const label = settingT?.label ?? def.label;
+        const description = settingT?.description ?? def.description;
         return (
           <div key={def.key} className="settings-panel__row">
-            <span className="settings-panel__label">{def.label}</span>
-            {def.description && <span className="settings-panel__desc">{def.description}</span>}
+            <span className="settings-panel__label">{label}</span>
+            {description && <span className="settings-panel__desc">{description}</span>}
             {def.type === "select" && (
               <div className="image-settings-ratios">
                 {def.options!.map((opt) => {
                   const optDisabled =
                     !!opt.unavailableIf && evalRule(opt.unavailableIf, effectiveValues);
+                  const optLabel = settingT?.options?.[String(opt.value)] ?? opt.label;
                   return (
                     <button
                       key={String(opt.value)}
@@ -62,7 +71,7 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
                       className={`ratio-btn${val === opt.value ? " ratio-btn--active" : ""}${optDisabled ? " ratio-btn--disabled" : ""}`}
                       onClick={() => !optDisabled && onChange(def.key, opt.value)}
                     >
-                      {opt.label}
+                      {optLabel}
                     </button>
                   );
                 })}
@@ -74,7 +83,7 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
                 onChange={(v) => onChange(def.key, v)}
                 options={def.options!.map((opt) => ({
                   value: String(opt.value),
-                  label: opt.label,
+                  label: settingT?.options?.[String(opt.value)] ?? opt.label,
                   disabled: !!opt.unavailableIf && evalRule(opt.unavailableIf, effectiveValues),
                 }))}
               />
