@@ -17,9 +17,6 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@metabox/shared-browser": "workspace:*"
-  },
   "devDependencies": {
     "typescript": "^5.8.3"
   }

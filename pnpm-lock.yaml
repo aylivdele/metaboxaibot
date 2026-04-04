@@ -201,10 +201,6 @@ importers:
         version: 5.9.3
 
   packages/shared:
-    dependencies:
-      '@metabox/shared-browser':
-        specifier: workspace:*
-        version: link:../shared-browser
     devDependencies:
       typescript:
         specifier: ^5.8.3
@@ -218,9 +214,6 @@ importers:
 
   packages/webapp:
     dependencies:
-      '@metabox/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@metabox/shared-browser':
         specifier: workspace:*
         version: link:../shared-browser

@@ -52,5 +52,5 @@ export {
   MODEL_TRANSLATIONS,
   SETTING_TRANSLATIONS,
   resolveModelDisplay,
-} from "@metabox/shared-browser";
-export type { ModelTranslation, SettingTranslation } from "@metabox/shared-browser";
+} from "./i18n/model-translations.js";
+export type { ModelTranslation, SettingTranslation } from "./i18n/model-translations.js";
