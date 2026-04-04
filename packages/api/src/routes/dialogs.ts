@@ -3,7 +3,7 @@ import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { dialogService } from "../services/dialog.service.js";
 import { userStateService } from "../services/user-state.service.js";
 import { db } from "../db.js";
-import { getT, AI_MODELS, config, type Section } from "@metabox/shared";
+import { getT, AI_MODELS, config, generateWebToken, type Section } from "@metabox/shared";
 import type { Language } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
@@ -133,15 +133,57 @@ async function sendDialogSelectedNotification(
   title: string | null,
   modelId: string,
 ): Promise<void> {
-  const user = await db.user.findUnique({ where: { id: userId }, select: { language: true } });
+  if (!config.bot.token) return;
+
+  const [user, botState] = await Promise.all([
+    db.user.findUnique({ where: { id: userId }, select: { language: true } }),
+    userStateService.get(userId),
+  ]);
   const t = getT((user?.language ?? "en") as Language);
   const modelName = AI_MODELS[modelId]?.name ?? modelId;
-  const text = t.gpt.dialogSelected
-    .replace("{title}", title ?? modelId)
+  const dialogLabel = title ?? modelId;
+
+  const alreadyInGpt = botState?.section === "gpt";
+
+  // Activate GPT section in bot state if not already there
+  if (!alreadyInGpt) {
+    await Promise.all([
+      userStateService.setState(userId, "GPT_ACTIVE", "gpt"),
+      userStateService.setGptModel(userId, modelId),
+    ]);
+
+    const webappUrl = config.bot.webappUrl;
+    const token = webappUrl ? generateWebToken(userId, config.bot.token) : "";
+    const managementBtn = webappUrl
+      ? {
+          text: t.gpt.management,
+          web_app: { url: `${webappUrl}?page=management&section=gpt&wtoken=${token}` },
+        }
+      : { text: t.gpt.management };
+
+    const sectionText = `${t.gpt.sectionTitle}\n\n💬 ${dialogLabel}`;
+    await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: String(userId),
+        text: sectionText,
+        reply_markup: {
+          keyboard: [[{ text: t.gpt.newDialog }], [managementBtn], [{ text: t.common.backToMain }]],
+          resize_keyboard: true,
+          is_persistent: true,
+        },
+      }),
+    });
+  }
+
+  // Always send dialog-selected confirmation
+  const confirmText = t.gpt.dialogSelected
+    .replace("{title}", dialogLabel)
     .replace("{model}", modelName);
   await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: String(userId), text }),
+    body: JSON.stringify({ chat_id: String(userId), text: confirmText }),
   });
 }

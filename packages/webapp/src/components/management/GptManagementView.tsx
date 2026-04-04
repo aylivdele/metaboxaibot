@@ -42,6 +42,7 @@ export function GptManagementView() {
   const [renameValue, setRenameValue] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [activatedPopup, setActivatedPopup] = useState(false);
   const [viewingDialog, setViewingDialog] = useState<Dialog | null>(null);
   const [settingsDialog, setSettingsDialog] = useState<Dialog | null>(null);
   const [filter, setFilter] = useState<ModelFilter>("all");
@@ -92,6 +93,8 @@ export function GptManagementView() {
   const handleActivate = async (dialog: Dialog) => {
     await api.dialogs.activate(dialog.id);
     setState((s) => (s ? { ...s, gptDialogId: dialog.id, gptModelId: dialog.modelId } : s));
+    setActivatedPopup(true);
+    setTimeout(() => setActivatedPopup(false), 3000);
   };
 
   const handleRename = async (id: string) => {
@@ -110,6 +113,8 @@ export function GptManagementView() {
       setState((s) => (s ? { ...s, gptDialogId: dialog.id, gptModelId: modelId } : s));
       setDialogs((ds) => [dialog, ...ds]);
       setIsCreating(false);
+      setActivatedPopup(true);
+      setTimeout(() => setActivatedPopup(false), 3000);
     } finally {
       setCreating(false);
     }
@@ -149,6 +154,7 @@ export function GptManagementView() {
 
   return (
     <div className="page">
+      {activatedPopup && <div className="activated-popup">{t("manage.dialogActivatedPopup")}</div>}
       <div className="page-header">
         <h2>{t("manage.title")}</h2>
         <p className="page-subtitle">{t("manage.subtitle")}</p>

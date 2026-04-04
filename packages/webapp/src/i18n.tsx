@@ -254,6 +254,7 @@ const translations = {
     "imageSettings.resetTitle": "Reset settings to defaults",
     "imageSettings.selectModel": "Select model",
     "imageSettings.activatedPopup": "Model activated. Return to the bot to start using it.",
+    "manage.dialogActivatedPopup": "Dialog activated. Return to the chat to work with it.",
 
     // Video settings
     "videoSettings.title": "Video Settings",
@@ -545,6 +546,7 @@ const translations = {
     "imageSettings.resetTitle": "Сбрасывает настройки до значений по умолчанию.",
     "imageSettings.selectModel": "Выберите модель",
     "imageSettings.activatedPopup": "Модель активирована. Вернитесь в бот для работы с ней.",
+    "manage.dialogActivatedPopup": "Диалог активирован. Вернитесь в чат для работы с ним.",
 
     // Video settings
     "videoSettings.title": "Настройки видео",
