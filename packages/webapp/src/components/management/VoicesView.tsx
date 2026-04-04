@@ -3,7 +3,7 @@ import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
 import type { UserVoice } from "../../types.js";
 
-export function VoicesView() {
+export function VoicesView({ onGoToVoiceClone }: { onGoToVoiceClone?: () => void }) {
   const { t } = useI18n();
   const [clonedVoices, setClonedVoices] = useState<UserVoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +84,11 @@ export function VoicesView() {
       <div className="page-header">
         <h2>{t("uploads.title")}</h2>
         <p className="page-subtitle">{t("uploads.subtitle")}</p>
+        {onGoToVoiceClone && (
+          <button className="btn btn--primary" onClick={onGoToVoiceClone}>
+            {t("uploads.cloneVoiceBtn")}
+          </button>
+        )}
       </div>
 
       {!hasContent ? (

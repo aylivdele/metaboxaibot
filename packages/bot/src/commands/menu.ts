@@ -60,14 +60,9 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
 
 export async function handleDesign(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
-  const [dialogLabel, state] = await Promise.all([
-    activeDialogLabel(ctx.user.id, "design"),
-    userStateService.get(ctx.user.id),
-  ]);
+  const state = await userStateService.get(ctx.user.id);
   await userStateService.setState(ctx.user.id, "DESIGN_SECTION", "design");
-  const text = dialogLabel
-    ? `${ctx.t.design.sectionTitle}\n\n💬 ${dialogLabel}`
-    : ctx.t.design.sectionTitle;
+  const text = ctx.t.design.sectionTitle;
 
   const webappUrl = config.bot.webappUrl;
   const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";

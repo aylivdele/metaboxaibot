@@ -127,6 +127,60 @@ function buildActivationCostLine(
   return t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
 }
 
+/** Send a section-entry message with the appropriate reply keyboard (mirrors bot menu.ts). */
+async function sendSectionMessage(
+  userId: bigint,
+  section: string,
+  t: Translations,
+  token: string,
+  webappUrl: string | undefined,
+): Promise<void> {
+  const makeMgmtBtn = (label: string) =>
+    webappUrl
+      ? { text: label, web_app: { url: `${webappUrl}?page=management&section=${section}` } }
+      : { text: label };
+
+  let text: string;
+  let keyboard: { text: string; web_app?: { url: string } }[][];
+
+  if (section === "audio") {
+    text = t.audio.sectionTitle;
+    keyboard = [
+      [{ text: t.audio.tts }, { text: t.audio.voiceClone }],
+      [{ text: t.audio.music }, { text: t.audio.sounds }],
+      [makeMgmtBtn(t.audio.management)],
+      [{ text: t.common.backToMain }],
+    ];
+  } else if (section === "design") {
+    text = t.design.sectionTitle;
+    keyboard = [
+      [{ text: t.design.chooseModel }],
+      [makeMgmtBtn(t.design.management)],
+      [{ text: t.common.backToMain }],
+    ];
+  } else if (section === "video") {
+    text = t.video.sectionTitle;
+    keyboard = [
+      [{ text: t.video.newDialog }],
+      [{ text: t.video.avatars }, { text: t.video.lipSync }],
+      [makeMgmtBtn(t.video.management)],
+      [{ text: t.common.backToMain }],
+    ];
+  } else {
+    return;
+  }
+
+  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: String(userId),
+      text,
+      reply_markup: { keyboard, resize_keyboard: true, is_persistent: true },
+    }),
+  }).catch((reason) => logger.warn(reason, `Could not send section switch message`));
+}
+
 async function sendModelActivatedNotification(
   userId: bigint,
   section: string,
@@ -135,12 +189,35 @@ async function sendModelActivatedNotification(
   const model = AI_MODELS[modelId];
   if (!model || !config.bot.token) return;
 
-  const [user, allSettings] = await Promise.all([
+  const [user, allSettings, botState] = await Promise.all([
     db.user.findUnique({ where: { id: userId }, select: { language: true } }),
     userStateService.getModelSettings(userId),
+    userStateService.get(userId),
   ]);
   const t = getT((user?.language ?? "en") as Language);
   const modelSettings = allSettings[modelId] ?? {};
+
+  // If the user is currently in a different section, switch them first
+  if (botState?.section !== section) {
+    const newState =
+      section === "audio"
+        ? "AUDIO_ACTIVE"
+        : section === "design"
+          ? "DESIGN_SECTION"
+          : section === "video"
+            ? "VIDEO_SECTION"
+            : undefined;
+    if (newState) {
+      await Promise.all([
+        sendSectionMessage(userId, section, t, config.bot.token, config.bot.webappUrl),
+        userStateService.setState(
+          userId,
+          newState as Parameters<typeof userStateService.setState>[1],
+          section as Section,
+        ),
+      ]);
+    }
+  }
 
   const defaultDuration =
     section === "video"

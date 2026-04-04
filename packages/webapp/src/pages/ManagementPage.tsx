@@ -15,8 +15,16 @@ export function ManagementPage({ initialSection }: { initialSection?: string }) 
         ? "video"
         : initialSection === "audio"
           ? "audio"
-          : "gpt",
+          : initialSection === "uploads"
+            ? "uploads"
+            : "gpt",
   );
+  const [audioInitialModel, setAudioInitialModel] = useState<string | undefined>(undefined);
+
+  const goToAudioModel = (modelId: string) => {
+    setAudioInitialModel(modelId);
+    setTab("audio");
+  };
 
   return (
     <div className="manage-root">
@@ -35,8 +43,10 @@ export function ManagementPage({ initialSection }: { initialSection?: string }) 
         {tab === "gpt" && <GptManagementView />}
         {tab === "design" && <MediaSettingsView section="design" />}
         {tab === "video" && <MediaSettingsView section="video" />}
-        {tab === "audio" && <MediaSettingsView section="audio" />}
-        {tab === "uploads" && <VoicesView />}
+        {tab === "audio" && (
+          <MediaSettingsView section="audio" initialModelId={audioInitialModel} />
+        )}
+        {tab === "uploads" && <VoicesView onGoToVoiceClone={() => goToAudioModel("voice-clone")} />}
       </div>
     </div>
   );

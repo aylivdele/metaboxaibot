@@ -253,6 +253,7 @@ const translations = {
     "imageSettings.reset": "Reset",
     "imageSettings.resetTitle": "Reset settings to defaults",
     "imageSettings.selectModel": "Select model",
+    "imageSettings.activatedPopup": "Model activated. Return to the bot to start using it.",
 
     // Video settings
     "videoSettings.title": "Video Settings",
@@ -275,6 +276,7 @@ const translations = {
     "uploads.photosTitle": "Photos",
     "uploads.voicesTitle": "Voice recordings",
     "uploads.clonedVoicesTitle": "Cloned voices (ElevenLabs)",
+    "uploads.cloneVoiceBtn": "🎙 Clone a voice",
     "uploads.confirmDeleteVoice": "Delete this voice from ElevenLabs?",
     "uploads.play": "Play",
     "uploads.delete": "Delete",
@@ -542,6 +544,7 @@ const translations = {
     "imageSettings.reset": "Сбросить",
     "imageSettings.resetTitle": "Сбрасывает настройки до значений по умолчанию.",
     "imageSettings.selectModel": "Выберите модель",
+    "imageSettings.activatedPopup": "Модель активирована. Вернитесь в бот для работы с ней.",
 
     // Video settings
     "videoSettings.title": "Настройки видео",
@@ -564,6 +567,7 @@ const translations = {
     "uploads.photosTitle": "Фотографии",
     "uploads.voicesTitle": "Голосовые записи",
     "uploads.clonedVoicesTitle": "Клонированные голоса (ElevenLabs)",
+    "uploads.cloneVoiceBtn": "🎙 Клонировать голос",
     "uploads.confirmDeleteVoice": "Удалить этот голос из ElevenLabs?",
     "uploads.play": "Воспроизвести",
     "uploads.delete": "Удалить",

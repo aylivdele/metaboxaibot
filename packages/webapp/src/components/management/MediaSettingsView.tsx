@@ -450,7 +450,13 @@ const SECTION_SUBTITLE_KEY: Record<MediaSection, Parameters<ReturnType<typeof us
   audio: "audioSettings.subtitle",
 };
 
-export function MediaSettingsView({ section }: { section: MediaSection }) {
+export function MediaSettingsView({
+  section,
+  initialModelId,
+}: {
+  section: MediaSection;
+  initialModelId?: string;
+}) {
   const { t } = useI18n();
   const [models, setModels] = useState<Model[]>([]);
   const [allModelSettings, setAllModelSettings] = useState<Record<string, Record<string, unknown>>>(
@@ -460,6 +466,7 @@ export function MediaSettingsView({ section }: { section: MediaSection }) {
   const [selectedPickerId, setSelectedPickerId] = useState<string>("");
   const [savedId, setSavedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activatedPopup, setActivatedPopup] = useState(false);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
@@ -468,8 +475,12 @@ export function MediaSettingsView({ section }: { section: MediaSection }) {
         setModels(ms);
         setAllModelSettings(ms2);
         const fromSection = (state[SECTION_ACTIVE_KEY[section]] as string | null) ?? undefined;
+        // initialModelId takes priority (e.g. deep-link from another page)
+        const forced =
+          initialModelId && ms.some((m) => m.id === initialModelId) ? initialModelId : undefined;
         // Only set active model if the user actually chose one; "" means "no model activated yet"
-        const initial = fromSection && ms.some((m) => m.id === fromSection) ? fromSection : "";
+        const initial =
+          forced ?? (fromSection && ms.some((m) => m.id === fromSection) ? fromSection : "");
         setActiveModelId(initial);
         // For picker: if no active model, show the first picker option
         setSelectedPickerId(
@@ -483,6 +494,8 @@ export function MediaSettingsView({ section }: { section: MediaSection }) {
   const handleModelActivate = async (modelId: string) => {
     setActiveModelId(modelId);
     await api.state.activate(section, modelId);
+    setActivatedPopup(true);
+    setTimeout(() => setActivatedPopup(false), 3000);
   };
 
   const handleSettingChange = (modelId: string, key: string, value: unknown) => {
@@ -535,6 +548,7 @@ export function MediaSettingsView({ section }: { section: MediaSection }) {
 
   return (
     <div className="page">
+      {activatedPopup && <div className="activated-popup">{t("imageSettings.activatedPopup")}</div>}
       <div className="page-header">
         <h2>{t(SECTION_TITLE_KEY[section])}</h2>
         <p className="page-subtitle">{t(SECTION_SUBTITLE_KEY[section])}</p>
