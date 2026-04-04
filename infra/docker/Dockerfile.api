@@ -4,8 +4,9 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/api/package.json ./packages/api/
-COPY packages/shared/package.json ./packages/shared/
+COPY packages/api/package.json            ./packages/api/
+COPY packages/shared/package.json         ./packages/shared/
+COPY packages/shared-browser/package.json ./packages/shared-browser/
 COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile
 
@@ -14,6 +15,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/api/node_modules ./packages/api/node_modules
 COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY . .
+RUN pnpm --filter @metabox/shared-browser build
 RUN pnpm --filter @metabox/shared build
 RUN pnpm exec prisma generate
 RUN pnpm --filter @metabox/api build
@@ -23,6 +25,8 @@ RUN npm install -g pnpm
 WORKDIR /app
 ENV NODE_ENV=production
 
+COPY --from=builder /app/packages/shared-browser/dist         ./packages/shared-browser/dist
+COPY --from=builder /app/packages/shared-browser/package.json ./packages/shared-browser/
 COPY --from=builder /app/packages/shared/dist         ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/
 COPY --from=builder /app/packages/api/dist            ./packages/api/dist
