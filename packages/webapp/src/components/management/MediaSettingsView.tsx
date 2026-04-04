@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
-import { MODEL_TRANSLATIONS } from "@metabox/shared";
+import { MODEL_TRANSLATIONS } from "@metabox/shared-browser";
 import type { Model, UserState } from "../../types.js";
 import { SettingsPanel } from "./SettingsPanel.js";
 import { StyledSelect } from "./StyledSelect.js";

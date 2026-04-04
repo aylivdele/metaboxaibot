@@ -1,5 +1,5 @@
 {
-  "name": "@metabox/shared",
+  "name": "@metabox/shared-browser",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -7,18 +7,14 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./src/index.ts",
       "default": "./dist/index.js"
     }
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch",
-    "lint": "eslint src",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@metabox/shared-browser": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

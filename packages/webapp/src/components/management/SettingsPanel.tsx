@@ -1,6 +1,6 @@
 import type { ModelSettingDef, UnavailableRule } from "../../types.js";
 import { useI18n } from "../../i18n.js";
-import { SETTING_TRANSLATIONS } from "@metabox/shared";
+import { SETTING_TRANSLATIONS } from "@metabox/shared-browser";
 import { StyledSelect } from "./StyledSelect.js";
 import { CustomSlider } from "./CustomSlider.js";
 import { HeyGenVoicePicker } from "./HeyGenVoicePicker.js";

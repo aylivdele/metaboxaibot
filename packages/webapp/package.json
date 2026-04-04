@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@metabox/shared": "workspace:*",
+    "@metabox/shared-browser": "workspace:*",
     "@telegram-apps/sdk-react": "^3.3.0",
     "dompurify": "^3.3.3",
     "marked": "^17.0.5",
