@@ -84,10 +84,10 @@ jobs:
 
           match() { echo "$changed" | grep -qE "$1" && echo "true" || echo "false"; }
 
-          echo "api=$(match    '^(packages/api|packages/shared|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.api)')"    >> "$GITHUB_OUTPUT"
-          echo "bot=$(match    '^(packages/bot|packages/api|packages/shared|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.bot)')"    >> "$GITHUB_OUTPUT"
-          echo "worker=$(match '^(packages/worker|packages/api|packages/shared|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.worker)')" >> "$GITHUB_OUTPUT"
-          echo "webapp=$(match '^(packages/webapp|packages/shared|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.webapp)')"     >> "$GITHUB_OUTPUT"
+          echo "api=$(match    '^(packages/api|packages/shared|packages/shared-browser|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.api)')"    >> "$GITHUB_OUTPUT"
+          echo "bot=$(match    '^(packages/bot|packages/api|packages/shared|packages/shared-browser|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.bot)')"    >> "$GITHUB_OUTPUT"
+          echo "worker=$(match '^(packages/worker|packages/api|packages/shared|packages/shared-browser|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.worker)')" >> "$GITHUB_OUTPUT"
+          echo "webapp=$(match '^(packages/webapp|packages/shared|packages/shared-browser|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.webapp)')"     >> "$GITHUB_OUTPUT"
 
   build-api:
     name: Build API
@@ -183,6 +183,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @metabox/shared-browser build
       - name: Build webapp
         run: pnpm --filter @metabox/webapp build
         env:

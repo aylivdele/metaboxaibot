@@ -497,17 +497,15 @@ export function MediaSettingsView({
         setModels(ms);
         setAllModelSettings(ms2);
         const fromSection = (state[SECTION_ACTIVE_KEY[section]] as string | null) ?? undefined;
-        // initialModelId takes priority (e.g. deep-link from another page)
-        const forced =
-          initialModelId && ms.some((m) => m.id === initialModelId) ? initialModelId : undefined;
-        // Only set active model if the user actually chose one; "" means "no model activated yet"
-        const initial =
-          forced ?? (fromSection && ms.some((m) => m.id === fromSection) ? fromSection : "");
-        setActiveModelId(initial);
-        // For picker: if no active model, show the first picker option
+        // activeModelId always reflects the real bot state
+        const activeId = fromSection && ms.some((m) => m.id === fromSection) ? fromSection : "";
+        setActiveModelId(activeId);
+        // initialModelId only controls which card is shown in the picker (navigation only)
+        const navTarget =
+          initialModelId && ms.some((m) => m.id === initialModelId) ? initialModelId : activeId;
         setSelectedPickerId(
-          initial
-            ? getPickerIdForModel(initial, ms)
+          navTarget
+            ? getPickerIdForModel(navTarget, ms)
             : (buildPickerOptions(ms, modelLocaleMap)[0]?.id ?? ""),
         );
       })
