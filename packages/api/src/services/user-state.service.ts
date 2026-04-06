@@ -32,7 +32,7 @@ export const userStateService = {
     return db.userState.findUnique({ where: { userId } });
   },
 
-  async setState(userId: bigint, state: BotState, section?: Section): Promise<UserState> {
+  async setState(userId: bigint, state: BotState, section?: Section | null): Promise<UserState> {
     return db.userState.upsert({
       where: { userId },
       create: { userId, state, section: section ?? null },

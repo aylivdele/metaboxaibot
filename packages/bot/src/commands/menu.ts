@@ -17,7 +17,7 @@ async function activeDialogLabel(userId: bigint, section: string): Promise<strin
 
 export async function handleMenu(ctx: BotContext): Promise<void> {
   if (ctx.user) {
-    await userStateService.setState(ctx.user.id, "MAIN_MENU");
+    await userStateService.setState(ctx.user.id, "MAIN_MENU", null);
   }
   await ctx.reply(ctx.t.start.mainMenuTitle, {
     reply_markup: buildMainMenuKeyboard(ctx.t, ctx.user?.id),
