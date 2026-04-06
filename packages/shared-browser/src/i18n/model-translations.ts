@@ -726,7 +726,10 @@ export function resolveModelDisplay(
   lang: string,
   fallback: { name: string; description?: string | null; descriptionOverride?: string | null },
 ): { name: string; description: string } {
-  const mt = MODEL_TRANSLATIONS[lang]?.[modelId] ?? MODEL_TRANSLATIONS["en"]?.[modelId];
+  // Only use translations for the requested locale — no cross-locale fallback.
+  // If the locale has no entry, fall back to the model definition strings (fallback),
+  // which are already in the correct language (e.g. Russian for ru locale).
+  const mt = MODEL_TRANSLATIONS[lang]?.[modelId];
   const name = mt?.name ?? fallback.name;
   const description =
     mt?.descriptionOverride ??
