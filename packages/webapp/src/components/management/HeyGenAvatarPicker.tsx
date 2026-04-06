@@ -34,6 +34,7 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
   const [myAvatars, setMyAvatars] = useState<UserAvatar[]>([]);
   const [myAvatarsLoading, setMyAvatarsLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createHint, setCreateHint] = useState(false);
 
   const fetchAvatars = (gender: string, searchVal: string, token?: string) => {
     const isLoadMore = !!token;
@@ -120,6 +121,8 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
     setCreating(true);
     try {
       await api.userAvatars.startCreation("heygen");
+      setCreateHint(true);
+      setTimeout(() => setCreateHint(false), 5000);
     } finally {
       setCreating(false);
     }
@@ -143,6 +146,7 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
 
   return (
     <div className="voice-picker">
+      {createHint && <div className="activated-popup">{t("uploads.createAvatarHint")}</div>}
       <div className="voice-picker__tabs">
         <button
           className={`voice-picker__tab${tab === "official" ? " voice-picker__tab--active" : ""}`}

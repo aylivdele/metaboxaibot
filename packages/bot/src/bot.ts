@@ -23,7 +23,6 @@ import {
   handleVideoVoice,
   handleNewVideoDialog,
   handleVideoAvatars,
-  handleVideoLipSync,
   handleAvatarPhotoCapture,
   handleHeygenAvatarCancel,
 } from "./scenes/video.js";
@@ -153,7 +152,7 @@ export function createBot(token: string): Bot<BotContext> {
       // Video section buttons
       [t.video.newDialog]: () => handleNewVideoDialog(ctx),
       [t.video.avatars]: () => handleVideoAvatars(ctx),
-      [t.video.lipSync]: () => handleVideoLipSync(ctx),
+      [t.video.lipSync]: () => handleVideoAvatars(ctx),
       // Help button — send inline link to support chat
       [t.menu.help]: async () => {
         await ctx.reply(ctx.t.menu.help, {

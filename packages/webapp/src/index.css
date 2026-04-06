@@ -153,6 +153,17 @@ textarea::placeholder {
   display: block;
 }
 
+.app-header__span {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -0.3px;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 .app-header__right {
   position: absolute;
   right: 16px;

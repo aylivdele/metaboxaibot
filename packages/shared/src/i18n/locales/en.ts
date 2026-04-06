@@ -120,7 +120,7 @@ export default {
     elVoiceTtsExtraCharge:
       "⚠️ A cloned ElevenLabs voice is selected — an additional TTS charge will be applied.",
     hintHeygen:
-      "👾 Set up your avatar and voice in the ⚙ Management section.\n\n✉️ Send text → the avatar will speak it. If a cloned ElevenLabs voice is selected, speech will be synthesised via ElevenLabs (extra TTS charge).\n🎙 Or send a voice message / audio file directly — the avatar will lip-sync to your recording without TTS.",
+      "👾 Set up your avatar and voice in the ⚙ Management section.\n\n📸 To create a personal photo avatar: open Management → HeyGen → My Avatars → Create avatar, then return to the chat and send a photo with your face.\n\n✉️ Send text → the avatar will speak it. If a cloned ElevenLabs voice is selected, speech will be synthesised via ElevenLabs (extra TTS charge).\n🎙 Or send a voice message / audio file directly — the avatar will lip-sync to your recording without TTS.",
     hintDid:
       "📸 Send a photo with a face — it will become the avatar.\n\n✉️ Send text → the avatar will speak it. If a cloned ElevenLabs voice is selected, speech will be synthesised via ElevenLabs (extra TTS charge).\n🎙 Or send a voice message / audio file directly — the avatar will lip-sync to your recording without TTS.\n⚙ Voice and other settings are available on the Management page.",
     hintHiggsfield:

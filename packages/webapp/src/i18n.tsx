@@ -291,6 +291,8 @@ const translations = {
     "uploads.myPhotos": "My photos",
     "uploads.myAvatars": "My avatars",
     "uploads.createAvatar": "➕ Create avatar",
+    "uploads.createAvatarHint":
+      "Return to the chat and send a photo with your face — the bot will create a personal avatar based on it.",
     "uploads.avatarCreating": "Creating...",
     "uploads.emptyAvatars": 'No avatars yet. Click "Create avatar" to start.',
 
@@ -583,6 +585,8 @@ const translations = {
     "uploads.myPhotos": "Мои фото",
     "uploads.myAvatars": "Мои аватары",
     "uploads.createAvatar": "➕ Создать аватар",
+    "uploads.createAvatarHint":
+      "Вернитесь в чат и отправьте фото с лицом — бот создаст персональный аватар на его основе.",
     "uploads.avatarCreating": "Создаётся...",
     "uploads.emptyAvatars": "Аватаров пока нет. Нажмите «Создать аватар».",
 
