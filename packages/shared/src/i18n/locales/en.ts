@@ -156,8 +156,7 @@ export default {
     noToolAudio: "🎧 You are in the Audio section.\n\nChoose a tool to work with audio 👇",
     noToolVideo:
       "🎬 You are in the Video section.\n\nChoose a model to generate a video 👇\nDescribe what you want to create.",
-    noTool:
-      "⚠️ No tool selected for working with the bot.\nPlease use the navigation to activate the desired function (see photo) ↕️\n*If the ☰ menu button (highlighted in red in the photo) has disappeared, type /start to restart the bot* 🔄",
+    noTool: "⚠️ No section selected.\n\nChoose a section to get started 👇",
     insufficientTokens: "❌ Insufficient tokens. Please top up your balance in the Plans section.",
     noSubscription: "❌ An active subscription is required to use the bot.",
     noSubscriptionForPurchase: "❌ Token packages are only available with an active subscription.",

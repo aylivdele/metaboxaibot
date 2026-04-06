@@ -53,6 +53,12 @@ export async function handleNoTool(ctx: BotContext): Promise<void> {
     return;
   }
 
-  // No section active — generic message
-  await ctx.reply(ctx.t.errors.noTool);
+  // No section active — show section picker
+  const kb = new InlineKeyboard()
+    .text(ctx.t.menu.gpt, "section:gpt")
+    .text(ctx.t.menu.design, "section:design")
+    .row()
+    .text(ctx.t.menu.audio, "section:audio")
+    .text(ctx.t.menu.video, "section:video");
+  await ctx.reply(ctx.t.errors.noTool, { reply_markup: kb });
 }

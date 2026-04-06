@@ -108,6 +108,17 @@ export function createBot(token: string): Bot<BotContext> {
   bot.callbackQuery("merge:cancel", handleMergeCancel);
   bot.callbackQuery(/^merge_confirm:(site|bot):/, handleMergeConfirm);
 
+  // ── Section picker callback (from noTool fallback) ───────────────────────
+  bot.callbackQuery(/^section:/, async (ctx) => {
+    const section = ctx.callbackQuery.data.split(":")[1];
+    await ctx.answerCallbackQuery();
+    await ctx.deleteMessage().catch(() => void 0);
+    if (section === "gpt") return handleGpt(ctx);
+    if (section === "design") return handleDesign(ctx);
+    if (section === "audio") return handleAudio(ctx);
+    if (section === "video") return handleVideo(ctx);
+  });
+
   // ── Audio model selection callback ───────────────────────────────────────
   bot.callbackQuery(/^audio_model:/, async (ctx) => {
     const modelId = ctx.callbackQuery.data.split(":")[1];
