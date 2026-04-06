@@ -121,7 +121,7 @@ function AppContent() {
   return (
     <div className="app">
       <header className="app-header">
-        <span className="app-header__logo">✦ {t("app.name")}</span>
+        <img src="/aibox.svg" alt={t("app.name")} className="app-header__logo" />
         <div className="app-header__right">
           <LangPicker />
         </div>

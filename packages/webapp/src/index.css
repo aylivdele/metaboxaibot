@@ -148,14 +148,9 @@ textarea::placeholder {
 }
 
 .app-header__logo {
-  font-family: var(--font-heading);
-  font-weight: 700;
-  font-size: 19px;
-  letter-spacing: -0.3px;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  height: 28px;
+  width: auto;
+  display: block;
 }
 
 .app-header__right {
