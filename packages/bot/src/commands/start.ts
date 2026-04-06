@@ -7,8 +7,64 @@ import { buildLanguageKeyboard } from "../keyboards/language.keyboard.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { SUPPORTED_LANGUAGES, getT, config } from "@metabox/shared";
 import type { Language, Translations } from "@metabox/shared";
-import { verifyLinkToken } from "@metabox/api/services";
+import {
+  verifyLinkToken,
+  getSubscriptionStatus,
+  grantMetaboxSubscription,
+  markTokensGrantedOnMetabox,
+  getPendingTokenGrants,
+  markOrderGrantedOnMetabox,
+} from "@metabox/api/services";
 import { logger } from "../logger.js";
+
+/**
+ * Sync all pending grants from Metabox for a newly linked/started user:
+ *  1. Active subscription not yet credited to the bot
+ *  2. Token-pack orders not yet credited to the bot
+ */
+async function syncMetaboxGrants(userId: bigint): Promise<void> {
+  // 1. Subscription sync
+  const { subscription } = await getSubscriptionStatus(userId);
+  if (
+    subscription &&
+    !subscription.tokensGrantedToBot &&
+    new Date(subscription.endDate) > new Date()
+  ) {
+    const granted = await grantMetaboxSubscription({
+      userId,
+      tokens: subscription.tokensGranted,
+      endDate: new Date(subscription.endDate),
+      planName: subscription.planName,
+      metaboxSubscriptionId: subscription.subscriptionId,
+    });
+    if (granted) {
+      await markTokensGrantedOnMetabox(subscription.subscriptionId);
+    }
+  }
+
+  // 2. Token-pack orders sync
+  const pendingOrders = await getPendingTokenGrants(userId);
+  for (const order of pendingOrders) {
+    try {
+      await db.user.update({
+        where: { id: userId },
+        data: { tokenBalance: { increment: order.tokens } },
+      });
+      await db.tokenTransaction.create({
+        data: {
+          userId,
+          amount: order.tokens,
+          type: "credit",
+          reason: "metabox_purchase",
+          description: order.description,
+        },
+      });
+      await markOrderGrantedOnMetabox(order.orderId);
+    } catch (err) {
+      logger.error({ err, orderId: order.orderId }, "[syncMetaboxGrants] token order grant failed");
+    }
+  }
+}
 
 /**
  * /start — handles deep link params, resets FSM state, shows language selection.
@@ -51,6 +107,11 @@ export async function handleStart(ctx: BotContext): Promise<void> {
             "✅ Аккаунты объединены! Ваши токены и подписка перенесены на аккаунт meta-box.ru.",
         );
       }
+
+      // Sync subscription and pending token grants from Metabox after linking
+      void syncMetaboxGrants(ctx.user.id).catch((err) => {
+        logger.error({ err }, "[start link] grant sync failed");
+      });
     } catch (err) {
       const apiErr = err as { code?: string; data?: Record<string, unknown> };
 
@@ -251,6 +312,11 @@ export async function handleStart(ctx: BotContext): Promise<void> {
               await ctx
                 .reply(`✅ Мы нашли ваш аккаунт на Metabox и привязали его к боту.${mentorInfo}`)
                 .catch(() => {});
+
+              // Sync subscription + pending token grants from Metabox
+              void syncMetaboxGrants(ctx.user!.id).catch((err) => {
+                logger.error({ err }, "[start registerBotUser] grant sync failed");
+              });
             } else {
               // Stub account — store referralCode but NOT metaboxUserId
               await db.user.update({

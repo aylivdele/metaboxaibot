@@ -9,7 +9,7 @@ export { videoGenerationService } from "./video-generation.service.js";
 export type { SubmitVideoParams, SubmitVideoResult } from "./video-generation.service.js";
 export { audioGenerationService } from "./audio-generation.service.js";
 export type { SubmitAudioParams, SubmitAudioResult } from "./audio-generation.service.js";
-export { paymentService } from "./payment.service.js";
+export { paymentService, expireSubscription, grantMetaboxSubscription } from "./payment.service.js";
 export type { SaleUserInfo } from "./payment.service.js";
 export {
   deductTokens,
@@ -35,6 +35,10 @@ export {
   registerBotUser,
   confirmMerge,
   MetaboxApiError,
+  getSubscriptionStatus,
+  markTokensGrantedOnMetabox,
+  getPendingTokenGrants,
+  markOrderGrantedOnMetabox,
 } from "./metabox-bridge.service.js";
 export type {
   AiBotProduct,

@@ -302,14 +302,49 @@ export async function getAiBotCatalog(): Promise<AiBotCatalog> {
   return get<AiBotCatalog>("/aibot/catalog");
 }
 
+/** Fetch PAID token-pack orders that haven't been granted to the bot yet. */
+export async function getPendingTokenGrants(
+  telegramId: bigint,
+): Promise<Array<{ orderId: string; tokens: number; description: string }>> {
+  const data = await get<{
+    orders: Array<{ orderId: string; tokens: number; description: string }>;
+  }>(`/internal/pending-token-grants?telegramId=${telegramId.toString()}`);
+  return data.orders ?? [];
+}
+
+/** Mark a token-pack order as granted in the bot (sets tokensGrantedToBot = true on Metabox). */
+export async function markOrderGrantedOnMetabox(orderId: string): Promise<void> {
+  try {
+    await post("/mark-order-granted", { orderId });
+  } catch {
+    // Non-fatal
+  }
+}
+
+/**
+ * Notify Metabox that tokens for a given subscription have been granted in the bot.
+ * Sets AiBoxSubscription.tokensGrantedToBot = true on the Metabox side.
+ * Silently ignores errors — the bot's LocalSubscription is the authoritative source.
+ */
+export async function markTokensGrantedOnMetabox(subscriptionId: string): Promise<void> {
+  try {
+    await post("/mark-tokens-granted", { subscriptionId });
+  } catch {
+    // Non-fatal: bot-side idempotency via LocalSubscription.metaboxSubscriptionId is sufficient
+  }
+}
+
 /** Fetch subscription status for a user from Metabox. */
 export async function getSubscriptionStatus(telegramId: bigint): Promise<{
   subscription: {
+    subscriptionId: string;
     planName: string;
     period: string;
     daysLeft: number;
     totalDays: number;
     endDate: string;
+    tokensGranted: number;
+    tokensGrantedToBot: boolean;
   } | null;
 }> {
   return get(`/internal/subscription-status?telegramId=${telegramId.toString()}`);

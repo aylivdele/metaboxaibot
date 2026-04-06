@@ -182,17 +182,29 @@ export const paymentService = {
             modelId: productId,
           },
         }),
-        db.localSubscription.create({
-          data: {
-            userId,
-            planName: productName ?? desc,
-            period: period || "undefined",
-            tokensGranted: tokens,
-            startDate,
-            endDate,
-          },
-        }),
       ]);
+      // Upsert LocalSubscription (bot-native purchase — no metaboxSubscriptionId)
+      await db.localSubscription.upsert({
+        where: { userId },
+        create: {
+          userId,
+          planName: productName ?? desc,
+          period: period || "undefined",
+          tokensGranted: tokens,
+          startDate,
+          endDate,
+          isActive: true,
+        },
+        update: {
+          planName: productName ?? desc,
+          period: period || "undefined",
+          tokensGranted: tokens,
+          startDate,
+          endDate,
+          isActive: true,
+          metaboxSubscriptionId: null,
+        },
+      });
     } else {
       // Token package — requires active subscription
       await checkSubscription(userId);
@@ -242,6 +254,90 @@ export const paymentService = {
       });
   },
 };
+
+/**
+ * Grant subscription tokens from a Metabox-side purchase, with idempotency.
+ *
+ * If `metaboxSubscriptionId` is provided and a LocalSubscription with that ID already
+ * exists, the grant is skipped (returns false). Otherwise tokens are credited and a
+ * LocalSubscription record is upserted with the Metabox subscription ID so that any
+ * future duplicate calls are no-ops.
+ *
+ * Returns true if tokens were granted, false if already granted.
+ */
+export async function grantMetaboxSubscription(params: {
+  userId: bigint;
+  tokens: number;
+  endDate: Date;
+  planName?: string;
+  metaboxSubscriptionId?: string;
+  description?: string;
+}): Promise<boolean> {
+  const { userId, tokens, endDate, planName, metaboxSubscriptionId, description } = params;
+
+  // Idempotency: skip if this specific Metabox subscription was already granted
+  if (metaboxSubscriptionId) {
+    const existing = await db.localSubscription.findUnique({
+      where: { metaboxSubscriptionId },
+    });
+    if (existing) return false;
+  }
+
+  const user = await db.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { subscriptionEndDate: true },
+  });
+
+  // Extend from current active endDate, otherwise use provided endDate
+  const resolvedEndDate =
+    user.subscriptionEndDate && user.subscriptionEndDate > endDate
+      ? user.subscriptionEndDate
+      : endDate;
+
+  await db.$transaction([
+    db.user.update({
+      where: { id: userId },
+      data: {
+        subscriptionTokenBalance: { increment: tokens },
+        subscriptionEndDate: resolvedEndDate,
+        ...(planName ? { subscriptionPlanName: planName } : {}),
+      },
+    }),
+    db.tokenTransaction.create({
+      data: {
+        userId,
+        amount: tokens,
+        type: "credit",
+        reason: "metabox_purchase",
+        description: description ?? null,
+      },
+    }),
+  ]);
+
+  // Upsert LocalSubscription — serves as the idempotency record for future calls
+  await db.localSubscription.upsert({
+    where: { userId },
+    create: {
+      userId,
+      planName: planName ?? "Subscription",
+      period: "M1",
+      tokensGranted: tokens,
+      startDate: new Date(),
+      endDate: resolvedEndDate,
+      isActive: true,
+      metaboxSubscriptionId: metaboxSubscriptionId ?? null,
+    },
+    update: {
+      planName: planName ?? "Subscription",
+      tokensGranted: tokens,
+      endDate: resolvedEndDate,
+      isActive: true,
+      metaboxSubscriptionId: metaboxSubscriptionId ?? null,
+    },
+  });
+
+  return true;
+}
 
 /**
  * Zero out subscription balance and clear subscription fields when a subscription expires.

@@ -5,7 +5,7 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { db } from "../db.js";
 import { config } from "@metabox/shared";
-import { expireSubscription } from "../services/payment.service.js";
+import { expireSubscription, grantMetaboxSubscription } from "../services/payment.service.js";
 
 function checkKey(request: FastifyRequest): boolean {
   const key = config.metabox.internalKey;
@@ -49,14 +49,17 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
    * grantType "tokens" (default): credits to regular tokenBalance.
    */
   fastify.post("/grant-tokens", async (request, reply) => {
-    const { telegramId, tokens, description, grantType, endDate, planName } = request.body as {
-      telegramId: string;
-      tokens: number;
-      description?: string;
-      grantType?: "subscription" | "tokens";
-      endDate?: string;
-      planName?: string;
-    };
+    const { telegramId, tokens, description, grantType, endDate, planName, subscriptionId } =
+      request.body as {
+        telegramId: string;
+        tokens: number;
+        description?: string;
+        grantType?: "subscription" | "tokens";
+        endDate?: string;
+        planName?: string;
+        /** AiBoxSubscription.id from Metabox — used for idempotency */
+        subscriptionId?: string;
+      };
 
     if (!telegramId || typeof tokens !== "number" || tokens === 0) {
       return reply.code(400).send({ error: "telegramId and non-zero tokens are required" });
@@ -69,32 +72,16 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     if (grantType === "subscription") {
-      // Extend from current endDate if still active, otherwise from now
-      const baseDate =
-        user.subscriptionEndDate && user.subscriptionEndDate > new Date()
-          ? user.subscriptionEndDate
-          : new Date();
-      const resolvedEndDate = endDate ? new Date(endDate) : baseDate;
-
-      await db.$transaction([
-        db.user.update({
-          where: { id: userId },
-          data: {
-            subscriptionTokenBalance: { increment: tokens },
-            subscriptionEndDate: resolvedEndDate,
-            ...(planName ? { subscriptionPlanName: planName } : {}),
-          },
-        }),
-        db.tokenTransaction.create({
-          data: {
-            userId,
-            amount: tokens,
-            type: "credit",
-            reason: "metabox_purchase",
-            description: description || null,
-          },
-        }),
-      ]);
+      const resolvedEndDate = endDate ? new Date(endDate) : new Date();
+      await grantMetaboxSubscription({
+        userId,
+        tokens,
+        endDate: resolvedEndDate,
+        planName,
+        metaboxSubscriptionId: subscriptionId,
+        description,
+      });
+      // alreadyGranted (false) is a no-op — idempotent, always return ok
     } else {
       await db.$transaction([
         db.user.update({

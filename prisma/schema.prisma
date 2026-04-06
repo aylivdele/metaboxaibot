@@ -281,14 +281,16 @@ model BannerSlide {
 // Локальная подписка (сохраняется при отвязке от сайта)
 // ─────────────────────────────────────────────
 model LocalSubscription {
-  id             String   @id @default(cuid())
-  userId         BigInt   @unique
-  planName       String
-  period         String   // M1 | M3 | M6 | M12
-  tokensGranted  Int
-  endDate        DateTime
-  startDate      DateTime
-  isActive       Boolean  @default(true)
+  id                    String   @id @default(cuid())
+  userId                BigInt   @unique
+  planName              String
+  period                String   // M1 | M3 | M6 | M12
+  tokensGranted         Int
+  endDate               DateTime
+  startDate             DateTime
+  isActive              Boolean  @default(true)
+  /// AiBoxSubscription.id from Metabox site — used for idempotency on grant-tokens
+  metaboxSubscriptionId String?  @unique
 
   createdAt DateTime @default(now())
 

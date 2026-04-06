@@ -154,6 +154,9 @@ textarea::placeholder {
 }
 
 .app-header__span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 19px;
