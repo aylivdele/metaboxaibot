@@ -120,6 +120,10 @@ export interface Translations {
   };
   errors: {
     noTool: string;
+    noToolGpt: string;
+    noToolDesign: string;
+    noToolAudio: string;
+    noToolVideo: string;
     unexpected: string;
     insufficientTokens: string;
     noSubscription: string;

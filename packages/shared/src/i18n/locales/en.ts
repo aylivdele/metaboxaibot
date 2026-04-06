@@ -149,6 +149,13 @@ export default {
   errors: {
     unexpected: "Unexpected error. Please, try again later.",
     sendOriginalFailed: "Failed to send the file. Please try again later or contact support.",
+    noToolGpt:
+      "💡 You are in the GPT section.\n\nTo get started, create or select a dialog in the Management section 👇",
+    noToolDesign:
+      "🎨 You are in the Design section.\n\nChoose a model to generate an image 👇\nDescribe what you want to create.",
+    noToolAudio: "🎧 You are in the Audio section.\n\nChoose a tool to work with audio 👇",
+    noToolVideo:
+      "🎬 You are in the Video section.\n\nChoose a model to generate a video 👇\nDescribe what you want to create.",
     noTool:
       "⚠️ No tool selected for working with the bot.\nPlease use the navigation to activate the desired function (see photo) ↕️\n*If the ☰ menu button (highlighted in red in the photo) has disappeared, type /start to restart the bot* 🔄",
     insufficientTokens: "❌ Insufficient tokens. Please top up your balance in the Plans section.",

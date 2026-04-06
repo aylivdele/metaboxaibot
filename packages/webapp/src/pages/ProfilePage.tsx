@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { TranslationKey } from "../i18n.js";
-import { BannerSlider } from "../components/BannerSlider.js";
+// import { BannerSlider } from "../components/BannerSlider.js";
 import type { UserProfile, GalleryItem } from "../types.js";
 
 export type ProfileTab = "overview" | "gallery";
@@ -56,7 +56,7 @@ export function ProfilePage({ initialSection }: { initialSection?: ProfileTab })
 
   return (
     <div className="page">
-      <BannerSlider />
+      {/* <BannerSlider /> */}
 
       <div className="profile-header">
         <div className="profile-avatar">{displayName[0].toUpperCase()}</div>
