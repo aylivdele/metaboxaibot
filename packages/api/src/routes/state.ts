@@ -204,9 +204,9 @@ async function sendModelActivatedNotification(
       section === "audio"
         ? "AUDIO_ACTIVE"
         : section === "design"
-          ? "DESIGN_SECTION"
+          ? "DESIGN_ACTIVE"
           : section === "video"
-            ? "VIDEO_SECTION"
+            ? "VIDEO_ACTIVE"
             : undefined;
     if (newState) {
       await Promise.all([
@@ -238,7 +238,19 @@ async function sendModelActivatedNotification(
     "music-el": t.audio.musicElActivated,
     "sounds-el": t.audio.soundsActivated,
   };
-  const hint = section === "audio" ? (audioHints[modelId] ?? t.audio.activated) : undefined;
+  const videoHints: Record<string, string> = {
+    heygen: t.video.hintHeygen,
+    higgsfield: t.video.hintHiggsfield,
+    "higgsfield-lite": t.video.hintHiggsfield,
+    "higgsfield-preview": t.video.hintHiggsfield,
+    "d-id": t.video.hintDid,
+  };
+  const hint =
+    section === "audio"
+      ? (audioHints[modelId] ?? t.audio.activated)
+      : section === "video"
+        ? (videoHints[modelId] ?? t.video.hintVideoDefault)
+        : undefined;
 
   const lang = (user?.language ?? "en") as string;
   const { name: modelName, description: modelDesc } = resolveModelDisplay(modelId, lang, model);

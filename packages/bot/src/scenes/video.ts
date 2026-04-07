@@ -2,7 +2,7 @@ import type { BotContext } from "../types/context.js";
 import {
   videoGenerationService,
   userStateService,
-  userUploadsService,
+  // userUploadsService,
   userAvatarService,
   s3Service,
   calculateCost,
@@ -388,31 +388,31 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
   const file = await ctx.api.getFile(fileId);
   const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
 
-  if (modelId === "heygen") {
-    const userId = ctx.user.id;
-    const s3Key = `avatar_photo/${userId.toString()}/${file.file_id}.jpg`;
-    const uploadedKey = await s3Service.uploadFromUrl(s3Key, tgUrl, "image/jpeg").catch(() => null);
-    const publicUrl = uploadedKey
-      ? ((await s3Service.getFileUrl(uploadedKey).catch(() => null)) ?? tgUrl)
-      : tgUrl;
+  // if (modelId === "heygen") {
+  //   const userId = ctx.user.id;
+  //   const s3Key = `avatar_photo/${userId.toString()}/${file.file_id}.jpg`;
+  //   const uploadedKey = await s3Service.uploadFromUrl(s3Key, tgUrl, "image/jpeg").catch(() => null);
+  //   const publicUrl = uploadedKey
+  //     ? ((await s3Service.getFileUrl(uploadedKey).catch(() => null)) ?? tgUrl)
+  //     : tgUrl;
 
-    await userUploadsService.create(userId, {
-      type: "avatar_photo",
-      name: ctx.t.video.myAvatarDefaultName,
-      url: publicUrl,
-      s3Key: uploadedKey ?? undefined,
-    });
+  //   await userUploadsService.create(userId, {
+  //     type: "avatar_photo",
+  //     name: ctx.t.video.myAvatarDefaultName,
+  //     url: publicUrl,
+  //     s3Key: uploadedKey ?? undefined,
+  //   });
 
-    // Auto-select: store in modelSettings so adapter picks it up on next generation
-    await userStateService.setModelSettings(userId, "heygen", {
-      avatar_photo_url: publicUrl,
-      avatar_photo_s3key: uploadedKey ?? "",
-      avatar_id: "",
-    });
+  //   // Auto-select: store in modelSettings so adapter picks it up on next generation
+  //   await userStateService.setModelSettings(userId, "heygen", {
+  //     avatar_photo_url: publicUrl,
+  //     avatar_photo_s3key: uploadedKey ?? "",
+  //     avatar_id: "",
+  //   });
 
-    await ctx.reply(ctx.t.video.avatarPhotoSaved);
-    return;
-  }
+  //   await ctx.reply(ctx.t.video.avatarPhotoSaved);
+  //   return;
+  // }
 
   // For image-to-video models: if caption is provided, generate immediately
   const caption = ctx.message.caption?.trim();

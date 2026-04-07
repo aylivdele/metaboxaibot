@@ -186,7 +186,9 @@ export function isActiveSection(section: string, state?: string) {
     case "design":
       return state === "DESIGN_ACTIVE" || state === "DESIGN_SECTION";
     case "video":
-      return state === "VIDEO_ACTIVE" || state === "VIDEO_SECTION";
+      return (
+        state === "VIDEO_ACTIVE" || state === "VIDEO_SECTION" || state === "HEYGEN_AVATAR_PHOTO"
+      );
     case "audio":
       return state === "AUDIO_ACTIVE" || state === "AUDIO_SECTION";
   }

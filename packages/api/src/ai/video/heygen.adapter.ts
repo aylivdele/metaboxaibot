@@ -161,18 +161,22 @@ export class HeyGenAdapter implements VideoAdapter {
       background: { type: "color", value: bgColor },
     };
 
-    // Avatar: pre-uploaded asset > one-shot upload > official look_id
-    if (imageAssetIdFromSettings) {
-      body.image_asset_id = imageAssetIdFromSettings;
-      logger.info(
-        { imageAssetId: imageAssetIdFromSettings },
-        "HeyGen: using pre-uploaded image asset",
-      );
+    // Avatar: one-shot upload > pre-uploaded asset >  official look_id
+    if (input.imageUrl) {
+      const uploadedId = await this.uploadImageAsset(undefined, input.imageUrl);
+      body.image_asset_id = uploadedId;
+      logger.info({ imageAssetId: uploadedId }, "HeyGen: using uploaded image asset");
     } else if (avatarPhotoUrl) {
       const avatarPhotoS3Key = input.modelSettings?.avatar_photo_s3key as string | undefined;
       const uploadedId = await this.uploadImageAsset(avatarPhotoS3Key, avatarPhotoUrl);
       body.image_asset_id = uploadedId;
       logger.info({ imageAssetId: uploadedId }, "HeyGen: using uploaded image asset");
+    } else if (imageAssetIdFromSettings) {
+      body.image_asset_id = imageAssetIdFromSettings;
+      logger.info(
+        { imageAssetId: imageAssetIdFromSettings },
+        "HeyGen: using pre-uploaded image asset",
+      );
     } else {
       body.avatar_id = avatarId;
     }
