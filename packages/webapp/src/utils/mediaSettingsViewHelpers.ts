@@ -178,3 +178,17 @@ export function modelCostLabel(
   }
   return null;
 }
+
+export function isActiveSection(section: string, state?: string) {
+  switch (section) {
+    case "gpt":
+      return state === "GPT_ACTIVE";
+    case "design":
+      return state === "DESIGN_ACTIVE";
+    case "video":
+      return state === "VIDEO_ACTIVE";
+    case "audio":
+      return state === "AUDIO_ACTIVE";
+  }
+  return false;
+}

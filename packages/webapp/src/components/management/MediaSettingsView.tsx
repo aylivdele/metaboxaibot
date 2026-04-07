@@ -11,6 +11,7 @@ import {
   buildPickerOptions,
   autoCorrectForCostMatrix,
   groupByFamily,
+  isActiveSection,
 } from "../../utils/mediaSettingsViewHelpers.js";
 
 // ── MediaSettingsView ─────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ export function MediaSettingsView({
     {},
   );
   const [activeModelId, setActiveModelId] = useState<string>("");
-  const [activeSection, setActiveSection] = useState<string | undefined>();
+  const [stateStr, setState] = useState<string | undefined>();
   const [selectedPickerId, setSelectedPickerId] = useState<string>("");
   const [savedId, setSavedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +66,7 @@ export function MediaSettingsView({
         // activeModelId always reflects the real bot state
         const activeId = fromSection && ms.some((m) => m.id === fromSection) ? fromSection : "";
         setActiveModelId(activeId);
-        setActiveSection(state.section ?? undefined);
+        setState(state.state);
         // initialModelId only controls which card is shown in the picker (navigation only)
         const navTarget =
           initialModelId && ms.some((m) => m.id === initialModelId) ? initialModelId : activeId;
@@ -77,7 +78,7 @@ export function MediaSettingsView({
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [section]);
+  }, [section, activeModelId]);
 
   const handleModelActivate = async (modelId: string) => {
     setActiveModelId(modelId);
@@ -159,7 +160,7 @@ export function MediaSettingsView({
           familyId={pickerId}
           members={familyMembers}
           activeModelId={activeModelId}
-          activeSection={activeSection}
+          activeState={stateStr}
           savedId={savedId}
           allModelSettings={allModelSettings}
           onModelActivate={handleModelActivate}
@@ -172,7 +173,8 @@ export function MediaSettingsView({
         <StandaloneCard
           model={standaloneModel}
           isActive={
-            activeModelId === standaloneModel.id && activeSection === standaloneModel.section
+            activeModelId === standaloneModel.id &&
+            isActiveSection(standaloneModel.section, stateStr)
           }
           savedId={savedId}
           allModelSettings={allModelSettings}

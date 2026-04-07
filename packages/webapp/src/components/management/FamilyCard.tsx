@@ -5,13 +5,13 @@ import { useState, useEffect } from "react";
 import { useI18n } from "../../i18n";
 import type { Model } from "../../types";
 import { SettingsPanel } from "./SettingsPanel";
-import { modelCostLabel } from "../../utils/mediaSettingsViewHelpers";
+import { isActiveSection, modelCostLabel } from "../../utils/mediaSettingsViewHelpers";
 
 interface FamilyCardProps {
   familyId: string;
   members: Model[];
   activeModelId: string;
-  activeSection?: string;
+  activeState?: string;
   savedId: string | null;
   allModelSettings: Record<string, Record<string, unknown>>;
   onModelActivate: (modelId: string) => Promise<void>;
@@ -23,7 +23,7 @@ export function FamilyCard({
   familyId,
   members,
   activeModelId,
-  activeSection,
+  activeState,
   savedId,
   allModelSettings,
   onModelActivate,
@@ -53,7 +53,8 @@ export function FamilyCard({
   const selected = members.find((m) => m.id === localId) ?? defaultMember;
   if (!selected) return null;
 
-  const isGloballyActive = activeModelId === localId && activeSection === selected.section;
+  const isGloballyActive =
+    activeModelId === localId && isActiveSection(selected.section, activeState);
 
   const versions = [...new Set(members.map((m) => m.versionLabel).filter(Boolean))] as string[];
   const currentVersion = selected.versionLabel ?? null;
