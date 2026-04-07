@@ -112,12 +112,21 @@ export function MediaSettingsView({
       ...(pendingChangesRef.current[modelId] ?? {}),
       ...allChanges,
     };
+    console.log("[settings] change queued", modelId, pendingChangesRef.current[modelId]);
     clearTimeout(debounceRef.current[modelId]);
     debounceRef.current[modelId] = setTimeout(() => {
       const batch = pendingChangesRef.current[modelId];
+      console.log("[settings] debounce fired", modelId, batch);
       if (!batch) return;
       delete pendingChangesRef.current[modelId];
-      void api.modelSettings.set(modelId, batch);
+      void api.modelSettings
+        .set(modelId, batch)
+        .then(() => {
+          console.log("[settings] PATCH success", modelId, batch);
+        })
+        .catch((e) => {
+          console.error("[settings] PATCH error", modelId, e);
+        });
     }, 800);
   };
 

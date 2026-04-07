@@ -207,17 +207,17 @@ export const userStateService = {
     // Atomic jsonb merge: deep-merge settings into modelSettings[modelId]
     // without reading the current value first.
     await db.$executeRaw`
-      INSERT INTO "UserState" ("userId", "state", "modelSettings")
+      INSERT INTO user_states ("userId", "state", "modelSettings")
       VALUES (
         ${userId},
         'IDLE',
         jsonb_build_object(${modelId}::text, ${settingsJson}::jsonb)
       )
       ON CONFLICT ("userId") DO UPDATE
-      SET "modelSettings" = COALESCE("UserState"."modelSettings", '{}'::jsonb)
+      SET "modelSettings" = COALESCE(user_states."modelSettings", '{}'::jsonb)
         || jsonb_build_object(
              ${modelId}::text,
-             COALESCE("UserState"."modelSettings"->${modelId}, '{}'::jsonb)
+             COALESCE(user_states."modelSettings"->${modelId}, '{}'::jsonb)
                || ${settingsJson}::jsonb
            )
     `;
