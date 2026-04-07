@@ -182,13 +182,13 @@ export function modelCostLabel(
 export function isActiveSection(section: string, state?: string) {
   switch (section) {
     case "gpt":
-      return state === "GPT_ACTIVE";
+      return state === "GPT_ACTIVE" || state === "GPT_SECTION";
     case "design":
-      return state === "DESIGN_ACTIVE";
+      return state === "DESIGN_ACTIVE" || state === "DESIGN_SECTION";
     case "video":
-      return state === "VIDEO_ACTIVE";
+      return state === "VIDEO_ACTIVE" || state === "VIDEO_SECTION";
     case "audio":
-      return state === "AUDIO_ACTIVE";
+      return state === "AUDIO_ACTIVE" || state === "AUDIO_SECTION";
   }
   return false;
 }
