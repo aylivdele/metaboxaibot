@@ -82,8 +82,15 @@ export function MediaSettingsView({
       .finally(() => setLoading(false));
   }, [section, activeModelId]);
 
+  const SECTION_ACTIVE_STATE: Record<MediaSection, string> = {
+    design: "DESIGN_ACTIVE",
+    video: "VIDEO_ACTIVE",
+    audio: "AUDIO_ACTIVE",
+  };
+
   const handleModelActivate = async (modelId: string) => {
     setActiveModelId(modelId);
+    setState(SECTION_ACTIVE_STATE[section]);
     await api.state.activate(section, modelId);
     setActivatedPopup(true);
     setTimeout(() => setActivatedPopup(false), 3000);

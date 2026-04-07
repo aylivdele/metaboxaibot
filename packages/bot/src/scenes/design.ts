@@ -370,6 +370,7 @@ export async function handleDesignRefSelect(ctx: BotContext): Promise<void> {
   const messageId = ctx.callbackQuery!.data!.replace("design_ref_", "");
   await userStateService.setDesignRefMessage(ctx.user.id, messageId);
   await ctx.answerCallbackQuery();
+  await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE");
   await ctx.reply(ctx.t.design.photoSaved);
 }
 

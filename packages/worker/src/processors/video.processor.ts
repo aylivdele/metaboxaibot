@@ -139,7 +139,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
       const model = AI_MODELS[modelId];
       if (model) {
-        const effectiveDuration = actualDuration ?? duration ?? 5;
+        const effectiveDuration = Math.ceil(actualDuration ?? duration ?? 5);
         const videoTokens = model.costUsdPerMVideoToken
           ? computeVideoTokens(
               model,
