@@ -1,10 +1,17 @@
 import type { BotContext } from "../types/context.js";
-import { chatService, dialogService, userStateService } from "@metabox/api/services";
+import {
+  chatService,
+  dialogService,
+  userStateService,
+  uploadBuffer,
+  getFileUrl,
+} from "@metabox/api/services";
 import { logger } from "../logger.js";
 import { config } from "@metabox/shared";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { InlineKeyboard } from "grammy";
 import { toMarkdownV2, closeOpenMarkdownV2 } from "../utils/markdown.js";
+import { randomUUID } from "crypto";
 
 /** Media group buffer: groups multiple photos sent at once before processing. */
 interface MediaGroupEntry {
@@ -12,6 +19,7 @@ interface MediaGroupEntry {
   userId: bigint;
   chatId: number;
   urls: string[];
+  s3Keys: string[];
   caption: string;
   ctx: BotContext;
   timer: ReturnType<typeof setTimeout>;
@@ -41,6 +49,7 @@ async function streamGptResponse(
   dialogId: string,
   content: string,
   imageUrls?: string[],
+  imageS3Keys?: string[],
 ): Promise<void> {
   let placeholder = await ctx.reply("⏳");
   let accumulated = "";
@@ -64,6 +73,7 @@ async function streamGptResponse(
       userId: ctx.user!.id,
       content,
       ...(imageUrls?.length ? { imageUrls } : {}),
+      ...(imageS3Keys?.length ? { imageS3Keys } : {}),
     });
 
     for await (const chunk of stream) {
@@ -196,18 +206,38 @@ export async function handleGptPhoto(ctx: BotContext): Promise<void> {
   }
 
   const file = await ctx.api.getFile(fileId);
-  const url = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+  const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
   const caption = ctx.message?.caption?.trim() ?? "";
   const mediaGroupId = ctx.message?.media_group_id;
+
+  // Upload to S3 and get presigned URL; fall back to Telegram URL if S3 not available
+  const uploadPhoto = async (
+    telegramUrl: string,
+  ): Promise<{ url: string; s3Key: string | null }> => {
+    try {
+      const res = await fetch(telegramUrl);
+      if (!res.ok) return { url: telegramUrl, s3Key: null };
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const s3Key = `chat/${ctx.user!.id}/${randomUUID()}.jpg`;
+      const uploaded = await uploadBuffer(s3Key, buffer, "image/jpeg");
+      if (!uploaded) return { url: telegramUrl, s3Key: null };
+      const presigned = await getFileUrl(s3Key);
+      return { url: presigned ?? telegramUrl, s3Key };
+    } catch {
+      return { url: telegramUrl, s3Key: null };
+    }
+  };
 
   if (mediaGroupId) {
     // Buffer photos from the same album and process together after 800 ms silence
     const key = `${ctx.user.id}__${mediaGroupId}`;
+    const { url, s3Key } = await uploadPhoto(tgUrl);
     const existing = mediaGroupBuffer.get(key);
 
     if (existing) {
       clearTimeout(existing.timer);
       existing.urls.push(url);
+      if (s3Key) existing.s3Keys = [...(existing.s3Keys ?? []), s3Key];
       if (!existing.caption && caption) existing.caption = caption;
       existing.timer = setTimeout(() => {
         mediaGroupBuffer.delete(key);
@@ -218,6 +248,7 @@ export async function handleGptPhoto(ctx: BotContext): Promise<void> {
           existing.dialogId,
           prompt,
           existing.urls,
+          existing.s3Keys,
         );
       }, 800);
     } else {
@@ -226,19 +257,29 @@ export async function handleGptPhoto(ctx: BotContext): Promise<void> {
         userId: ctx.user.id,
         chatId,
         urls: [url],
+        s3Keys: s3Key ? [s3Key] : [],
         caption,
         ctx,
         timer: setTimeout(() => {
           mediaGroupBuffer.delete(key);
-          void streamGptResponse(ctx, chatId, gptDialogId, caption, [url]);
+          const prompt = entry.caption || ctx.t.gpt.photoDefaultPrompt;
+          void streamGptResponse(
+            ctx,
+            chatId,
+            gptDialogId,
+            prompt,
+            entry.urls,
+            entry.s3Keys.length ? entry.s3Keys : undefined,
+          );
         }, 800),
       };
       mediaGroupBuffer.set(key, entry);
     }
   } else {
     // Single photo — process immediately
+    const { url, s3Key } = await uploadPhoto(tgUrl);
     const prompt = caption || ctx.t.gpt.photoDefaultPrompt;
-    await streamGptResponse(ctx, chatId, gptDialogId, prompt, [url]);
+    await streamGptResponse(ctx, chatId, gptDialogId, prompt, [url], s3Key ? [s3Key] : undefined);
   }
 }
 

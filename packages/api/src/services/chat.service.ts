@@ -11,6 +11,8 @@ export interface SendMessageParams {
   content: string;
   imageUrl?: string;
   imageUrls?: string[];
+  /** S3 keys for user-uploaded images (parallel array to imageUrls). Stored in the message record. */
+  imageS3Keys?: string[];
 }
 
 export interface SendMessageResult {
@@ -28,7 +30,7 @@ export const chatService = {
   async *sendMessageStream(
     params: SendMessageParams,
   ): AsyncGenerator<string, SendMessageResult, unknown> {
-    const { dialogId, userId, content, imageUrl, imageUrls } = params;
+    const { dialogId, userId, content, imageUrl, imageUrls, imageS3Keys } = params;
 
     const dialog = await dialogService.findById(dialogId);
     if (!dialog) throw new Error(`Dialog ${dialogId} not found`);
@@ -73,7 +75,13 @@ export const chatService = {
     }
 
     // Save user message — keep the ID so we can mark it failed on error
-    const userMessage = await dialogService.saveMessage(dialogId, "user", content);
+    // Prefer the first S3 key for storage (presigned at read time); fall back to direct URL
+    const firstS3Key = imageS3Keys?.[0];
+    const firstImageUrl = imageUrl ?? imageUrls?.[0];
+    const savedMediaUrl = firstS3Key ?? firstImageUrl;
+    const userMessage = await dialogService.saveMessage(dialogId, "user", content, {
+      ...(savedMediaUrl ? { mediaUrl: savedMediaUrl, mediaType: "image" } : {}),
+    });
 
     // Stream response — iterate manually to capture the generator return value
     const chunks: string[] = [];

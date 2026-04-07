@@ -2,6 +2,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { dialogService } from "../services/dialog.service.js";
 import { userStateService } from "../services/user-state.service.js";
+import { getFileUrl } from "../services/s3.service.js";
 import { db } from "../db.js";
 import { getT, AI_MODELS, config, generateWebToken, type Section } from "@metabox/shared";
 import type { Language } from "@metabox/shared";
@@ -117,14 +118,26 @@ export const dialogsRoutes: FastifyPluginAsync = async (fastify) => {
     if (dialog.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
 
     const messages = await dialogService.getMessages(id);
-    return messages.map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: m.content,
-      mediaUrl: m.mediaUrl ?? null,
-      mediaType: m.mediaType ?? null,
-      createdAt: m.createdAt.toISOString(),
-    }));
+
+    // Resolve S3 keys to presigned URLs (S3 keys don't start with "http")
+    const resolvedMessages = await Promise.all(
+      messages.map(async (m) => {
+        let mediaUrl = m.mediaUrl ?? null;
+        if (mediaUrl && !mediaUrl.startsWith("http")) {
+          mediaUrl = (await getFileUrl(mediaUrl)) ?? mediaUrl;
+        }
+        return {
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          mediaUrl,
+          mediaType: m.mediaType ?? null,
+          createdAt: m.createdAt.toISOString(),
+        };
+      }),
+    );
+
+    return resolvedMessages;
   });
 };
 

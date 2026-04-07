@@ -18,7 +18,7 @@ export {
   calculateCost,
   computeVideoTokens,
 } from "./token.service.js";
-export { s3Service, getFileUrl } from "./s3.service.js";
+export { s3Service, getFileUrl, uploadBuffer } from "./s3.service.js";
 export {
   verifyLinkToken,
   issueSsoToken,

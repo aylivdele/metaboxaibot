@@ -9,13 +9,11 @@ const HEYGEN_API = "https://api.heygen.com";
 const HEYGEN_UPLOAD = "https://upload.heygen.com";
 
 interface HeyGenVideoDetail {
-  code?: string;
   data?: {
     status: string;
     video_url?: string | null;
     failure_message?: string | null;
     failure_code?: string | null;
-    error?: string;
   };
 }
 
@@ -204,7 +202,7 @@ export class HeyGenAdapter implements VideoAdapter {
       }
     }
 
-    const res = await fetchWithLog(`${HEYGEN_API}/v2/videos`, {
+    const res = await fetchWithLog(`${HEYGEN_API}/v3/videos`, {
       method: "POST",
       headers: this.jsonHeaders,
       body: JSON.stringify(body),
@@ -212,17 +210,17 @@ export class HeyGenAdapter implements VideoAdapter {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`HeyGen /v2/videos submit failed: ${res.status} ${text}`);
+      throw new Error(`HeyGen /v3/videos submit failed: ${res.status} ${text}`);
     }
 
-    const data = (await res.json()) as { data?: { video_id?: string }; video_id?: string };
-    const videoId = data.data?.video_id ?? data.video_id;
+    const data = (await res.json()) as { data?: { video_id?: string } };
+    const videoId = data.data?.video_id;
     if (!videoId) throw new Error(`HeyGen: no video_id in response: ${JSON.stringify(data)}`);
     return videoId;
   }
 
   async poll(videoId: string): Promise<VideoResult | null> {
-    const res = await fetchWithLog(`${HEYGEN_API}/v2/videos/${videoId}`, {
+    const res = await fetchWithLog(`${HEYGEN_API}/v3/videos/${videoId}`, {
       headers: this.jsonHeaders,
     });
     const text = await res.text();
@@ -234,12 +232,10 @@ export class HeyGenAdapter implements VideoAdapter {
     const result = JSON.parse(text) as HeyGenVideoDetail;
     const data = result.data;
 
-    logger.info({ videoId, result }, `Response from heygen`);
-
     if (!data) throw new Error("HeyGen: empty status response");
     if (data.status === "failed") {
       throw new Error(
-        `HeyGen video failed: ${data.failure_message ?? data.failure_code ?? data.error ?? "unknown"}`,
+        `HeyGen video failed: ${data.failure_message ?? data.failure_code ?? "unknown"}`,
       );
     }
     if (data.status !== "completed") return null;
