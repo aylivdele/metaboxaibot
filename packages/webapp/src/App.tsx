@@ -8,6 +8,7 @@ import { ReferralPage } from "./pages/ReferralPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
 import { LinkMetaboxPage } from "./pages/LinkMetaboxPage.js";
 import { I18nProvider, useI18n } from "./i18n.js";
+import { AiboxLogo } from "./components/AiboxLogo.js";
 import { api } from "./api/client.js";
 import type { Page, UserProfile } from "./types.js";
 
@@ -121,7 +122,7 @@ function AppContent() {
   return (
     <div className="app">
       <header className="app-header">
-        <img src="/aibox-with-name.svg" alt={t("app.name")} className="app-header__logo" />
+        <AiboxLogo className="app-header__logo" />
         <div className="app-header__right">
           <LangPicker />
         </div>

@@ -80,7 +80,7 @@ export function MediaSettingsView({
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [section, activeModelId]);
+  }, [section]);
 
   const SECTION_ACTIVE_STATE: Record<MediaSection, string> = {
     design: "DESIGN_ACTIVE",
