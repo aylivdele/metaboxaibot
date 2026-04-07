@@ -91,23 +91,27 @@ export function MediaSettingsView({
 
   const handleSettingChange = (modelId: string, key: string, value: unknown) => {
     const model = models.find((m) => m.id === modelId);
+    // Use the latest accumulated pending changes as "current" so corrections
+    // see the most recent values even before a re-render occurs.
+    const current = {
+      ...(allModelSettings[modelId] ?? {}),
+      ...(pendingChangesRef.current[modelId] ?? {}),
+    };
+    const corrections = model ? autoCorrectForCostMatrix(model, key, value, current) : null;
+    const allChanges: Record<string, unknown> = { [key]: value, ...(corrections ?? {}) };
 
-    setAllModelSettings((prev) => {
-      const current = prev[modelId] ?? {};
-      const corrections = model ? autoCorrectForCostMatrix(model, key, value, current) : null;
-      const allChanges: Record<string, unknown> = { [key]: value, ...(corrections ?? {}) };
-
-      // Accumulate all changes for this model, then flush as a single PATCH after 800ms
-      pendingChangesRef.current[modelId] = {
-        ...(pendingChangesRef.current[modelId] ?? {}),
-        ...allChanges,
-      };
-
-      return { ...prev, [modelId]: { ...current, ...allChanges } };
-    });
-
+    setAllModelSettings((prev) => ({
+      ...prev,
+      [modelId]: { ...(prev[modelId] ?? {}), ...allChanges },
+    }));
     setSavedId(modelId);
     setTimeout(() => setSavedId((id) => (id === modelId ? null : id)), 1500);
+
+    // Accumulate all changes for this model, then flush as a single PATCH after 800ms
+    pendingChangesRef.current[modelId] = {
+      ...(pendingChangesRef.current[modelId] ?? {}),
+      ...allChanges,
+    };
     clearTimeout(debounceRef.current[modelId]);
     debounceRef.current[modelId] = setTimeout(() => {
       const batch = pendingChangesRef.current[modelId];

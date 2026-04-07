@@ -22,6 +22,7 @@ export const modelSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       if (!modelId || typeof settings !== "object" || settings === null) {
         throw { statusCode: 400, message: "modelId and settings object are required" };
       }
+      request.log.info({ userId: userId.toString(), modelId, settings }, "[model-settings] PATCH");
       await userStateService.setModelSettings(userId, modelId, settings);
       return { success: true };
     },
