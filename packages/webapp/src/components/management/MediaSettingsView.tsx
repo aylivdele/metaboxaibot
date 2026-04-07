@@ -56,6 +56,8 @@ export function MediaSettingsView({
   const [loading, setLoading] = useState(true);
   const [activatedPopup, setActivatedPopup] = useState(false);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Pending changes per model — batched and flushed as a single PATCH
+  const pendingChangesRef = useRef<Record<string, Record<string, unknown>>>({});
 
   useEffect(() => {
     Promise.all([api.models.list(section), api.state.get(), api.modelSettings.get()])
@@ -89,24 +91,30 @@ export function MediaSettingsView({
 
   const handleSettingChange = (modelId: string, key: string, value: unknown) => {
     const model = models.find((m) => m.id === modelId);
-    const current = allModelSettings[modelId] ?? {};
-    const corrections = model ? autoCorrectForCostMatrix(model, key, value, current) : null;
-    const allChanges: Record<string, unknown> = { [key]: value, ...(corrections ?? {}) };
 
-    setAllModelSettings((prev) => ({
-      ...prev,
-      [modelId]: { ...(prev[modelId] ?? {}), ...allChanges },
-    }));
+    setAllModelSettings((prev) => {
+      const current = prev[modelId] ?? {};
+      const corrections = model ? autoCorrectForCostMatrix(model, key, value, current) : null;
+      const allChanges: Record<string, unknown> = { [key]: value, ...(corrections ?? {}) };
+
+      // Accumulate all changes for this model, then flush as a single PATCH after 800ms
+      pendingChangesRef.current[modelId] = {
+        ...(pendingChangesRef.current[modelId] ?? {}),
+        ...allChanges,
+      };
+
+      return { ...prev, [modelId]: { ...current, ...allChanges } };
+    });
+
     setSavedId(modelId);
     setTimeout(() => setSavedId((id) => (id === modelId ? null : id)), 1500);
-
-    for (const [changeKey, changeVal] of Object.entries(allChanges)) {
-      const dKey = `${modelId}__${changeKey}`;
-      clearTimeout(debounceRef.current[dKey]);
-      debounceRef.current[dKey] = setTimeout(() => {
-        void api.modelSettings.set(modelId, { [changeKey]: changeVal });
-      }, 800);
-    }
+    clearTimeout(debounceRef.current[modelId]);
+    debounceRef.current[modelId] = setTimeout(() => {
+      const batch = pendingChangesRef.current[modelId];
+      if (!batch) return;
+      delete pendingChangesRef.current[modelId];
+      void api.modelSettings.set(modelId, batch);
+    }, 800);
   };
 
   const handleReset = (modelId: string) => {

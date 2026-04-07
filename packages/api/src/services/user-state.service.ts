@@ -192,20 +192,34 @@ export const userStateService = {
     return state.modelSettings as Record<string, Record<string, unknown>>;
   },
 
-  /** Merges the given key/value pairs into the stored settings for a specific model. */
+  /** Merges the given key/value pairs into the stored settings for a specific model.
+   *
+   * Uses a single atomic SQL upsert with jsonb concatenation (||) to avoid
+   * the lost-update race condition of a read-modify-write cycle. The merge is:
+   *   modelSettings = COALESCE(modelSettings, '{}') || { modelId: COALESCE(modelSettings->modelId, '{}') || settings }
+   */
   async setModelSettings(
     userId: bigint,
     modelId: string,
     settings: Record<string, unknown>,
   ): Promise<void> {
-    const current = await this.getModelSettings(userId);
-    const updated = { ...current, [modelId]: { ...(current[modelId] ?? {}), ...settings } };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const json = updated as any;
-    await db.userState.upsert({
-      where: { userId },
-      create: { userId, state: "IDLE", modelSettings: json },
-      update: { modelSettings: json },
-    });
+    const settingsJson = JSON.stringify(settings);
+    // Atomic jsonb merge: deep-merge settings into modelSettings[modelId]
+    // without reading the current value first.
+    await db.$executeRaw`
+      INSERT INTO "UserState" ("userId", "state", "modelSettings")
+      VALUES (
+        ${userId},
+        'IDLE',
+        jsonb_build_object(${modelId}::text, ${settingsJson}::jsonb)
+      )
+      ON CONFLICT ("userId") DO UPDATE
+      SET "modelSettings" = COALESCE("UserState"."modelSettings", '{}'::jsonb)
+        || jsonb_build_object(
+             ${modelId}::text,
+             COALESCE("UserState"."modelSettings"->${modelId}, '{}'::jsonb)
+               || ${settingsJson}::jsonb
+           )
+    `;
   },
 };
