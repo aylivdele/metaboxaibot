@@ -73,7 +73,10 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (grantType === "subscription") {
       const resolvedEndDate = endDate ? new Date(endDate) : new Date();
-      await grantMetaboxSubscription({
+      console.log(
+        `[grant-tokens] subscription grant: userId=${userId}, tokens=${tokens}, endDate=${resolvedEndDate.toISOString()}, planName=${planName}, subscriptionId=${subscriptionId}`,
+      );
+      const granted = await grantMetaboxSubscription({
         userId,
         tokens,
         endDate: resolvedEndDate,
@@ -81,6 +84,9 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
         metaboxSubscriptionId: subscriptionId,
         description,
       });
+      console.log(
+        `[grant-tokens] grantMetaboxSubscription result: ${granted ? "GRANTED" : "ALREADY_GRANTED (skipped)"}`,
+      );
       // alreadyGranted (false) is a no-op — idempotent, always return ok
     } else {
       await db.$transaction([
@@ -195,7 +201,11 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
     if (!user) {
       return reply.code(404).send({ error: "User not found" });
     }
-    return { tokens: Number(user.tokenBalance) + Number(user.subscriptionTokenBalance) };
+    return {
+      tokens: Number(user.tokenBalance) + Number(user.subscriptionTokenBalance),
+      tokenBalance: Number(user.tokenBalance),
+      subscriptionTokenBalance: Number(user.subscriptionTokenBalance),
+    };
   });
 
   /**

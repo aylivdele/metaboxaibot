@@ -95,6 +95,12 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
         setError(
           `Конфликт наставников. На сайте: ${siteInfo}, в боте: ${botInfo}. Для объединения перейдите по кнопке AI Box на сайте Metabox.`,
         );
+      } else if (code === "TELEGRAM_MISMATCH" && err?.linkedTo) {
+        const lt = err.linkedTo;
+        const tgInfo = lt.telegramUsername ? `@${lt.telegramUsername}` : lt.telegramPhone || "";
+        setError(
+          `Этот аккаунт уже привязан к другому Telegram${tgInfo ? ` (${tgInfo})` : ""}. Войдите с того Telegram или обратитесь в поддержку @${supportTg}`,
+        );
       } else if (code === "TELEGRAM_LINKED" && err?.linkedTo) {
         const lt = err.linkedTo;
         const tgInfo = lt.telegramUsername ? `@${lt.telegramUsername}` : lt.telegramPhone || "";

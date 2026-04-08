@@ -275,12 +275,23 @@ export async function grantMetaboxSubscription(params: {
 }): Promise<boolean> {
   const { userId, tokens, endDate, planName, metaboxSubscriptionId, description } = params;
 
-  // Idempotency: skip if this specific Metabox subscription was already granted
+  // Idempotency: skip only if this subscription was already granted AND is still active
   if (metaboxSubscriptionId) {
     const existing = await db.localSubscription.findUnique({
       where: { metaboxSubscriptionId },
     });
-    if (existing) return false;
+    if (existing && existing.isActive) {
+      console.log(
+        `[grantMetaboxSubscription] Idempotency skip: metaboxSubscriptionId=${metaboxSubscriptionId} already exists and active`,
+      );
+      return false;
+    }
+    // If exists but inactive (e.g. after TG disconnect) — allow re-grant
+    if (existing && !existing.isActive) {
+      console.log(
+        `[grantMetaboxSubscription] Re-granting: metaboxSubscriptionId=${metaboxSubscriptionId} exists but inactive`,
+      );
+    }
   }
 
   const user = await db.user.findUniqueOrThrow({
@@ -293,6 +304,10 @@ export async function grantMetaboxSubscription(params: {
     user.subscriptionEndDate && user.subscriptionEndDate > endDate
       ? user.subscriptionEndDate
       : endDate;
+
+  console.log(
+    `[grantMetaboxSubscription] userId=${userId}, tokens=${tokens}, endDate=${endDate.toISOString()}, resolvedEndDate=${resolvedEndDate.toISOString()}, planName=${planName}, currentSubEndDate=${user.subscriptionEndDate?.toISOString() ?? "null"}`,
+  );
 
   await db.$transaction([
     db.user.update({
@@ -313,6 +328,19 @@ export async function grantMetaboxSubscription(params: {
       },
     }),
   ]);
+
+  // Verify the update
+  const updated = await db.user.findUnique({
+    where: { id: userId },
+    select: {
+      subscriptionEndDate: true,
+      subscriptionTokenBalance: true,
+      subscriptionPlanName: true,
+    },
+  });
+  console.log(
+    `[grantMetaboxSubscription] ✅ After update: subscriptionEndDate=${updated?.subscriptionEndDate?.toISOString()}, subscriptionTokenBalance=${updated?.subscriptionTokenBalance}, subscriptionPlanName=${updated?.subscriptionPlanName}`,
+  );
 
   // Upsert LocalSubscription — serves as the idempotency record for future calls
   await db.localSubscription.upsert({
@@ -352,9 +380,8 @@ export async function expireSubscription(userId: bigint): Promise<void> {
         subscriptionPlanName: null,
       },
     }),
-    db.localSubscription.updateMany({
-      where: { userId, isActive: true },
-      data: { isActive: false },
+    db.localSubscription.deleteMany({
+      where: { userId },
     }),
   ]);
 }
