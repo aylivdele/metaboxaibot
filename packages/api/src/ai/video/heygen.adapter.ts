@@ -5,19 +5,10 @@ import { logger } from "../../logger.js";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { transcodeOggToMp3 } from "../../utils/audio-transcode.js";
 import { parseHeyGenErrorBody, parseHeyGenPollFailure } from "../../utils/heygen-error.js";
+import { resolveImageMimeType, resolveAudioMimeType } from "../../utils/mime-detect.js";
 
 const HEYGEN_API = "https://api.heygen.com";
 const HEYGEN_UPLOAD = "https://upload.heygen.com";
-
-/** Detect image MIME type from magic bytes. Returns null if unrecognized. */
-function detectImageMimeType(buf: ArrayBuffer): string | null {
-  const b = new Uint8Array(buf);
-  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
-  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png";
-  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return "image/gif";
-  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46) return "image/webp";
-  return null;
-}
 
 interface HeyGenVideoDetail {
   code?: string;
@@ -72,7 +63,8 @@ export class HeyGenAdapter implements VideoAdapter {
     if (!audioRes.ok)
       throw new Error(`Failed to fetch audio for HeyGen upload: ${audioRes.status}`);
     let audioBuffer = Buffer.from(await audioRes.arrayBuffer()) as Buffer;
-    let contentType = audioRes.headers.get("content-type") ?? "audio/mpeg";
+    // Detect actual audio type from magic bytes — HTTP Content-Type may be unreliable.
+    let contentType = resolveAudioMimeType(audioBuffer, audioRes.headers.get("content-type"));
 
     // HeyGen does not support OGG/Opus — transcode to MP3 first
     if (contentType.includes("ogg") || contentType.includes("opus")) {
@@ -110,7 +102,7 @@ export class HeyGenAdapter implements VideoAdapter {
 
     // Detect actual image type from magic bytes — HTTP Content-Type may be unreliable
     // (S3 presigned URLs and Telegram file URLs often return application/octet-stream).
-    const contentType = detectImageMimeType(imgBuffer) ?? "image/jpeg";
+    const contentType = resolveImageMimeType(imgBuffer, imgRes.headers.get("content-type"));
 
     const uploadRes = await fetchWithLog(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",

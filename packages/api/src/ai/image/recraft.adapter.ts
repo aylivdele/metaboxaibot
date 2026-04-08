@@ -1,6 +1,7 @@
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
+import { resolveImageMimeType } from "../../utils/mime-detect.js";
 
 const RECRAFT_API_BASE = "https://external.api.recraft.ai/v1";
 
@@ -140,10 +141,13 @@ export class RecraftAdapter implements ImageAdapter {
       // Image-to-image via multipart form
       const imgResp = await fetchWithLog(input.imageUrl);
       if (!imgResp.ok) throw new Error(`Failed to fetch source image: ${imgResp.status}`);
-      const blob = await imgResp.blob();
+      const imgBuf = await imgResp.arrayBuffer();
+      // Detect actual MIME from magic bytes — S3/Telegram URLs often return application/octet-stream.
+      const detectedMime = resolveImageMimeType(imgBuf, imgResp.headers.get("content-type"));
+      const blob = new Blob([imgBuf], { type: detectedMime });
 
       // Recraft imageToImage only accepts raster formats (PNG/JPEG/WebP)
-      const isSvgMime = blob.type === "image/svg+xml";
+      const isSvgMime = detectedMime === "image/svg+xml";
       const isSvgUrl = input.imageUrl.split("?")[0].toLowerCase().endsWith(".svg");
       if (isSvgMime || isSvgUrl) {
         throw new UserFacingError(

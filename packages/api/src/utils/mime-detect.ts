@@ -1,0 +1,94 @@
+/**
+ * MIME-type detection from magic bytes.
+ * Used to override unreliable HTTP Content-Type headers
+ * (S3 presigned URLs and Telegram file URLs often return application/octet-stream).
+ */
+
+/**
+ * Detects image MIME type from the first bytes of the buffer.
+ * Returns null if the format is not recognized.
+ */
+export function detectImageMimeType(buf: ArrayBuffer | Buffer): string | null {
+  const b = buf instanceof Buffer ? buf : new Uint8Array(buf);
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png";
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return "image/gif";
+  // WebP: RIFF....WEBP
+  if (
+    b[0] === 0x52 &&
+    b[1] === 0x49 &&
+    b[2] === 0x46 &&
+    b[3] === 0x46 &&
+    b[8] === 0x57 &&
+    b[9] === 0x45 &&
+    b[10] === 0x42 &&
+    b[11] === 0x50
+  )
+    return "image/webp";
+  return null;
+}
+
+/**
+ * Detects audio MIME type from the first bytes of the buffer.
+ * Returns null if the format is not recognized.
+ */
+export function detectAudioMimeType(buf: ArrayBuffer | Buffer): string | null {
+  const b = buf instanceof Buffer ? buf : new Uint8Array(buf);
+  // ID3 tag (MP3)
+  if (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) return "audio/mpeg";
+  // MPEG sync word (MP3 frame)
+  if (b[0] === 0xff && (b[1] & 0xe0) === 0xe0) return "audio/mpeg";
+  // OGG
+  if (b[0] === 0x4f && b[1] === 0x67 && b[2] === 0x67 && b[3] === 0x53) return "audio/ogg";
+  // RIFF/WAVE
+  if (
+    b[0] === 0x52 &&
+    b[1] === 0x49 &&
+    b[2] === 0x46 &&
+    b[3] === 0x46 &&
+    b[8] === 0x57 &&
+    b[9] === 0x41 &&
+    b[10] === 0x56 &&
+    b[11] === 0x45
+  )
+    return "audio/wav";
+  // FLAC
+  if (b[0] === 0x66 && b[1] === 0x4c && b[2] === 0x61 && b[3] === 0x43) return "audio/flac";
+  // AAC ADTS
+  if (b[0] === 0xff && (b[1] & 0xf0) === 0xf0) return "audio/aac";
+  return null;
+}
+
+/**
+ * Returns a safe image MIME type: detects from magic bytes first,
+ * then falls back to the HTTP Content-Type header value (if it starts with "image/"),
+ * then falls back to the provided default.
+ */
+export function resolveImageMimeType(
+  buf: ArrayBuffer | Buffer,
+  headerContentType: string | null,
+  defaultType = "image/jpeg",
+): string {
+  return (
+    detectImageMimeType(buf) ??
+    (headerContentType?.startsWith("image/") ? headerContentType : null) ??
+    defaultType
+  );
+}
+
+/**
+ * Returns a safe audio MIME type: detects from magic bytes first,
+ * then falls back to the HTTP Content-Type header value (if it starts with "audio/"),
+ * then falls back to the provided default.
+ */
+export function resolveAudioMimeType(
+  buf: ArrayBuffer | Buffer,
+  headerContentType: string | null,
+  defaultType = "audio/mpeg",
+): string {
+  return (
+    detectAudioMimeType(buf) ??
+    (headerContentType?.startsWith("audio/") ? headerContentType : null) ??
+    defaultType
+  );
+}

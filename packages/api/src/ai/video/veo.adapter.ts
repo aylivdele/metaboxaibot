@@ -6,6 +6,7 @@ import {
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { fetchWithLog, logCall } from "../../utils/fetch.js";
+import { resolveImageMimeType } from "../../utils/mime-detect.js";
 
 const API_MODELS: Record<string, string> = {
   veo: "veo-3.0-generate-001",
@@ -54,7 +55,7 @@ export class VeoAdapter implements VideoAdapter {
         const imgResp = await fetchWithLog(input.imageUrl);
         if (!imgResp.ok) throw new Error(`Veo: failed to fetch reference image: ${imgResp.status}`);
         const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
-        const mimeType = imgResp.headers.get("content-type") ?? "image/jpeg";
+        const mimeType = resolveImageMimeType(imgBuffer, imgResp.headers.get("content-type"));
         params.image = {
           imageBytes: imgBuffer.toString("base64"),
           mimeType,
