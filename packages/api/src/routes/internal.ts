@@ -110,6 +110,54 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * POST /internal/sync-subscription
+   * Mirrors subscription state from Metabox site to bot.
+   * SETS (does not increment) subscription fields directly.
+   * No TokenTransaction created, no LocalSubscription created.
+   * Used when reconnecting site to bot to avoid token doubling.
+   */
+  fastify.post("/sync-subscription", async (request, reply) => {
+    const {
+      telegramId,
+      subscriptionTokenBalance,
+      tokenBalance,
+      subscriptionEndDate,
+      subscriptionPlanName,
+    } = request.body as {
+      telegramId: string;
+      subscriptionTokenBalance?: number;
+      tokenBalance?: number;
+      subscriptionEndDate?: string;
+      subscriptionPlanName?: string;
+    };
+
+    if (!telegramId) {
+      return reply.code(400).send({ error: "telegramId is required" });
+    }
+
+    const userId = BigInt(telegramId);
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return reply.code(404).send({ error: "User not found" });
+    }
+
+    const data: Record<string, unknown> = {};
+    if (subscriptionTokenBalance !== undefined)
+      data.subscriptionTokenBalance = subscriptionTokenBalance;
+    if (tokenBalance !== undefined) data.tokenBalance = tokenBalance;
+    if (subscriptionEndDate) data.subscriptionEndDate = new Date(subscriptionEndDate);
+    if (subscriptionPlanName) data.subscriptionPlanName = subscriptionPlanName;
+
+    if (Object.keys(data).length > 0) {
+      await db.user.update({ where: { id: userId }, data });
+    }
+
+    console.log(`[sync-subscription] userId=${userId}, set:`, data);
+
+    return { ok: true };
+  });
+
+  /**
    * POST /internal/revoke-tokens
    * Called by Metabox when a subscription expires or is revoked on the site.
    * Zeroes subscription balance, clears endDate/planName, deactivates local subscription record.
