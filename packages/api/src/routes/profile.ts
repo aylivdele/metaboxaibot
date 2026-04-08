@@ -33,15 +33,25 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/profile", async (request) => {
     const { userId } = request as AuthRequest;
 
-    const [user, transactions, referralCount] = await Promise.all([
+    const [user, transactions] = await Promise.all([
       db.user.findUnique({ where: { id: userId } }),
       db.tokenTransaction.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
-      db.user.count({ where: { referredById: userId } }),
     ]);
+
+    // Referral count from Metabox (includes site referrals, not just bot)
+    let referralCount = 0;
+    try {
+      const { getPartnerBalance } = await import("../services/metabox-bridge.service.js");
+      const partnerData = await getPartnerBalance(userId);
+      referralCount = partnerData?.referralCount ?? 0;
+    } catch {
+      // Fallback to local count
+      referralCount = await db.user.count({ where: { referredById: userId } });
+    }
 
     if (!user) throw new Error("User not found");
 

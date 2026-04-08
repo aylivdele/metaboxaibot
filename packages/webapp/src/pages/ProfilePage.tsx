@@ -5,7 +5,7 @@ import type { TranslationKey } from "../i18n.js";
 // import { BannerSlider } from "../components/BannerSlider.js";
 import type { UserProfile, GalleryItem } from "../types.js";
 
-export type ProfileTab = "overview" | "gallery";
+export type ProfileTab = "overview" | "gallery" | "account";
 
 /**
  * Format a token amount with dynamic precision so small values never show as 0.00.
@@ -77,10 +77,17 @@ export function ProfilePage({ initialSection }: { initialSection?: ProfileTab })
         >
           {t("profile.tabGallery")}
         </button>
+        <button
+          className={`profile-tabs__btn${activeTab === "account" ? " profile-tabs__btn--active" : ""}`}
+          onClick={() => setActiveTab("account")}
+        >
+          Аккаунт
+        </button>
       </div>
 
       {activeTab === "overview" && <OverviewTab profile={profile} />}
       {activeTab === "gallery" && <GalleryTab />}
+      {activeTab === "account" && <AccountTab profile={profile} />}
     </div>
   );
 }
@@ -325,6 +332,100 @@ function GalleryCard({
           {loading ? "…" : sent ? t("gallery.sent") : t("gallery.download")}
         </button>
       </div>
+    </div>
+  );
+}
+
+/* ── Account tab ────────────────────────────────────────────────────────── */
+
+interface AccountData {
+  balance: number;
+  totalEarned: number;
+  userStatus: string;
+  referralCode: string | null;
+  email: string | null;
+  mentor: {
+    name: string;
+    email: string | null;
+    telegramUsername: string | null;
+    telegramPhone: string | null;
+  } | null;
+}
+
+function AccountTab(_props: { profile: UserProfile }) {
+  const [data, setData] = useState<AccountData | null>(null);
+
+  useEffect(() => {
+    api.profile
+      .partnerBalance()
+      .then((d) => setData(d as unknown as AccountData))
+      .catch(() => {});
+  }, []);
+
+  return (
+    <div className="account-tab">
+      {/* Email */}
+      <div className="account-section">
+        <div className="account-label">Email</div>
+        <div className="account-value">
+          {data?.email ? (
+            <span>{data.email}</span>
+          ) : (
+            <span className="account-hint">Аккаунт Metabox не привязан</span>
+          )}
+        </div>
+      </div>
+
+      {/* Status */}
+      <div className="account-section">
+        <div className="account-label">Статус</div>
+        <div className="account-value">
+          {data?.userStatus === "PARTNER"
+            ? "Партнёр"
+            : data?.userStatus === "CLIENT"
+              ? "Клиент"
+              : "Пользователь"}
+        </div>
+      </div>
+
+      {/* Mentor */}
+      {data?.mentor && (
+        <div className="account-section">
+          <div className="account-label">Наставник</div>
+          <div className="account-value">
+            <div className="account-mentor-name">{data.mentor.name}</div>
+            {data.mentor.telegramUsername ? (
+              <a
+                href={`https://t.me/${data.mentor.telegramUsername}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="account-mentor-link"
+              >
+                @{data.mentor.telegramUsername}
+              </a>
+            ) : data.mentor.telegramPhone ? (
+              <a
+                href={`https://t.me/+${data.mentor.telegramPhone.replace(/^\+/, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="account-mentor-link"
+              >
+                {data.mentor.telegramPhone}
+              </a>
+            ) : data.mentor.email ? (
+              <div className="account-mentor-email">{data.mentor.email}</div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* Referral code */}
+      {data?.referralCode && (
+        <div className="account-section">
+          <div className="account-label">Реферальный код</div>
+          <div className="account-value account-value--mono">{data.referralCode}</div>
+        </div>
+      )}
     </div>
   );
 }
