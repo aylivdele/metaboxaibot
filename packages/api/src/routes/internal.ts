@@ -201,7 +201,11 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
     if (!user) {
       return reply.code(404).send({ error: "User not found" });
     }
-    return { tokens: Number(user.tokenBalance) + Number(user.subscriptionTokenBalance) };
+    return {
+      tokens: Number(user.tokenBalance) + Number(user.subscriptionTokenBalance),
+      tokenBalance: Number(user.tokenBalance),
+      subscriptionTokenBalance: Number(user.subscriptionTokenBalance),
+    };
   });
 
   /**
