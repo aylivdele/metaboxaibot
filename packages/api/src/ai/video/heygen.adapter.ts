@@ -9,6 +9,16 @@ import { parseHeyGenErrorBody, parseHeyGenPollFailure } from "../../utils/heygen
 const HEYGEN_API = "https://api.heygen.com";
 const HEYGEN_UPLOAD = "https://upload.heygen.com";
 
+/** Detect image MIME type from magic bytes. Returns null if unrecognized. */
+function detectImageMimeType(buf: ArrayBuffer): string | null {
+  const b = new Uint8Array(buf);
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png";
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return "image/gif";
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46) return "image/webp";
+  return null;
+}
+
 interface HeyGenVideoDetail {
   code?: string;
   data?: {
@@ -97,7 +107,10 @@ export class HeyGenAdapter implements VideoAdapter {
     const imgRes = await fetchWithLog(imageUrl);
     if (!imgRes.ok) throw new Error(`Failed to fetch image for HeyGen upload: ${imgRes.status}`);
     const imgBuffer = await imgRes.arrayBuffer();
-    const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
+
+    // Detect actual image type from magic bytes — HTTP Content-Type may be unreliable
+    // (S3 presigned URLs and Telegram file URLs often return application/octet-stream).
+    const contentType = detectImageMimeType(imgBuffer) ?? "image/jpeg";
 
     const uploadRes = await fetchWithLog(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",
