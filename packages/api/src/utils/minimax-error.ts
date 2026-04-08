@@ -30,19 +30,23 @@ export function isMinimaxUserFacingError(err: unknown): err is MinimaxApiError {
   return err instanceof MinimaxApiError && USER_FACING_CODES.has(err.statusCode);
 }
 
-export function getMinimaxUserMessage(err: MinimaxApiError): string {
+export function getMinimaxUserMessage(
+  err: MinimaxApiError,
+  t: { errors: Record<string, string> },
+): string {
+  const e = t.errors;
   switch (err.statusCode) {
     case 1026:
     case 1027:
-      return "❌ Запрос содержит недопустимый контент. Измените описание и попробуйте снова.";
+      return e.minimaxSensitiveContent;
     case 1042:
-      return "❌ Запрос содержит невидимые или недопустимые символы. Проверьте текст и попробуйте снова.";
+      return e.minimaxInvalidChars;
     case 2013:
-      return "❌ Некорректные параметры запроса. Проверьте настройки модели и попробуйте снова.";
+      return e.minimaxInvalidParams;
     case 2056:
-      return "❌ Превышен лимит использования MiniMax. Попробуйте позже.";
+      return e.minimaxUsageLimit;
     default:
-      return "❌ MiniMax отклонил запрос. Проверьте настройки и попробуйте снова.";
+      return e.minimaxRejected;
   }
 }
 

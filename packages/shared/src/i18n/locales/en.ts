@@ -181,6 +181,111 @@ export default {
     audioCreateTaskFailed: "❌ Failed to create a generation task. Please try again later.",
     generationTimeout: "❌ Generation took too long. Please try again.",
     generationFailed: "❌ Generation failed. Please try again later or contact support.",
+    // HeyGen
+    heygenBlockedWords:
+      "❌ Your request contains prohibited words or content. Please edit your text and try again.",
+    heygenNsfw:
+      "❌ Request rejected: NSFW content detected. Please modify your prompt and try again.",
+    heygenCelebrity:
+      "❌ Request rejected: celebrity likeness detected. Using such images is not allowed.",
+    heygenChildSafety:
+      "❌ Request rejected: content involving minors detected. Such material is not permitted.",
+    heygenPolicyViolation:
+      "❌ Your request violates the acceptable use policy. Please modify it and try again.",
+    heygenNoFace:
+      "❌ No face detected in the image. Please make sure the photo clearly shows a face.",
+    heygenMultipleFaces:
+      "❌ Multiple faces detected in the image. Please use a photo with a single face.",
+    heygenBadImageQuality: "❌ Image quality is too low. Please upload a clearer photo.",
+    heygenInvalidText:
+      "❌ The text contains invalid characters or is too long. Please fix it and try again.",
+    heygenVideoFormat: "❌ Video format not supported. Please use MP4 or MOV.",
+    heygenAudioFormat: "❌ Audio format not supported. Please use MP3 or WAV.",
+    heygenFileFormat: "❌ File format not supported. Please use JPEG or PNG.",
+    heygenVideoTooShort: "❌ The video is too short. Please try a different video.",
+    heygenFileTooLong: "❌ The video or audio is too long. Please use a shorter file.",
+    heygenAudioTooLong: "❌ The audio is too long. Please use a shorter audio file.",
+    heygenAudioLengthMismatch:
+      "❌ Audio length does not match video length. Please check your input files.",
+    heygenAvatarNotFound: "❌ Avatar not found. Please select a different avatar in settings.",
+    heygenVoiceNotFound: "❌ Voice not found. Please select a different voice in settings.",
+    heygenVoicePremium: "❌ The selected voice is only available for HeyGen premium accounts.",
+    heygenTtsLanguage: "❌ TTS language error. Please check your voice settings.",
+    heygenTrialLimit:
+      "❌ HeyGen daily trial limit reached. Please try again tomorrow or upgrade your plan.",
+    heygenAvatarPermission: "❌ You are not permitted to use this avatar.",
+    heygenUserBlocked: "❌ Your HeyGen account has been blocked for violating the service rules.",
+    heygenTierRequired: "❌ This feature requires a higher HeyGen subscription tier.",
+    heygenRejected: "❌ HeyGen rejected your request. Please check your settings and try again.",
+    // Luma
+    lumaBlacklistedWords:
+      "❌ Your request contains prohibited words. Please modify your description and try again.",
+    lumaImageModeration: "❌ The image did not pass moderation. Please use a different photo.",
+    lumaPromptModeration:
+      "❌ Your request was rejected by the moderation system. Please modify it and try again.",
+    lumaImageLoadError:
+      "❌ Failed to load the image. Please make sure the file is accessible and try again.",
+    lumaPromptRequired: "❌ A text prompt is required. Please add a description and try again.",
+    lumaPromptTooShort: "❌ Prompt is too short (minimum 3 characters). Please add more detail.",
+    lumaPromptTooLong:
+      "❌ Prompt is too long (maximum 5000 characters). Please shorten your description.",
+    lumaLoopUnsupported:
+      "❌ The loop option is not compatible with the selected settings. Please disable it and try again.",
+    lumaNoKeyframes: "❌ No keyframes provided. Please check your settings and try again.",
+    lumaUnknownRequestType: "❌ Invalid request type. Please check your model settings.",
+    lumaRejected: "❌ Luma rejected your request. Please check your settings and try again.",
+    // MiniMax
+    minimaxSensitiveContent:
+      "❌ Your request contains prohibited content. Please modify your description and try again.",
+    minimaxInvalidChars:
+      "❌ Your request contains invisible or invalid characters. Please check the text and try again.",
+    minimaxInvalidParams:
+      "❌ Invalid request parameters. Please check the model settings and try again.",
+    minimaxUsageLimit: "❌ MiniMax usage limit exceeded. Please try again later.",
+    minimaxRejected: "❌ MiniMax rejected your request. Please check your settings and try again.",
+    // Runway
+    runwayModeration:
+      "❌ Your prompt or image did not pass Runway's moderation check. Please modify your prompt or use a different image.",
+    runwayInvalidAsset:
+      "❌ The image is not suitable for video generation. Please check the dimensions, format, and try a different photo.",
+    runwayRejected: "❌ Runway rejected your request. Please check your settings and try again.",
+    // Replicate
+    replicateOom:
+      "❌ Input data is too large for this model. Please try reducing the image size or text length.",
+    replicateInvalidParams:
+      "❌ Generation failed to start due to invalid parameters. Please check your settings and try again.",
+    replicateFileTooLarge:
+      "❌ Failed to upload the file for generation. Please check the size (usually up to 50 MB) and file format.",
+    // Fal
+    falContentPolicy:
+      "❌ Your request was rejected due to a content policy violation. Please modify your prompt and try again.",
+    falNoMediaGenerated:
+      "❌ The model could not generate a result for this prompt. Please try modifying it.",
+    falImageTooSmall: "❌ Image is too small. Minimum size: {width}×{height} px.",
+    falImageTooLarge: "❌ Image is too large. Maximum size: {width}×{height} px.",
+    falImageLoadError:
+      "❌ Failed to load the image. Please make sure the file is not corrupted and has a supported format.",
+    falFileDownloadError:
+      "❌ Failed to download the file from the URL. Please make sure it is publicly accessible.",
+    falFaceDetectionError:
+      "❌ No face detected in the image. Please make sure the photo clearly shows a face.",
+    falFileTooLarge: "❌ File is too large.",
+    falFileTooLargeLimit: "❌ File is too large. Maximum size: {maxMb} MB.",
+    falAudioTooLong: "❌ Audio is too long ({got}s). Maximum duration: {max}s.",
+    falAudioTooShort: "❌ Audio is too short ({got}s). Minimum duration: {min}s.",
+    falVideoTooLong: "❌ Video is too long ({got}s). Maximum duration: {max}s.",
+    falVideoTooShort: "❌ Video is too short ({got}s). Minimum duration: {min}s.",
+    falUnsupportedFormat: "❌ Unsupported file format.",
+    falUnsupportedFormatList: "❌ Unsupported file format. Supported: {formats}.",
+    falInvalidArchive: "❌ Failed to open the archive. Please make sure the file is not corrupted.",
+    falInvalidArchiveExts: "❌ Failed to open the archive. Supported formats: {exts}.",
+    falArchiveTooFew: "❌ Not enough files in the archive (found {got}, minimum {min} required).",
+    falArchiveTooFewExts:
+      "❌ Not enough files in the archive (found {got}, minimum {min} required, formats: {exts}).",
+    falArchiveTooMany: "❌ Too many files in the archive (found {got}, maximum {max} allowed).",
+    falFeatureNotSupported: "❌ The requested feature is not supported by this model.",
+    falOneOf: "❌ Invalid value. Allowed values: {expected}.",
+    falOneOfField: "❌ Invalid value for field '{field}'. Allowed values: {expected}.",
   },
   common: {
     backToMain: "🏠 Back to Main Menu",

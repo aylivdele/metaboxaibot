@@ -45,32 +45,25 @@ export function isLumaUserFacingError(err: unknown): err is LumaApiError {
   return USER_FACING_PATTERNS.some((p) => lower.includes(p));
 }
 
-/** Returns a Russian user-facing message for a Luma user-facing error. */
-export function getLumaUserMessage(err: LumaApiError): string {
+export function getLumaUserMessage(
+  err: LumaApiError,
+  t: { errors: Record<string, string> },
+): string {
   const lower = err.detail.toLowerCase();
+  const e = t.errors;
 
-  if (lower.includes("blacklisted words"))
-    return "❌ Запрос содержит запрещённые слова. Измените описание и попробуйте снова.";
-  if (lower.includes("frame moderation failed"))
-    return "❌ Изображение не прошло проверку модерации. Используйте другое фото.";
-  if (lower.includes("advanced prompt moderation failed"))
-    return "❌ Запрос отклонён системой модерации. Измените описание и попробуйте снова.";
-  if (lower.includes("failed to read user input frames"))
-    return "❌ Не удалось загрузить изображение. Убедитесь, что файл доступен, и попробуйте снова.";
-  if (lower.includes("prompt is required"))
-    return "❌ Текстовый запрос обязателен. Добавьте описание и попробуйте снова.";
-  if (lower.includes("prompt is too short"))
-    return "❌ Запрос слишком короткий (минимум 3 символа). Добавьте больше деталей.";
-  if (lower.includes("prompt is too long"))
-    return "❌ Запрос слишком длинный (максимум 5000 символов). Сократите описание.";
-  if (lower.includes("loop is not supported"))
-    return "❌ Параметр «зацикливание» несовместим с выбранными настройками. Отключите его и попробуйте снова.";
-  if (lower.includes("no keyframes provided"))
-    return "❌ Не указаны ключевые кадры. Проверьте настройки и попробуйте снова.";
-  if (lower.includes("unknown request type"))
-    return "❌ Неверный тип запроса. Проверьте настройки модели.";
+  if (lower.includes("blacklisted words")) return e.lumaBlacklistedWords;
+  if (lower.includes("frame moderation failed")) return e.lumaImageModeration;
+  if (lower.includes("advanced prompt moderation failed")) return e.lumaPromptModeration;
+  if (lower.includes("failed to read user input frames")) return e.lumaImageLoadError;
+  if (lower.includes("prompt is required")) return e.lumaPromptRequired;
+  if (lower.includes("prompt is too short")) return e.lumaPromptTooShort;
+  if (lower.includes("prompt is too long")) return e.lumaPromptTooLong;
+  if (lower.includes("loop is not supported")) return e.lumaLoopUnsupported;
+  if (lower.includes("no keyframes provided")) return e.lumaNoKeyframes;
+  if (lower.includes("unknown request type")) return e.lumaUnknownRequestType;
 
-  return "❌ Luma отклонила запрос. Проверьте настройки и попробуйте снова.";
+  return e.lumaRejected;
 }
 
 // ── Parsing ───────────────────────────────────────────────────────────────────

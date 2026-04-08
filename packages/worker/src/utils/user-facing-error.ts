@@ -12,13 +12,15 @@ import {
   isReplicateUserFacingError,
   getReplicateUserMessage,
 } from "@metabox/api/utils/replicate-error";
+import type { Translations } from "@metabox/shared";
 
-export function resolveUserFacingMessage(err: unknown, falFallback: string): string | null {
-  if (isHeyGenUserFacingError(err)) return getHeyGenUserMessage(err);
-  if (isRunwayUserFacingError(err)) return getRunwayUserMessage(err);
-  if (isMinimaxUserFacingError(err)) return getMinimaxUserMessage(err);
-  if (isLumaUserFacingError(err)) return getLumaUserMessage(err);
-  if (isReplicateUserFacingError(err)) return getReplicateUserMessage(err);
-  if (hasFalUserFacingError(err)) return getFalUserMessage(err) ?? falFallback;
+export function resolveUserFacingMessage(err: unknown, t: Translations): string | null {
+  if (isHeyGenUserFacingError(err)) return getHeyGenUserMessage(err, t);
+  if (isRunwayUserFacingError(err)) return getRunwayUserMessage(err, t);
+  if (isMinimaxUserFacingError(err)) return getMinimaxUserMessage(err, t);
+  if (isLumaUserFacingError(err)) return getLumaUserMessage(err, t);
+  if (isReplicateUserFacingError(err)) return getReplicateUserMessage(err, t);
+  if (hasFalUserFacingError(err))
+    return getFalUserMessage(err, t) ?? t.errors.contentPolicyViolation;
   return null;
 }

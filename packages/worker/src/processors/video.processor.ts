@@ -212,7 +212,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Video job completed");
   } catch (err) {
-    const userMsg = resolveUserFacingMessage(err, t.errors.contentPolicyViolation);
+    const userMsg = resolveUserFacingMessage(err, t);
     if (userMsg !== null) {
       logger.warn({ dbJobId, err }, "Video job rejected: user-facing error");
       await db.generationJob.update({

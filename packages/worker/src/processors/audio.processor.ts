@@ -137,7 +137,7 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
     const t = getT(userLang);
 
     // Provider-typed user-facing errors (fal content policy, etc.) — no retry
-    const providerMsg = resolveUserFacingMessage(err, t.errors.contentPolicyViolation);
+    const providerMsg = resolveUserFacingMessage(err, t);
     if (providerMsg !== null) {
       logger.warn({ dbJobId, err }, "Audio job rejected: user-facing error");
       await db.generationJob.update({

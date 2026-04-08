@@ -9,18 +9,6 @@
 /** Codes that indicate a user-correctable problem. */
 const USER_FACING_CODES = new Set(["E1001", "E9243", "E9825"]);
 
-const CODE_MESSAGES: Record<string, string> = {
-  /** OOM — input too large */
-  E1001:
-    "Входные данные слишком большие для модели. Попробуйте уменьшить изображение или длину текста.",
-  /** Error starting prediction — invalid input parameters */
-  E9243:
-    "Ошибка запуска генерации: некорректные параметры. Проверьте настройки и повторите попытку.",
-  /** Failed to upload file — file too large or bad format */
-  E9825:
-    "Не удалось загрузить файл для генерации. Проверьте размер (обычно до 50 МБ) и формат файла.",
-};
-
 export class ReplicatePredictionError extends Error {
   constructor(
     public readonly code: string,
@@ -49,6 +37,19 @@ export function isReplicateUserFacingError(err: unknown): err is ReplicatePredic
   return err instanceof ReplicatePredictionError && USER_FACING_CODES.has(err.code);
 }
 
-export function getReplicateUserMessage(err: ReplicatePredictionError): string {
-  return CODE_MESSAGES[err.code] ?? "Произошла ошибка при генерации. Попробуйте снова.";
+export function getReplicateUserMessage(
+  err: ReplicatePredictionError,
+  t: { errors: Record<string, string> },
+): string {
+  const e = t.errors;
+  switch (err.code) {
+    case "E1001":
+      return e.replicateOom;
+    case "E9243":
+      return e.replicateInvalidParams;
+    case "E9825":
+      return e.replicateFileTooLarge;
+    default:
+      return e.generationFailed;
+  }
 }

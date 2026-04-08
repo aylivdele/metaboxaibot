@@ -257,7 +257,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Image job completed");
   } catch (err) {
-    const userMsg = resolveUserFacingMessage(err, t.errors.contentPolicyViolation);
+    const userMsg = resolveUserFacingMessage(err, t);
     if (userMsg !== null) {
       logger.warn({ dbJobId, err }, "Image job rejected: user-facing error");
       await db.generationJob.update({

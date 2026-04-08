@@ -34,16 +34,20 @@ export function isRunwayUserFacingError(err: unknown): err is RunwayTaskError {
   );
 }
 
-export function getRunwayUserMessage(err: RunwayTaskError): string {
+export function getRunwayUserMessage(
+  err: RunwayTaskError,
+  t: { errors: Record<string, string> },
+): string {
   const code = err.failureCode ?? "";
+  const e = t.errors;
 
   if (code.startsWith("SAFETY.INPUT.") || code === "INPUT_PREPROCESSING.SAFETY.TEXT") {
-    return "❌ Запрос или изображение не прошли проверку модерации Runway. Измените запрос или используйте другое изображение.";
+    return e.runwayModeration;
   }
   if (code === "ASSET.INVALID") {
-    return "❌ Изображение не подходит для генерации видео. Проверьте размеры, формат и попробуйте другое фото.";
+    return e.runwayInvalidAsset;
   }
-  return "❌ Runway отклонил запрос. Проверьте настройки и попробуйте снова.";
+  return e.runwayRejected;
 }
 
 // ── Parsing ───────────────────────────────────────────────────────────────────

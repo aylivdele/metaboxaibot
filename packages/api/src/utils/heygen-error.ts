@@ -73,69 +73,72 @@ export function isHeyGenUserFacingError(err: unknown): err is HeyGenApiError {
   return err instanceof HeyGenApiError && USER_FACING_CODES.has(err.code);
 }
 
-/** Returns a Russian user-facing message for a HeyGen user-facing error. */
-export function getHeyGenUserMessage(err: HeyGenApiError): string {
+export function getHeyGenUserMessage(
+  err: HeyGenApiError,
+  t: { errors: Record<string, string> },
+): string {
+  const e = t.errors;
   switch (err.code) {
     case 400105:
-      return "❌ Запрос содержит запрещённые слова или запрещённый контент. Измените текст и попробуйте снова.";
+      return e.heygenBlockedWords;
     case 400168:
     case 402009:
-      return "❌ Запрос отклонён: обнаружен контент NSFW. Измените запрос и попробуйте снова.";
+      return e.heygenNsfw;
     case 400625:
     case 402008:
-      return "❌ Запрос отклонён: обнаружено лицо знаменитости. Использование таких изображений запрещено.";
+      return e.heygenCelebrity;
     case 402007:
-      return "❌ Запрос отклонён: обнаружен контент с несовершеннолетними. Использование таких материалов запрещено.";
+      return e.heygenChildSafety;
     case 401003:
     case 400680:
-      return "❌ Запрос нарушает политику допустимого использования. Измените запрос и попробуйте снова.";
+      return e.heygenPolicyViolation;
     case 40004:
-      return "❌ Лицо не обнаружено на изображении. Убедитесь, что на фото чётко видно лицо.";
+      return e.heygenNoFace;
     case 40005:
-      return "❌ На изображении обнаружено несколько лиц. Используйте фото с одним лицом.";
+      return e.heygenMultipleFaces;
     case 40006:
-      return "❌ Качество изображения недостаточное. Загрузите более чёткое фото.";
+      return e.heygenBadImageQuality;
     case 40039:
-      return "❌ Текст содержит недопустимые символы или слишком длинный. Исправьте текст и попробуйте снова.";
+      return e.heygenInvalidText;
     case 40010:
-      return "❌ Формат видео не поддерживается. Используйте MP4 или MOV.";
+      return e.heygenVideoFormat;
     case 40044:
-      return "❌ Формат аудио не поддерживается. Используйте MP3 или WAV.";
+      return e.heygenAudioFormat;
     case 40002:
     case 400543:
     case 400111:
-      return "❌ Формат файла не поддерживается. Используйте JPEG или PNG.";
+      return e.heygenFileFormat;
     case 400165:
-      return "❌ Видео слишком короткое. Попробуйте другое видео.";
+      return e.heygenVideoTooShort;
     case 400150:
     case 400128:
-      return "❌ Видео или аудио слишком длинное. Используйте более короткий файл.";
+      return e.heygenFileTooLong;
     case 1000022:
-      return "❌ Аудио слишком длинное. Используйте более короткий аудиофайл.";
+      return e.heygenAudioTooLong;
     case 401035:
-      return "❌ Длина аудио не совпадает с длиной видео. Проверьте входные файлы.";
+      return e.heygenAudioLengthMismatch;
     case 400144:
     case 400174:
     case 40090:
-      return "❌ Аватар не найден. Выберите другой аватар в настройках.";
+      return e.heygenAvatarNotFound;
     case 400116:
     case 400548:
     case 400552:
-      return "❌ Голос не найден. Выберите другой голос в настройках.";
+      return e.heygenVoiceNotFound;
     case 400551:
-      return "❌ Выбранный голос доступен только для премиум-аккаунтов HeyGen.";
+      return e.heygenVoicePremium;
     case 400634:
-      return "❌ Ошибка языка TTS. Проверьте настройки голоса.";
+      return e.heygenTtsLanguage;
     case 400664:
-      return "❌ Достигнут дневной лимит пробного периода HeyGen. Попробуйте завтра или обновите план.";
+      return e.heygenTrialLimit;
     case 400685:
-      return "❌ Использование этого аватара не разрешено.";
+      return e.heygenAvatarPermission;
     case 400631:
-      return "❌ Аккаунт HeyGen заблокирован за нарушение правил сервиса.";
+      return e.heygenUserBlocked;
     case 400599:
-      return "❌ Эта функция требует более высокого тарифного плана HeyGen.";
+      return e.heygenTierRequired;
     default:
-      return "❌ HeyGen отклонил запрос. Проверьте настройки и попробуйте снова.";
+      return e.heygenRejected;
   }
 }
 
