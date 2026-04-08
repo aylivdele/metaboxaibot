@@ -281,7 +281,9 @@ export async function grantMetaboxSubscription(params: {
       where: { metaboxSubscriptionId },
     });
     if (existing) {
-      console.log(`[grantMetaboxSubscription] Idempotency skip: metaboxSubscriptionId=${metaboxSubscriptionId} already exists`);
+      console.log(
+        `[grantMetaboxSubscription] Idempotency skip: metaboxSubscriptionId=${metaboxSubscriptionId} already exists`,
+      );
       return false;
     }
   }
@@ -297,7 +299,9 @@ export async function grantMetaboxSubscription(params: {
       ? user.subscriptionEndDate
       : endDate;
 
-  console.log(`[grantMetaboxSubscription] userId=${userId}, tokens=${tokens}, endDate=${endDate.toISOString()}, resolvedEndDate=${resolvedEndDate.toISOString()}, planName=${planName}, currentSubEndDate=${user.subscriptionEndDate?.toISOString() ?? "null"}`);
+  console.log(
+    `[grantMetaboxSubscription] userId=${userId}, tokens=${tokens}, endDate=${endDate.toISOString()}, resolvedEndDate=${resolvedEndDate.toISOString()}, planName=${planName}, currentSubEndDate=${user.subscriptionEndDate?.toISOString() ?? "null"}`,
+  );
 
   await db.$transaction([
     db.user.update({
@@ -320,8 +324,17 @@ export async function grantMetaboxSubscription(params: {
   ]);
 
   // Verify the update
-  const updated = await db.user.findUnique({ where: { id: userId }, select: { subscriptionEndDate: true, subscriptionTokenBalance: true, subscriptionPlanName: true } });
-  console.log(`[grantMetaboxSubscription] ✅ After update: subscriptionEndDate=${updated?.subscriptionEndDate?.toISOString()}, subscriptionTokenBalance=${updated?.subscriptionTokenBalance}, subscriptionPlanName=${updated?.subscriptionPlanName}`);
+  const updated = await db.user.findUnique({
+    where: { id: userId },
+    select: {
+      subscriptionEndDate: true,
+      subscriptionTokenBalance: true,
+      subscriptionPlanName: true,
+    },
+  });
+  console.log(
+    `[grantMetaboxSubscription] ✅ After update: subscriptionEndDate=${updated?.subscriptionEndDate?.toISOString()}, subscriptionTokenBalance=${updated?.subscriptionTokenBalance}, subscriptionPlanName=${updated?.subscriptionPlanName}`,
+  );
 
   // Upsert LocalSubscription — serves as the idempotency record for future calls
   await db.localSubscription.upsert({
