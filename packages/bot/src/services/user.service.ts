@@ -53,8 +53,6 @@ export const userService = {
         data: {
           isNew: false,
           subscriptionTokenBalance: { increment: WELCOME_BONUS_TOKENS },
-          subscriptionEndDate: trialEndDate,
-          subscriptionPlanName: "Trial",
         },
       }),
       db.tokenTransaction.create({
@@ -66,5 +64,25 @@ export const userService = {
         },
       }),
     ]);
+
+    // Create Trial subscription in LocalSubscription (source of truth)
+    await db.localSubscription.upsert({
+      where: { userId },
+      create: {
+        userId,
+        planName: "Trial",
+        period: "M1",
+        tokensGranted: WELCOME_BONUS_TOKENS,
+        startDate: new Date(),
+        endDate: trialEndDate,
+        isActive: true,
+      },
+      update: {
+        planName: "Trial",
+        tokensGranted: WELCOME_BONUS_TOKENS,
+        endDate: trialEndDate,
+        isActive: true,
+      },
+    });
   },
 };

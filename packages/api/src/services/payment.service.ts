@@ -152,14 +152,11 @@ export const paymentService = {
         : `Пакет токенов ${productName || productId}`;
 
     if (productType === "subscription") {
-      // Extend from current endDate if subscription is still active, otherwise from now
-      const currentUser = await db.user.findUniqueOrThrow({
-        where: { id: userId },
-        select: { subscriptionEndDate: true },
-      });
+      // Extend from current endDate (from LocalSubscription) if still active, otherwise from now
+      const currentSub = await db.localSubscription.findUnique({ where: { userId } });
       const baseDate =
-        currentUser.subscriptionEndDate && currentUser.subscriptionEndDate > startDate
-          ? currentUser.subscriptionEndDate
+        currentSub && currentSub.isActive && currentSub.endDate > startDate
+          ? currentSub.endDate
           : startDate;
       const endDate = endDateOverride ?? add(baseDate, { months });
 
@@ -168,8 +165,6 @@ export const paymentService = {
           where: { id: userId },
           data: {
             subscriptionTokenBalance: { increment: tokens },
-            subscriptionEndDate: endDate,
-            subscriptionPlanName: productName ?? productId,
           },
         }),
         db.tokenTransaction.create({
@@ -294,28 +289,25 @@ export async function grantMetaboxSubscription(params: {
     }
   }
 
-  const user = await db.user.findUniqueOrThrow({
-    where: { id: userId },
-    select: { subscriptionEndDate: true },
-  });
+  // Read current subscription from LocalSubscription (source of truth for endDate)
+  const currentSub = await db.localSubscription.findUnique({ where: { userId } });
 
   // Extend from current active endDate, otherwise use provided endDate
   const resolvedEndDate =
-    user.subscriptionEndDate && user.subscriptionEndDate > endDate
-      ? user.subscriptionEndDate
+    currentSub && currentSub.isActive && currentSub.endDate > endDate
+      ? currentSub.endDate
       : endDate;
 
   console.log(
-    `[grantMetaboxSubscription] userId=${userId}, tokens=${tokens}, endDate=${endDate.toISOString()}, resolvedEndDate=${resolvedEndDate.toISOString()}, planName=${planName}, currentSubEndDate=${user.subscriptionEndDate?.toISOString() ?? "null"}`,
+    `[grantMetaboxSubscription] userId=${userId}, tokens=${tokens}, endDate=${endDate.toISOString()}, resolvedEndDate=${resolvedEndDate.toISOString()}, planName=${planName}, currentSubEndDate=${currentSub?.endDate?.toISOString() ?? "null"}`,
   );
 
+  // Update User: only subscriptionTokenBalance (no subscriptionEndDate/PlanName)
   await db.$transaction([
     db.user.update({
       where: { id: userId },
       data: {
         subscriptionTokenBalance: { increment: tokens },
-        subscriptionEndDate: resolvedEndDate,
-        ...(planName ? { subscriptionPlanName: planName } : {}),
       },
     }),
     db.tokenTransaction.create({
@@ -329,20 +321,7 @@ export async function grantMetaboxSubscription(params: {
     }),
   ]);
 
-  // Verify the update
-  const updated = await db.user.findUnique({
-    where: { id: userId },
-    select: {
-      subscriptionEndDate: true,
-      subscriptionTokenBalance: true,
-      subscriptionPlanName: true,
-    },
-  });
-  console.log(
-    `[grantMetaboxSubscription] ✅ After update: subscriptionEndDate=${updated?.subscriptionEndDate?.toISOString()}, subscriptionTokenBalance=${updated?.subscriptionTokenBalance}, subscriptionPlanName=${updated?.subscriptionPlanName}`,
-  );
-
-  // Upsert LocalSubscription — serves as the idempotency record for future calls
+  // Upsert LocalSubscription — single source of truth for subscription state
   await db.localSubscription.upsert({
     where: { userId },
     create: {
@@ -364,6 +343,10 @@ export async function grantMetaboxSubscription(params: {
     },
   });
 
+  console.log(
+    `[grantMetaboxSubscription] ✅ Done: endDate=${resolvedEndDate.toISOString()}, planName=${planName}`,
+  );
+
   return true;
 }
 
@@ -376,8 +359,6 @@ export async function expireSubscription(userId: bigint): Promise<void> {
       where: { id: userId },
       data: {
         subscriptionTokenBalance: 0,
-        subscriptionEndDate: null,
-        subscriptionPlanName: null,
       },
     }),
     db.localSubscription.deleteMany({

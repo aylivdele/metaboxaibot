@@ -24,8 +24,6 @@ model User {
   role         Role     @default(USER)
   tokenBalance             Decimal  @default(0)    @db.Decimal(12, 4)
   subscriptionTokenBalance Decimal  @default(0)    @db.Decimal(12, 4)
-  subscriptionEndDate      DateTime?
-  subscriptionPlanName     String?
   isNew        Boolean  @default(true)
   isBlocked    Boolean  @default(false)
   referredById BigInt?

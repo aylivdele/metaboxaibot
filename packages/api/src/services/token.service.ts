@@ -52,14 +52,15 @@ export async function checkBalance(userId: bigint, required: number): Promise<vo
     select: {
       tokenBalance: true,
       subscriptionTokenBalance: true,
-      subscriptionEndDate: true,
       role: true,
     },
   });
   if (user.role === "ADMIN") {
     return;
   }
-  const hasActiveSub = user.subscriptionEndDate && user.subscriptionEndDate > new Date();
+  // Check active subscription from LocalSubscription (single source of truth)
+  const sub = await db.localSubscription.findUnique({ where: { userId } });
+  const hasActiveSub = sub && sub.isActive && sub.endDate > new Date();
   if (!hasActiveSub) throw new Error("NO_SUBSCRIPTION");
   const total = Number(user.subscriptionTokenBalance) + Number(user.tokenBalance);
   if (total < required) throw new Error("INSUFFICIENT_TOKENS");
@@ -72,12 +73,13 @@ export async function checkBalance(userId: bigint, required: number): Promise<vo
 export async function checkSubscription(userId: bigint): Promise<void> {
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { subscriptionEndDate: true, role: true },
+    select: { role: true },
   });
   if (user.role === "ADMIN") {
     return;
   }
-  if (!user.subscriptionEndDate || user.subscriptionEndDate <= new Date()) {
+  const sub = await db.localSubscription.findUnique({ where: { userId } });
+  if (!sub || !sub.isActive || sub.endDate <= new Date()) {
     throw new Error("NO_SUBSCRIPTION");
   }
 }
