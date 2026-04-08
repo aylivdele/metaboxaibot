@@ -9,40 +9,17 @@ import { SUPPORTED_LANGUAGES, getT, config } from "@metabox/shared";
 import type { Language, Translations } from "@metabox/shared";
 import {
   verifyLinkToken,
-  getSubscriptionStatus,
-  grantMetaboxSubscription,
-  markTokensGrantedOnMetabox,
   getPendingTokenGrants,
   markOrderGrantedOnMetabox,
 } from "@metabox/api/services";
 import { logger } from "../logger.js";
 
 /**
- * Sync all pending grants from Metabox for a newly linked/started user:
- *  1. Active subscription not yet credited to the bot
- *  2. Token-pack orders not yet credited to the bot
+ * Sync pending token-pack orders from Metabox for a newly linked/started user.
+ * Note: subscription sync is handled by site via /internal/sync-subscription on connect.
  */
 async function syncMetaboxGrants(userId: bigint): Promise<void> {
-  // 1. Subscription sync
-  const { subscription } = await getSubscriptionStatus(userId);
-  if (
-    subscription &&
-    !subscription.tokensGrantedToBot &&
-    new Date(subscription.endDate) > new Date()
-  ) {
-    const granted = await grantMetaboxSubscription({
-      userId,
-      tokens: subscription.tokensGranted,
-      endDate: new Date(subscription.endDate),
-      planName: subscription.planName,
-      metaboxSubscriptionId: subscription.subscriptionId,
-    });
-    if (granted) {
-      await markTokensGrantedOnMetabox(subscription.subscriptionId);
-    }
-  }
-
-  // 2. Token-pack orders sync
+  // Token-pack orders sync
   const pendingOrders = await getPendingTokenGrants(userId);
   for (const order of pendingOrders) {
     try {

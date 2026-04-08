@@ -55,7 +55,7 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (!user) throw new Error("User not found");
 
-    // Fetch subscription: check local first, then Metabox
+    // Subscription info from local bot DB fields (synced from site on connect)
     let subscription: {
       planName: string;
       period: string;
@@ -64,34 +64,16 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       endDate: string;
     } | null = null;
 
-    // 1. Check local subscription (saved during TG disconnect)
-    const localSub = await db.localSubscription.findUnique({
-      where: { userId },
-    });
-    if (localSub && localSub.isActive && new Date(localSub.endDate) > new Date()) {
-      const daysLeft = Math.max(0, Math.ceil((localSub.endDate.getTime() - Date.now()) / 86400000));
-      const totalDays = Math.max(
-        1,
-        Math.ceil((localSub.endDate.getTime() - localSub.startDate.getTime()) / 86400000),
-      );
+    if (user.subscriptionEndDate && user.subscriptionEndDate > new Date()) {
+      const endDate = user.subscriptionEndDate;
+      const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / 86400000));
       subscription = {
-        planName: localSub.planName,
-        period: localSub.period,
+        planName: user.subscriptionPlanName ?? "Подписка",
+        period: "M1",
         daysLeft,
-        totalDays,
-        endDate: localSub.endDate.toISOString(),
+        totalDays: daysLeft, // approximate — exact startDate not stored on bot
+        endDate: endDate.toISOString(),
       };
-    }
-
-    // 2. If no local, try Metabox
-    if (!subscription) {
-      try {
-        const { getSubscriptionStatus } = await import("../services/metabox-bridge.service.js");
-        const subData = await getSubscriptionStatus(userId);
-        subscription = subData.subscription;
-      } catch {
-        // Non-fatal: subscription info unavailable
-      }
     }
 
     return {
