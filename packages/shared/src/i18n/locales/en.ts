@@ -19,7 +19,7 @@ export default {
     metaboxLinked: "✅ Metabox account linked successfully!",
     metaboxLinkFailed: "❌ Failed to link account. Please try again.",
     accountsMerged:
-      "✅ Accounts merged! Your tokens and subscription have been transferred to your meta-box.ru account.",
+      "✅ Accounts merged! Your tokens and subscription have been transferred to your {siteUrl} account.",
   },
   menu: {
     profile: "👤 Profile",

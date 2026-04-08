@@ -102,10 +102,10 @@ export async function handleStart(ctx: BotContext): Promise<void> {
       });
       await ctx.reply(ctx.t.start.metaboxLinked ?? "✅ Аккаунт Metabox успешно привязан!");
       if (mergedFrom) {
-        await ctx.reply(
-          ctx.t.start.accountsMerged ??
-            "✅ Аккаунты объединены! Ваши токены и подписка перенесены на аккаунт meta-box.ru.",
-        );
+        const siteUrl = config.metabox.apiUrl
+          ? new URL(config.metabox.apiUrl).hostname
+          : "meta-box.ru";
+        await ctx.reply(ctx.t.start.accountsMerged.replace("{siteUrl}", siteUrl));
       }
 
       // Sync subscription and pending token grants from Metabox after linking
