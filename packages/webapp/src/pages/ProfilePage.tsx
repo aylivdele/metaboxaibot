@@ -338,25 +338,27 @@ function GalleryCard({
 
 /* ── Account tab ────────────────────────────────────────────────────────── */
 
-function AccountTab({ profile }: { profile: UserProfile }) {
-  const [data, setData] = useState<{
-    balance: number;
-    totalEarned: number;
-    userStatus: string;
-    referralCode: string | null;
+interface AccountData {
+  balance: number;
+  totalEarned: number;
+  userStatus: string;
+  referralCode: string | null;
+  email: string | null;
+  mentor: {
+    name: string;
     email: string | null;
-    mentor: {
-      name: string;
-      email: string | null;
-      telegramUsername: string | null;
-      telegramPhone: string | null;
-    } | null;
-  } | null>(null);
+    telegramUsername: string | null;
+    telegramPhone: string | null;
+  } | null;
+}
+
+function AccountTab(_props: { profile: UserProfile }) {
+  const [data, setData] = useState<AccountData | null>(null);
 
   useEffect(() => {
     api.profile
       .partnerBalance()
-      .then((d: any) => setData(d))
+      .then((d) => setData(d as unknown as AccountData))
       .catch(() => {});
   }, []);
 
