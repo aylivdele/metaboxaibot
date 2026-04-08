@@ -6,16 +6,17 @@ import { expireSubscription } from "./payment.service.js";
  * subscriptionTokenBalance, and zero them out.
  */
 export async function deactivateExpiredSubscriptions(): Promise<void> {
-  const expired = await db.user.findMany({
+  // Find expired subscriptions from LocalSubscription (single source of truth)
+  const expired = await db.localSubscription.findMany({
     where: {
-      subscriptionEndDate: { lte: new Date() },
-      subscriptionTokenBalance: { gt: 0 },
+      endDate: { lte: new Date() },
+      isActive: true,
     },
-    select: { id: true },
+    select: { userId: true },
   });
 
-  for (const user of expired) {
-    await expireSubscription(user.id);
+  for (const sub of expired) {
+    await expireSubscription(sub.userId);
   }
 }
 

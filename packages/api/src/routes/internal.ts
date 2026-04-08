@@ -112,23 +112,31 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * POST /internal/sync-subscription
    * Mirrors subscription state from Metabox site to bot.
-   * SETS (does not increment) subscription fields directly.
-   * No TokenTransaction created, no LocalSubscription created.
-   * Used when reconnecting site to bot to avoid token doubling.
+   * SETS token balances on User + upserts LocalSubscription.
+   * No TokenTransaction created. Used when reconnecting site to bot.
    */
   fastify.post("/sync-subscription", async (request, reply) => {
     const {
       telegramId,
       subscriptionTokenBalance,
       tokenBalance,
-      subscriptionEndDate,
-      subscriptionPlanName,
+      // LocalSubscription fields
+      endDate,
+      planName,
+      period,
+      startDate,
+      tokensGranted,
+      metaboxSubscriptionId,
     } = request.body as {
       telegramId: string;
       subscriptionTokenBalance?: number;
       tokenBalance?: number;
-      subscriptionEndDate?: string;
-      subscriptionPlanName?: string;
+      endDate?: string;
+      planName?: string;
+      period?: string;
+      startDate?: string;
+      tokensGranted?: number;
+      metaboxSubscriptionId?: string;
     };
 
     if (!telegramId) {
@@ -141,18 +149,67 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send({ error: "User not found" });
     }
 
-    const data: Record<string, unknown> = {};
+    // Update User token balances (SET, not increment)
+    const userData: Record<string, unknown> = {};
     if (subscriptionTokenBalance !== undefined)
-      data.subscriptionTokenBalance = subscriptionTokenBalance;
-    if (tokenBalance !== undefined) data.tokenBalance = tokenBalance;
-    if (subscriptionEndDate) data.subscriptionEndDate = new Date(subscriptionEndDate);
-    if (subscriptionPlanName) data.subscriptionPlanName = subscriptionPlanName;
+      userData.subscriptionTokenBalance = subscriptionTokenBalance;
+    if (tokenBalance !== undefined) userData.tokenBalance = tokenBalance;
 
-    if (Object.keys(data).length > 0) {
-      await db.user.update({ where: { id: userId }, data });
+    if (Object.keys(userData).length > 0) {
+      await db.user.update({ where: { id: userId }, data: userData });
     }
 
-    console.log(`[sync-subscription] userId=${userId}, set:`, data);
+    // Upsert LocalSubscription (single source of truth for subscription state)
+    if (endDate) {
+      const resolvedEndDate = new Date(endDate);
+      await db.localSubscription.upsert({
+        where: { userId },
+        create: {
+          userId,
+          planName: planName ?? "Subscription",
+          period: period ?? "M1",
+          tokensGranted: tokensGranted ?? 0,
+          startDate: startDate ? new Date(startDate) : new Date(),
+          endDate: resolvedEndDate,
+          isActive: resolvedEndDate > new Date(),
+          metaboxSubscriptionId: metaboxSubscriptionId ?? null,
+        },
+        update: {
+          planName: planName ?? "Subscription",
+          ...(period ? { period } : {}),
+          ...(tokensGranted !== undefined ? { tokensGranted } : {}),
+          ...(startDate ? { startDate: new Date(startDate) } : {}),
+          endDate: resolvedEndDate,
+          isActive: resolvedEndDate > new Date(),
+          ...(metaboxSubscriptionId !== undefined ? { metaboxSubscriptionId } : {}),
+        },
+      });
+    }
+
+    console.log(`[sync-subscription] userId=${userId}, user:`, userData, `sub endDate:`, endDate);
+
+    return { ok: true };
+  });
+
+  /**
+   * POST /internal/unlink-subscription
+   * Clears metaboxSubscriptionId on LocalSubscription (used by disconnect "keep in bot").
+   */
+  fastify.post("/unlink-subscription", async (request, reply) => {
+    const { telegramId } = request.body as { telegramId: string };
+    if (!telegramId) {
+      return reply.code(400).send({ error: "telegramId is required" });
+    }
+
+    const userId = BigInt(telegramId);
+    await db.localSubscription
+      .update({
+        where: { userId },
+        data: { metaboxSubscriptionId: null },
+      })
+      .catch(() => {
+        /* no subscription to unlink — that's ok */
+      });
 
     return { ok: true };
   });
@@ -351,6 +408,7 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
           endDate: sub.endDate.toISOString(),
           startDate: sub.startDate.toISOString(),
           daysLeft: Math.max(0, Math.ceil((sub.endDate.getTime() - Date.now()) / 86400000)),
+          metaboxSubscriptionId: sub.metaboxSubscriptionId ?? undefined,
         },
       };
     },

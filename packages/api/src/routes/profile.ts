@@ -55,7 +55,7 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (!user) throw new Error("User not found");
 
-    // Subscription info from local bot DB fields (synced from site on connect)
+    // Subscription info from LocalSubscription (single source of truth)
     let subscription: {
       planName: string;
       period: string;
@@ -64,15 +64,19 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       endDate: string;
     } | null = null;
 
-    if (user.subscriptionEndDate && user.subscriptionEndDate > new Date()) {
-      const endDate = user.subscriptionEndDate;
-      const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / 86400000));
+    const localSub = await db.localSubscription.findUnique({ where: { userId } });
+    if (localSub && localSub.isActive && localSub.endDate > new Date()) {
+      const daysLeft = Math.max(0, Math.ceil((localSub.endDate.getTime() - Date.now()) / 86400000));
+      const totalDays = Math.max(
+        1,
+        Math.ceil((localSub.endDate.getTime() - localSub.startDate.getTime()) / 86400000),
+      );
       subscription = {
-        planName: user.subscriptionPlanName ?? "Подписка",
-        period: "M1",
+        planName: localSub.planName,
+        period: localSub.period,
         daysLeft,
-        totalDays: daysLeft, // approximate — exact startDate not stored on bot
-        endDate: endDate.toISOString(),
+        totalDays,
+        endDate: localSub.endDate.toISOString(),
       };
     }
 
