@@ -28,7 +28,8 @@ export function parseReplicatePredictionFailure(
   status: string,
 ): ReplicatePredictionError {
   const errorStr = String(error ?? "");
-  const codeMatch = errorStr.match(/\bE\d{4}\b/);
+  // Replicate uses E#### (4-digit) codes, but some model errors use shorter codes like E006.
+  const codeMatch = errorStr.match(/\bE\d{3,4}\b/);
   const code = codeMatch ? codeMatch[0] : "E1000";
   return new ReplicatePredictionError(code, `Replicate prediction ${status}: ${errorStr}`);
 }

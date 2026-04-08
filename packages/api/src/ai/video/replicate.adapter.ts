@@ -3,6 +3,7 @@ import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
 import { parseReplicatePredictionFailure } from "../../utils/replicate-error.js";
+import { resolveImageMimeType } from "../../utils/mime-detect.js";
 
 /**
  * Replicate-backed video adapter.
@@ -34,8 +35,20 @@ export class ReplicateVideoAdapter implements VideoAdapter {
     const isSora = this.modelId === "sora";
     const predInput: Record<string, unknown> = { prompt: input.prompt };
 
+    // Download image and pass as Blob — Replicate cannot fetch Telegram/S3 presigned URLs directly.
+    let imageBlob: Blob | undefined;
+    if (input.imageUrl) {
+      const imgRes = await fetch(input.imageUrl);
+      if (imgRes.ok) {
+        const imgBuf = await imgRes.arrayBuffer();
+        const mimeType = resolveImageMimeType(imgBuf, imgRes.headers.get("content-type"));
+        imageBlob = new Blob([imgBuf], { type: mimeType });
+      }
+    }
+
     if (isSora) {
-      if (input.imageUrl) predInput.input_reference = input.imageUrl;
+      if (imageBlob) predInput.input_reference = imageBlob;
+      else if (input.imageUrl) predInput.input_reference = input.imageUrl;
       if (input.duration) predInput.seconds = input.duration;
       // aspect_ratio stored in modelSettings for Sora (portrait/landscape)
       const ar = ms.aspect_ratio as string | undefined;
@@ -43,7 +56,8 @@ export class ReplicateVideoAdapter implements VideoAdapter {
     } else {
       if (ms.negative_prompt) predInput.negative_prompt = ms.negative_prompt;
       if (ms.seed != null) predInput.seed = ms.seed;
-      if (input.imageUrl) predInput.image = input.imageUrl;
+      if (imageBlob) predInput.image = imageBlob;
+      else if (input.imageUrl) predInput.image = input.imageUrl;
       if (input.duration) predInput.duration = input.duration;
       if (input.aspectRatio) predInput.aspect_ratio = input.aspectRatio;
     }

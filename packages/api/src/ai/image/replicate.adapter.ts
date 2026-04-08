@@ -3,6 +3,7 @@ import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
 import { parseReplicatePredictionFailure } from "../../utils/replicate-error.js";
+import { resolveImageMimeType } from "../../utils/mime-detect.js";
 
 /**
  * Models that accept a raw `aspect_ratio` string (e.g. "16:9") instead of
@@ -121,11 +122,24 @@ export class ReplicateAdapter implements ImageAdapter {
           : { aspect_ratio: aspectRatio }
         : this.resolveSize(input);
 
-    const imageParam = input.imageUrl
-      ? IDEOGRAM_MODELS.has(this.modelId)
-        ? { style_reference_images: [input.imageUrl] }
-        : { image: input.imageUrl }
-      : {};
+    // Download image and pass as Blob — Replicate cannot fetch Telegram/S3 presigned URLs directly.
+    let imageParam: Record<string, unknown> = {};
+    if (input.imageUrl) {
+      const imgRes = await fetch(input.imageUrl);
+      if (imgRes.ok) {
+        const imgBuf = await imgRes.arrayBuffer();
+        const mimeType = resolveImageMimeType(imgBuf, imgRes.headers.get("content-type"));
+        const blob = new Blob([imgBuf], { type: mimeType });
+        imageParam = IDEOGRAM_MODELS.has(this.modelId)
+          ? { style_reference_images: [blob] }
+          : { image: blob };
+      } else {
+        // Fall back to URL if download fails (non-critical)
+        imageParam = IDEOGRAM_MODELS.has(this.modelId)
+          ? { style_reference_images: [input.imageUrl] }
+          : { image: input.imageUrl };
+      }
+    }
 
     const predInput = {
       prompt: input.prompt,
