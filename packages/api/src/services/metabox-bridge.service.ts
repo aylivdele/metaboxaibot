@@ -350,6 +350,18 @@ export async function getSubscriptionStatus(telegramId: bigint): Promise<{
   return get(`/internal/subscription-status?telegramId=${telegramId.toString()}`);
 }
 
+/** Get partner balance and referral count from Metabox. */
+export async function getPartnerBalance(telegramId: bigint): Promise<{
+  balance: number;
+  totalEarned: number;
+  totalWithdrawn: number;
+  userStatus: string;
+  referralCode: string | null;
+  referralCount: number;
+}> {
+  return get(`/internal/partner-balance?telegramId=${telegramId.toString()}`);
+}
+
 /** Create a subscription invoice on Metabox for a linked user. */
 export async function createSubscriptionInvoice(params: {
   metaboxUserId: string;
