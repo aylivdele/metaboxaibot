@@ -59,6 +59,30 @@
     "./ai/avatar/heygen": {
       "types": "./src/ai/avatar/heygen.avatar.adapter.ts",
       "default": "./dist/ai/avatar/heygen.avatar.adapter.js"
+    },
+    "./utils/fal-error": {
+      "types": "./src/utils/fal-error.ts",
+      "default": "./dist/utils/fal-error.js"
+    },
+    "./utils/heygen-error": {
+      "types": "./src/utils/heygen-error.ts",
+      "default": "./dist/utils/heygen-error.js"
+    },
+    "./utils/luma-error": {
+      "types": "./src/utils/luma-error.ts",
+      "default": "./dist/utils/luma-error.js"
+    },
+    "./utils/minimax-error": {
+      "types": "./src/utils/minimax-error.ts",
+      "default": "./dist/utils/minimax-error.js"
+    },
+    "./utils/runway-error": {
+      "types": "./src/utils/runway-error.ts",
+      "default": "./dist/utils/runway-error.js"
+    },
+    "./utils/replicate-error": {
+      "types": "./src/utils/replicate-error.ts",
+      "default": "./dist/utils/replicate-error.js"
     }
   },
   "dependencies": {

@@ -1,4 +1,4 @@
-import type { Job } from "bullmq";
+import { UnrecoverableError, type Job } from "bullmq";
 import { Api, InputFile } from "grammy";
 import type { AudioJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
@@ -6,7 +6,9 @@ import { createAudioAdapter } from "@metabox/api/ai/audio";
 import { deductTokens, calculateCost } from "@metabox/api/services";
 import { buildS3Key, uploadBuffer, uploadFromUrl, getFileUrl } from "@metabox/api/services/s3";
 import { logger } from "../logger.js";
-import { config, AI_MODELS } from "@metabox/shared";
+import { config, AI_MODELS, getT } from "@metabox/shared";
+import { notifyTechError } from "../utils/notify-error.js";
+import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
 
 const POLL_INTERVAL_MS = 4000;
 const MAX_POLLS = 90; // 6 minutes max
@@ -129,6 +131,23 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Audio job completed");
   } catch (err) {
+    const userLang = (await db.user
+      .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
+      .then((u) => u?.language ?? "ru")) as Parameters<typeof getT>[0];
+    const t = getT(userLang);
+
+    // Provider-typed user-facing errors (fal content policy, etc.) — no retry
+    const providerMsg = resolveUserFacingMessage(err, t.errors.contentPolicyViolation);
+    if (providerMsg !== null) {
+      logger.warn({ dbJobId, err }, "Audio job rejected: user-facing error");
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "failed", error: providerMsg },
+      });
+      await telegram.sendMessage(telegramChatId, providerMsg).catch(() => void 0);
+      throw new UnrecoverableError(providerMsg);
+    }
+
     logger.error({ dbJobId, err }, "Audio job failed");
 
     const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 1) - 1;
@@ -140,19 +159,33 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
       });
 
       const errMsg = err instanceof Error ? err.message : String(err);
-      let userMessage = "❌ Ошибка при генерации, попробуйте позже или обратитесь в поддержку.";
+
+      let userMessage: string | null = null;
       if (errMsg.includes("SENSITIVE_WORD_ERROR")) {
-        userMessage =
-          "❌ Запрос содержит запрещённый контент (авторские права или ограниченные слова). Измените описание и попробуйте снова.";
+        userMessage = t.errors.audioSensitiveWord;
       } else if (errMsg.includes("GENERATE_AUDIO_FAILED")) {
-        userMessage = "❌ Провайдер не смог сгенерировать аудио. Попробуйте изменить запрос.";
+        userMessage = t.errors.audioGenerateFailed;
       } else if (errMsg.includes("CREATE_TASK_FAILED")) {
-        userMessage = "❌ Не удалось создать задачу генерации. Попробуйте позже.";
+        userMessage = t.errors.audioCreateTaskFailed;
       } else if (errMsg.includes("Timed out")) {
-        userMessage = "❌ Генерация заняла слишком долго. Попробуйте снова.";
+        userMessage = t.errors.generationTimeout;
       }
 
-      await telegram.sendMessage(telegramChatId, userMessage).catch(() => void 0);
+      const isKnownError = userMessage !== null;
+
+      if (!isKnownError) {
+        await notifyTechError(err, {
+          jobId: dbJobId,
+          modelId,
+          section: "audio",
+          userId: userIdStr,
+          attempt: job.attemptsMade,
+        });
+      }
+
+      await telegram
+        .sendMessage(telegramChatId, userMessage ?? t.errors.generationFailed)
+        .catch(() => void 0);
     }
 
     throw err;

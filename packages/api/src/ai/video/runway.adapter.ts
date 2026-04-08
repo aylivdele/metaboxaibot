@@ -1,6 +1,7 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
+import { parseRunwayTaskFailure } from "../../utils/runway-error.js";
 
 const RUNWAY_API = "https://api.dev.runwayml.com/v1";
 
@@ -9,6 +10,7 @@ interface RunwayTask {
   status: string;
   output?: string[];
   failure?: string;
+  failureCode?: string | null;
 }
 
 /**
@@ -95,7 +97,7 @@ export class RunwayAdapter implements VideoAdapter {
     const task = (await res.json()) as RunwayTask;
 
     if (task.status === "FAILED") {
-      throw new Error(`Runway task failed: ${task.failure ?? "unknown"}`);
+      throw parseRunwayTaskFailure(task.failureCode, task.failure);
     }
     if (task.status !== "SUCCEEDED") return null;
 

@@ -2,6 +2,7 @@ import Replicate from "replicate";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
+import { parseReplicatePredictionFailure } from "../../utils/replicate-error.js";
 
 /**
  * Models that accept a raw `aspect_ratio` string (e.g. "16:9") instead of
@@ -165,7 +166,7 @@ export class ReplicateAdapter implements ImageAdapter {
     }
 
     if (prediction.status === "failed" || prediction.status === "canceled") {
-      throw new Error(`Replicate prediction ${prediction.status}: ${prediction.error ?? ""}`);
+      throw parseReplicatePredictionFailure(prediction.error, prediction.status);
     }
 
     return null; // still processing

@@ -174,6 +174,13 @@ export default {
       "❌ The reference image resolution {width}×{height} ({mp} MP) exceeds the Recraft img2img limit of 16 MP.",
     gptImageModerationBlocked:
       "❌ Your request was rejected by the safety system. Violations: {violations}. Please modify your prompt and try again.",
+    audioSensitiveWord:
+      "❌ Your request contains restricted content (copyright or prohibited words). Please modify your description and try again.",
+    audioGenerateFailed:
+      "❌ The provider failed to generate audio. Please try modifying your request.",
+    audioCreateTaskFailed: "❌ Failed to create a generation task. Please try again later.",
+    generationTimeout: "❌ Generation took too long. Please try again.",
+    generationFailed: "❌ Generation failed. Please try again later or contact support.",
   },
   common: {
     backToMain: "🏠 Back to Main Menu",

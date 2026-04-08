@@ -111,9 +111,10 @@ export const config = {
     chatId: opt("ALERT_CHAT_ID"),
     /** message_thread_id for supergroup topics (optional). */
     threadId: optInt("ALERT_THREAD_ID", 0) || undefined,
+    usageThreadId: optInt("USAGE_THREAD_ID", 0) || undefined,
     intervalHours: optFloat("ALERT_INTERVAL_HOURS", 12),
     falThresholdUsd: optFloat("ALERT_FAL_THRESHOLD_USD", 5),
-    elevenlabsThresholdChars: optInt("ALERT_ELEVENLABS_THRESHOLD_CHARS", 50_000),
+    elevenlabsThresholdChars: optInt("ALERT_ELEVENLABS_THRESHOLD_CHARS", 10_000),
   },
 
   /**

@@ -371,7 +371,27 @@ export async function handleDesignRefSelect(ctx: BotContext): Promise<void> {
   await userStateService.setDesignRefMessage(ctx.user.id, messageId);
   await ctx.answerCallbackQuery();
   await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE");
-  await ctx.reply(ctx.t.design.photoSaved);
+
+  const webappUrl = config.bot.webappUrl;
+  const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
+  const managementBtn = webappUrl
+    ? {
+        text: ctx.t.design.management,
+        web_app: { url: `${webappUrl}?page=management&section=design&wtoken=${token}` },
+      }
+    : { text: ctx.t.design.management };
+
+  await ctx.reply(ctx.t.design.photoSaved, {
+    reply_markup: {
+      keyboard: [
+        [{ text: ctx.t.design.chooseModel }],
+        [managementBtn],
+        [{ text: ctx.t.common.backToMain }],
+      ],
+      resize_keyboard: true,
+      is_persistent: true,
+    },
+  });
 }
 
 // ── Management — opens Mini App ───────────────────────────────────────────────

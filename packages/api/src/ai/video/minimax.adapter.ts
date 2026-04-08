@@ -1,6 +1,7 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
+import { parseMinimaxBaseResp } from "../../utils/minimax-error.js";
 
 const MINIMAX_API_BASE = "https://api.minimax.io/v1";
 
@@ -104,9 +105,8 @@ export class MinimaxVideoAdapter implements VideoAdapter {
     }
 
     const data = (await resp.json()) as MinimaxSubmitResponse;
-    if (data.base_resp.status_code !== 0) {
-      throw new Error(`MiniMax API error: ${data.base_resp.status_msg}`);
-    }
+    const submitErr = parseMinimaxBaseResp(data.base_resp);
+    if (submitErr) throw submitErr;
     if (!data.task_id) throw new Error("MiniMax: no task_id in response");
     return data.task_id;
   }
@@ -125,6 +125,8 @@ export class MinimaxVideoAdapter implements VideoAdapter {
     const status = data.status?.toLowerCase();
 
     if (status === "failed" || status === "fail") {
+      const pollErr = parseMinimaxBaseResp(data.base_resp);
+      if (pollErr) throw pollErr;
       throw new Error(`MiniMax generation failed: ${data.error_message ?? "unknown error"}`);
     }
     if (status !== "success") return null;

@@ -1,4 +1,6 @@
+import { UnrecoverableError } from "bullmq";
 import type { Job } from "bullmq";
+import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
 import { Api } from "grammy";
 import type { VideoJobData } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
@@ -11,6 +13,7 @@ import type { InlineKeyboardButton } from "grammy/types";
 import { parseMp4Info } from "@metabox/api/utils/mp4-duration";
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT } from "@metabox/shared";
+import { notifyTechError } from "../utils/notify-error.js";
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_POLLS = 144; // 12 minutes max
@@ -209,6 +212,17 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Video job completed");
   } catch (err) {
+    const userMsg = resolveUserFacingMessage(err, t.errors.contentPolicyViolation);
+    if (userMsg !== null) {
+      logger.warn({ dbJobId, err }, "Video job rejected: user-facing error");
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "failed", error: userMsg },
+      });
+      await telegram.sendMessage(telegramChatId, userMsg).catch(() => void 0);
+      throw new UnrecoverableError(userMsg);
+    }
+
     logger.error({ dbJobId, err }, "Video job failed");
 
     const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 1) - 1;
@@ -219,12 +233,15 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
         data: { status: "failed", error: String(err) },
       });
 
-      await telegram
-        .sendMessage(
-          telegramChatId,
-          "❌ Ошибка при генерации, попробуйте позже или обратитесь в поддержку.",
-        )
-        .catch(() => void 0);
+      await notifyTechError(err, {
+        jobId: dbJobId,
+        modelId,
+        section: "video",
+        userId: userIdStr,
+        attempt: job.attemptsMade,
+      });
+
+      await telegram.sendMessage(telegramChatId, t.errors.generationFailed).catch(() => void 0);
     }
 
     throw err;

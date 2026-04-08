@@ -2,6 +2,7 @@ import Replicate from "replicate";
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
+import { parseReplicatePredictionFailure } from "../../utils/replicate-error.js";
 
 /**
  * Replicate-backed video adapter.
@@ -59,7 +60,7 @@ export class ReplicateVideoAdapter implements VideoAdapter {
     const prediction = await this.client.predictions.get(predictionId);
 
     if (prediction.status === "failed") {
-      throw new Error(`Replicate ${this.modelId} failed: ${String(prediction.error)}`);
+      throw parseReplicatePredictionFailure(prediction.error, prediction.status);
     }
     if (prediction.status !== "succeeded") return null;
 

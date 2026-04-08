@@ -82,7 +82,7 @@ export async function sendUsageReport(): Promise<void> {
   const telegram = new Api(config.bot.token);
   await telegram.sendMessage(chatId, text, {
     parse_mode: "Markdown",
-    message_thread_id: config.alerts.threadId,
+    message_thread_id: config.alerts.usageThreadId,
   });
   logger.info({ models: rows.length, totalSpent }, "Usage report sent");
 }

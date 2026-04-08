@@ -7,6 +7,7 @@ import { getFileUrl } from "@metabox/api/services/s3";
 import { HeyGenAvatarAdapter } from "@metabox/api/ai/avatar/heygen";
 import { logger } from "../logger.js";
 import { config } from "@metabox/shared";
+import { notifyTechError } from "../utils/notify-error.js";
 
 const telegram = new Api(config.bot.token);
 
@@ -64,6 +65,7 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
     } catch (err) {
       logger.error({ userAvatarId, err }, "Avatar creation failed");
       await userAvatarService.updateStatus(userAvatarId, { status: "failed" });
+      await notifyTechError(err, { jobId: userAvatarId, section: "avatar", modelId: provider });
       await telegram
         .sendMessage(telegramChatId, "❌ Не удалось создать аватар. Попробуйте снова.")
         .catch(() => void 0);
@@ -130,6 +132,12 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
       logger.info({ userAvatarId, nextAttempt }, "Avatar still processing, rescheduled");
     } catch (err) {
       logger.error({ userAvatarId, err }, "Avatar poll error");
+      await notifyTechError(err, {
+        jobId: userAvatarId,
+        section: "avatar",
+        modelId: provider,
+        attempt: pollAttempt,
+      });
       // Re-schedule on error (non-fatal) if under limit
       const nextAttempt = pollAttempt + 1;
       if (nextAttempt < MAX_POLL_ATTEMPTS) {

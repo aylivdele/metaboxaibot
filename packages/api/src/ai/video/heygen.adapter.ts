@@ -4,6 +4,7 @@ import { getFileUrl } from "../../services/s3.service.js";
 import { logger } from "../../logger.js";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { transcodeOggToMp3 } from "../../utils/audio-transcode.js";
+import { parseHeyGenErrorBody, parseHeyGenPollFailure } from "../../utils/heygen-error.js";
 
 const HEYGEN_API = "https://api.heygen.com";
 const HEYGEN_UPLOAD = "https://upload.heygen.com";
@@ -216,6 +217,14 @@ export class HeyGenAdapter implements VideoAdapter {
 
     if (!res.ok) {
       const text = await res.text();
+      let json: unknown;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = null;
+      }
+      const structured = parseHeyGenErrorBody(json);
+      if (structured) throw structured;
       throw new Error(`HeyGen /v2/videos submit failed: ${res.status} ${text}`);
     }
 
@@ -242,9 +251,7 @@ export class HeyGenAdapter implements VideoAdapter {
 
     if (!data) throw new Error("HeyGen: empty status response");
     if (data.status === "failed") {
-      throw new Error(
-        `HeyGen video failed: ${data.failure_message ?? data.failure_code ?? data.error ?? "unknown"}`,
-      );
+      throw parseHeyGenPollFailure(data.failure_code, data.failure_message ?? data.error);
     }
     if (data.status !== "completed") return null;
 

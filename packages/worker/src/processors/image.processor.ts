@@ -1,5 +1,6 @@
 import { UnrecoverableError } from "bullmq";
 import type { Job } from "bullmq";
+import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
 import { Api } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
 import type { ImageJobData } from "@metabox/api/queues";
@@ -18,6 +19,7 @@ import { generateDownloadToken } from "@metabox/api/utils/download-token";
 import { InputFile } from "grammy";
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT } from "@metabox/shared";
+import { notifyTechError } from "../utils/notify-error.js";
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLLS = 120; // 6 minutes max
@@ -114,13 +116,16 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       try {
         const res = await fetch(imageResult.url);
         if (res.ok) imageBuffer = Buffer.from(await res.arrayBuffer());
-      } catch {
-        // non-fatal — fall back to URL-only upload below
+      } catch (e) {
+        logger.error({ reason: e }, "Could not fetch image buffer");
       }
 
       const mainKey = buildS3Key("image", userIdStr, dbJobId, resolvedExt);
       s3Key = imageBuffer
-        ? await uploadBuffer(mainKey, imageBuffer, resolvedContentType).catch(() => null)
+        ? await uploadBuffer(mainKey, imageBuffer, resolvedContentType).catch((reason) => {
+            logger.error({ reason }, "Could not upload image buffer");
+            return null;
+          })
         : null;
 
       // Generate and upload thumbnail (WebP 400px) — skipped for SVG
@@ -252,26 +257,15 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Image job completed");
   } catch (err) {
-    // Content policy violation — notify user immediately and skip retries
-    const isContentPolicy =
-      err !== null &&
-      typeof err === "object" &&
-      "body" in err &&
-      Array.isArray((err as { body?: { detail?: unknown[] } }).body?.detail) &&
-      (err as { body: { detail: Array<{ type?: string }> } }).body.detail.some(
-        (d) => d?.type === "content_policy_violation",
-      );
-
-    if (isContentPolicy) {
-      logger.warn({ dbJobId }, "Image job rejected: content policy violation");
+    const userMsg = resolveUserFacingMessage(err, t.errors.contentPolicyViolation);
+    if (userMsg !== null) {
+      logger.warn({ dbJobId, err }, "Image job rejected: user-facing error");
       await db.generationJob.update({
         where: { id: dbJobId },
-        data: { status: "failed", error: "content_policy_violation" },
+        data: { status: "failed", error: userMsg },
       });
-      await telegram
-        .sendMessage(telegramChatId, t.errors.contentPolicyViolation)
-        .catch(() => void 0);
-      throw new UnrecoverableError("content_policy_violation");
+      await telegram.sendMessage(telegramChatId, userMsg).catch(() => void 0);
+      throw new UnrecoverableError(userMsg);
     }
 
     logger.error({ dbJobId, err }, "Image job failed");
@@ -284,12 +278,15 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         data: { status: "failed", error: String(err) },
       });
 
-      await telegram
-        .sendMessage(
-          telegramChatId,
-          "❌ Ошибка при генерации, попробуйте позже или обратитесь в поддержку.",
-        )
-        .catch(() => void 0);
+      await notifyTechError(err, {
+        jobId: dbJobId,
+        modelId,
+        section: "image",
+        userId: userIdStr,
+        attempt: job.attemptsMade,
+      });
+
+      await telegram.sendMessage(telegramChatId, t.errors.generationFailed).catch(() => void 0);
     }
 
     throw err;

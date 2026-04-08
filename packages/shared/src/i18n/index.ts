@@ -137,6 +137,11 @@ export interface Translations {
     recraftImg2imgDimensionsTooLarge: string;
     recraftImg2imgResolutionTooLarge: string;
     gptImageModerationBlocked: string;
+    audioSensitiveWord: string;
+    audioGenerateFailed: string;
+    audioCreateTaskFailed: string;
+    generationTimeout: string;
+    generationFailed: string;
   };
   common: {
     backToMain: string;
