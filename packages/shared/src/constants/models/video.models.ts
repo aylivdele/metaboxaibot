@@ -277,7 +277,17 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     supportedDurations: [6, 8],
     settings: [
       mkAspectRatio(["16:9", "9:16"]),
-      mkDurationSelect([6, 8]),
+      {
+        key: "duration",
+        label: "Длительность",
+        description: "Продолжительность видеоклипа в секундах.",
+        type: "select",
+        options: [
+          { value: 6, label: "6 с", unavailableIf: { key: "resolution", eq: "1080p" } },
+          { value: 8, label: "8 с" },
+        ],
+        default: 6,
+      },
       {
         key: "resolution",
         label: "Разрешение",
@@ -339,7 +349,17 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     supportedDurations: [6, 8],
     settings: [
       mkAspectRatio(["16:9", "9:16"]),
-      mkDurationSelect([6, 8]),
+      {
+        key: "duration",
+        label: "Длительность",
+        description: "Продолжительность видеоклипа в секундах.",
+        type: "select",
+        options: [
+          { value: 6, label: "6 с", unavailableIf: { key: "resolution", eq: "1080p" } },
+          { value: 8, label: "8 с" },
+        ],
+        default: 6,
+      },
       {
         key: "resolution",
         label: "Разрешение",
@@ -915,7 +935,17 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     supportedAspectRatios: ["16:9"],
     supportedDurations: [6, 10],
     settings: [
-      mkDurationSelect([6, 10]),
+      {
+        key: "duration",
+        label: "Длительность",
+        description: "Продолжительность видеоклипа в секундах.",
+        type: "select",
+        options: [
+          { value: 6, label: "6 с" },
+          { value: 10, label: "10 с", unavailableIf: { key: "resolution", eq: "1080P" } },
+        ],
+        default: 6,
+      },
       {
         key: "resolution",
         label: "Разрешение видео",
@@ -924,7 +954,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         type: "select",
         options: [
           { value: "768P", label: "768p" },
-          { value: "1080P", label: "1080p" },
+          { value: "1080P", label: "1080p", unavailableIf: { key: "duration", eq: 10 } },
         ],
         default: "768P",
       },

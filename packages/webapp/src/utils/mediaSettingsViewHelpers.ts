@@ -43,12 +43,21 @@ export function autoCorrectForCostMatrix(
   const changedIndex = dims.indexOf(changedKey);
   const changedStr = String(changedValue);
 
+  // Table keys are always strings, but setting option values can be numbers,
+  // booleans, etc. Coerce each corrected value back to the type of the matching
+  // option so strict equality checks in the UI still work.
+  const coerceToOptionValue = (dimKey: string, raw: string): unknown => {
+    const def = model.settings.find((s) => s.key === dimKey);
+    const match = def?.options?.find((o) => String(o.value) === raw);
+    return match ? match.value : raw;
+  };
+
   for (const tableKey of Object.keys(table)) {
     const parts = tableKey.split("__");
     if (parts[changedIndex] === changedStr) {
       const corrections: Record<string, unknown> = {};
       for (let i = 0; i < dims.length; i++) {
-        if (i !== changedIndex) corrections[dims[i]] = parts[i];
+        if (i !== changedIndex) corrections[dims[i]] = coerceToOptionValue(dims[i], parts[i]);
       }
       return corrections;
     }
