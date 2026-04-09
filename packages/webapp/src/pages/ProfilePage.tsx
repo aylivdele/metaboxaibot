@@ -92,12 +92,53 @@ export function ProfilePage({ initialSection }: { initialSection?: ProfileTab })
   );
 }
 
+/* ── Subscription Countdown ────────────────────────────────────────────────── */
+
+function useCountdown(endDate: string) {
+  const [text, setText] = useState("");
+  const [urgent, setUrgent] = useState(false);
+
+  useEffect(() => {
+    const update = () => {
+      const diff = new Date(endDate).getTime() - Date.now();
+      if (diff <= 0) {
+        setText("Подписка истекла");
+        setUrgent(true);
+        return;
+      }
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+
+      if (days >= 1) {
+        const w = days === 1 ? "день" : days < 5 ? "дня" : "дней";
+        setText(`${days} ${w}`);
+        setUrgent(false);
+      } else if (hours >= 1) {
+        setText(`${hours} ч ${minutes} мин`);
+        setUrgent(true);
+      } else {
+        setText(`${minutes} мин ${seconds} сек`);
+        setUrgent(true);
+      }
+    };
+    update();
+    const diff = new Date(endDate).getTime() - Date.now();
+    const interval = setInterval(update, diff < 86400000 ? 1000 : 60000);
+    return () => clearInterval(interval);
+  }, [endDate]);
+
+  return { text, urgent };
+}
+
 /* ── Overview Tab ──────────────────────────────────────────────────────────── */
 
 function OverviewTab({ profile }: { profile: UserProfile }) {
   const { t } = useI18n();
   const sub = profile.subscription;
   const progressPct = sub ? Math.max(0, Math.min(100, (sub.daysLeft / sub.totalDays) * 100)) : 0;
+  const countdown = useCountdown(sub?.endDate ?? "");
 
   return (
     <>
@@ -116,8 +157,10 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
             <span className="sub-card__period">{sub.period}</span>
           </div>
           <div className="sub-card__days">
-            <span className="sub-card__days-left">
-              {sub.daysLeft} {sub.daysLeft === 1 ? "день" : sub.daysLeft < 5 ? "дня" : "дней"}
+            <span
+              className={`sub-card__days-left${countdown.urgent ? " sub-card__days-left--urgent" : ""}`}
+            >
+              {countdown.text}
             </span>
             <span className="sub-card__end-date">
               до {new Date(sub.endDate).toLocaleDateString("ru-RU")}
