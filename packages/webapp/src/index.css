@@ -593,6 +593,9 @@ textarea::placeholder {
   font-weight: 600;
   color: var(--accent);
 }
+.sub-card__days-left--urgent {
+  color: #ef4444;
+}
 .sub-card__end-date {
   font-size: 12px;
   color: var(--text-hint);
