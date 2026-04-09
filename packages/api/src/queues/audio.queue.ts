@@ -17,6 +17,12 @@ export interface AudioJobData {
   telegramChatId: number;
   /** Per-model user settings (voice, speed, stability, etc.) */
   modelSettings?: Record<string, unknown>;
+  /** Job pipeline stage. `"generate"` (default) submits; `"poll"` checks status. */
+  stage?: "generate" | "poll";
+  /** Epoch ms timestamp when polling started. */
+  pollStartedAt?: number;
+  /** Last poll interval used, so we can detect interval tier changes. */
+  lastIntervalMs?: number;
 }
 
 let _connection: Redis | undefined;

@@ -1,9 +1,11 @@
 import { UnrecoverableError } from "bullmq";
 import type { Job } from "bullmq";
 import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
+import { getIntervalForElapsed } from "../utils/poll-schedule.js";
 import { Api } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
 import type { ImageJobData } from "@metabox/api/queues";
+import { getImageQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createImageAdapter } from "@metabox/api/ai/image";
 import { deductTokens, calculateCost } from "@metabox/api/services";
@@ -21,8 +23,7 @@ import { logger } from "../logger.js";
 import { config, AI_MODELS, getT } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
 
-const POLL_INTERVAL_MS = 3000;
-const MAX_POLLS = 120; // 6 minutes max
+const INITIAL_POLL_INTERVAL_MS = 5000;
 
 const telegram = new Api(config.bot.token);
 
@@ -39,22 +40,20 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     modelSettings,
   } = job.data;
 
-  logger.info({ dbJobId, modelId }, "Processing image job");
+  const stage = job.data.stage ?? "generate";
+
+  logger.info({ dbJobId, modelId, stage }, "Processing image job");
 
   const userLang = (await db.user
     .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
     .then((u) => u?.language ?? "ru")) as Parameters<typeof getT>[0];
   const t = getT(userLang);
-
-  await db.generationJob.update({
-    where: { id: dbJobId },
-    data: { status: "processing" },
-  });
+  const modelMeta = AI_MODELS[modelId];
+  const modelName = modelMeta?.name ?? modelId;
 
   const adapter = createImageAdapter(modelId);
 
   try {
-    // On retry: resume from the furthest completed stage
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
       select: { outputUrl: true, s3Key: true, providerJobId: true },
@@ -62,16 +61,22 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
     let outputUrl: string;
     let s3Key: string | null;
+    let imageResult: Awaited<ReturnType<NonNullable<typeof adapter.poll>>> | null = null;
 
     if (existingJob?.outputUrl) {
-      // Stage 3 already done — skip submit + poll
+      // Stage 3 already done — skip submit + poll (crash-recovery fast path)
       logger.info({ dbJobId }, "Generation already done, skipping to send");
       outputUrl = existingJob.outputUrl;
       s3Key = existingJob.s3Key ?? null;
-    } else {
+    } else if (stage === "generate") {
+      // ── Stage 1: submit ────────────────────────────────────────────────
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "processing" },
+      });
+
       if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
 
-      // Stage 1: submit (or resume with saved providerJobId)
       let providerJobId: string;
       if (existingJob?.providerJobId) {
         providerJobId = existingJob.providerJobId;
@@ -84,25 +89,71 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
           aspectRatio,
           modelSettings,
         });
-        // Persist providerJobId immediately so poll can resume if worker restarts
         await db.generationJob.update({
           where: { id: dbJobId },
           data: { providerJobId },
         });
       }
 
-      // Stage 2: poll
-      let imageResult = null;
-      for (let i = 0; i < MAX_POLLS; i++) {
-        await sleep(POLL_INTERVAL_MS);
-        imageResult = await adapter.poll!(providerJobId);
-        if (imageResult) break;
-      }
+      // Schedule the first poll job and exit. The current job is now done.
+      await getImageQueue().add(
+        "poll",
+        {
+          ...job.data,
+          stage: "poll",
+          pollStartedAt: Date.now(),
+          lastIntervalMs: INITIAL_POLL_INTERVAL_MS,
+        },
+        { delay: INITIAL_POLL_INTERVAL_MS, attempts: 1, removeOnComplete: true },
+      );
+      logger.info({ dbJobId, providerJobId }, "Image poll scheduled");
+      return;
+    } else {
+      // ── Stage 2: poll ──────────────────────────────────────────────────
+      const providerJobId = existingJob?.providerJobId;
+      if (!providerJobId) throw new Error(`Image poll stage without providerJobId: ${dbJobId}`);
+      if (!adapter.poll) throw new Error(`Adapter ${modelId} has no poll()`);
+
+      imageResult = await adapter.poll(providerJobId);
 
       if (!imageResult) {
-        throw new Error(`Timed out waiting for ${modelId} job ${providerJobId}`);
+        // Not done yet — schedule the next poll with tiered interval.
+        const elapsed = Date.now() - (job.data.pollStartedAt ?? Date.now());
+        const interval = getIntervalForElapsed(elapsed);
+
+        if (interval === null) {
+          // 24 h hard cap — cancel and notify.
+          await db.generationJob.update({
+            where: { id: dbJobId },
+            data: { status: "failed", error: "poll timeout (24h)" },
+          });
+          await telegram
+            .sendMessage(
+              telegramChatId,
+              t.errors.generationTimedOut24h.replace("{modelName}", modelName),
+            )
+            .catch(() => void 0);
+          throw new UnrecoverableError("poll timeout 24h");
+        }
+
+        if (job.data.lastIntervalMs !== undefined && interval !== job.data.lastIntervalMs) {
+          await telegram
+            .sendMessage(
+              telegramChatId,
+              t.errors.generationStillRunning.replace("{modelName}", modelName),
+            )
+            .catch(() => void 0);
+        }
+
+        await getImageQueue().add(
+          "poll",
+          { ...job.data, stage: "poll", lastIntervalMs: interval },
+          { delay: interval, attempts: 1, removeOnComplete: true },
+        );
+        return;
       }
 
+      // imageResult present → fall through to finalize.
       const isSvg = imageResult.filename?.endsWith(".svg") ?? false;
       const resolvedContentType = isSvg
         ? "image/svg+xml"
@@ -111,7 +162,6 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         ? "svg"
         : (resolvedContentType.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg");
 
-      // Download into buffer so we can generate a thumbnail alongside the original
       let imageBuffer: Buffer | null = null;
       try {
         const res = await fetch(imageResult.url);
@@ -128,7 +178,6 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
           })
         : null;
 
-      // Generate and upload thumbnail (WebP 400px) — skipped for SVG
       let thumbnailS3Key: string | null = null;
       if (imageBuffer && s3Key) {
         const thumbBuf = await generateThumbnail(imageBuffer, resolvedContentType);
@@ -162,16 +211,15 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       }
     }
 
+    // ── Stage 3: send to user ────────────────────────────────────────────
     const retryExt = s3Key?.split(".").pop() ?? "png";
-    const imageResult = {
+    const finalImageResult = {
       url: outputUrl,
       filename: `${dbJobId}.${retryExt}`,
       contentType: `image/${retryExt}`,
     };
     const model = AI_MODELS[modelId];
 
-    // Save messages to dialog and get assistantMessageId for Refine button
-    // (only on first attempt — skip if messages already exist for this job)
     let assistantMessageId: string | undefined;
     if (dialogId) {
       const existingMsg = await db.message.findFirst({
@@ -198,7 +246,6 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       }
     }
 
-    // Build inline keyboard: optional Refine row + optional Download row
     const refineRow =
       model?.supportsImages && assistantMessageId
         ? [{ text: "🔄 Доработать", callback_data: `design_ref_${assistantMessageId}` }]
@@ -215,21 +262,16 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     const rows = [refineRow, downloadRow].filter(Boolean) as InlineKeyboardButton[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
-    // Prefer S3 URL (always accessible by Telegram); fall back to downloading
-    // the provider URL as a buffer (some providers like fal.media block Telegram's fetcher).
     const { source: tgImageSource, byteSize } = await resolveTelegramSource(
       s3Key,
-      imageResult.url,
-      imageResult.filename ?? "image.png",
+      finalImageResult.url,
+      finalImageResult.filename ?? "image.png",
     );
 
-    // Telegram limits differ for URL vs uploaded buffer.
-    // When source is a URL (byteSize known via HEAD), use URL limits: 5 MB photo, 20 MB document.
-    // When source is a buffer (InputFile), limits are 10 MB photo, 50 MB document.
     const isUrl = typeof tgImageSource === "string";
     const PHOTO_MAX_BYTES = isUrl ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
     const DOCUMENT_MAX_BYTES = isUrl ? 20 * 1024 * 1024 : 50 * 1024 * 1024;
-    const isSvg = imageResult.filename?.endsWith("svg") ?? false;
+    const isSvg = finalImageResult.filename?.endsWith("svg") ?? false;
     const useDocument = isSvg || byteSize > PHOTO_MAX_BYTES;
     const tooLargeForTelegram = byteSize > DOCUMENT_MAX_BYTES;
 
@@ -237,7 +279,6 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     slicedPrompt = slicedPrompt.concat(slicedPrompt.length < 200 ? "" : "...");
 
     if (tooLargeForTelegram) {
-      // File exceeds Telegram's document limit — send a download link instead
       await telegram.sendMessage(
         telegramChatId,
         `✅ ${modelId}: ${slicedPrompt}\n\n${t.errors.fileTooLargeForTelegram}`,
@@ -293,10 +334,6 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
   }
 }
 
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 /**
  * Returns the best source to send to Telegram:
  * 1. S3 public/presigned URL if available (always reachable by Telegram).
@@ -308,8 +345,6 @@ async function resolveTelegramSource(
   providerUrl: string,
   filename: string,
 ): Promise<{ source: string | InstanceType<typeof InputFile>; byteSize: number }> {
-  // Prefer S3 URL (public) — Telegram can fetch without buffering.
-  // HEAD request to get actual byte size so size-based routing (photo vs document) works correctly.
   if (s3Key) {
     const s3Url = await getFileUrl(s3Key).catch(() => null);
     if (s3Url) {
@@ -321,10 +356,8 @@ async function resolveTelegramSource(
           return { source: s3Url, byteSize };
         }
       }
-      // HEAD missing or no Content-Length — fall through to download for exact size
     }
   }
-  // Download the image ourselves and send as a buffer
   const res = await fetch(providerUrl);
   if (!res.ok) throw new Error(`Failed to fetch image from provider: ${res.status}`);
   const buffer = Buffer.from(await res.arrayBuffer());

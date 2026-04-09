@@ -146,6 +146,8 @@ export interface Translations {
     audioCreateTaskFailed: string;
     generationTimeout: string;
     generationFailed: string;
+    generationStillRunning: string;
+    generationTimedOut24h: string;
     // HeyGen
     heygenBlockedWords: string;
     heygenNsfw: string;

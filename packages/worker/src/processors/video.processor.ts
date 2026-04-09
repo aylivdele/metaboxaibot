@@ -1,8 +1,10 @@
 import { UnrecoverableError } from "bullmq";
 import type { Job } from "bullmq";
 import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
+import { getIntervalForElapsed } from "../utils/poll-schedule.js";
 import { Api } from "grammy";
 import type { VideoJobData } from "@metabox/api/queues";
+import { getVideoQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createVideoAdapter } from "@metabox/api/ai/video";
 import { deductTokens, calculateCost, computeVideoTokens } from "@metabox/api/services";
@@ -15,8 +17,7 @@ import { logger } from "../logger.js";
 import { config, AI_MODELS, getT } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
 
-const POLL_INTERVAL_MS = 5000;
-const MAX_POLLS = 144; // 12 minutes max
+const INITIAL_POLL_INTERVAL_MS = 5000;
 
 const telegram = new Api(config.bot.token);
 
@@ -34,22 +35,20 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     modelSettings,
   } = job.data;
 
-  logger.info({ dbJobId, modelId }, "Processing video job");
+  const stage = job.data.stage ?? "generate";
+
+  logger.info({ dbJobId, modelId, stage }, "Processing video job");
 
   const userLang = (await db.user
     .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
     .then((u) => u?.language ?? "ru")) as Parameters<typeof getT>[0];
   const t = getT(userLang);
-
-  await db.generationJob.update({
-    where: { id: dbJobId },
-    data: { status: "processing" },
-  });
+  const modelMeta = AI_MODELS[modelId];
+  const modelName = modelMeta?.name ?? modelId;
 
   const adapter = createVideoAdapter(modelId);
 
   try {
-    // On retry: resume from the furthest completed stage
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
       select: { outputUrl: true, s3Key: true, providerJobId: true },
@@ -58,14 +57,19 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     let outputUrl: string;
     let s3Key: string | null;
     let videoBuffer: Buffer | null = null;
+    let videoResult: Awaited<ReturnType<typeof adapter.poll>> | null = null;
 
     if (existingJob?.outputUrl) {
-      // Stage 3 already done — skip submit + poll
       logger.info({ dbJobId }, "Generation already done, skipping to send");
       outputUrl = existingJob.outputUrl;
       s3Key = existingJob.s3Key ?? null;
-    } else {
-      // Stage 1: submit (or resume with saved providerJobId)
+    } else if (stage === "generate") {
+      // ── Stage 1: submit ────────────────────────────────────────────────
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "processing" },
+      });
+
       let providerJobId: string;
       if (existingJob?.providerJobId) {
         providerJobId = existingJob.providerJobId;
@@ -80,29 +84,69 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
           userId: BigInt(userIdStr),
         });
         logger.info({ dbJobId, modelId, providerJobId }, "Submitted video generation task");
-        // Persist providerJobId immediately so poll can resume if worker restarts
         await db.generationJob.update({
           where: { id: dbJobId },
           data: { providerJobId },
         });
       }
 
-      // Stage 2: poll
-      let videoResult = null;
-      for (let i = 0; i < MAX_POLLS; i++) {
-        await sleep(POLL_INTERVAL_MS);
-        videoResult = await adapter.poll(providerJobId);
-        if (videoResult) break;
-      }
+      await getVideoQueue().add(
+        "poll",
+        {
+          ...job.data,
+          stage: "poll",
+          pollStartedAt: Date.now(),
+          lastIntervalMs: INITIAL_POLL_INTERVAL_MS,
+        },
+        { delay: INITIAL_POLL_INTERVAL_MS, attempts: 1, removeOnComplete: true },
+      );
+      logger.info({ dbJobId, providerJobId }, "Video poll scheduled");
+      return;
+    } else {
+      // ── Stage 2: poll ──────────────────────────────────────────────────
+      const providerJobId = existingJob?.providerJobId;
+      if (!providerJobId) throw new Error(`Video poll stage without providerJobId: ${dbJobId}`);
+
+      videoResult = await adapter.poll(providerJobId);
 
       if (!videoResult) {
-        throw new Error(`Timed out waiting for ${modelId} job ${providerJobId}`);
+        const elapsed = Date.now() - (job.data.pollStartedAt ?? Date.now());
+        const interval = getIntervalForElapsed(elapsed);
+
+        if (interval === null) {
+          await db.generationJob.update({
+            where: { id: dbJobId },
+            data: { status: "failed", error: "poll timeout (24h)" },
+          });
+          await telegram
+            .sendMessage(
+              telegramChatId,
+              t.errors.generationTimedOut24h.replace("{modelName}", modelName),
+            )
+            .catch(() => void 0);
+          throw new UnrecoverableError("poll timeout 24h");
+        }
+
+        if (job.data.lastIntervalMs !== undefined && interval !== job.data.lastIntervalMs) {
+          await telegram
+            .sendMessage(
+              telegramChatId,
+              t.errors.generationStillRunning.replace("{modelName}", modelName),
+            )
+            .catch(() => void 0);
+        }
+
+        await getVideoQueue().add(
+          "poll",
+          { ...job.data, stage: "poll", lastIntervalMs: interval },
+          { delay: interval, attempts: 1, removeOnComplete: true },
+        );
+        return;
       }
 
+      // videoResult present → finalize inline.
       const { ext, contentType } = sectionMeta("video");
 
-      // Fetch video to buffer — needed for S3 upload, duration and resolution detection.
-      // Use adapter.fetchBuffer when available (e.g. Veo URLs require auth).
       let actualDuration: number | null = null;
       let actualWidth: number | null = null;
       let actualHeight: number | null = null;
@@ -122,7 +166,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
         actualHeight = info.height;
         actualFps = info.fps;
       } catch {
-        // non-fatal: fall back to estimated duration/resolution/fps
+        // non-fatal
       }
 
       s3Key = videoBuffer
@@ -161,6 +205,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       }
     }
 
+    // ── Stage 3: send to user ────────────────────────────────────────────
     const origRow: InlineKeyboardButton[] | null = sendOriginalLabel
       ? [{ text: sendOriginalLabel, callback_data: `orig_${dbJobId}` }]
       : null;
@@ -176,10 +221,8 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     const rows = [downloadRow, origRow].filter(Boolean) as InlineKeyboardButton[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
-    // Prefer already-downloaded buffer, then S3 URL, then download fresh from provider URL
     const tgVideoSource = await resolveTelegramVideoSource(s3Key, outputUrl, videoBuffer);
 
-    // Determine actual byte size: buffer is exact; for S3 URL do a HEAD request.
     let videoByteSize = videoBuffer?.byteLength;
     if (!videoByteSize && typeof tgVideoSource === "string") {
       const head = await fetch(tgVideoSource, { method: "HEAD" }).catch(() => null);
@@ -188,7 +231,6 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       }
     }
 
-    // Telegram limits: 20 MB via URL, 50 MB via buffer upload
     const isUrl = typeof tgVideoSource === "string";
     const VIDEO_MAX_BYTES = isUrl ? 20 * 1024 * 1024 : 50 * 1024 * 1024;
     const tooLargeForTelegram = (videoByteSize || Number.MAX_SAFE_INTEGER) > VIDEO_MAX_BYTES;
@@ -197,7 +239,6 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     const model = AI_MODELS[modelId];
 
     if (tooLargeForTelegram && downloadRow) {
-      // File exceeds Telegram's video limit — send a download link instead
       await telegram.sendMessage(
         telegramChatId,
         `✅ ${model.name ?? modelId}: ${slicedPrompt}\n\n${t.errors.fileTooLargeForTelegram}`,
@@ -248,16 +289,11 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
   }
 }
 
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 async function resolveTelegramVideoSource(
   s3Key: string | null,
   providerUrl: string,
   cachedBuffer: Buffer | null,
 ): Promise<string | InstanceType<typeof InputFile>> {
-  // Prefer S3 URL (public or presigned) — Telegram can fetch both without buffering
   if (s3Key) {
     const s3Url = await getFileUrl(s3Key).catch(() => null);
     if (s3Url) return s3Url;

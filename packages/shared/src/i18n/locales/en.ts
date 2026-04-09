@@ -185,6 +185,9 @@ export default {
     audioCreateTaskFailed: "❌ Failed to create a generation task. Please try again later.",
     generationTimeout: "❌ Generation took too long. Please try again.",
     generationFailed: "❌ Generation failed. Please try again later or contact support.",
+    generationStillRunning: "{modelName}\nStill generating, please wait...",
+    generationTimedOut24h:
+      "❌ {modelName}: generation did not finish within 24 hours and was cancelled. Please try again.",
     // HeyGen
     heygenBlockedWords:
       "❌ Your request contains prohibited words or content. Please edit your text and try again.",

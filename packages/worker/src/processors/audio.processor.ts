@@ -1,6 +1,7 @@
 import { UnrecoverableError, type Job } from "bullmq";
 import { Api, InputFile } from "grammy";
 import type { AudioJobData } from "@metabox/api/queues";
+import { getAudioQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createAudioAdapter } from "@metabox/api/ai/audio";
 import { deductTokens, calculateCost } from "@metabox/api/services";
@@ -9,9 +10,9 @@ import { logger } from "../logger.js";
 import { config, AI_MODELS, getT } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
 import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
+import { getIntervalForElapsed } from "../utils/poll-schedule.js";
 
-const POLL_INTERVAL_MS = 4000;
-const MAX_POLLS = 90; // 6 minutes max
+const INITIAL_POLL_INTERVAL_MS = 5000;
 
 const telegram = new Api(config.bot.token);
 
@@ -43,28 +44,31 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
     modelSettings,
   } = job.data;
 
-  logger.info({ dbJobId, modelId }, "Processing audio job");
+  const stage = job.data.stage ?? "generate";
 
-  await db.generationJob.update({
-    where: { id: dbJobId },
-    data: { status: "processing" },
-  });
+  logger.info({ dbJobId, modelId, stage }, "Processing audio job");
+
+  const userLang = (await db.user
+    .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
+    .then((u) => u?.language ?? "ru")) as Parameters<typeof getT>[0];
+  const t = getT(userLang);
+  const modelMeta = AI_MODELS[modelId];
+  const modelName = modelMeta?.name ?? modelId;
 
   const adapter = createAudioAdapter(modelId);
 
   try {
-    // On retry: if generation already completed, skip submit/poll
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
-      select: { outputUrl: true, s3Key: true },
+      select: { outputUrl: true, s3Key: true, providerJobId: true },
     });
 
-    let audioResult: { buffer?: Buffer; url?: string; ext: string; contentType: string };
-    let s3Key: string | null;
+    let audioResult: { buffer?: Buffer; url?: string; ext: string; contentType: string } | null =
+      null;
+    let s3Key: string | null = null;
 
     if (existingJob?.outputUrl || existingJob?.s3Key) {
       logger.info({ dbJobId }, "Generation already done, skipping to send");
-      // Reconstruct a minimal audioResult to pass to sendAudio
       const ext = existingJob.s3Key?.split(".").pop() ?? "mp3";
       const resolvedUrl = existingJob.s3Key
         ? ((await getFileUrl(existingJob.s3Key).catch(() => null)) ??
@@ -73,31 +77,105 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
         : (existingJob.outputUrl ?? undefined);
       audioResult = { url: resolvedUrl, ext, contentType: `audio/${ext}` };
       s3Key = existingJob.s3Key ?? null;
-    } else {
+    } else if (stage === "generate") {
+      // ── Stage 1: submit (or sync-generate) ────────────────────────────
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "processing" },
+      });
+
       if (!adapter.isAsync && adapter.generate) {
-        // Sync adapter (should not normally end up in queue, but handle gracefully)
-        audioResult = await adapter.generate({ prompt, voiceId, sourceAudioUrl, modelSettings });
-      } else {
-        // Async adapter (Suno)
-        if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
-        const providerJobId = await adapter.submit({
+        // Sync adapter — generate inline, then fall through to finalize.
+        audioResult = await adapter.generate({
           prompt,
           voiceId,
           sourceAudioUrl,
           modelSettings,
         });
+      } else {
+        // Async adapter (Suno) — submit then schedule poll.
+        if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
 
-        let polled = null;
-        for (let i = 0; i < MAX_POLLS; i++) {
-          await sleep(POLL_INTERVAL_MS);
-          polled = await adapter.poll!(providerJobId);
-          if (polled) break;
+        let providerJobId: string;
+        if (existingJob?.providerJobId) {
+          providerJobId = existingJob.providerJobId;
+          logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
+        } else {
+          providerJobId = await adapter.submit({
+            prompt,
+            voiceId,
+            sourceAudioUrl,
+            modelSettings,
+          });
+          await db.generationJob.update({
+            where: { id: dbJobId },
+            data: { providerJobId },
+          });
         }
 
-        if (!polled) throw new Error(`Timed out waiting for ${modelId} job ${providerJobId}`);
-        audioResult = polled;
+        await getAudioQueue().add(
+          "poll",
+          {
+            ...job.data,
+            stage: "poll",
+            pollStartedAt: Date.now(),
+            lastIntervalMs: INITIAL_POLL_INTERVAL_MS,
+          },
+          { delay: INITIAL_POLL_INTERVAL_MS, attempts: 1, removeOnComplete: true },
+        );
+        logger.info({ dbJobId, providerJobId }, "Audio poll scheduled");
+        return;
       }
+    } else {
+      // ── Stage 2: poll ──────────────────────────────────────────────────
+      const providerJobId = existingJob?.providerJobId;
+      if (!providerJobId) throw new Error(`Audio poll stage without providerJobId: ${dbJobId}`);
+      if (!adapter.poll) throw new Error(`Adapter ${modelId} has no poll()`);
 
+      audioResult = await adapter.poll(providerJobId);
+
+      if (!audioResult) {
+        const elapsed = Date.now() - (job.data.pollStartedAt ?? Date.now());
+        const interval = getIntervalForElapsed(elapsed);
+
+        if (interval === null) {
+          await db.generationJob.update({
+            where: { id: dbJobId },
+            data: { status: "failed", error: "poll timeout (24h)" },
+          });
+          await telegram
+            .sendMessage(
+              telegramChatId,
+              t.errors.generationTimedOut24h.replace("{modelName}", modelName),
+            )
+            .catch(() => void 0);
+          throw new UnrecoverableError("poll timeout 24h");
+        }
+
+        if (job.data.lastIntervalMs !== undefined && interval !== job.data.lastIntervalMs) {
+          await telegram
+            .sendMessage(
+              telegramChatId,
+              t.errors.generationStillRunning.replace("{modelName}", modelName),
+            )
+            .catch(() => void 0);
+        }
+
+        await getAudioQueue().add(
+          "poll",
+          { ...job.data, stage: "poll", lastIntervalMs: interval },
+          { delay: interval, attempts: 1, removeOnComplete: true },
+        );
+        return;
+      }
+    }
+
+    if (!audioResult) {
+      throw new Error(`Audio job ${dbJobId}: no result after stage ${stage}`);
+    }
+
+    // ── Stage 3: upload + deduct (when not already persisted) ───────────
+    if (!(existingJob?.outputUrl || existingJob?.s3Key)) {
       const audioKey = buildS3Key("audio", userIdStr, dbJobId, audioResult.ext ?? "mp3");
       s3Key = await (
         audioResult.buffer
@@ -131,12 +209,6 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Audio job completed");
   } catch (err) {
-    const userLang = (await db.user
-      .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
-      .then((u) => u?.language ?? "ru")) as Parameters<typeof getT>[0];
-    const t = getT(userLang);
-
-    // Provider-typed user-facing errors (fal content policy, etc.) — no retry
     const providerMsg = resolveUserFacingMessage(err, t);
     if (providerMsg !== null) {
       logger.warn({ dbJobId, err }, "Audio job rejected: user-facing error");
@@ -190,8 +262,4 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
 
     throw err;
   }
-}
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
 }
