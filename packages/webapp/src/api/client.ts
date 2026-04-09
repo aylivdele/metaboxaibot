@@ -278,6 +278,7 @@ export const api = {
       }),
     delete: (id: string) =>
       request<{ success: boolean }>(`/user-voices/${id}`, { method: "DELETE" }),
+    previewUrl: (id: string) => request<{ url: string }>(`/user-voices/${id}/preview-url`),
   },
 
   userAvatars: {

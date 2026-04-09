@@ -2,6 +2,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
 import { config } from "@metabox/shared";
+import { getFileUrl } from "../services/s3.service.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
@@ -22,10 +23,35 @@ export const userVoicesRoutes: FastifyPluginAsync = async (fastify) => {
       name: v.name,
       externalId: v.externalId,
       previewUrl: v.previewUrl,
+      hasAudio: v.previewUrl !== null || v.audioS3Key !== null,
       status: v.status,
       createdAt: v.createdAt.toISOString(),
     }));
   });
+
+  /**
+   * GET /user-voices/:id/preview-url — resolve a playable URL on demand.
+   * Prefers ElevenLabs-hosted preview; otherwise mints a fresh presigned URL
+   * for the original recording in S3 (no public bucket).
+   */
+  fastify.get<{ Params: { id: string } }>(
+    "/user-voices/:id/preview-url",
+    async (request, reply) => {
+      const { userId } = request as AuthRequest;
+      const { id } = request.params;
+      const voice = await db.userVoice.findFirst({
+        where: { id, userId },
+        select: { previewUrl: true, audioS3Key: true },
+      });
+      if (!voice) return reply.status(404).send({ error: "Voice not found" });
+      if (voice.previewUrl) return { url: voice.previewUrl };
+      if (voice.audioS3Key) {
+        const url = await getFileUrl(voice.audioS3Key).catch(() => null);
+        if (url) return { url };
+      }
+      return reply.status(404).send({ error: "No preview available" });
+    },
+  );
 
   /** PATCH /user-voices/:id — rename */
   fastify.patch<{ Params: { id: string }; Body: { name: string } }>(
@@ -49,6 +75,7 @@ export const userVoicesRoutes: FastifyPluginAsync = async (fastify) => {
         name: updated.name,
         externalId: updated.externalId,
         previewUrl: updated.previewUrl,
+        hasAudio: updated.previewUrl !== null || updated.audioS3Key !== null,
         status: updated.status,
         createdAt: updated.createdAt.toISOString(),
       };

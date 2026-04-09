@@ -252,7 +252,9 @@ export function createBot(token: string): Bot<BotContext> {
     }
     if (state?.state === "HEYGEN_AVATAR_PHOTO") {
       if (ctx.message?.photo) return handleAvatarPhotoCapture(ctx);
-      return; // ignore non-photo messages while waiting for avatar photo
+      if (ctx.message?.document?.mime_type?.startsWith("image/"))
+        return handleAvatarPhotoCapture(ctx);
+      return; // ignore non-image messages while waiting for avatar photo
     }
     if (state?.state === "AUDIO_ACTIVE") {
       if (state.audioModelId === "voice-clone") {

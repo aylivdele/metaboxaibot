@@ -20,6 +20,7 @@ import {
   AI_MODELS,
   config,
   resolveModelDisplay,
+  generateWebToken,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -471,10 +472,20 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
 // ── HEYGEN_AVATAR_PHOTO state: capture photo and synchronously upload as HeyGen asset ──
 
 export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
-  if (!ctx.user || !ctx.message?.photo) return;
+  if (!ctx.user) return;
 
-  const photo = ctx.message.photo.at(-1)!;
-  const file = await ctx.api.getFile(photo.file_id);
+  // Accept either a compressed photo or an image-document upload.
+  let fileId: string | undefined;
+  let mimeHint: string | undefined;
+  if (ctx.message?.photo) {
+    fileId = ctx.message.photo.at(-1)?.file_id;
+  } else if (ctx.message?.document?.mime_type?.startsWith("image/")) {
+    fileId = ctx.message.document.file_id;
+    mimeHint = ctx.message.document.mime_type;
+  }
+  if (!fileId) return;
+
+  const file = await ctx.api.getFile(fileId);
   const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
 
   const userId = ctx.user.id;
@@ -483,16 +494,15 @@ export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
   const imgRes = await fetch(tgUrl);
   if (!imgRes.ok) throw new Error(`Failed to fetch avatar photo from Telegram: ${imgRes.status}`);
   const imageBuffer = Buffer.from(await imgRes.arrayBuffer());
+  const contentType = mimeHint ?? imgRes.headers.get("content-type") ?? "image/jpeg";
 
   // Upload directly to HeyGen asset storage — synchronous, no worker needed
   const adapter = new HeyGenAvatarAdapter();
-  const { externalId } = await adapter.create(imageBuffer, "image/jpeg");
+  const { externalId } = await adapter.create(imageBuffer, contentType);
 
   // Generate thumbnail and upload to S3 — store S3 key, not presigned URL
   let previewUrl: string | undefined;
-  const thumbBuffer = await s3Service
-    .generateThumbnail(imageBuffer, "image/jpeg")
-    .catch(() => null);
+  const thumbBuffer = await s3Service.generateThumbnail(imageBuffer, contentType).catch(() => null);
   if (thumbBuffer) {
     const thumbKey = `avatar_photo/${userId.toString()}/${file.file_id}_thumb.webp`;
     const uploadedThumbKey = await s3Service
@@ -512,8 +522,38 @@ export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
     previewUrl,
   });
 
-  await userStateService.setState(userId, "VIDEO_ACTIVE", "video");
-  await ctx.reply(ctx.t.video.avatarReady);
+  // Send the section reply keyboard so the user can immediately interact.
+  const webappUrl = config.bot.webappUrl;
+  const token = webappUrl ? generateWebToken(userId, config.bot.token) : "";
+  const managementBtn = webappUrl
+    ? {
+        text: ctx.t.video.management,
+        web_app: { url: `${webappUrl}?page=management&section=video&wtoken=${token}` },
+      }
+    : { text: ctx.t.video.management };
+
+  await ctx.reply(ctx.t.video.avatarReady, {
+    reply_markup: {
+      keyboard: [
+        [{ text: ctx.t.video.newDialog }],
+        [{ text: ctx.t.video.avatars }, { text: ctx.t.video.lipSync }],
+        [managementBtn],
+        [{ text: ctx.t.common.backToMain }],
+      ],
+      resize_keyboard: true,
+      is_persistent: true,
+    },
+  });
+
+  // Auto-activate HeyGen so the user can immediately submit a prompt.
+  // If HeyGen is already the active model, just switch state to VIDEO_ACTIVE
+  // without re-sending the model intro + hint.
+  const currentState = await userStateService.get(userId);
+  if (currentState?.videoModelId === "heygen") {
+    await userStateService.setState(userId, "VIDEO_ACTIVE", "video");
+  } else {
+    await activateVideoModel(ctx, "heygen");
+  }
 }
 
 export async function handleHeygenAvatarCancel(ctx: BotContext): Promise<void> {

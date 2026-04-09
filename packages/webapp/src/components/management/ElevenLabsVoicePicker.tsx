@@ -57,6 +57,20 @@ export function ElevenLabsVoicePicker({ voiceId, onChange }: ElevenLabsVoicePick
     audio.onended = () => setPlayingId(null);
   };
 
+  const toggleMyVoicePreview = async (e: React.MouseEvent, voice: UserVoice) => {
+    e.stopPropagation();
+    if (playingId === voice.id) {
+      stopAudio();
+      return;
+    }
+    try {
+      const { url } = await api.userVoices.previewUrl(voice.id);
+      togglePreview(voice.id, url);
+    } catch {
+      // ignore
+    }
+  };
+
   const handleDeleteMyVoice = async (e: React.MouseEvent, voice: UserVoice) => {
     e.stopPropagation();
     if (!confirm(`Удалить голос «${voice.name}»?`)) return;
@@ -186,6 +200,7 @@ export function ElevenLabsVoicePicker({ voiceId, onChange }: ElevenLabsVoicePick
           <div className="voice-picker__list">
             {myVoices.map((voice) => {
               const isSelected = voiceId === voice.externalId;
+              const isPlaying = playingId === voice.id;
               return (
                 <div
                   key={voice.id}
@@ -198,6 +213,15 @@ export function ElevenLabsVoicePicker({ voiceId, onChange }: ElevenLabsVoicePick
                       {new Date(voice.createdAt).toLocaleDateString()}
                     </span>
                   </div>
+                  {voice.hasAudio && (
+                    <button
+                      className={`voice-picker__preview-btn${isPlaying ? " voice-picker__preview-btn--playing" : ""}`}
+                      onClick={(e) => toggleMyVoicePreview(e, voice)}
+                      title={isPlaying ? "Стоп" : "Прослушать"}
+                    >
+                      {isPlaying ? "⏹" : "▶"}
+                    </button>
+                  )}
                   <button
                     className="voice-picker__preview-btn"
                     onClick={(e) => handleDeleteMyVoice(e, voice)}

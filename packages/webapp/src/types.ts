@@ -103,6 +103,7 @@ export interface UserVoice {
   name: string;
   externalId: string | null;
   previewUrl: string | null;
+  hasAudio: boolean;
   status: "ready" | "failed";
   createdAt: string;
 }
