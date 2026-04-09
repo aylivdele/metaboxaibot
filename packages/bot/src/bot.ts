@@ -2,7 +2,12 @@ import { Bot, InlineKeyboard } from "grammy";
 import type { BotContext } from "./types/context.js";
 import { authMiddleware } from "./middlewares/auth.middleware.js";
 import { i18nMiddleware } from "./middlewares/i18n.middleware.js";
-import { handleStart, handleLanguageSelect } from "./commands/start.js";
+import {
+  handleStart,
+  handleLanguageSelect,
+  handleLanguageMenu,
+  handleLanguageChangeSelect,
+} from "./commands/start.js";
 import { buildLanguageKeyboard } from "./keyboards/language.keyboard.js";
 import { handleMenu, handleGpt, handleDesign, handleAudio, handleVideo } from "./commands/menu.js";
 import { handleNoTool } from "./handlers/no-tool.handler.js";
@@ -91,9 +96,7 @@ export function createBot(token: string): Bot<BotContext> {
       await ctx.answerCallbackQuery().catch(() => void 0);
     }
     if (ctx.chat) {
-      await ctx
-        .reply(prompt, { reply_markup: buildLanguageKeyboard() })
-        .catch(() => void 0);
+      await ctx.reply(prompt, { reply_markup: buildLanguageKeyboard() }).catch(() => void 0);
     }
   });
 
@@ -113,6 +116,8 @@ export function createBot(token: string): Bot<BotContext> {
 
   // ── Language selection callback ───────────────────────────────────────────
   bot.callbackQuery(/^lang_/, handleLanguageSelect);
+  // In-menu language change (keeps current state, no welcome/balance) ────────
+  bot.callbackQuery(/^langset_/, handleLanguageChangeSelect);
 
   // ── Design model selection callback ──────────────────────────────────────
   bot.callbackQuery(/^design_model_/, handleDesignModelSelect);
@@ -182,6 +187,8 @@ export function createBot(token: string): Bot<BotContext> {
       [t.video.newDialog]: () => handleNewVideoDialog(ctx),
       [t.video.avatars]: () => handleVideoAvatars(ctx),
       [t.video.lipSync]: () => handleVideoAvatars(ctx),
+      // Language button — inline language picker (no state change)
+      [t.menu.language]: () => handleLanguageMenu(ctx),
       // Help button — send inline link to support chat
       [t.menu.help]: async () => {
         await ctx.reply(ctx.t.menu.help, {

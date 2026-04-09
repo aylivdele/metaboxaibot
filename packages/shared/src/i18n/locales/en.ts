@@ -31,6 +31,9 @@ export default {
     storage: "📁 Media Storage",
     help: "❓ Help",
     knowledgeBase: "📖 Knowledge Base",
+    language: "🌐 Language",
+    chooseLanguage: "Choose a language:",
+    languageChanged: "✅ Language changed.",
   },
   gpt: {
     sectionTitle:

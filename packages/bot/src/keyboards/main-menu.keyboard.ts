@@ -26,5 +26,5 @@ export function buildMainMenuKeyboard(t: Translations, userId?: bigint): Keyboar
     kb.text(t.menu.storage).row();
   }
 
-  return kb.text(t.menu.help).resized().persistent();
+  return kb.text(t.menu.help).text(t.menu.language).resized().persistent();
 }

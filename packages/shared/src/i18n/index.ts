@@ -28,6 +28,9 @@ export interface Translations {
     storage: string;
     help: string;
     knowledgeBase: string;
+    language: string;
+    chooseLanguage: string;
+    languageChanged: string;
   };
   gpt: {
     sectionTitle: string;

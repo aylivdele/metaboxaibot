@@ -31,6 +31,9 @@ export default {
     storage: "📁 Хранилище медиа",
     help: "❓ Помощь",
     knowledgeBase: "📖 База знаний",
+    language: "🌐 Язык",
+    chooseLanguage: "Выберите язык:",
+    languageChanged: "✅ Язык изменён.",
   },
   gpt: {
     sectionTitle:

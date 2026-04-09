@@ -173,7 +173,8 @@ export async function handleStart(ctx: BotContext): Promise<void> {
     if (state) {
       return;
     }
-  } else if (param?.startsWith("ref_") && ctx.user && ctx.user.referredById) { // ── Referral deep link ─────────────────────────────────────────────────────
+  } else if (param?.startsWith("ref_") && ctx.user && ctx.user.referredById) {
+    // ── Referral deep link ─────────────────────────────────────────────────────
     // User already has a referrer — notify with mentor name
     let mentorName = "";
     try {
@@ -367,6 +368,51 @@ export async function handleLanguageSelect(ctx: BotContext): Promise<void> {
   }
 
   ctx.user = { ...updatedUser, isNew: false };
+}
+
+/**
+ * Shows the inline language picker from the main menu.
+ * Does NOT change user state — user remains in whatever state they were in.
+ */
+export async function handleLanguageMenu(ctx: BotContext): Promise<void> {
+  await ctx.reply(ctx.t.menu.chooseLanguage, {
+    reply_markup: buildLanguageKeyboard("langset_"),
+  });
+}
+
+/**
+ * Callback for in-menu language change (data: langset_<code>).
+ * Updates the user's language and refreshes bot commands, but does NOT
+ * touch user state, does NOT send welcome/balance, does NOT re-send main menu.
+ */
+export async function handleLanguageChangeSelect(ctx: BotContext): Promise<void> {
+  const data = ctx.callbackQuery?.data ?? "";
+  const lang = data.replace("langset_", "") as Language;
+
+  if (!SUPPORTED_LANGUAGES.includes(lang) || !ctx.user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
+  await ctx.answerCallbackQuery();
+
+  const updatedUser = await userService.setLanguage(ctx.user.id, lang);
+  const t = getT(lang);
+
+  // Remove the inline picker message to keep chat clean.
+  await ctx.deleteMessage().catch(() => void 0);
+
+  await ctx.reply(t.menu.languageChanged, {
+    reply_markup: buildMainMenuKeyboard(t, ctx.user.id),
+  });
+
+  if (ctx.chat?.id) {
+    await ctx.api
+      .setMyCommands(buildCommands(t), { scope: { type: "chat", chat_id: ctx.chat.id } })
+      .catch(() => void 0);
+  }
+
+  ctx.user = { ...updatedUser, isNew: ctx.user.isNew };
 }
 
 function buildCommands(t: Translations) {
