@@ -388,11 +388,40 @@ export async function handleVideoLipSync(ctx: BotContext): Promise<void> {
 // HeyGen: saves as avatar_photo UserUpload + auto-selects in modelSettings
 // D-ID: saves as one-shot reference image URL
 
+/**
+ * Media-group (album) dedup — see design.ts for rationale.
+ */
+type VideoMediaGroupEntry = { timer: ReturnType<typeof setTimeout>; processed: boolean };
+const videoMediaGroupBuffer = new Map<string, VideoMediaGroupEntry>();
+
 export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
   const isPhoto = !!ctx.message?.photo;
   const isImageDoc =
     !!ctx.message?.document && ctx.message.document.mime_type?.startsWith("image/");
   if (!ctx.user || (!isPhoto && !isImageDoc)) return;
+
+  // Only the captioned photo from an album triggers generation; siblings are ignored.
+  const mediaGroupId = ctx.message?.media_group_id;
+  if (mediaGroupId) {
+    const key = `${ctx.user.id}__${mediaGroupId}`;
+    const hasCaption = !!ctx.message?.caption?.trim();
+    const existing = videoMediaGroupBuffer.get(key);
+    if (existing?.processed) return;
+    if (existing) clearTimeout(existing.timer);
+    if (hasCaption) {
+      videoMediaGroupBuffer.set(key, {
+        processed: true,
+        timer: setTimeout(() => videoMediaGroupBuffer.delete(key), 10_000),
+      });
+    } else {
+      videoMediaGroupBuffer.set(key, {
+        processed: false,
+        timer: setTimeout(() => videoMediaGroupBuffer.delete(key), 10_000),
+      });
+      return;
+    }
+  }
+
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.videoModelId ?? "kling";
   const fileId = isPhoto ? ctx.message!.photo!.at(-1)!.file_id : ctx.message!.document!.file_id;
@@ -425,12 +454,16 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
   //   return;
   // }
 
-  // For image-to-video models: if caption is provided, generate immediately
+  // If caption is provided, treat it as a prompt and generate immediately.
+  // When the model doesn't support images, we still start generation with
+  // the caption as prompt and warn the user that the image is ignored.
   const caption = ctx.message.caption?.trim();
   const model = AI_MODELS[modelId];
-  if (caption && model?.supportsImages) {
+  if (caption) {
     const chatId = ctx.chat?.id;
     if (!chatId) return;
+
+    const supportsImages = model?.supportsImages ?? false;
 
     const videoSettings = await userStateService.getVideoSettings(ctx.user.id);
     const modelSettings = videoSettings[modelId];
@@ -447,6 +480,10 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       }
     }
 
+    if (!supportsImages) {
+      await ctx.reply(ctx.t.video.imageIgnoredUnsupported).catch(() => void 0);
+    }
+
     const pendingMsg = await ctx.reply(ctx.t.video.queuing);
 
     try {
@@ -454,7 +491,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
         userId: ctx.user.id,
         modelId,
         prompt: caption,
-        imageUrl: tgUrl,
+        imageUrl: supportsImages ? tgUrl : undefined,
         telegramChatId: chatId,
         sendOriginalLabel: ctx.t.common.sendOriginal,
         aspectRatio: modelSettings?.aspectRatio,

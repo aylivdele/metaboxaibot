@@ -146,6 +146,14 @@ function resolveRates(
 
 interface MediaOpts {
   megapixels?: number;
+  /**
+   * Megapixels of the input image (img2img models). Used to add an
+   * input-image surcharge via `costUsdPerMPixelInput`. Ignored when the
+   * model has `costUsdPerMPixelInputFixed === true` (flat fee).
+   */
+  inputMegapixels?: number;
+  /** True when an input image is present. Needed for flat-fee input billing. */
+  hasInputImage?: boolean;
   videoTokens?: number;
   durationSeconds?: number;
   charCount?: number;
@@ -181,7 +189,17 @@ function computeMediaBaseUsd(model: AIModel, rates: ResolvedRates, opts: MediaOp
 
   // 2. Per-megapixel
   if (model.costUsdPerMPixel && megapixels) {
-    return (model.costUsdPerMPixelBase ?? 0) + Math.ceil(megapixels) * model.costUsdPerMPixel;
+    let cost = (model.costUsdPerMPixelBase ?? 0) + Math.ceil(megapixels) * model.costUsdPerMPixel;
+    // Optional image-to-image input surcharge
+    if (model.costUsdPerMPixelInput && opts.hasInputImage) {
+      if (model.costUsdPerMPixelInputFixed) {
+        // Flat fee regardless of input size (provider normalizes input to 1 MP).
+        cost += model.costUsdPerMPixelInput;
+      } else if (opts.inputMegapixels !== undefined && opts.inputMegapixels > 0) {
+        cost += Math.ceil(opts.inputMegapixels) * model.costUsdPerMPixelInput;
+      }
+    }
+    return cost;
   }
 
   // 3. Per-video-token
@@ -254,10 +272,13 @@ export function calculateCost(
   modelSettings?: Record<string, unknown>,
   durationSeconds?: number,
   charCount?: number,
+  extra?: { inputMegapixels?: number; hasInputImage?: boolean },
 ): number {
   const rates = resolveRates(model, inputTokens, modelSettings);
   const mediaUsd = computeMediaBaseUsd(model, rates, {
     megapixels,
+    inputMegapixels: extra?.inputMegapixels,
+    hasInputImage: extra?.hasInputImage,
     videoTokens,
     durationSeconds,
     charCount,

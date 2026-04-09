@@ -167,7 +167,8 @@ export default {
     noSubscription: "❌ An active subscription is required to use the bot.",
     noSubscriptionForPurchase: "❌ Token packages are only available with an active subscription.",
     userBlocked: "❌ Your account has been blocked. Contact support.",
-    fileTooLargeForTelegram: "The file is too large to send via Telegram.",
+    fileTooLargeForTelegram:
+      "The file is too large to send via Telegram. If you are on mobile, we recommend opening the download link in a browser.",
     contentPolicyViolation:
       "❌ Your request was rejected due to a content policy violation. Please modify your prompt and try again.",
     recraftImg2imgSvgUnsupported:
@@ -186,7 +187,8 @@ export default {
       "❌ The provider failed to generate audio. Please try modifying your request.",
     audioCreateTaskFailed: "❌ Failed to create a generation task. Please try again later.",
     generationTimeout: "❌ Generation took too long. Please try again.",
-    generationFailed: "❌ Generation failed. Please try again later or contact support.",
+    generationFailed:
+      "❌ {modelName}: generation failed. Please try again later or contact support.",
     generationStillRunning: "{modelName}\nStill generating, please wait...",
     generationTimedOut24h:
       "❌ {modelName}: generation did not finish within 24 hours and was cancelled. Please try again.",

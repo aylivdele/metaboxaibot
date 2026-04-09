@@ -125,6 +125,20 @@ export function buildThumbnailKey(s3Key: string): string {
 }
 
 /**
+ * Fetches an image URL and returns its size in megapixels
+ * (width × height / 1_000_000). Throws on fetch/decode failures so
+ * the caller can decide whether to fall back to a default.
+ */
+export async function measureImageMegapixels(imageUrl: string): Promise<number> {
+  const res = await fetch(imageUrl);
+  if (!res.ok) throw new Error(`Failed to fetch image for measurement: ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const meta = await sharp(buf).metadata();
+  if (!meta.width || !meta.height) throw new Error("Could not read image dimensions");
+  return (meta.width * meta.height) / 1_000_000;
+}
+
+/**
  * Generates a 400px-wide WebP thumbnail from an image buffer.
  * Returns null for SVG or non-image content types.
  */

@@ -1149,6 +1149,9 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     variantLabel: "Standard",
     costUsdPerRequest: 0,
     costUsdPerMPixel: 0.012, // $0.012/MP, billed as ceil(px/1_000_000)
+    // img2img: FAL resizes every input to 1 MP and charges a flat $0.012
+    costUsdPerMPixelInput: 0.012,
+    costUsdPerMPixelInputFixed: true,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1175,6 +1178,8 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     // $0.03 for first MP + $0.015 per extra MP: base=$0.015, perMP=$0.015 → ceil formula
     costUsdPerMPixelBase: 0.015,
     costUsdPerMPixel: 0.015,
+    // img2img: +$0.015 per ceil-MP of the actual input image
+    costUsdPerMPixelInput: 0.015,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,

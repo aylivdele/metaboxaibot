@@ -279,11 +279,57 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
 
 // ── Incoming photo or image document in DESIGN_ACTIVE state — set as reference ─
 
+/**
+ * Media-group (album) dedup: Telegram delivers each photo of an album as a
+ * separate update sharing the same `media_group_id`. Only one of them carries
+ * the caption. We only generate once per group — using the first photo that
+ * arrives with a caption (or simply the first photo if none has one).
+ */
+type DesignMediaGroupEntry = {
+  timer: ReturnType<typeof setTimeout>;
+  processed: boolean;
+};
+const designMediaGroupBuffer = new Map<string, DesignMediaGroupEntry>();
+
 export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   const isPhoto = !!ctx.message?.photo;
   const isImageDoc =
     !!ctx.message?.document && ctx.message.document.mime_type?.startsWith("image/");
   if (!ctx.user || (!isPhoto && !isImageDoc)) return;
+
+  // Deduplicate album messages — only the first photo-with-caption (or the first
+  // one overall, after a short buffering window) is processed.
+  const mediaGroupId = ctx.message?.media_group_id;
+  if (mediaGroupId) {
+    const key = `${ctx.user.id}__${mediaGroupId}`;
+    const hasCaption = !!ctx.message?.caption?.trim();
+    const existing = designMediaGroupBuffer.get(key);
+
+    if (existing?.processed) {
+      // Another photo from the same album already triggered the generation — ignore.
+      return;
+    }
+
+    if (existing) {
+      clearTimeout(existing.timer);
+    }
+
+    if (hasCaption) {
+      // This is the captioned photo — mark the group as processed and fall through.
+      designMediaGroupBuffer.set(key, {
+        processed: true,
+        timer: setTimeout(() => designMediaGroupBuffer.delete(key), 10_000),
+      });
+    } else {
+      // No caption yet — buffer briefly. If nothing else arrives, we'll treat this
+      // as a plain reference. If a captioned sibling arrives, it will take over.
+      designMediaGroupBuffer.set(key, {
+        processed: false,
+        timer: setTimeout(() => designMediaGroupBuffer.delete(key), 10_000),
+      });
+      return; // skip non-captioned siblings entirely
+    }
+  }
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";

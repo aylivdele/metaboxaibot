@@ -215,7 +215,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
       const model = AI_MODELS[modelId];
       if (model) {
-        const effectiveDuration = Math.ceil(actualDuration ?? duration ?? 5);
+        const effectiveDuration = actualDuration ?? duration ?? 5;
         const videoTokens = model.costUsdPerMVideoToken
           ? computeVideoTokens(
               model,
@@ -311,7 +311,9 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
         attempt: job.attemptsMade,
       });
 
-      await telegram.sendMessage(telegramChatId, t.errors.generationFailed).catch(() => void 0);
+      await telegram
+        .sendMessage(telegramChatId, t.errors.generationFailed.replace("{modelName}", modelName))
+        .catch(() => void 0);
     }
 
     throw err;

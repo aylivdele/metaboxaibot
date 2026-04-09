@@ -262,7 +262,10 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
       }
 
       await telegram
-        .sendMessage(telegramChatId, userMessage ?? t.errors.generationFailed)
+        .sendMessage(
+          telegramChatId,
+          userMessage ?? t.errors.generationFailed.replace("{modelName}", modelName),
+        )
         .catch(() => void 0);
     }
 

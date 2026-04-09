@@ -152,6 +152,21 @@ export interface AIModel {
    */
   costUsdPerMPixelBase?: number;
   /**
+   * USD per megapixel of the INPUT image for image-to-image models (e.g. FLUX).
+   * Added to the cost only when an input image is present.
+   *
+   * If `costUsdPerMPixelInputFixed === true`, the caller-provided
+   * `inputMegapixels` is ignored and the charge is added as a flat rate
+   * (used for providers that resize every input to 1 MP, e.g. FLUX.2 standard
+   * which always bills $0.012 regardless of actual input size).
+   *
+   * Otherwise the charge is `ceil(inputMegapixels) × costUsdPerMPixelInput`
+   * (e.g. FLUX.2 Pro: $0.015 per ceil-MP of the real input).
+   */
+  costUsdPerMPixelInput?: number;
+  /** See `costUsdPerMPixelInput`. When true, acts as a flat per-request fee for any input image. */
+  costUsdPerMPixelInputFixed?: boolean;
+  /**
    * USD per 1 million video tokens for models with per-video-token billing (e.g. Seedance).
    * When set, costUsdPerRequest must be 0.
    * videoTokens = (width × height × fps × duration) / 1024

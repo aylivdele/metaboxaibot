@@ -16,6 +16,7 @@ import {
   uploadBuffer,
   getFileUrl,
   generateThumbnail,
+  measureImageMegapixels,
 } from "@metabox/api/services/s3";
 import { generateDownloadToken } from "@metabox/api/utils/download-token";
 import { InputFile } from "grammy";
@@ -208,9 +209,21 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
           model.costUsdPerMPixel && imageResult.width && imageResult.height
             ? (imageResult.width * imageResult.height) / 1_000_000
             : undefined;
+
+        // img2img input surcharge
+        const sourceImageUrl = job.data.sourceImageUrl;
+        const hasInputImage = !!sourceImageUrl;
+        let inputMegapixels: number | undefined;
+        if (hasInputImage && model.costUsdPerMPixelInput && !model.costUsdPerMPixelInputFixed) {
+          inputMegapixels = await measureImageMegapixels(sourceImageUrl!).catch(() => undefined);
+        }
+
         await deductTokens(
           BigInt(userIdStr),
-          calculateCost(model, 0, 0, megapixels, undefined, modelSettings),
+          calculateCost(model, 0, 0, megapixels, undefined, modelSettings, undefined, undefined, {
+            hasInputImage,
+            inputMegapixels,
+          }),
           modelId,
         );
       }
@@ -332,7 +345,9 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         attempt: job.attemptsMade,
       });
 
-      await telegram.sendMessage(telegramChatId, t.errors.generationFailed).catch(() => void 0);
+      await telegram
+        .sendMessage(telegramChatId, t.errors.generationFailed.replace("{modelName}", modelName))
+        .catch(() => void 0);
     }
 
     throw err;
