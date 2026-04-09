@@ -1,7 +1,8 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
-import { fetchWithLog } from "../../utils/fetch.js";
+import { fetchWithLog, isTransientNetworkError } from "../../utils/fetch.js";
 import { parseMinimaxBaseResp } from "../../utils/minimax-error.js";
+import { logger } from "../../logger.js";
 
 const MINIMAX_API_BASE = "https://api.minimax.io/v1";
 
@@ -112,40 +113,51 @@ export class MinimaxVideoAdapter implements VideoAdapter {
   }
 
   async poll(taskId: string): Promise<VideoResult | null> {
-    const resp = await fetchWithLog(
-      `${MINIMAX_API_BASE}/query/video_generation?task_id=${encodeURIComponent(taskId)}`,
-      {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
-      },
-    );
+    try {
+      const resp = await fetchWithLog(
+        `${MINIMAX_API_BASE}/query/video_generation?task_id=${encodeURIComponent(taskId)}`,
+        {
+          headers: { Authorization: `Bearer ${this.apiKey}` },
+        },
+      );
 
-    if (!resp.ok) throw new Error(`MiniMax poll error ${resp.status}`);
+      if (!resp.ok) throw new Error(`MiniMax poll error ${resp.status}`);
 
-    const data = (await resp.json()) as MinimaxPollResponse;
-    const status = data.status?.toLowerCase();
+      const data = (await resp.json()) as MinimaxPollResponse;
+      const status = data.status?.toLowerCase();
 
-    if (status === "failed" || status === "fail") {
-      const pollErr = parseMinimaxBaseResp(data.base_resp);
-      if (pollErr) throw pollErr;
-      throw new Error(`MiniMax generation failed: ${data.error_message ?? "unknown error"}`);
+      if (status === "failed" || status === "fail") {
+        const pollErr = parseMinimaxBaseResp(data.base_resp);
+        if (pollErr) throw pollErr;
+        throw new Error(`MiniMax generation failed: ${data.error_message ?? "unknown error"}`);
+      }
+      if (status !== "success") return null;
+      if (!data.file_id) throw new Error("MiniMax: no file_id in success response");
+
+      // Retrieve actual download URL from file ID
+      const fileResp = await fetchWithLog(
+        `${MINIMAX_API_BASE}/files/retrieve?file_id=${encodeURIComponent(data.file_id)}`,
+        {
+          headers: { Authorization: `Bearer ${this.apiKey}` },
+        },
+      );
+
+      if (!fileResp.ok) throw new Error(`MiniMax file retrieve error ${fileResp.status}`);
+
+      const fileData = (await fileResp.json()) as MinimaxFileResponse;
+      const url = fileData.file?.download_url;
+      if (!url) throw new Error("MiniMax: no download_url in file response");
+
+      return { url, filename: `${this.modelId}.mp4` };
+    } catch (err) {
+      // Transient network errors (DNS hiccups, socket resets) — treat as
+      // "not ready yet" so the processor schedules another poll instead of
+      // failing the whole generation.
+      if (isTransientNetworkError(err)) {
+        logger.warn({ err, taskId }, "MiniMax poll: transient network error, will retry");
+        return null;
+      }
+      throw err;
     }
-    if (status !== "success") return null;
-    if (!data.file_id) throw new Error("MiniMax: no file_id in success response");
-
-    // Retrieve actual download URL from file ID
-    const fileResp = await fetchWithLog(
-      `${MINIMAX_API_BASE}/files/retrieve?file_id=${encodeURIComponent(data.file_id)}`,
-      {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
-      },
-    );
-
-    if (!fileResp.ok) throw new Error(`MiniMax file retrieve error ${fileResp.status}`);
-
-    const fileData = (await fileResp.json()) as MinimaxFileResponse;
-    const url = fileData.file?.download_url;
-    if (!url) throw new Error("MiniMax: no download_url in file response");
-
-    return { url, filename: `${this.modelId}.mp4` };
   }
 }

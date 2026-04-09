@@ -69,6 +69,46 @@ export function fetchWithLog(url: string | URL | Request, init?: RequestInit): P
 }
 
 /**
+ * Node DNS/socket error codes that indicate a *transient* network failure —
+ * the request never reached the remote server, so the operation can safely
+ * be retried later without risk of duplicating side effects.
+ */
+const TRANSIENT_NETWORK_CODES = new Set([
+  "EAI_AGAIN", // DNS lookup temporarily failed (try again)
+  "EAI_FAIL", // DNS lookup failed (usually transient upstream issue)
+  "ENOTFOUND", // DNS name not found (often transient during resolver outages)
+  "ECONNRESET", // connection reset mid-flight
+  "ECONNREFUSED", // peer refused (load balancer reload etc.)
+  "ETIMEDOUT", // socket-level timeout
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "EPIPE",
+  "UND_ERR_SOCKET", // undici socket error
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+/**
+ * Returns true if the given error represents a transient network failure
+ * (DNS hiccup, connection reset, etc.) rather than a logical/HTTP error.
+ * Walks the `cause` chain because undici wraps the original libuv error.
+ */
+export function isTransientNetworkError(err: unknown): boolean {
+  let cur: unknown = err;
+  for (let i = 0; i < 5 && cur; i++) {
+    if (typeof cur === "object" && cur !== null) {
+      const code = (cur as { code?: unknown }).code;
+      if (typeof code === "string" && TRANSIENT_NETWORK_CODES.has(code)) return true;
+      // undici generic wrapper exposes "fetch failed" — treat as transient only
+      // when the underlying cause is a transient code (handled by the walk).
+      cur = (cur as { cause?: unknown }).cause;
+    } else {
+      break;
+    }
+  }
+  return false;
+}
+
+/**
  * Log an SDK call at debug level: model, action, and params (strings > 20 chars truncated).
  */
 export function logCall(model: string, action: string, params: Record<string, unknown>): void {
