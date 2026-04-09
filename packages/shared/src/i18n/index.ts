@@ -17,6 +17,7 @@ export interface Translations {
     metaboxLinked: string;
     metaboxLinkFailed: string;
     accountsMerged: string;
+    selectLanguagePrompt: string;
   };
   menu: {
     profile: string;

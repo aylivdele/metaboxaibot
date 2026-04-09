@@ -3,6 +3,7 @@ import type { BotContext } from "./types/context.js";
 import { authMiddleware } from "./middlewares/auth.middleware.js";
 import { i18nMiddleware } from "./middlewares/i18n.middleware.js";
 import { handleStart, handleLanguageSelect } from "./commands/start.js";
+import { buildLanguageKeyboard } from "./keyboards/language.keyboard.js";
 import { handleMenu, handleGpt, handleDesign, handleAudio, handleVideo } from "./commands/menu.js";
 import { handleNoTool } from "./handlers/no-tool.handler.js";
 import { handleNewGptDialog, handleGptMessage, handleGptPhoto } from "./scenes/gpt.js";
@@ -66,6 +67,34 @@ export function createBot(token: string): Bot<BotContext> {
   // Updates without ctx.chat (e.g. pre_checkout_query) must always pass through.
   bot.use(async (ctx, next) => {
     if (!ctx.chat || ctx.chat.type === "private") return next();
+  });
+
+  // ── Language selection gate ──────────────────────────────────────────────
+  // While a user is in AWAITING_LANGUAGE state, block everything except
+  // /start command and lang_* callback queries. Reply with a bilingual prompt.
+  bot.use(async (ctx, next) => {
+    if (!ctx.user) return next();
+
+    // Always allow /start to (re)initialise the flow.
+    if (ctx.message?.text?.startsWith("/start")) return next();
+    // Always allow language selection callback itself.
+    if (ctx.callbackQuery?.data?.startsWith("lang_")) return next();
+
+    const state = await userStateService.get(ctx.user.id);
+    if (state?.state !== "AWAITING_LANGUAGE") return next();
+
+    // Blocked — prompt bilingually and re-show the keyboard.
+    const ru = getT("ru");
+    const en = getT("en");
+    const prompt = `${ru.start.selectLanguagePrompt}\n${en.start.selectLanguagePrompt}`;
+    if (ctx.callbackQuery) {
+      await ctx.answerCallbackQuery().catch(() => void 0);
+    }
+    if (ctx.chat) {
+      await ctx
+        .reply(prompt, { reply_markup: buildLanguageKeyboard() })
+        .catch(() => void 0);
+    }
   });
 
   // ── Commands ─────────────────────────────────────────────────────────────

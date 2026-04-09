@@ -20,6 +20,7 @@ export default {
     metaboxLinkFailed: "❌ Failed to link account. Please try again.",
     accountsMerged:
       "✅ Accounts merged! Your tokens and subscription have been transferred to your {siteUrl} account.",
+    selectLanguagePrompt: "⚠️ Please choose a language to continue.",
   },
   menu: {
     profile: "👤 Profile",

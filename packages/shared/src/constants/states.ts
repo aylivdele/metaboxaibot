@@ -1,6 +1,7 @@
 import type { BotState, Section } from "../types/user.js";
 
 export const BOT_STATES = {
+  AWAITING_LANGUAGE: "AWAITING_LANGUAGE",
   IDLE: "IDLE",
   MAIN_MENU: "MAIN_MENU",
   GPT_SECTION: "GPT_SECTION",

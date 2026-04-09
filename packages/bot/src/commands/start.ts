@@ -169,11 +169,11 @@ export async function handleStart(ctx: BotContext): Promise<void> {
       }
       await ctx.reply(msg);
     }
-    return;
-  }
-
-  // ── Referral deep link ─────────────────────────────────────────────────────
-  if (param?.startsWith("ref_") && ctx.user && ctx.user.referredById) {
+    const state = await userStateService.get(ctx.user.id);
+    if (state) {
+      return;
+    }
+  } else if (param?.startsWith("ref_") && ctx.user && ctx.user.referredById) { // ── Referral deep link ─────────────────────────────────────────────────────
     // User already has a referrer — notify with mentor name
     let mentorName = "";
     try {
@@ -252,7 +252,7 @@ export async function handleStart(ctx: BotContext): Promise<void> {
   }
 
   if (ctx.user) {
-    await userStateService.setState(ctx.user.id, "IDLE");
+    await userStateService.setState(ctx.user.id, "AWAITING_LANGUAGE");
 
     // Register stub account on Metabox (or link existing)
     if (config.metabox?.apiUrl) {
@@ -308,7 +308,8 @@ export async function handleStart(ctx: BotContext): Promise<void> {
       })();
     }
   }
-  await ctx.reply(ctx.t.start.welcome, {
+  const welcomeBilingual = `${getT("ru").start.welcome}\n\n${getT("en").start.welcome}`;
+  await ctx.reply(welcomeBilingual, {
     reply_markup: buildLanguageKeyboard(),
     parse_mode: "HTML",
   });
@@ -331,6 +332,7 @@ export async function handleLanguageSelect(ctx: BotContext): Promise<void> {
 
   const isNew = ctx.user.isNew;
   const updatedUser = await userService.setLanguage(ctx.user.id, lang);
+  await userStateService.setState(ctx.user.id, "IDLE");
   const t = getT(lang);
 
   if (isNew) {
