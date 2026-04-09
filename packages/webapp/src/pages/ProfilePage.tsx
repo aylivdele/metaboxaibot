@@ -145,6 +145,14 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
       <div className="balance-card">
         <div className="balance-card__label">{t("profile.balance")}</div>
         <div className="balance-card__amount">✦ {formatTokens(profile.tokenBalance)}</div>
+        <div className="balance-card__breakdown">
+          <span className="balance-card__breakdown-item">
+            {t("profile.balanceSubscription")}: ✦ {formatTokens(profile.subscriptionTokenBalance)}
+          </span>
+          <span className="balance-card__breakdown-item">
+            {t("profile.balancePurchased")}: ✦ {formatTokens(profile.purchasedTokenBalance)}
+          </span>
+        </div>
         <div className="balance-card__sub">
           {t("profile.referrals")}: {profile.referralCount}
         </div>

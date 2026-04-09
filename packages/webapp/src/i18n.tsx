@@ -22,6 +22,8 @@ const translations = {
 
     // Profile
     "profile.balance": "Token Balance",
+    "profile.balanceSubscription": "From subscription",
+    "profile.balancePurchased": "From packages",
     "profile.referrals": "Referrals",
     "profile.txHistory": "Transaction History",
     "profile.noTx": "No transactions yet",
@@ -319,6 +321,8 @@ const translations = {
 
     // Profile
     "profile.balance": "Баланс токенов",
+    "profile.balanceSubscription": "Из подписки",
+    "profile.balancePurchased": "Из пакетов",
     "profile.referrals": "Рефералы",
     "profile.txHistory": "История транзакций",
     "profile.noTx": "Транзакций пока нет",

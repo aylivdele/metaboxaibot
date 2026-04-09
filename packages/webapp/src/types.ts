@@ -6,6 +6,8 @@ export interface UserProfile {
   language: string;
   role: "USER" | "MODERATOR" | "ADMIN";
   tokenBalance: string;
+  purchasedTokenBalance: string;
+  subscriptionTokenBalance: string;
   referralCount: number;
   createdAt: string;
   metaboxUserId: string | null;

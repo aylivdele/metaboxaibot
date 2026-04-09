@@ -554,6 +554,19 @@ textarea::placeholder {
   position: relative;
   z-index: 1;
 }
+.balance-card__breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  position: relative;
+  z-index: 1;
+}
+.balance-card__breakdown-item {
+  display: block;
+}
 
 /* ── Subscription Card ── */
 .sub-card {
