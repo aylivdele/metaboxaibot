@@ -549,9 +549,7 @@ export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
   // If HeyGen is already the active model, just switch state to VIDEO_ACTIVE
   // without re-sending the model intro + hint.
   const currentState = await userStateService.get(userId);
-  if (currentState?.videoModelId === "heygen") {
-    await userStateService.setState(userId, "VIDEO_ACTIVE", "video");
-  } else {
+  if (currentState?.videoModelId === "heygen" || currentState?.state !== "VIDEO_ACTIVE") {
     await activateVideoModel(ctx, "heygen");
   }
 }

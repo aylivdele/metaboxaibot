@@ -70,9 +70,26 @@ function GalleryCard({
           onClick={() => !videoActive && setVideoActive(true)}
         >
           {videoActive ? (
-            <video src={previewUrl} autoPlay controls muted playsInline />
+            <video
+              src={previewUrl}
+              poster={item.thumbnailUrl ?? undefined}
+              autoPlay
+              controls
+              muted
+              playsInline
+            />
           ) : (
-            <div className="gallery-card__video-overlay">▶</div>
+            <>
+              {item.thumbnailUrl && (
+                <img
+                  src={item.thumbnailUrl}
+                  alt={item.prompt}
+                  loading="lazy"
+                  className="gallery-card__video-poster"
+                />
+              )}
+              <div className="gallery-card__video-overlay">▶</div>
+            </>
           )}
         </div>
       )}

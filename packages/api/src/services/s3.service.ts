@@ -2,6 +2,13 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { config } from "@metabox/shared";
 import sharp from "sharp";
+import { createRequire } from "module";
+import ffmpeg from "fluent-ffmpeg";
+import { Readable, PassThrough } from "stream";
+
+const _require = createRequire(import.meta.url);
+const ffmpegPath: string | null = _require("ffmpeg-static") as string | null;
+if (ffmpegPath) ffmpeg.setFfmpegPath(ffmpegPath);
 
 /** Seconds until a presigned GET URL expires. */
 const PRESIGN_TTL = 3600;
@@ -133,6 +140,39 @@ export async function generateThumbnail(buf: Buffer, contentType: string): Promi
   }
 }
 
+/**
+ * Extracts a single frame (~1s in) from a video buffer and returns a
+ * 400px-wide WebP thumbnail. Returns null on any failure.
+ */
+export async function generateVideoThumbnail(buf: Buffer): Promise<Buffer | null> {
+  try {
+    const rawFrame: Buffer = await new Promise((resolve, reject) => {
+      const readable = new Readable({ read() {} });
+      readable.push(buf);
+      readable.push(null);
+
+      const output = new PassThrough();
+      const chunks: Buffer[] = [];
+      output.on("data", (c: Buffer) => chunks.push(c));
+      output.on("end", () => resolve(Buffer.concat(chunks)));
+      output.on("error", reject);
+
+      ffmpeg(readable)
+        .inputOptions(["-ss", "1"])
+        .outputOptions(["-frames:v", "1", "-f", "image2", "-vcodec", "mjpeg"])
+        .on("error", reject)
+        .pipe(output, { end: true });
+    });
+
+    return await sharp(rawFrame)
+      .resize({ width: 400, withoutEnlargement: true })
+      .webp({ quality: 75 })
+      .toBuffer();
+  } catch {
+    return null;
+  }
+}
+
 export const s3Service = {
   buildS3Key,
   buildThumbnailKey,
@@ -141,4 +181,5 @@ export const s3Service = {
   uploadFromUrl,
   getFileUrl,
   generateThumbnail,
+  generateVideoThumbnail,
 };

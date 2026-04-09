@@ -4,7 +4,7 @@ import type { AudioJobData } from "@metabox/api/queues";
 import { getAudioQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createAudioAdapter } from "@metabox/api/ai/audio";
-import { deductTokens, calculateCost } from "@metabox/api/services";
+import { deductTokens, calculateCost, translatePromptIfNeeded } from "@metabox/api/services";
 import { buildS3Key, uploadBuffer, uploadFromUrl, getFileUrl } from "@metabox/api/services/s3";
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT } from "@metabox/shared";
@@ -84,10 +84,16 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
         data: { status: "processing" },
       });
 
+      const effectivePrompt = await translatePromptIfNeeded(
+        prompt,
+        modelSettings,
+        BigInt(userIdStr),
+      );
+
       if (!adapter.isAsync && adapter.generate) {
         // Sync adapter — generate inline, then fall through to finalize.
         audioResult = await adapter.generate({
-          prompt,
+          prompt: effectivePrompt,
           voiceId,
           sourceAudioUrl,
           modelSettings,
@@ -102,7 +108,7 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
           logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
         } else {
           providerJobId = await adapter.submit({
-            prompt,
+            prompt: effectivePrompt,
             voiceId,
             sourceAudioUrl,
             modelSettings,

@@ -14,6 +14,7 @@ import {
 } from "./s3.service.js";
 import { dialogService } from "./dialog.service.js";
 import { userStateService } from "./user-state.service.js";
+import { translatePromptIfNeeded } from "./prompt-translate.service.js";
 
 /** Parse megapixels from modelSettings.size ("WxH") or width/height fields. */
 function parseMegapixels(modelSettings: Record<string, unknown>): number | undefined {
@@ -100,8 +101,9 @@ export const generationService = {
     if (!adapter.isAsync && adapter.generate) {
       // ── Sync generation (DALL-E 3) ──────────────────────────────────────
       try {
+        const effectivePrompt = await translatePromptIfNeeded(prompt, modelSettings, userId);
         const result = await adapter.generate({
-          prompt,
+          prompt: effectivePrompt,
           negativePrompt,
           imageUrl: sourceImageUrl,
           aspectRatio: effectiveAspectRatio,

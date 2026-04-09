@@ -7,8 +7,20 @@ import type { VideoJobData } from "@metabox/api/queues";
 import { getVideoQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createVideoAdapter } from "@metabox/api/ai/video";
-import { deductTokens, calculateCost, computeVideoTokens } from "@metabox/api/services";
-import { buildS3Key, sectionMeta, uploadBuffer, getFileUrl } from "@metabox/api/services/s3";
+import {
+  deductTokens,
+  calculateCost,
+  computeVideoTokens,
+  translatePromptIfNeeded,
+} from "@metabox/api/services";
+import {
+  buildS3Key,
+  buildThumbnailKey,
+  sectionMeta,
+  uploadBuffer,
+  getFileUrl,
+  generateVideoThumbnail,
+} from "@metabox/api/services/s3";
 import { generateDownloadToken } from "@metabox/api/utils/download-token";
 import { InputFile } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
@@ -75,8 +87,13 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
         providerJobId = existingJob.providerJobId;
         logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
       } else {
-        providerJobId = await adapter.submit({
+        const effectivePrompt = await translatePromptIfNeeded(
           prompt,
+          modelSettings,
+          BigInt(userIdStr),
+        );
+        providerJobId = await adapter.submit({
+          prompt: effectivePrompt,
           imageUrl,
           aspectRatio,
           duration,
@@ -177,11 +194,23 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
           ).catch(() => null)
         : null;
 
+      let thumbnailS3Key: string | null = null;
+      if (videoBuffer && s3Key) {
+        const thumbBuf = await generateVideoThumbnail(videoBuffer);
+        if (thumbBuf) {
+          thumbnailS3Key = await uploadBuffer(
+            buildThumbnailKey(s3Key),
+            thumbBuf,
+            "image/webp",
+          ).catch(() => null);
+        }
+      }
+
       outputUrl = videoResult.url;
 
       await db.generationJob.update({
         where: { id: dbJobId },
-        data: { status: "done", outputUrl, s3Key, completedAt: new Date() },
+        data: { status: "done", outputUrl, s3Key, thumbnailS3Key, completedAt: new Date() },
       });
 
       const model = AI_MODELS[modelId];

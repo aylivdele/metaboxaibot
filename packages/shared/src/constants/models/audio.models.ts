@@ -256,7 +256,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     id: "sounds-el",
     name: "🔔 Звуковые эффекты (ElevenLabs)",
     description:
-      "Генерирует оригинальные звуковые эффекты по описанию. Подходит для видеопроизводства, игр и подкастов. Рекомендованно задавать промпт на английском языке.",
+      "Генерирует оригинальные звуковые эффекты по описанию. Подходит для видеопроизводства, игр и подкастов. Рекомендуем задавать промпт на английском языке.",
     section: "audio",
     provider: "elevenlabs",
     costUsdPerRequest: 0.06,
@@ -290,6 +290,14 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.3,
+      },
+      {
+        key: "auto_translate_prompt",
+        label: "Автоперевод промпта",
+        description:
+          "Эта модель работает только с промптами на английском языке, мы можем перевести его для вас за отдельную плату.",
+        type: "toggle",
+        default: false,
       },
     ],
   },

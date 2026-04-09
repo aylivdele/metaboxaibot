@@ -8,7 +8,7 @@ import type { ImageJobData } from "@metabox/api/queues";
 import { getImageQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createImageAdapter } from "@metabox/api/ai/image";
-import { deductTokens, calculateCost } from "@metabox/api/services";
+import { deductTokens, calculateCost, translatePromptIfNeeded } from "@metabox/api/services";
 import {
   buildS3Key,
   buildThumbnailKey,
@@ -82,8 +82,13 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         providerJobId = existingJob.providerJobId;
         logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
       } else {
-        providerJobId = await adapter.submit({
+        const effectivePrompt = await translatePromptIfNeeded(
           prompt,
+          modelSettings,
+          BigInt(userIdStr),
+        );
+        providerJobId = await adapter.submit({
+          prompt: effectivePrompt,
           negativePrompt,
           imageUrl: job.data.sourceImageUrl,
           aspectRatio,

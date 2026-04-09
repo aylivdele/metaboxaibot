@@ -5,6 +5,7 @@ import { AI_MODELS } from "@metabox/shared";
 import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
 import { buildS3Key, uploadBuffer, uploadFromUrl } from "./s3.service.js";
 import { userStateService } from "./user-state.service.js";
+import { translatePromptIfNeeded } from "./prompt-translate.service.js";
 
 export interface SubmitAudioParams {
   userId: bigint;
@@ -83,8 +84,13 @@ export const audioGenerationService = {
     if (!adapter.isAsync && adapter.generate) {
       // ── Sync generation (TTS, ElevenLabs) ───────────────────────────────
       try {
-        const result = await adapter.generate({
+        const effectivePrompt = await translatePromptIfNeeded(
           prompt,
+          resolvedModelSettings,
+          userId,
+        );
+        const result = await adapter.generate({
+          prompt: effectivePrompt,
           voiceId,
           sourceAudioUrl,
           modelSettings: resolvedModelSettings,
