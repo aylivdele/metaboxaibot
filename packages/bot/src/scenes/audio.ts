@@ -106,21 +106,10 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
         removeBackgroundNoise,
       );
     } catch (err) {
-      // ElevenLabs returns 400 with voice_limit_reached when the slot limit is exceeded
+      // ElevenLabs returns 400 with voice_limit_reached when the workspace slot limit is exceeded.
       if (err instanceof Error && err.message.includes("voice_limit_reached")) {
-        // Evict the least recently used voice for this user
-        const lruVoice = await db.userVoice.findFirst({
-          where: { provider: "elevenlabs", externalId: { not: null } },
-          orderBy: [{ lastUsedAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
-          select: { id: true, externalId: true },
-        });
-        if (!lruVoice) throw err;
-        // Delete the LRU voice slot from ElevenLabs only (keep DB record — audioS3Key lets us recreate it)
-        await ElevenLabsAdapter.deleteVoice(lruVoice.externalId!);
-        await db.userVoice.update({
-          where: { id: lruVoice.id },
-          data: { externalId: null },
-        });
+        const freed = await evictOneElevenLabsVoice();
+        if (!freed) throw err;
         // Retry cloning
         voiceId = await ElevenLabsAdapter.cloneVoice(
           audioBuffer,
@@ -164,6 +153,81 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
     logger.error(err, "Voice clone error");
     await ctx.reply(ctx.t.audio.voiceCloneFailed);
   }
+}
+
+/**
+ * Frees one custom voice slot on ElevenLabs by deleting the least-recently-used
+ * cloned voice that is actually occupying a slot right now.
+ *
+ * Strategy:
+ * 1. List the real custom voices on ElevenLabs (source of truth for the slot count).
+ * 2. Correlate with our DB's UserVoice records by externalId.
+ * 3. Pick the LRU candidate among the DB-tracked ones (oldest lastUsedAt, then
+ *    oldest createdAt). If none of the EL voices are tracked in our DB (drift),
+ *    fall back to the oldest voice on ElevenLabs by created_at_unix.
+ * 4. Delete it on ElevenLabs, verifying the HTTP response. Clear externalId in
+ *    our DB if the voice was tracked — the audioS3Key is preserved so the voice
+ *    can be recreated on next use via `ensureVoiceExists`.
+ *
+ * Returns true if a slot was freed, false otherwise.
+ */
+async function evictOneElevenLabsVoice(): Promise<boolean> {
+  let elVoices: Awaited<ReturnType<typeof ElevenLabsAdapter.listVoices>>;
+  try {
+    elVoices = await ElevenLabsAdapter.listVoices();
+  } catch (e) {
+    logger.error({ err: e }, "Voice eviction: failed to list ElevenLabs voices");
+    return false;
+  }
+
+  // Only cloned/generated voices occupy the custom-voice limit (premade does not).
+  const deletable = elVoices.filter((v) => v.category === "cloned" || v.category === "generated");
+  if (deletable.length === 0) {
+    logger.warn("Voice eviction: ElevenLabs returned no deletable voices");
+    return false;
+  }
+
+  const deletableIds = deletable.map((v) => v.voice_id);
+  const trackedRecords = await db.userVoice.findMany({
+    where: { provider: "elevenlabs", externalId: { in: deletableIds } },
+    orderBy: [{ lastUsedAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
+    select: { id: true, externalId: true },
+  });
+
+  let targetExternalId: string | null = null;
+  let targetDbId: string | null = null;
+
+  if (trackedRecords.length > 0) {
+    targetExternalId = trackedRecords[0].externalId;
+    targetDbId = trackedRecords[0].id;
+  } else {
+    // Drift: ElevenLabs slots are filled by voices we don't track. Evict the
+    // oldest one on ElevenLabs (by creation time) so we can keep going.
+    const oldest = [...deletable].sort(
+      (a, b) => (a.created_at_unix ?? 0) - (b.created_at_unix ?? 0),
+    )[0];
+    targetExternalId = oldest.voice_id;
+    logger.warn(
+      { voiceId: targetExternalId, name: oldest.name },
+      "Voice eviction: no DB-tracked EL voices, falling back to oldest untracked",
+    );
+  }
+
+  if (!targetExternalId) return false;
+
+  const deleted = await ElevenLabsAdapter.deleteVoice(targetExternalId);
+  if (!deleted) return false;
+
+  if (targetDbId) {
+    await db.userVoice
+      .update({ where: { id: targetDbId }, data: { externalId: null } })
+      .catch((e) =>
+        logger.error({ err: e, id: targetDbId }, "Voice eviction: failed to clear DB externalId"),
+      );
+  }
+
+  logger.info({ voiceId: targetExternalId }, "Voice eviction: freed one ElevenLabs slot");
+  return true;
 }
 
 // ── Incoming prompt in AUDIO_ACTIVE state ─────────────────────────────────────

@@ -1,4 +1,9 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { config } from "@metabox/shared";
 import sharp from "sharp";
@@ -187,6 +192,28 @@ export async function generateVideoThumbnail(buf: Buffer): Promise<Buffer | null
   }
 }
 
+/**
+ * Delete an object from S3. Returns true on success (or if S3 is not
+ * configured — nothing to clean up), false on failure. Missing keys are
+ * treated as success since the goal state (object gone) is already met.
+ */
+export async function deleteFile(key: string): Promise<boolean> {
+  const client = makeClient();
+  if (!client) return true;
+
+  try {
+    await client.send(
+      new DeleteObjectCommand({
+        Bucket: config.s3.bucket!,
+        Key: key,
+      }),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const s3Service = {
   buildS3Key,
   buildThumbnailKey,
@@ -194,6 +221,7 @@ export const s3Service = {
   uploadBuffer,
   uploadFromUrl,
   getFileUrl,
+  deleteFile,
   generateThumbnail,
   generateVideoThumbnail,
 };

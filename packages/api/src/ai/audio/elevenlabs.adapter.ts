@@ -128,15 +128,62 @@ export class ElevenLabsAdapter implements AudioAdapter {
     return data.voice_id;
   }
 
-  /** Deletes a voice from ElevenLabs. Silently ignores errors. */
+  /**
+   * Deletes a voice from ElevenLabs.
+   * Returns true on success (2xx or 404 — the slot is free either way),
+   * false otherwise. Logs the failure body.
+   */
   static async deleteVoice(
     voiceId: string,
     apiKey: string = config.ai.elevenlabs ?? "",
-  ): Promise<void> {
-    await fetch(`${ELEVENLABS_API}/voices/${voiceId}`, {
-      method: "DELETE",
+  ): Promise<boolean> {
+    try {
+      const res = await fetch(`${ELEVENLABS_API}/voices/${voiceId}`, {
+        method: "DELETE",
+        headers: { "xi-api-key": apiKey },
+      });
+      if (res.ok || res.status === 404) return true;
+      const body = await res.text().catch(() => "");
+      logger.error({ voiceId, status: res.status, body }, "ElevenLabs deleteVoice failed");
+      return false;
+    } catch (reason) {
+      logger.error({ voiceId, reason }, "ElevenLabs deleteVoice network error");
+      return false;
+    }
+  }
+
+  /**
+   * Lists all voices on the ElevenLabs account.
+   * Returns an array of { voice_id, name, category, created_at_unix? } entries.
+   * "category" distinguishes "cloned" / "professional" / "generated" / "premade".
+   * We only need "cloned" and "generated" for eviction (premade cannot be deleted).
+   */
+  static async listVoices(
+    apiKey: string = config.ai.elevenlabs ?? "",
+  ): Promise<
+    Array<{ voice_id: string; name: string; category: string; created_at_unix?: number }>
+  > {
+    const res = await fetch(`${ELEVENLABS_API}/voices`, {
       headers: { "xi-api-key": apiKey },
-    }).catch((reason) => logger.error({ voiceId, reason }, `Could not delete voice`));
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`ElevenLabs listVoices failed: ${res.status} ${body}`);
+    }
+    const data = (await res.json()) as {
+      voices?: Array<{
+        voice_id: string;
+        name?: string;
+        category?: string;
+        created_at_unix?: number;
+      }>;
+    };
+    return (data.voices ?? []).map((v) => ({
+      voice_id: v.voice_id,
+      name: v.name ?? "",
+      category: v.category ?? "",
+      created_at_unix: v.created_at_unix,
+    }));
   }
 
   /** Fetches the preview_url for a voice from ElevenLabs. Returns null on failure. */

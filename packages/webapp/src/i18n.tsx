@@ -186,6 +186,11 @@ const translations = {
     "gallery.empty": "No files in this section yet",
     "gallery.download": "Send to chat",
     "gallery.sent": "✓ Sent!",
+    "gallery.delete": "Delete",
+    "gallery.confirmDeleteTitle": "Delete this item?",
+    "gallery.confirmDeleteText": "This action is irreversible.",
+    "gallery.confirmDelete": "Delete",
+    "gallery.cancel": "Cancel",
 
     // Settings
     "settings.title": "Account Settings",
@@ -484,6 +489,11 @@ const translations = {
     "gallery.empty": "В этом разделе пока нет файлов",
     "gallery.download": "Отправить в чат",
     "gallery.sent": "✓ Отправлено!",
+    "gallery.delete": "Удалить",
+    "gallery.confirmDeleteTitle": "Удалить запись?",
+    "gallery.confirmDeleteText": "Это действие необратимо.",
+    "gallery.confirmDelete": "Удалить",
+    "gallery.cancel": "Отмена",
 
     // Settings
     "settings.title": "Настройки аккаунта",

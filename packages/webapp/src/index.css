@@ -1245,6 +1245,15 @@ textarea::placeholder {
   color: var(--text);
   border: 1.5px solid var(--border);
 }
+.btn--ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+}
+.btn--danger {
+  background: #e53935;
+  color: #fff;
+}
 .btn:disabled {
   opacity: 0.5;
   pointer-events: none;
@@ -1885,13 +1894,6 @@ textarea::placeholder {
   font-size: 28px;
 }
 
-.gallery-card__audio-icon {
-  padding: 24px;
-  font-size: 36px;
-  text-align: center;
-  background: var(--accent-lighter);
-}
-
 .gallery-card__body {
   padding: 12px;
   display: flex;
@@ -1904,6 +1906,76 @@ textarea::placeholder {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.gallery-card {
+  position: relative;
+}
+
+.gallery-card__delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.15s var(--ease);
+}
+.gallery-card__delete:hover {
+  background: rgba(229, 57, 53, 0.9);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.video-modal {
+  position: relative;
+  background: #000;
+  border-radius: var(--radius-lg);
+  max-width: min(92vw, 960px);
+  max-height: 90vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeInScale 0.2s ease;
+}
+.video-modal__player {
+  width: 100%;
+  max-height: 90vh;
+  border-radius: var(--radius-lg);
+  display: block;
+}
+.video-modal .modal-close {
+  top: -36px;
+  right: 0;
+  color: #fff;
+  font-size: 26px;
+}
+
+.gallery-card__preview--video {
+  cursor: pointer;
+}
+
+.gallery-card__meta-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 
 .gallery-card__model {

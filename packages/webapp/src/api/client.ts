@@ -217,6 +217,8 @@ export const api = {
     },
     download: (id: string) =>
       request<{ success: boolean }>(`/gallery/${id}/download`, { method: "POST" }),
+    previewUrl: (id: string) => request<{ url: string }>(`/gallery/${id}/preview-url`),
+    delete: (id: string) => request<{ success: boolean }>(`/gallery/${id}`, { method: "DELETE" }),
   },
 
   imageSettings: {

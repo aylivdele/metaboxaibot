@@ -29,15 +29,24 @@ export function VoicesView({ onGoToVoiceClone }: { onGoToVoiceClone?: () => void
     setLoadingId(null);
   };
 
-  const playPreview = (id: string, url: string) => {
+  const playPreview = async (id: string) => {
     if (playingId === id || loadingId === id) {
       stopAudio();
       return;
     }
     stopAudio();
+    setLoadingId(id);
+    let url: string;
+    try {
+      const res = await api.userVoices.previewUrl(id);
+      url = res.url;
+    } catch (e) {
+      console.error("Failed to resolve voice preview URL", e);
+      setLoadingId(null);
+      return;
+    }
     const audio = new Audio(url);
     audioRef.current = audio;
-    setLoadingId(id);
     audio.addEventListener(
       "canplay",
       () => {
@@ -102,10 +111,10 @@ export function VoicesView({ onGoToVoiceClone }: { onGoToVoiceClone?: () => void
               <div className="uploads-list">
                 {clonedVoices.map((voice) => (
                   <div key={voice.id} className="uploads-item">
-                    {voice.previewUrl && (
+                    {voice.hasAudio && (
                       <button
                         className={`voice-picker__play-btn${playingId === voice.id ? " voice-picker__play-btn--playing" : ""}${loadingId === voice.id ? " voice-picker__play-btn--loading" : ""}`}
-                        onClick={() => playPreview(voice.id, voice.previewUrl!)}
+                        onClick={() => void playPreview(voice.id)}
                         title={t("uploads.play")}
                       >
                         {loadingId === voice.id ? "⏳" : playingId === voice.id ? "⏹" : "▶"}

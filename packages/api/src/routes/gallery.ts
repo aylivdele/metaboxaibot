@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
-import { getFileUrl } from "../services/s3.service.js";
+import { getFileUrl, deleteFile } from "../services/s3.service.js";
 import { generateDownloadToken } from "../utils/download-token.js";
 import { config, getT } from "@metabox/shared";
 
@@ -85,14 +85,19 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     ]);
 
     // Resolve stable URLs for each item via signed download tokens.
-    // thumbnailUrl: thumbnail WebP when available (images only), else null.
+    // thumbnailUrl: thumbnail WebP when available, else null.
     // previewUrl: full-res file — S3 token when available, else provider URL.
+    //   Videos skip this resolution to keep list payloads light; callers fetch
+    //   the URL on-demand via GET /gallery/:id/preview-url when the user opens
+    //   the player.
     const items = rawItems.map((item) => {
       const base = config.api.publicUrl;
       const previewUrl =
-        item.s3Key && base
-          ? `${base}/download/${generateDownloadToken(item.s3Key, userId)}`
-          : item.outputUrl;
+        item.section === "video"
+          ? null
+          : item.s3Key && base
+            ? `${base}/download/${generateDownloadToken(item.s3Key, userId)}`
+            : item.outputUrl;
       const thumbnailUrl =
         item.thumbnailS3Key && base
           ? `${base}/download/${generateDownloadToken(item.thumbnailS3Key, userId)}`
@@ -188,6 +193,63 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         throw err;
       }
     }
+
+    return { success: true };
+  });
+
+  /**
+   * GET /gallery/:id/preview-url
+   * Returns a playable URL for the gallery item on demand. Used primarily by
+   * the webapp video player modal — list responses no longer include
+   * previewUrl for videos to keep payloads small. Falls back to the raw
+   * provider outputUrl when no S3 key is available.
+   */
+  fastify.get<{ Params: { id: string } }>("/gallery/:id/preview-url", async (request, reply) => {
+    const userId = (request as AuthRequest).userId;
+    const { id } = request.params;
+
+    const job = await db.generationJob.findUnique({
+      where: { id },
+      select: { id: true, userId: true, s3Key: true, outputUrl: true },
+    });
+
+    if (!job) return reply.code(404).send({ error: "Not found" });
+    if (job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+
+    const base = config.api.publicUrl;
+    const url =
+      job.s3Key && base
+        ? `${base}/download/${generateDownloadToken(job.s3Key, userId)}`
+        : job.outputUrl;
+
+    if (!url) return reply.code(422).send({ error: "File not available" });
+    return { url };
+  });
+
+  /**
+   * DELETE /gallery/:id
+   * Removes a gallery item (completed generation job) along with its S3
+   * artifacts (main file + thumbnail, if any). The DB row is deleted only
+   * after S3 cleanup is attempted — failures in S3 are logged via the
+   * boolean return but do not block the DB delete (the user's intent is to
+   * remove the item from their gallery).
+   */
+  fastify.delete<{ Params: { id: string } }>("/gallery/:id", async (request, reply) => {
+    const userId = (request as AuthRequest).userId;
+    const { id } = request.params;
+
+    const job = await db.generationJob.findUnique({
+      where: { id },
+      select: { id: true, userId: true, s3Key: true, thumbnailS3Key: true },
+    });
+
+    if (!job) return reply.code(404).send({ error: "Not found" });
+    if (job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+
+    if (job.s3Key) await deleteFile(job.s3Key);
+    if (job.thumbnailS3Key) await deleteFile(job.thumbnailS3Key);
+
+    await db.generationJob.delete({ where: { id } });
 
     return { success: true };
   });

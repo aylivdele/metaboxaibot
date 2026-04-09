@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { TranslationKey } from "../i18n.js";
@@ -256,6 +256,12 @@ function GalleryTab() {
     await api.gallery.download(id);
   }, []);
 
+  const handleDelete = useCallback(async (id: string) => {
+    await api.gallery.delete(id);
+    setItems((prev) => prev.filter((it) => it.id !== id));
+    setTotal((prev) => Math.max(0, prev - 1));
+  }, []);
+
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
@@ -282,7 +288,7 @@ function GalleryTab() {
       {!loading && items.length > 0 && (
         <div className={`gallery-grid${section === "image" ? " gallery-grid--2col" : ""}`}>
           {items.map((item) => (
-            <GalleryCard key={item.id} item={item} onSend={handleSend} />
+            <GalleryCard key={item.id} item={item} onSend={handleSend} onDelete={handleDelete} />
           ))}
         </div>
       )}
@@ -312,18 +318,73 @@ function GalleryTab() {
   );
 }
 
+function AudioPlayButton({ url, title }: { url: string; title: string }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+      audioRef.current = null;
+    };
+  }, []);
+
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (playing || loading) {
+      audioRef.current?.pause();
+      setPlaying(false);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.addEventListener(
+      "canplay",
+      () => {
+        setLoading(false);
+        setPlaying(true);
+      },
+      { once: true },
+    );
+    audio.onended = () => setPlaying(false);
+    audio.play().catch(() => {
+      setLoading(false);
+      setPlaying(false);
+    });
+  };
+
+  return (
+    <button
+      className={`voice-picker__play-btn${playing ? " voice-picker__play-btn--playing" : ""}${loading ? " voice-picker__play-btn--loading" : ""}`}
+      onClick={toggle}
+      title={title}
+    >
+      {loading ? "⏳" : playing ? "⏹" : "▶"}
+    </button>
+  );
+}
+
 function GalleryCard({
   item,
   onSend,
+  onDelete,
 }: {
   item: GalleryItem;
   onSend: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   const { t, locale } = useI18n();
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
 
   const handleSend = async () => {
     setLoading(true);
@@ -344,8 +405,67 @@ function GalleryCard({
   const isVideo = item.section === "video";
   const isAudio = item.section === "audio";
 
+  const openVideo = async () => {
+    if (videoLoading || videoUrl) return;
+    setVideoLoading(true);
+    try {
+      const res = await api.gallery.previewUrl(item.id);
+      setVideoUrl(res.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setVideoLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    try {
+      await onDelete(item.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
   return (
     <div className="gallery-card">
+      <button
+        type="button"
+        className="gallery-card__delete"
+        onClick={() => setConfirmDelete(true)}
+        title={t("gallery.delete")}
+        aria-label={t("gallery.delete")}
+      >
+        ×
+      </button>
+      {confirmDelete && (
+        <div className="modal-overlay" onClick={() => !deleting && setConfirmDelete(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">{t("gallery.confirmDeleteTitle")}</div>
+            <div className="modal-text">{t("gallery.confirmDeleteText")}</div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+              >
+                {t("gallery.cancel")}
+              </button>
+              <button
+                type="button"
+                className="btn btn--danger"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? "…" : t("gallery.confirmDelete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {isImage && previewUrl && !imgError && (
         <div className="gallery-card__preview">
           <img
@@ -356,17 +476,45 @@ function GalleryCard({
           />
         </div>
       )}
-      {isVideo && previewUrl && (
-        <div className="gallery-card__preview gallery-card__preview--video">
-          <video src={previewUrl} preload="metadata" controls={false} muted playsInline />
-          <div className="gallery-card__video-overlay">▶</div>
+      {isVideo && item.thumbnailUrl && !imgError && (
+        <div
+          className="gallery-card__preview gallery-card__preview--video"
+          onClick={openVideo}
+          role="button"
+          tabIndex={0}
+        >
+          <img
+            src={item.thumbnailUrl}
+            alt={item.prompt}
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+          <div className="gallery-card__video-overlay">{videoLoading ? "⏳" : "▶"}</div>
         </div>
       )}
-      {isAudio && <div className="gallery-card__audio-icon">🎵</div>}
-
+      {videoUrl && (
+        <div className="modal-overlay" onClick={() => setVideoUrl(null)}>
+          <div className="video-modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setVideoUrl(null)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <video src={videoUrl} controls autoPlay playsInline className="video-modal__player" />
+          </div>
+        </div>
+      )}
       <div className="gallery-card__body">
         <div className="gallery-card__meta">
-          <span className="gallery-card__model">{item.modelId}</span>
+          <div className="gallery-card__meta-left">
+            {isAudio && previewUrl && (
+              <AudioPlayButton url={previewUrl} title={t("uploads.play")} />
+            )}
+            <span className="gallery-card__model">{item.modelId}</span>
+          </div>
           {item.completedAt && (
             <span className="gallery-card__date">
               {new Date(item.completedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
