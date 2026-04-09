@@ -149,11 +149,12 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send({ error: "User not found" });
     }
 
-    // Update User token balances (SET, not increment)
+    // Update User token balances (INCREMENT pending tokens onto existing balance)
     const userData: Record<string, unknown> = {};
-    if (subscriptionTokenBalance !== undefined)
-      userData.subscriptionTokenBalance = subscriptionTokenBalance;
-    if (tokenBalance !== undefined) userData.tokenBalance = tokenBalance;
+    if (subscriptionTokenBalance !== undefined && subscriptionTokenBalance > 0)
+      userData.subscriptionTokenBalance = { increment: subscriptionTokenBalance };
+    if (tokenBalance !== undefined && tokenBalance > 0)
+      userData.tokenBalance = { increment: tokenBalance };
 
     if (Object.keys(userData).length > 0) {
       await db.user.update({ where: { id: userId }, data: userData });

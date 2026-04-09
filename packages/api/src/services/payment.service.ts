@@ -158,7 +158,10 @@ export const paymentService = {
         currentSub && currentSub.isActive && currentSub.endDate > startDate
           ? currentSub.endDate
           : startDate;
-      const endDate = endDateOverride ?? add(baseDate, { months });
+      // End of day MSK (23:59:59.999 Moscow time)
+      const rawEnd = endDateOverride ?? add(baseDate, { months });
+      const mskDateStr = rawEnd.toLocaleDateString("sv-SE", { timeZone: "Europe/Moscow" });
+      const endDate = new Date(mskDateStr + "T23:59:59.999+03:00");
 
       await db.$transaction([
         db.user.update({

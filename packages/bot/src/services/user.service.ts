@@ -44,8 +44,11 @@ export const userService = {
   },
 
   async creditWelcomeBonus(userId: bigint): Promise<void> {
-    const trialEndDate = new Date();
-    trialEndDate.setDate(trialEndDate.getDate() + 3);
+    // End of day MSK (23:59:59.999 Moscow time) for trial period
+    const rawEnd = new Date();
+    rawEnd.setDate(rawEnd.getDate() + 3);
+    const mskDateStr = rawEnd.toLocaleDateString("sv-SE", { timeZone: "Europe/Moscow" });
+    const trialEndDate = new Date(mskDateStr + "T23:59:59.999+03:00");
 
     await db.$transaction([
       db.user.update({
