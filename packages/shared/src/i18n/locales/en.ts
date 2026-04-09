@@ -133,6 +133,8 @@ export default {
       "❌ Higgsfield requires an image to generate video. Please send a photo first, then your text prompt.",
     runwayRequiresImage:
       "❌ Runway requires an image to generate video. Please send a photo first, then your text prompt.",
+    heygenNeedsVoice:
+      "❌ HeyGen requires either an official voice selected in ⚙ Management or a voice message containing speech.",
     imageIgnoredUnsupported:
       "⚠️ This model does not support image input — your photo will be ignored.",
     hintVideoDefault:

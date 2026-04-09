@@ -268,6 +268,16 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
     // Build voice override: raw recording > EL TTS > nothing (adapter uses configured voice_id)
     const effectiveVoiceS3Key = rawVoiceS3Key ?? elTtsS3Key ?? undefined;
 
+    // HeyGen requires either an explicitly selected official voice or an audio file
+    if (modelId === "heygen") {
+      const explicitVoiceId = (fullModelSettings.voice_id as string | undefined)?.trim();
+      if (!explicitVoiceId && !effectiveVoiceS3Key) {
+        await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+        await ctx.reply(ctx.t.video.heygenNeedsVoice);
+        return;
+      }
+    }
+
     await videoGenerationService.submitVideo({
       userId: ctx.user.id,
       modelId,
@@ -424,6 +434,19 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
 
     const videoSettings = await userStateService.getVideoSettings(ctx.user.id);
     const modelSettings = videoSettings[modelId];
+
+    // HeyGen requires an explicitly selected official voice for photo+caption flow
+    // (this path does not carry voice recordings — those go via handleVideoMessage)
+    if (modelId === "heygen") {
+      const allModelSettings = await userStateService.getModelSettings(ctx.user.id);
+      const fullModelSettings = allModelSettings[modelId] ?? {};
+      const explicitVoiceId = (fullModelSettings.voice_id as string | undefined)?.trim();
+      if (!explicitVoiceId) {
+        await ctx.reply(ctx.t.video.heygenNeedsVoice);
+        return;
+      }
+    }
+
     const pendingMsg = await ctx.reply(ctx.t.video.queuing);
 
     try {
