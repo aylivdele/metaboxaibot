@@ -1,6 +1,7 @@
 import { config } from "@metabox/shared";
 import type { AvatarAdapter, AvatarCreateResult, AvatarPollResult } from "./base.adapter.js";
 import { fetchWithLog } from "../../utils/fetch.js";
+import { resolveImageMimeType } from "../../utils/mime-detect.js";
 
 const HEYGEN_UPLOAD = "https://upload.heygen.com";
 
@@ -19,9 +20,12 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
    * Creation is synchronous — no training job needed.
    */
   async create(imageBuffer: Buffer, contentType: string): Promise<AvatarCreateResult> {
+    // HTTP Content-Type from S3 presigned URLs is often application/octet-stream.
+    // Detect the real image type from magic bytes so HeyGen accepts the upload.
+    const resolvedContentType = resolveImageMimeType(imageBuffer, contentType);
     const uploadRes = await fetchWithLog(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",
-      headers: { "X-Api-Key": this.apiKey, "Content-Type": contentType },
+      headers: { "X-Api-Key": this.apiKey, "Content-Type": resolvedContentType },
       body: imageBuffer,
     });
     if (!uploadRes.ok) {
