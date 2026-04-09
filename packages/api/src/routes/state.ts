@@ -186,38 +186,24 @@ async function sendModelActivatedNotification(
   userId: bigint,
   section: string,
   modelId: string,
+  sectionSwitched: boolean,
 ): Promise<void> {
   const model = AI_MODELS[modelId];
   if (!model || !config.bot.token) return;
 
-  const [user, allSettings, botState] = await Promise.all([
+  const [user, allSettings] = await Promise.all([
     db.user.findUnique({ where: { id: userId }, select: { language: true } }),
     userStateService.getModelSettings(userId),
-    userStateService.get(userId),
   ]);
   const t = getT((user?.language ?? "en") as Language);
   const modelSettings = allSettings[modelId] ?? {};
 
-  // If the user is currently in a different section, switch them first
-  if (botState?.section !== section) {
-    const newState =
-      section === "audio"
-        ? "AUDIO_ACTIVE"
-        : section === "design"
-          ? "DESIGN_ACTIVE"
-          : section === "video"
-            ? "VIDEO_ACTIVE"
-            : undefined;
-    if (newState) {
-      await Promise.all([
-        sendSectionMessage(userId, section, t, config.bot.token, config.bot.webappUrl),
-        userStateService.setState(
-          userId,
-          newState as Parameters<typeof userStateService.setState>[1],
-          section as Section,
-        ),
-      ]);
-    }
+  // Section switch (state/section) was already performed synchronously in the route handler.
+  // Here we only send the optional section-switch keyboard message if needed.
+  if (sectionSwitched) {
+    await sendSectionMessage(userId, section, t, config.bot.token, config.bot.webappUrl).catch(
+      (reason) => logger.warn(reason, "Could not send section switch message"),
+    );
   }
 
   const defaultDuration =
@@ -350,7 +336,33 @@ export const stateRoutes: FastifyPluginAsync = async (fastify) => {
       modelId,
     );
 
-    void sendModelActivatedNotification(userId, section, modelId);
+    // Synchronously switch the bot state + section so the very next user message
+    // is routed to the newly-activated section (avoids a race with the async
+    // notification send). sendModelActivatedNotification will only send the
+    // optional section-switch keyboard message.
+    const newState =
+      section === "audio"
+        ? "AUDIO_ACTIVE"
+        : section === "design"
+          ? "DESIGN_ACTIVE"
+          : section === "video"
+            ? "VIDEO_ACTIVE"
+            : undefined;
+
+    let sectionSwitched = false;
+    if (newState) {
+      const prev = await userStateService.get(userId);
+      if (prev?.section !== section) {
+        sectionSwitched = true;
+        await userStateService.setState(
+          userId,
+          newState as Parameters<typeof userStateService.setState>[1],
+          section as Section,
+        );
+      }
+    }
+
+    void sendModelActivatedNotification(userId, section, modelId, sectionSwitched);
 
     return { success: true };
   });
