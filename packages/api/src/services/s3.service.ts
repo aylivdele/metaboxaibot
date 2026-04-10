@@ -9,7 +9,12 @@ import { config } from "@metabox/shared";
 import sharp from "sharp";
 import { createRequire } from "module";
 import ffmpeg from "fluent-ffmpeg";
-import { Readable, PassThrough } from "stream";
+import { PassThrough } from "stream";
+import { writeFile, unlink } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+import { randomUUID } from "crypto";
+import { logger } from "../logger.js";
 
 const _require = createRequire(import.meta.url);
 const ffmpegPath: string | null = _require("ffmpeg-static") as string | null;
@@ -162,33 +167,45 @@ export async function generateThumbnail(buf: Buffer, contentType: string): Promi
 /**
  * Extracts a single frame (~1s in) from a video buffer and returns a
  * 400px-wide WebP thumbnail. Returns null on any failure.
+ *
+ * We write the buffer to a temp file first instead of piping via stdin
+ * because ffmpeg's `-ss` seek requires a seekable input — non-seekable
+ * stdin streams silently produce zero frames, which is what made every
+ * previous video job end up with thumbnailS3Key=null.
  */
 export async function generateVideoThumbnail(buf: Buffer): Promise<Buffer | null> {
+  const tmpFile = join(tmpdir(), `vid-${randomUUID()}.mp4`);
   try {
-    const rawFrame: Buffer = await new Promise((resolve, reject) => {
-      const readable = new Readable({ read() {} });
-      readable.push(buf);
-      readable.push(null);
+    await writeFile(tmpFile, buf);
 
+    const rawFrame: Buffer = await new Promise((resolve, reject) => {
       const output = new PassThrough();
       const chunks: Buffer[] = [];
       output.on("data", (c: Buffer) => chunks.push(c));
       output.on("end", () => resolve(Buffer.concat(chunks)));
       output.on("error", reject);
 
-      ffmpeg(readable)
+      ffmpeg(tmpFile)
         .inputOptions(["-ss", "1"])
         .outputOptions(["-frames:v", "1", "-f", "image2", "-vcodec", "mjpeg"])
         .on("error", reject)
         .pipe(output, { end: true });
     });
 
+    if (!rawFrame.length) {
+      logger.warn("generateVideoThumbnail: ffmpeg produced zero-byte frame");
+      return null;
+    }
+
     return await sharp(rawFrame)
       .resize({ width: 400, withoutEnlargement: true })
       .webp({ quality: 75 })
       .toBuffer();
-  } catch {
+  } catch (err) {
+    logger.warn({ err }, "generateVideoThumbnail failed");
     return null;
+  } finally {
+    await unlink(tmpFile).catch(() => void 0);
   }
 }
 

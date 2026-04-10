@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { TranslationKey } from "../i18n.js";
@@ -318,7 +319,13 @@ function GalleryTab() {
   );
 }
 
-function AudioPlayButton({ url, title }: { url: string; title: string }) {
+function AudioPlayButton({
+  resolveUrl,
+  title,
+}: {
+  resolveUrl: () => Promise<string>;
+  title: string;
+}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -330,7 +337,7 @@ function AudioPlayButton({ url, title }: { url: string; title: string }) {
     };
   }, []);
 
-  const toggle = (e: React.MouseEvent) => {
+  const toggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (playing || loading) {
       audioRef.current?.pause();
@@ -339,6 +346,13 @@ function AudioPlayButton({ url, title }: { url: string; title: string }) {
       return;
     }
     setLoading(true);
+    let url: string;
+    try {
+      url = await resolveUrl();
+    } catch {
+      setLoading(false);
+      return;
+    }
     const audio = new Audio(url);
     audioRef.current = audio;
     audio.addEventListener(
@@ -400,10 +414,13 @@ function GalleryCard({
     }
   };
 
-  const previewUrl = item.outputUrl;
   const isImage = item.section === "image";
   const isVideo = item.section === "video";
   const isAudio = item.section === "audio";
+  // Image preview: prefer the server-resolved thumbnail (fast, small WebP),
+  // then any full previewUrl the backend bothered to sign, then the raw
+  // provider outputUrl as last resort.
+  const imagePreviewUrl = item.thumbnailUrl ?? item.previewUrl ?? item.outputUrl;
 
   const openVideo = async () => {
     if (videoLoading || videoUrl) return;
@@ -416,6 +433,11 @@ function GalleryCard({
     } finally {
       setVideoLoading(false);
     }
+  };
+
+  const resolveAudioUrl = async () => {
+    const res = await api.gallery.previewUrl(item.id);
+    return res.url;
   };
 
   const handleConfirmDelete = async () => {
@@ -440,81 +462,44 @@ function GalleryCard({
       >
         ×
       </button>
-      {confirmDelete && (
-        <div className="modal-overlay" onClick={() => !deleting && setConfirmDelete(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">{t("gallery.confirmDeleteTitle")}</div>
-            <div className="modal-text">{t("gallery.confirmDeleteText")}</div>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="btn btn--ghost"
-                onClick={() => setConfirmDelete(false)}
-                disabled={deleting}
-              >
-                {t("gallery.cancel")}
-              </button>
-              <button
-                type="button"
-                className="btn btn--danger"
-                onClick={handleConfirmDelete}
-                disabled={deleting}
-              >
-                {deleting ? "…" : t("gallery.confirmDelete")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {isImage && previewUrl && !imgError && (
+      {isImage && imagePreviewUrl && !imgError && (
         <div className="gallery-card__preview">
           <img
-            src={previewUrl}
+            src={imagePreviewUrl}
             alt={item.prompt}
             loading="lazy"
             onError={() => setImgError(true)}
           />
         </div>
       )}
-      {isVideo && item.thumbnailUrl && !imgError && (
+      {isVideo && (
         <div
           className="gallery-card__preview gallery-card__preview--video"
           onClick={openVideo}
           role="button"
           tabIndex={0}
         >
-          <img
-            src={item.thumbnailUrl}
-            alt={item.prompt}
-            loading="lazy"
-            onError={() => setImgError(true)}
-          />
+          {item.thumbnailUrl && !imgError ? (
+            <img
+              src={item.thumbnailUrl}
+              alt={item.prompt}
+              loading="lazy"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <div className="gallery-card__placeholder">🎬</div>
+          )}
           <div className="gallery-card__video-overlay">{videoLoading ? "⏳" : "▶"}</div>
         </div>
       )}
-      {videoUrl && (
-        <div className="modal-overlay" onClick={() => setVideoUrl(null)}>
-          <div className="video-modal" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              className="modal-close"
-              onClick={() => setVideoUrl(null)}
-              aria-label="Close"
-            >
-              ×
-            </button>
-            <video src={videoUrl} controls autoPlay playsInline className="video-modal__player" />
-          </div>
+      {isAudio && (
+        <div className="gallery-card__preview gallery-card__preview--audio">
+          <AudioPlayButton resolveUrl={resolveAudioUrl} title={t("uploads.play")} />
         </div>
       )}
       <div className="gallery-card__body">
         <div className="gallery-card__meta">
-          <div className="gallery-card__meta-left">
-            {isAudio && previewUrl && (
-              <AudioPlayButton url={previewUrl} title={t("uploads.play")} />
-            )}
-            <span className="gallery-card__model">{item.modelId}</span>
-          </div>
+          <span className="gallery-card__model">{item.modelId}</span>
           {item.completedAt && (
             <span className="gallery-card__date">
               {new Date(item.completedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
@@ -531,6 +516,51 @@ function GalleryCard({
           {loading ? "…" : sent ? t("gallery.sent") : t("gallery.download")}
         </button>
       </div>
+      {confirmDelete &&
+        createPortal(
+          <div className="modal-overlay" onClick={() => !deleting && setConfirmDelete(false)}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-title">{t("gallery.confirmDeleteTitle")}</div>
+              <div className="modal-text">{t("gallery.confirmDeleteText")}</div>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={deleting}
+                >
+                  {t("gallery.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  onClick={handleConfirmDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? "…" : t("gallery.confirmDelete")}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+      {videoUrl &&
+        createPortal(
+          <div className="modal-overlay" onClick={() => setVideoUrl(null)}>
+            <div className="video-modal" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setVideoUrl(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+              <video src={videoUrl} controls autoPlay playsInline className="video-modal__player" />
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

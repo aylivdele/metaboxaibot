@@ -93,7 +93,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     const items = rawItems.map((item) => {
       const base = config.api.publicUrl;
       const previewUrl =
-        item.section === "video"
+        item.section !== "design"
           ? null
           : item.s3Key && base
             ? `${base}/download/${generateDownloadToken(item.s3Key, userId)}`
