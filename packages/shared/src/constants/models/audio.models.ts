@@ -295,7 +295,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         key: "auto_translate_prompt",
         label: "Автоперевод промпта",
         description:
-          "Эта модель работает только с промптами на английском языке, мы можем перевести его для вас за отдельную плату.",
+          "Эта модель работает только (либо значительно лучше) с промптами на английском языке, мы можем перевести его для вас за отдельную плату.",
         type: "toggle",
         default: false,
       },
@@ -319,6 +319,14 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     settings: [
+      {
+        key: "auto_translate_prompt",
+        label: "Автоперевод промпта",
+        description:
+          "Эта модель работает только (либо значительно лучше) с промптами на английском языке, мы можем перевести его для вас за отдельную плату.",
+        type: "toggle",
+        default: false,
+      },
       {
         key: "duration_seconds",
         label: "Длительность (сек)",

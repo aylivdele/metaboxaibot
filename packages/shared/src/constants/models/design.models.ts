@@ -750,6 +750,14 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     // Replicate/SDXL accepts arbitrary dimensions — offer extended set
     supportedAspectRatios: ["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"],
     settings: [
+      {
+        key: "auto_translate_prompt",
+        label: "Автоперевод промпта",
+        description:
+          "Эта модель работает только (либо значительно лучше) с промптами на английском языке, мы можем перевести его для вас за отдельную плату.",
+        type: "toggle",
+        default: false,
+      },
       mkAspectRatio(["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"]),
       {
         key: "negative_prompt",
