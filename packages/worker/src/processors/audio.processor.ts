@@ -88,6 +88,7 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
         prompt,
         modelSettings,
         BigInt(userIdStr),
+        modelId,
       );
 
       if (!adapter.isAsync && adapter.generate) {

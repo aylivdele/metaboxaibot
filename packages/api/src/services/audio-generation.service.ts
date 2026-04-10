@@ -88,6 +88,7 @@ export const audioGenerationService = {
           prompt,
           resolvedModelSettings,
           userId,
+          modelId,
         );
         const result = await adapter.generate({
           prompt: effectivePrompt,

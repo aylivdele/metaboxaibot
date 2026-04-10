@@ -11,6 +11,7 @@ export async function deductTokens(
   amount: number,
   modelId: string,
   dialogId?: string,
+  reason?: string,
 ): Promise<void> {
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
@@ -34,7 +35,7 @@ export async function deductTokens(
         userId,
         amount: -amount,
         type: "debit",
-        reason: "ai_usage",
+        reason: reason ?? "ai_usage",
         modelId,
         dialogId: dialogId ?? null,
       },

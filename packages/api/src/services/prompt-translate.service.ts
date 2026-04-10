@@ -50,6 +50,7 @@ export async function translatePromptIfNeeded(
   prompt: string,
   modelSettings: Record<string, unknown> | undefined,
   userId: bigint,
+  forModel: string,
 ): Promise<string> {
   if (!modelSettings || modelSettings.auto_translate_prompt !== true) return prompt;
   if (looksEnglish(prompt)) return prompt;
@@ -77,7 +78,7 @@ export async function translatePromptIfNeeded(
     const outputTokens = response.usage?.output_tokens ?? 0;
     const cost = calculateCost(model, inputTokens, outputTokens);
     if (cost > 0) {
-      await deductTokens(userId, cost, TRANSLATE_MODEL_ID).catch((err) => {
+      await deductTokens(userId, cost, forModel, undefined, "autotranslate").catch((err) => {
         logger.warn({ err, userId: userId.toString() }, "Failed to deduct translation cost");
       });
     }

@@ -91,6 +91,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
           prompt,
           modelSettings,
           BigInt(userIdStr),
+          modelId,
         );
         providerJobId = await adapter.submit({
           prompt: effectivePrompt,

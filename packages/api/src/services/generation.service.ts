@@ -101,7 +101,12 @@ export const generationService = {
     if (!adapter.isAsync && adapter.generate) {
       // ── Sync generation (DALL-E 3) ──────────────────────────────────────
       try {
-        const effectivePrompt = await translatePromptIfNeeded(prompt, modelSettings, userId);
+        const effectivePrompt = await translatePromptIfNeeded(
+          prompt,
+          modelSettings,
+          userId,
+          modelId,
+        );
         const result = await adapter.generate({
           prompt: effectivePrompt,
           negativePrompt,

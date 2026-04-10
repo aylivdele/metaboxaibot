@@ -33,6 +33,7 @@ const translations = {
     "profile.reason.metabox_purchase": "💳 Metabox purchase",
     "profile.reason.referral_bonus": "🎁 Referral bonus",
     "profile.reason.admin": "🔧 Admin adjustment",
+    "profile.reason.autotranslate": "📜 Autotranslation",
 
     // Banner
     "banner.welcome.title": "Welcome to Metabox",
@@ -336,6 +337,7 @@ const translations = {
     "profile.reason.purchase": "💳 Покупка токенов",
     "profile.reason.metabox_purchase": "💳 Покупка через Metabox",
     "profile.reason.referral_bonus": "🎁 Реферальный бонус",
+    "profile.reason.autotranslate": "📜 Автоперевод",
     "profile.reason.admin": "🔧 Корректировка",
 
     // Banner

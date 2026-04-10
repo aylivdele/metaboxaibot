@@ -87,6 +87,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
           prompt,
           modelSettings,
           BigInt(userIdStr),
+          modelId,
         );
         providerJobId = await adapter.submit({
           prompt: effectivePrompt,
