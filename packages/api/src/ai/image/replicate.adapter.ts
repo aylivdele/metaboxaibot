@@ -36,7 +36,7 @@ const MODEL_IDS: Record<string, string> = {
 };
 
 /** Ideogram model IDs — accept `style_reference_images` array instead of `image`. */
-const IDEOGRAM_MODELS = new Set(["ideogram", "ideogram-balanced", "ideogram-turbo"]);
+const IDEOGRAM_MODELS = new Set(["ideogram-quality", "ideogram-balanced", "ideogram-turbo"]);
 
 /**
  * Replicate adapter — async image generation.

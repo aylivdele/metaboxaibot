@@ -1,8 +1,4 @@
-import {
-  GoogleGenAI,
-  type GenerateVideosOperation,
-  type GenerateVideosParameters,
-} from "@google/genai";
+import { GoogleGenAI, GenerateVideosOperation, type GenerateVideosParameters } from "@google/genai";
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { fetchWithLog, logCall } from "../../utils/fetch.js";
@@ -87,8 +83,10 @@ export class VeoAdapter implements VideoAdapter {
   async poll(operationName: string): Promise<VideoResult | null> {
     logCall(this.apiModel, "getVideosOperation", { operationName });
 
+    const ref = new GenerateVideosOperation();
+    ref.name = operationName;
     const operation = await this.ai.operations.getVideosOperation({
-      operation: { name: operationName } as GenerateVideosOperation,
+      operation: ref,
     });
 
     if (operation.error) throw new Error(`Veo operation error: ${JSON.stringify(operation.error)}`);
