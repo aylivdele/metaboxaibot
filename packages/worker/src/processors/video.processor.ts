@@ -215,7 +215,12 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
       const model = AI_MODELS[modelId];
       if (model) {
-        const effectiveDuration = actualDuration ?? duration ?? 5;
+        // Providers that bill per whole second — round up so we never under-charge.
+        const CEIL_DURATION_MODELS = new Set(["heygen"]);
+        const rawDuration = actualDuration ?? duration ?? 5;
+        const effectiveDuration = CEIL_DURATION_MODELS.has(modelId)
+          ? Math.ceil(rawDuration)
+          : rawDuration;
         const videoTokens = model.costUsdPerMVideoToken
           ? computeVideoTokens(
               model,
