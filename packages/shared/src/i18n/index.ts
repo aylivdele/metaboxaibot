@@ -117,6 +117,7 @@ export interface Translations {
     higgsfieldRequiresImage: string;
     runwayRequiresImage: string;
     heygenNeedsVoice: string;
+    heygenNeedsAvatar: string;
     imageIgnoredUnsupported: string;
     hintVideoDefault: string;
     avatarCreationCancelled: string;

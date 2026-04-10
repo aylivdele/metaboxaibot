@@ -268,8 +268,20 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
     // Build voice override: raw recording > EL TTS > nothing (adapter uses configured voice_id)
     const effectiveVoiceS3Key = rawVoiceS3Key ?? elTtsS3Key ?? undefined;
 
-    // HeyGen requires either an explicitly selected official voice or an audio file
+    // HeyGen requires an explicitly selected avatar/photo and voice
     if (modelId === "heygen") {
+      const hasAvatar =
+        !!imageUrl ||
+        !!(fullModelSettings.image_asset_id as string | undefined)?.trim() ||
+        !!(fullModelSettings.avatar_id as string | undefined)?.trim() ||
+        !!(fullModelSettings.avatar_photo_s3key as string | undefined)?.trim() ||
+        !!(fullModelSettings.avatar_photo_url as string | undefined)?.trim();
+      if (!hasAvatar) {
+        await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+        await ctx.reply(ctx.t.video.heygenNeedsAvatar);
+        return;
+      }
+
       const explicitVoiceId = (fullModelSettings.voice_id as string | undefined)?.trim();
       if (!explicitVoiceId && !effectiveVoiceS3Key) {
         await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
@@ -664,6 +676,21 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
   }
 
   // Avatar model: trigger generation immediately — raw audio is the voice, no text prompt needed
+  // Check avatar is selected before queuing
+  if (modelId === "heygen") {
+    const allModelSettings = await userStateService.getModelSettings(userId);
+    const ms = allModelSettings[modelId] ?? {};
+    const hasAvatar =
+      !!(ms.image_asset_id as string | undefined)?.trim() ||
+      !!(ms.avatar_id as string | undefined)?.trim() ||
+      !!(ms.avatar_photo_s3key as string | undefined)?.trim() ||
+      !!(ms.avatar_photo_url as string | undefined)?.trim();
+    if (!hasAvatar) {
+      await ctx.reply(ctx.t.video.heygenNeedsAvatar);
+      return;
+    }
+  }
+
   const pendingMsg = await ctx.reply(ctx.t.video.videoVoiceQueuing);
 
   try {
