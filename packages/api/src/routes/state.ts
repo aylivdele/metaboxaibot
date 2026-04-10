@@ -362,7 +362,7 @@ export const stateRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
 
-    void sendModelActivatedNotification(userId, section, modelId, sectionSwitched);
+    await sendModelActivatedNotification(userId, section, modelId, sectionSwitched);
 
     return { success: true };
   });

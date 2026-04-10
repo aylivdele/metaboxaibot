@@ -554,7 +554,13 @@ export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
   const imgRes = await fetch(tgUrl);
   if (!imgRes.ok) throw new Error(`Failed to fetch avatar photo from Telegram: ${imgRes.status}`);
   const imageBuffer = Buffer.from(await imgRes.arrayBuffer());
-  const contentType = mimeHint ?? imgRes.headers.get("content-type") ?? "image/jpeg";
+  // Telegram photo downloads often return application/octet-stream;
+  // for compressed photos mimeHint is undefined — default to image/jpeg.
+  const contentType =
+    mimeHint ??
+    (imgRes.headers.get("content-type")?.startsWith("image/")
+      ? imgRes.headers.get("content-type")!
+      : "image/jpeg");
 
   // Upload directly to HeyGen asset storage — synchronous, no worker needed
   const adapter = new HeyGenAvatarAdapter();

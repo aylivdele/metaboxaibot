@@ -151,15 +151,29 @@ export async function measureImageMegapixels(imageUrl: string): Promise<number> 
 /**
  * Generates a 400px-wide WebP thumbnail from an image buffer.
  * Returns null for SVG or non-image content types.
+ *
+ * `.rotate()` without arguments applies EXIF orientation so phone photos
+ * come out right-side-up in the thumbnail.
+ *
+ * The content-type guard treats unknown types (e.g. `application/octet-stream`)
+ * as potentially valid images — sharp will reject them safely if they aren't.
  */
 export async function generateThumbnail(buf: Buffer, contentType: string): Promise<Buffer | null> {
-  if (!contentType.startsWith("image/") || contentType === "image/svg+xml") return null;
+  if (contentType === "image/svg+xml") return null;
+  if (
+    contentType &&
+    !contentType.startsWith("image/") &&
+    contentType !== "application/octet-stream"
+  )
+    return null;
   try {
     return await sharp(buf)
+      .rotate() // honour EXIF orientation
       .resize({ width: 400, withoutEnlargement: true })
       .webp({ quality: 75 })
       .toBuffer();
-  } catch {
+  } catch (err) {
+    logger.warn({ err, contentType }, "generateThumbnail failed");
     return null;
   }
 }
