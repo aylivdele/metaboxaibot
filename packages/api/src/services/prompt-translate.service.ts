@@ -9,6 +9,29 @@ const SYSTEM_PROMPT =
   "Preserve meaning, tone, named entities, numbers, and any technical terms. " +
   "Respond with ONLY the translated text — no commentary, no quotes.";
 
+/**
+ * Returns true when the prompt already looks like English (or is purely
+ * numeric / punctuation / emoji). We check that every "letter" codepoint
+ * falls within the Basic Latin range (A-Z, a-z). Non-letter characters
+ * (digits, punctuation, whitespace, emoji) are ignored — they are
+ * language-neutral and shouldn't force a translation call.
+ */
+function looksEnglish(text: string): boolean {
+  for (const ch of text) {
+    const cp = ch.codePointAt(0)!;
+    // Skip ASCII non-letters, whitespace, and characters outside BMP letter
+    // ranges (emoji, symbols, etc.) — only test actual letter codepoints.
+    if (cp < 0x41) continue; // before 'A'
+    if (cp <= 0x5a) continue; // A-Z
+    if (cp < 0x61) continue; // between 'Z' and 'a' (punctuation)
+    if (cp <= 0x7a) continue; // a-z
+    if (cp < 0x80) continue; // remaining ASCII (DEL, etc.)
+    // Any non-ASCII letter (Cyrillic, CJK, Arabic, etc.) → not English
+    return false;
+  }
+  return true;
+}
+
 let cachedClient: OpenAI | null = null;
 function getClient(): OpenAI {
   if (!cachedClient) cachedClient = new OpenAI({ apiKey: config.ai.openai });
@@ -29,6 +52,7 @@ export async function translatePromptIfNeeded(
   userId: bigint,
 ): Promise<string> {
   if (!modelSettings || modelSettings.auto_translate_prompt !== true) return prompt;
+  if (looksEnglish(prompt)) return prompt;
 
   const model = AI_MODELS[TRANSLATE_MODEL_ID];
   if (!model) {

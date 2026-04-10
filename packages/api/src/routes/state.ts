@@ -28,7 +28,7 @@ function buildActivationCostLine(
   defaultDuration?: number,
 ): string {
   const isPerMPixel = (model.costUsdPerMPixel ?? 0) > 0;
-  const isPerSecond = model.costUsdPerSecond !== undefined;
+  const isPerSecond = model.costUsdPerSecond !== undefined && model.costUsdPerSecond > 0;
   const isPerKChar = model.costUsdPerKChar !== undefined;
 
   if (isPerMPixel) {
@@ -241,11 +241,9 @@ async function sendModelActivatedNotification(
   const lang = (user?.language ?? "en") as string;
   const { name: modelName, description: modelDesc } = resolveModelDisplay(modelId, lang, model);
   const text =
-    hint && modelId !== "voice-clone"
-      ? `${modelName}\n\n${modelDesc}\n\n${hint}\n\n${costLine}`
-      : hint
-        ? `${modelName}\n\n${modelDesc}\n\n${hint}`
-        : `${modelName}\n\n${modelDesc}\n\n${costLine}`;
+    modelId !== "voice-clone"
+      ? `${modelName}\n\n${modelDesc}\n\n${costLine}`
+      : `${modelName}\n\n${modelDesc}`;
 
   const webappUrl = config.bot.webappUrl;
   const replyMarkup = webappUrl
@@ -270,6 +268,17 @@ async function sendModelActivatedNotification(
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     }),
   }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
+
+  if (hint) {
+    await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: String(userId),
+        text: hint,
+      }),
+    }).catch((reason) => logger.warn(reason, `Could not send model hint`));
+  }
 }
 
 export const stateRoutes: FastifyPluginAsync = async (fastify) => {

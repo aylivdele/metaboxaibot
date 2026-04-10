@@ -255,8 +255,10 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
 
+    const model = AI_MODELS[modelId];
+
     if (!result.isPending && result.imageUrl) {
-      const caption = `🎨 ${prompt.slice(0, 200)}${sourceImageUrl ? ` ${ctx.t.design.withReference}` : ""}`;
+      const caption = `${model.name ?? modelId}: ${prompt.slice(0, 200)}${sourceImageUrl ? ` ${ctx.t.design.withReference}` : ""}`;
       await sendSyncImageResult(ctx, modelId, result, caption);
     } else {
       // Async — worker will notify when done

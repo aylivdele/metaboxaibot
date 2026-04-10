@@ -164,7 +164,7 @@ async function activateVideoModel(ctx: BotContext, modelId: string): Promise<voi
       ctx.user.language,
       model,
     );
-    await ctx.reply(`🎬 ${modelName}\n\n${modelDesc}\n\n${costLine}`, {
+    await ctx.reply(`${modelName}\n\n${modelDesc}\n\n${costLine}`, {
       reply_markup: kb,
     });
 
