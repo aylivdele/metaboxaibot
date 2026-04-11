@@ -47,6 +47,12 @@ export default {
     newDialogCreated:
       '💬 New dialog created. View all dialogs in the "⚙ Management" menu, "Dialogs" tab.',
     photoDefaultPrompt: "Here is the image",
+    docDefaultPrompt: "Analyze this document",
+    docOnlyPdf: "📄 Only PDF is currently supported. Please send a PDF file.",
+    docTooLarge: "📄 File is too large. Maximum size is 20 MB.",
+    docModelNotSupported:
+      "📄 The current model does not support documents. Change the model via ⚙ Management.",
+    docExtractFailed: "📄 Could not read the document. It may be password-protected or corrupted.",
     backToMain: "🏠 Main Menu",
     dialogSelected: "✅ Dialog selected: {title}\nModel: {model}",
   },

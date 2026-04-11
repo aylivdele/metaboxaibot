@@ -11,7 +11,12 @@ import {
 import { buildLanguageKeyboard } from "./keyboards/language.keyboard.js";
 import { handleMenu, handleGpt, handleDesign, handleAudio, handleVideo } from "./commands/menu.js";
 import { handleNoTool } from "./handlers/no-tool.handler.js";
-import { handleNewGptDialog, handleGptMessage, handleGptPhoto } from "./scenes/gpt.js";
+import {
+  handleNewGptDialog,
+  handleGptMessage,
+  handleGptPhoto,
+  handleGptDocument,
+} from "./scenes/gpt.js";
 import {
   buildDesignModelKeyboard,
   handleDesignModelSelect,
@@ -235,6 +240,7 @@ export function createBot(token: string): Bot<BotContext> {
     if (state?.state === "GPT_ACTIVE" || state?.state === "GPT_SECTION") {
       if (ctx.message?.photo) return handleGptPhoto(ctx);
       if (ctx.message?.document?.mime_type?.startsWith("image/")) return handleGptPhoto(ctx);
+      if (ctx.message?.document) return handleGptDocument(ctx);
       return handleGptMessage(ctx);
     }
     if (state?.state === "DESIGN_ACTIVE") {

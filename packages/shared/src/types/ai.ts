@@ -135,6 +135,19 @@ export interface AIModel {
   supportsVoice: boolean;
   supportsWeb: boolean; // выход в интернет
   supportsVideo?: boolean;
+  /**
+   * Model accepts PDF documents natively via content blocks (OpenAI Responses `input_file`,
+   * Anthropic `document`). When set, the chat service forwards attachment s3Keys to the
+   * adapter unchanged and the provider tokenises the PDF itself.
+   */
+  supportsDocuments?: boolean;
+  /**
+   * Model does NOT accept PDFs natively — the chat service extracts text from each PDF
+   * on the server (via pdf-parse) and inlines it into the prompt as
+   * `<document name="...">...</document>` blocks before invoking the adapter.
+   * Set for Gemini / DeepSeek / Qwen / Grok / Perplexity and similar text-only chat models.
+   */
+  documentTextExtractFallback?: boolean;
   isAsync: boolean; // требует очереди (для image/video/audio)
   contextStrategy: ContextStrategy;
   contextMaxMessages: number; // актуально для db_history: сколько сообщений отправлять

@@ -253,12 +253,21 @@ export interface BannerSlide {
   active: boolean;
 }
 
+export interface MessageAttachment {
+  s3Key: string;
+  mimeType: string;
+  name: string;
+  size?: number;
+  previewUrl?: string;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   mediaUrl: string | null;
   mediaType: string | null;
+  attachments?: MessageAttachment[];
   createdAt: string;
 }
 

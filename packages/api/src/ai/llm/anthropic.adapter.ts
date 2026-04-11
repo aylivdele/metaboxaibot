@@ -88,22 +88,46 @@ export class AnthropicAdapter implements LLMAdapter {
   }
 
   private buildMessages(input: LLMInput): Anthropic.MessageParam[] {
-    const history: Anthropic.MessageParam[] = (input.history ?? []).map((m: MessageRecord) => ({
-      role: m.role,
-      content: m.content,
-    }));
+    // Historical messages may carry attachments (PDFs) that need to be
+    // re-sent as `document` blocks on every request. User explicitly chose
+    // "resend every time" over "only current message" for quality.
+    const history: Anthropic.MessageParam[] = (input.history ?? []).map((m: MessageRecord) => {
+      const docs = (m.attachments ?? []).filter((a) => !!a.url);
+      if (docs.length === 0) return { role: m.role, content: m.content };
+
+      const blocks: Anthropic.ContentBlockParam[] = [
+        ...docs.map(
+          (d) =>
+            ({
+              type: "document" as const,
+              source: { type: "url" as const, url: d.url! },
+            }) as Anthropic.ContentBlockParam,
+        ),
+        ...(m.content ? [{ type: "text" as const, text: m.content }] : []),
+      ];
+      return { role: m.role, content: blocks };
+    });
 
     const urls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
+    const docs = (input.documentAttachments ?? []).filter((d) => !!d.url);
 
-    const userContent: Anthropic.MessageParam["content"] = urls.length
-      ? [
-          ...urls.map((url) => ({
-            type: "image" as const,
-            source: { type: "url" as const, url },
-          })),
-          ...(input.prompt ? [{ type: "text" as const, text: input.prompt }] : []),
-        ]
-      : input.prompt;
+    const userContent: Anthropic.MessageParam["content"] =
+      urls.length || docs.length
+        ? [
+            ...urls.map((url) => ({
+              type: "image" as const,
+              source: { type: "url" as const, url },
+            })),
+            ...docs.map(
+              (d) =>
+                ({
+                  type: "document" as const,
+                  source: { type: "url" as const, url: d.url! },
+                }) as Anthropic.ContentBlockParam,
+            ),
+            ...(input.prompt ? [{ type: "text" as const, text: input.prompt }] : []),
+          ]
+        : input.prompt;
 
     return [...history, { role: "user", content: userContent }];
   }

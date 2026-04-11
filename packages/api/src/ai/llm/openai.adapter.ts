@@ -97,8 +97,9 @@ export class OpenAIAdapter implements LLMAdapter {
 
   private buildInput(input: LLMInput): string | OpenAI.Responses.ResponseInput {
     const urls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
+    const docs = (input.documentAttachments ?? []).filter((d) => !!d.url);
 
-    if (urls.length > 0) {
+    if (urls.length > 0 || docs.length > 0) {
       const content: OpenAI.Responses.ResponseInputContent[] = [
         ...(input.prompt ? [{ type: "input_text" as const, text: input.prompt }] : []),
         ...urls.map((url) => ({
@@ -106,6 +107,13 @@ export class OpenAIAdapter implements LLMAdapter {
           image_url: url,
           detail: "auto" as const,
         })),
+        ...docs.map(
+          (d) =>
+            ({
+              type: "input_file" as const,
+              file_url: d.url!,
+            }) as unknown as OpenAI.Responses.ResponseInputContent,
+        ),
       ];
       return [{ role: "user", content }];
     }

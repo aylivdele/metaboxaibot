@@ -41,6 +41,11 @@ export interface Translations {
     gptEditorActivated: string;
     newDialogCreated: string;
     photoDefaultPrompt: string;
+    docDefaultPrompt: string;
+    docOnlyPdf: string;
+    docTooLarge: string;
+    docModelNotSupported: string;
+    docExtractFailed: string;
     backToMain: string;
     dialogSelected: string;
   };

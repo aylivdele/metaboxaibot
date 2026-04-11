@@ -129,6 +129,7 @@ model Message {
   content           String
   mediaUrl          String?
   mediaType         String? // image | video | audio
+  attachments       Json?   // [{ s3Key, mimeType, name, size }] — documents attached to the message
   tokensUsed        Decimal @default(0) @db.Decimal(10, 4)
   providerMessageId String? // OpenAI Assistants: message_id (для управления историей)
   failed            Boolean @default(false) // true if the LLM request failed; excluded from history

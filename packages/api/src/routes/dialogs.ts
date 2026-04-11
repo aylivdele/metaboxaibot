@@ -126,12 +126,27 @@ export const dialogsRoutes: FastifyPluginAsync = async (fastify) => {
         if (mediaUrl && !mediaUrl.startsWith("http")) {
           mediaUrl = (await getFileUrl(mediaUrl)) ?? mediaUrl;
         }
+        const rawAttachments = Array.isArray(m.attachments)
+          ? (m.attachments as unknown as Array<{
+              s3Key: string;
+              mimeType: string;
+              name: string;
+              size?: number;
+            }>)
+          : [];
+        const attachments = await Promise.all(
+          rawAttachments.map(async (a) => ({
+            ...a,
+            previewUrl: (await getFileUrl(a.s3Key)) ?? undefined,
+          })),
+        );
         return {
           id: m.id,
           role: m.role,
           content: m.content,
           mediaUrl,
           mediaType: m.mediaType ?? null,
+          attachments: attachments.length ? attachments : undefined,
           createdAt: m.createdAt.toISOString(),
         };
       }),

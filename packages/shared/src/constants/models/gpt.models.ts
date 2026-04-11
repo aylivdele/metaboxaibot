@@ -705,6 +705,17 @@ export const GPT_MODELS: Record<string, AIModel> = {
   // },
 };
 
+// ── Apply document-input capability flags ────────────────────────────────────
+// OpenAI Responses API and Anthropic accept PDFs natively via content blocks.
+// All other providers get server-side text extraction fallback.
+for (const model of Object.values(GPT_MODELS)) {
+  if (model.provider === "openai" || model.provider === "anthropic") {
+    model.supportsDocuments = true;
+  } else {
+    model.documentTextExtractFallback = true;
+  }
+}
+
 // ── Apply settings ────────────────────────────────────────────────────────────
 // Models with explicitly defined settings (e.g. gpt-5 family, o-series) are skipped.
 // All other LLM models get LLM_SETTINGS + provider-specific extras.

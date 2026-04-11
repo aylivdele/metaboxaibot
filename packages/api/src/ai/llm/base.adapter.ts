@@ -1,8 +1,22 @@
 import type { ContextStrategy } from "@metabox/shared";
 
+export interface MessageAttachment {
+  /** S3 key of the stored file (persisted in DB). */
+  s3Key: string;
+  mimeType: string;
+  name: string;
+  size?: number;
+  /** Presigned GET URL — populated by the chat service just before the adapter call. */
+  url?: string;
+}
+
 export interface MessageRecord {
+  /** Optional DB message id — needed so adapters can look up historyAttachments. */
+  id?: string;
   role: "user" | "assistant";
   content: string;
+  /** Documents attached to this historical message (reattached at every send). */
+  attachments?: MessageAttachment[];
 }
 
 export interface LLMInput {
@@ -12,6 +26,11 @@ export interface LLMInput {
   history?: MessageRecord[];
   /** One or more image URLs to include in the user turn. */
   imageUrls?: string[];
+  /**
+   * Documents attached to the current user turn. Each entry holds the s3Key
+   * plus mime/name metadata — adapters presign GET URLs just before sending.
+   */
+  documentAttachments?: MessageAttachment[];
   /** provider_chain: OpenAI Responses API — chains via previous_response_id */
   previousResponseId?: string;
   /** System prompt override */

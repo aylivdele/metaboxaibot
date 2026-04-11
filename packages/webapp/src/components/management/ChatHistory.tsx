@@ -78,6 +78,21 @@ export function ChatHistory({ dialog, onBack }: ChatHistoryProps) {
               {msg.mediaUrl && msg.mediaType === "image" && (
                 <img className="chat-bubble__image" src={msg.mediaUrl} alt="" loading="lazy" />
               )}
+              {msg.attachments?.length ? (
+                <div className="chat-bubble__attachments">
+                  {msg.attachments.map((a, i) => (
+                    <a
+                      key={`${msg.id}-${i}`}
+                      className="chat-bubble__attachment"
+                      href={a.previewUrl ?? "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      📄 {a.name}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
               {msg.content && <MessageText content={msg.content} role={msg.role} />}
               <div className="chat-bubble__time">
                 {new Date(msg.createdAt).toLocaleTimeString([], {

@@ -5,7 +5,10 @@ import {
   userStateService,
   uploadBuffer,
   getFileUrl,
+  DocumentNotSupportedError,
+  DocumentExtractFailedError,
 } from "@metabox/api/services";
+import type { StoredAttachment } from "@metabox/api/services";
 import { logger } from "../logger.js";
 import { config } from "@metabox/shared";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
@@ -25,6 +28,21 @@ interface MediaGroupEntry {
   timer: ReturnType<typeof setTimeout>;
 }
 const mediaGroupBuffer = new Map<string, MediaGroupEntry>();
+
+/** Separate buffer for document media groups — Telegram disallows mixing docs & photos. */
+interface DocumentGroupEntry {
+  dialogId: string;
+  userId: bigint;
+  chatId: number;
+  attachments: StoredAttachment[];
+  caption: string;
+  ctx: BotContext;
+  timer: ReturnType<typeof setTimeout>;
+}
+const documentGroupBuffer = new Map<string, DocumentGroupEntry>();
+
+/** Max document file size that we can download from Telegram Bot API. */
+const MAX_DOC_SIZE = 20 * 1024 * 1024;
 
 /** Default model for new GPT dialogs (user can change via Management). */
 const DEFAULT_GPT_MODEL = "o4-mini";
@@ -50,6 +68,7 @@ async function streamGptResponse(
   content: string,
   imageUrls?: string[],
   imageS3Keys?: string[],
+  documentAttachments?: StoredAttachment[],
 ): Promise<void> {
   let placeholder = await ctx.reply("⏳");
   let accumulated = "";
@@ -74,6 +93,7 @@ async function streamGptResponse(
       content,
       ...(imageUrls?.length ? { imageUrls } : {}),
       ...(imageS3Keys?.length ? { imageS3Keys } : {}),
+      ...(documentAttachments?.length ? { documentAttachments } : {}),
     });
 
     for await (const chunk of stream) {
@@ -125,6 +145,10 @@ async function streamGptResponse(
       await replyNoSubscription(ctx);
     } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
       await replyInsufficientTokens(ctx);
+    } else if (err instanceof DocumentNotSupportedError) {
+      await ctx.reply(ctx.t.gpt.docModelNotSupported);
+    } else if (err instanceof DocumentExtractFailedError) {
+      await ctx.reply(ctx.t.gpt.docExtractFailed);
     } else {
       await ctx.reply(ctx.t.errors.noTool);
     }
@@ -280,6 +304,104 @@ export async function handleGptPhoto(ctx: BotContext): Promise<void> {
     const { url, s3Key } = await uploadPhoto(tgUrl);
     const prompt = caption || ctx.t.gpt.photoDefaultPrompt;
     await streamGptResponse(ctx, chatId, gptDialogId, prompt, [url], s3Key ? [s3Key] : undefined);
+  }
+}
+
+// ── Document (PDF) in active GPT dialog ───────────────────────────────────────
+
+export async function handleGptDocument(ctx: BotContext): Promise<void> {
+  if (!ctx.user || !ctx.message?.document) return;
+
+  const doc = ctx.message.document;
+  const mime = doc.mime_type ?? "application/octet-stream";
+  const name = doc.file_name ?? "document.pdf";
+  const size = doc.file_size ?? 0;
+
+  if (mime !== "application/pdf") {
+    await ctx.reply(ctx.t.gpt.docOnlyPdf);
+    return;
+  }
+  if (size > MAX_DOC_SIZE) {
+    await ctx.reply(ctx.t.gpt.docTooLarge);
+    return;
+  }
+
+  const gptDialogId: string | null | undefined =
+    (await userStateService.get(ctx.user.id))?.gptDialogId ??
+    (await createNewDialog(ctx, DEFAULT_GPT_MODEL));
+  if (!gptDialogId) return;
+
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  // Download from Telegram → upload to S3
+  let attachment: StoredAttachment | null = null;
+  try {
+    const file = await ctx.api.getFile(doc.file_id);
+    const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+    const res = await fetch(tgUrl);
+    if (!res.ok) throw new Error(`Telegram download failed: ${res.status}`);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const s3Key = `chat-docs/${ctx.user.id}/${randomUUID()}.pdf`;
+    const uploaded = await uploadBuffer(s3Key, buffer, mime);
+    if (!uploaded) throw new Error("S3 upload returned false");
+    attachment = { s3Key, mimeType: mime, name, size };
+  } catch (err) {
+    logger.error(err, "handleGptDocument: download/upload failed");
+    await ctx.reply(ctx.t.errors.noTool);
+    return;
+  }
+
+  const caption = ctx.message.caption?.trim() ?? "";
+  const mediaGroupId = ctx.message.media_group_id;
+
+  if (mediaGroupId) {
+    const key = `${ctx.user.id}__${mediaGroupId}`;
+    const existing = documentGroupBuffer.get(key);
+    if (existing) {
+      clearTimeout(existing.timer);
+      existing.attachments.push(attachment);
+      if (!existing.caption && caption) existing.caption = caption;
+      existing.timer = setTimeout(() => {
+        documentGroupBuffer.delete(key);
+        const prompt = existing.caption || existing.ctx.t.gpt.docDefaultPrompt;
+        void streamGptResponse(
+          existing.ctx,
+          existing.chatId,
+          existing.dialogId,
+          prompt,
+          undefined,
+          undefined,
+          existing.attachments,
+        );
+      }, 800);
+    } else {
+      const entry: DocumentGroupEntry = {
+        dialogId: gptDialogId,
+        userId: ctx.user.id,
+        chatId,
+        attachments: [attachment],
+        caption,
+        ctx,
+        timer: setTimeout(() => {
+          documentGroupBuffer.delete(key);
+          const prompt = entry.caption || ctx.t.gpt.docDefaultPrompt;
+          void streamGptResponse(
+            ctx,
+            chatId,
+            gptDialogId,
+            prompt,
+            undefined,
+            undefined,
+            entry.attachments,
+          );
+        }, 800),
+      };
+      documentGroupBuffer.set(key, entry);
+    }
+  } else {
+    const prompt = caption || ctx.t.gpt.docDefaultPrompt;
+    await streamGptResponse(ctx, chatId, gptDialogId, prompt, undefined, undefined, [attachment]);
   }
 }
 

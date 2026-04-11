@@ -1,7 +1,15 @@
 import { db } from "../db.js";
 import { AI_MODELS } from "@metabox/shared";
 import type { Section } from "@metabox/shared";
-import type { Dialog, Message } from "@prisma/client";
+import type { Dialog, Message, Prisma } from "@prisma/client";
+
+/** Shape of one entry in Message.attachments JSON array. */
+export interface StoredAttachment {
+  s3Key: string;
+  mimeType: string;
+  name: string;
+  size?: number;
+}
 
 export interface CreateDialogParams {
   userId: bigint;
@@ -59,6 +67,7 @@ export const dialogService = {
       providerMessageId?: string;
       mediaUrl?: string;
       mediaType?: string;
+      attachments?: StoredAttachment[];
     },
   ): Promise<Message> {
     return db.message.create({
@@ -70,6 +79,9 @@ export const dialogService = {
         providerMessageId: extras?.providerMessageId,
         mediaUrl: extras?.mediaUrl,
         mediaType: extras?.mediaType,
+        attachments: extras?.attachments?.length
+          ? (extras.attachments as unknown as Prisma.InputJsonValue)
+          : undefined,
       },
     });
   },
@@ -98,6 +110,7 @@ export const dialogService = {
         content: true,
         mediaUrl: true,
         mediaType: true,
+        attachments: true,
         createdAt: true,
       },
     });
@@ -107,16 +120,27 @@ export const dialogService = {
   async getHistory(
     dialogId: string,
     limit: number,
-  ): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
+  ): Promise<
+    Array<{
+      id: string;
+      role: "user" | "assistant";
+      content: string;
+      attachments?: StoredAttachment[];
+    }>
+  > {
     const messages = await db.message.findMany({
       where: { dialogId, failed: false },
       orderBy: { createdAt: "desc" },
       take: limit,
-      select: { role: true, content: true },
+      select: { id: true, role: true, content: true, attachments: true },
     });
     return messages.reverse().map((m) => ({
+      id: m.id,
       role: m.role as "user" | "assistant",
       content: m.content,
+      attachments: Array.isArray(m.attachments)
+        ? (m.attachments as unknown as StoredAttachment[])
+        : undefined,
     }));
   },
 
