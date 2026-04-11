@@ -6,6 +6,7 @@ import { db } from "../db.js";
 import {
   AI_MODELS,
   config,
+  generateWebToken,
   getT,
   resolveModelDisplay,
   type AIModel,
@@ -136,9 +137,15 @@ async function sendSectionMessage(
   token: string,
   webappUrl: string | undefined,
 ): Promise<void> {
+  const wtoken = webappUrl ? generateWebToken(userId, token) : "";
   const makeMgmtBtn = (label: string) =>
     webappUrl
-      ? { text: label, web_app: { url: `${webappUrl}?page=management&section=${section}` } }
+      ? {
+          text: label,
+          web_app: {
+            url: `${webappUrl}?page=management&section=${section}&wtoken=${wtoken}`,
+          },
+        }
       : { text: label };
 
   let text: string;
