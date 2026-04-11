@@ -137,6 +137,8 @@ export default {
       "❌ HeyGen requires either an official voice selected in ⚙ Management or a voice message containing speech.",
     heygenNeedsAvatar:
       "❌ HeyGen requires an avatar selected in ⚙ Management or a photo sent for animation.",
+    veoImageRequires8s:
+      "❌ When using an input image, Veo only supports 8-second duration. Change the duration in ⚙ Management.",
     imageIgnoredUnsupported:
       "⚠️ This model does not support image input — your photo will be ignored.",
     hintVideoDefault:

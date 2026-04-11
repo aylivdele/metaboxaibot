@@ -118,6 +118,7 @@ export interface Translations {
     runwayRequiresImage: string;
     heygenNeedsVoice: string;
     heygenNeedsAvatar: string;
+    veoImageRequires8s: string;
     imageIgnoredUnsupported: string;
     hintVideoDefault: string;
     avatarCreationCancelled: string;

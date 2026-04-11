@@ -1,5 +1,10 @@
-import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
-import { config, UserFacingError } from "@metabox/shared";
+import type {
+  VideoAdapter,
+  VideoInput,
+  VideoResult,
+  VideoValidationError,
+} from "./base.adapter.js";
+import { config } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { parseRunwayTaskFailure } from "../../utils/runway-error.js";
 
@@ -33,10 +38,13 @@ export class RunwayAdapter implements VideoAdapter {
     };
   }
 
+  validateRequest(input: VideoInput): VideoValidationError | null {
+    if (!input.imageUrl) return { key: "runwayRequiresImage" };
+    return null;
+  }
+
   async submit(input: VideoInput): Promise<string> {
-    if (!input.imageUrl) {
-      throw new UserFacingError("Runway requires an image", { key: "runwayRequiresImage" });
-    }
+    if (!input.imageUrl) throw new Error("Runway: imageUrl missing (validation bypassed)");
 
     // Runway rejects Telegram URLs (application/octet-stream) — download and encode as data URL
     const imgResp = await fetchWithLog(input.imageUrl);

@@ -3,6 +3,12 @@ import { getVideoQueue } from "../queues/video.queue.js";
 import { AI_MODELS } from "@metabox/shared";
 import { checkBalance, calculateCost, computeVideoTokens } from "./token.service.js";
 import { userStateService } from "./user-state.service.js";
+import { createVideoAdapter } from "../ai/video/factory.js";
+import type {
+  VideoInput,
+  VideoValidationContext,
+  VideoValidationError,
+} from "../ai/video/base.adapter.js";
 
 export interface SubmitVideoParams {
   userId: bigint;
@@ -25,7 +31,39 @@ export interface SubmitVideoResult {
   isPending: true;
 }
 
+export interface ValidateVideoParams {
+  modelId: string;
+  prompt: string;
+  imageUrl?: string;
+  aspectRatio?: string;
+  duration?: number;
+  modelSettings?: Record<string, unknown>;
+  userId?: bigint;
+}
+
 export const videoGenerationService = {
+  /**
+   * Runs adapter-level pre-generation checks (e.g. Veo image→8s, HeyGen avatar+voice,
+   * Runway requires image). Returns a `VideoValidationError` when the request should
+   * be aborted, or `null` when it can proceed. Safe to call before `submitVideo`.
+   */
+  validateVideoRequest(
+    params: ValidateVideoParams,
+    ctx?: VideoValidationContext,
+  ): VideoValidationError | null {
+    const adapter = createVideoAdapter(params.modelId);
+    if (!adapter.validateRequest) return null;
+    const input: VideoInput = {
+      prompt: params.prompt,
+      imageUrl: params.imageUrl,
+      aspectRatio: params.aspectRatio,
+      duration: params.duration,
+      modelSettings: params.modelSettings,
+      userId: params.userId,
+    };
+    return adapter.validateRequest(input, ctx);
+  },
+
   async submitVideo(params: SubmitVideoParams): Promise<SubmitVideoResult> {
     const {
       userId,

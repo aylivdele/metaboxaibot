@@ -268,26 +268,25 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
     // Build voice override: raw recording > EL TTS > nothing (adapter uses configured voice_id)
     const effectiveVoiceS3Key = rawVoiceS3Key ?? elTtsS3Key ?? undefined;
 
-    // HeyGen requires an explicitly selected avatar/photo and voice
-    if (modelId === "heygen") {
-      const hasAvatar =
-        !!imageUrl ||
-        !!(fullModelSettings.image_asset_id as string | undefined)?.trim() ||
-        !!(fullModelSettings.avatar_id as string | undefined)?.trim() ||
-        !!(fullModelSettings.avatar_photo_s3key as string | undefined)?.trim() ||
-        !!(fullModelSettings.avatar_photo_url as string | undefined)?.trim();
-      if (!hasAvatar) {
-        await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
-        await ctx.reply(ctx.t.video.heygenNeedsAvatar);
-        return;
-      }
-
-      const explicitVoiceId = (fullModelSettings.voice_id as string | undefined)?.trim();
-      if (!explicitVoiceId && !effectiveVoiceS3Key) {
-        await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
-        await ctx.reply(ctx.t.video.heygenNeedsVoice);
-        return;
-      }
+    const validationError = videoGenerationService.validateVideoRequest(
+      {
+        modelId,
+        prompt,
+        imageUrl,
+        aspectRatio: modelSettings?.aspectRatio,
+        duration: modelSettings?.duration,
+        modelSettings: {
+          ...fullModelSettings,
+          ...(effectiveVoiceS3Key ? { voice_s3key: effectiveVoiceS3Key } : {}),
+        },
+        userId: ctx.user.id,
+      },
+      { hasVoiceFile: !!effectiveVoiceS3Key },
+    );
+    if (validationError) {
+      await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+      await ctx.reply(ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string);
+      return;
     }
 
     await videoGenerationService.submitVideo({
@@ -480,16 +479,23 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     const videoSettings = await userStateService.getVideoSettings(ctx.user.id);
     const modelSettings = videoSettings[modelId];
 
-    // HeyGen requires an explicitly selected official voice for photo+caption flow
-    // (this path does not carry voice recordings — those go via handleVideoMessage)
-    if (modelId === "heygen") {
-      const allModelSettings = await userStateService.getModelSettings(ctx.user.id);
-      const fullModelSettings = allModelSettings[modelId] ?? {};
-      const explicitVoiceId = (fullModelSettings.voice_id as string | undefined)?.trim();
-      if (!explicitVoiceId) {
-        await ctx.reply(ctx.t.video.heygenNeedsVoice);
-        return;
-      }
+    const allModelSettings = await userStateService.getModelSettings(ctx.user.id);
+    const fullModelSettings = allModelSettings[modelId] ?? {};
+    const validationError = videoGenerationService.validateVideoRequest(
+      {
+        modelId,
+        prompt: caption,
+        imageUrl: supportsImages ? tgUrl : undefined,
+        aspectRatio: modelSettings?.aspectRatio,
+        duration: modelSettings?.duration,
+        modelSettings: fullModelSettings,
+        userId: ctx.user.id,
+      },
+      { hasVoiceFile: false },
+    );
+    if (validationError) {
+      await ctx.reply(ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string);
+      return;
     }
 
     if (!supportsImages) {
@@ -676,28 +682,35 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
   }
 
   // Avatar model: trigger generation immediately — raw audio is the voice, no text prompt needed
-  // Check avatar is selected before queuing
-  if (modelId === "heygen") {
-    const allModelSettings = await userStateService.getModelSettings(userId);
-    const ms = allModelSettings[modelId] ?? {};
-    const hasAvatar =
-      !!(ms.image_asset_id as string | undefined)?.trim() ||
-      !!(ms.avatar_id as string | undefined)?.trim() ||
-      !!(ms.avatar_photo_s3key as string | undefined)?.trim() ||
-      !!(ms.avatar_photo_url as string | undefined)?.trim();
-    if (!hasAvatar) {
-      await ctx.reply(ctx.t.video.heygenNeedsAvatar);
-      return;
-    }
+  const allModelSettings = await userStateService.getModelSettings(userId);
+  const fullModelSettings = allModelSettings[modelId] ?? {};
+  const videoSettings = await userStateService.getVideoSettings(userId);
+  const modelSettings = videoSettings[modelId];
+  const imageUrl = (await userStateService.getAndClearVideoRefImageUrl(userId)) ?? undefined;
+
+  const validationError = videoGenerationService.validateVideoRequest(
+    {
+      modelId,
+      prompt: "",
+      imageUrl,
+      aspectRatio: modelSettings?.aspectRatio,
+      duration: modelSettings?.duration,
+      modelSettings: {
+        ...fullModelSettings,
+        ...(uploadedKey ? { voice_s3key: uploadedKey } : { voice_url: tgUrl }),
+      },
+      userId,
+    },
+    { hasVoiceFile: true },
+  );
+  if (validationError) {
+    await ctx.reply(ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string);
+    return;
   }
 
   const pendingMsg = await ctx.reply(ctx.t.video.videoVoiceQueuing);
 
   try {
-    const videoSettings = await userStateService.getVideoSettings(userId);
-    const modelSettings = videoSettings[modelId];
-    const imageUrl = (await userStateService.getAndClearVideoRefImageUrl(userId)) ?? undefined;
-
     await videoGenerationService.submitVideo({
       userId,
       modelId,

@@ -257,7 +257,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "veo",
     name: "📽️ Veo 3",
     description:
-      "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Отправьте фото или видео вместе с текстом — Отправьте фото вместе с текстом — видео начнется с вашего фото.",
+      "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Отправьте фото вместе с текстом — видео начнется с вашего фото.",
     section: "video",
     provider: "google",
     familyId: "veo",
@@ -274,7 +274,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
-    supportedDurations: [6, 8],
+    supportedDurations: [4, 6, 8],
     settings: [
       mkAspectRatio(["16:9", "9:16"]),
       {
@@ -283,10 +283,11 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         description: "Продолжительность видеоклипа в секундах.",
         type: "select",
         options: [
-          { value: 6, label: "6 с", unavailableIf: { key: "resolution", eq: "1080p" } },
+          { value: 4, label: "4 с", unavailableIf: { key: "resolution", neq: "720p" } },
+          { value: 6, label: "6 с", unavailableIf: { key: "resolution", neq: "720p" } },
           { value: 8, label: "8 с" },
         ],
-        default: 6,
+        default: 4,
       },
       {
         key: "resolution",
@@ -298,6 +299,11 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
           {
             value: "1080p",
             label: "1080p",
+            unavailableIf: { key: "duration", neq: 8 },
+          },
+          {
+            value: "4k",
+            label: "4k",
             unavailableIf: { key: "duration", neq: 8 },
           },
         ],
@@ -334,9 +340,17 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     provider: "google",
     familyId: "veo",
     variantLabel: "Fast",
-    // $0.15/s (Veo 3 Fast, Gemini API)
+    // Resolution-based: 720p $0.10/s, 1080p $0.12/s, 4k $0.30/s
     costUsdPerRequest: 0,
-    costUsdPerSecond: 0.15,
+    costUsdPerSecond: 0.1,
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "720p": { costUsdPerSecond: 0.1 },
+        "1080p": { costUsdPerSecond: 0.12 },
+        "4k": { costUsdPerSecond: 0.3 },
+      },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -346,19 +360,21 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
-    supportedDurations: [6, 8],
+    supportedDurations: [4, 6, 8],
     settings: [
       mkAspectRatio(["16:9", "9:16"]),
       {
         key: "duration",
         label: "Длительность",
-        description: "Продолжительность видеоклипа в секундах.",
+        description:
+          "Продолжительность видеоклипа в секундах. Если используется референсное изображение, то доступнен только вариант 8с.",
         type: "select",
         options: [
-          { value: 6, label: "6 с", unavailableIf: { key: "resolution", eq: "1080p" } },
+          { value: 4, label: "4 с", unavailableIf: { key: "resolution", neq: "720p" } },
+          { value: 6, label: "6 с", unavailableIf: { key: "resolution", neq: "720p" } },
           { value: 8, label: "8 с" },
         ],
-        default: 6,
+        default: 4,
       },
       {
         key: "resolution",
@@ -372,19 +388,13 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
             label: "1080p",
             unavailableIf: { key: "duration", neq: 8 },
           },
+          {
+            value: "4k",
+            label: "4k",
+            unavailableIf: { key: "duration", neq: 8 },
+          },
         ],
         default: "720p",
-      },
-      {
-        key: "person_generation",
-        label: "Генерация людей",
-        description: "Разрешить ли появление людей в видео.",
-        type: "select",
-        options: [
-          { value: "dont_allow", label: "Запрещено" },
-          { value: "allow_adult", label: "Разрешены взрослые" },
-        ],
-        default: "allow_adult",
       },
       {
         key: "negative_prompt",

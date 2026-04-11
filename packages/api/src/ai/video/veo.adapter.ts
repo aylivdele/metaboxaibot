@@ -1,5 +1,10 @@
 import { GoogleGenAI, GenerateVideosOperation, type GenerateVideosParameters } from "@google/genai";
-import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
+import type {
+  VideoAdapter,
+  VideoInput,
+  VideoResult,
+  VideoValidationError,
+} from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { fetchWithLog, logCall } from "../../utils/fetch.js";
 import { resolveImageMimeType } from "../../utils/mime-detect.js";
@@ -26,6 +31,13 @@ export class VeoAdapter implements VideoAdapter {
     this.apiKey = apiKey;
     this.ai = new GoogleGenAI({ apiKey });
     this.apiModel = API_MODELS[modelId] ?? API_MODELS["veo"];
+  }
+
+  validateRequest(input: VideoInput): VideoValidationError | null {
+    if (input.imageUrl && input.duration !== undefined && input.duration !== 8) {
+      return { key: "veoImageRequires8s" };
+    }
+    return null;
   }
 
   async submit(input: VideoInput): Promise<string> {

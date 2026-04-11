@@ -1,4 +1,10 @@
-import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
+import type {
+  VideoAdapter,
+  VideoInput,
+  VideoResult,
+  VideoValidationContext,
+  VideoValidationError,
+} from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { getFileUrl } from "../../services/s3.service.js";
 import { logger } from "../../logger.js";
@@ -132,6 +138,26 @@ export class HeyGenAdapter implements VideoAdapter {
       if (fresh) return fresh;
     }
     return url || undefined;
+  }
+
+  validateRequest(input: VideoInput, ctx?: VideoValidationContext): VideoValidationError | null {
+    const ms = input.modelSettings ?? {};
+    const hasAvatar =
+      !!input.imageUrl ||
+      !!(ms.image_asset_id as string | undefined)?.trim() ||
+      !!(ms.avatar_id as string | undefined)?.trim() ||
+      !!(ms.avatar_photo_s3key as string | undefined)?.trim() ||
+      !!(ms.avatar_photo_url as string | undefined)?.trim();
+    if (!hasAvatar) return { key: "heygenNeedsAvatar" };
+
+    const explicitVoiceId = (ms.voice_id as string | undefined)?.trim();
+    const hasVoiceAsset =
+      !!(ms.voice_s3key as string | undefined)?.trim() ||
+      !!(ms.voice_url as string | undefined)?.trim();
+    if (!explicitVoiceId && !hasVoiceAsset && !ctx?.hasVoiceFile) {
+      return { key: "heygenNeedsVoice" };
+    }
+    return null;
   }
 
   async submit(input: VideoInput): Promise<string> {
