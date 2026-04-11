@@ -81,13 +81,18 @@ export class ReplicateAdapter implements ImageAdapter {
     if (ms.cfg !== undefined) msExtras.cfg = ms.cfg;
     if (ms.num_inference_steps !== undefined) msExtras.num_inference_steps = ms.num_inference_steps;
     const stylePreset = ms.style_preset && ms.style_preset !== "None" ? ms.style_preset : undefined;
-    if (stylePreset) {
-      msExtras.style_preset = stylePreset;
-      // Ideogram requires style_type to be Auto or General when style_preset is set
-      const styleType = ms.style_type && ms.style_type !== "None" ? (ms.style_type as string) : "";
-      msExtras.style_type = styleType === "General" || styleType === "Auto" ? styleType : "Auto";
-    } else if (ms.style_type && ms.style_type !== "None") {
-      msExtras.style_type = ms.style_type;
+    if (stylePreset) msExtras.style_preset = stylePreset;
+    // Ideogram constraint: when style_preset, style_codes, or style_reference_images
+    // is used, style_type must be Auto or General. A reference image sent by the
+    // user becomes style_reference_images further down, so detect that here too.
+    const ideogramHasStyleRef =
+      IDEOGRAM_MODELS.has(this.modelId) && (!!stylePreset || !!input.imageUrl);
+    if (ms.style_type && ms.style_type !== "None") {
+      const styleType = ms.style_type as string;
+      msExtras.style_type =
+        ideogramHasStyleRef && styleType !== "Auto" && styleType !== "General" ? "Auto" : styleType;
+    } else if (ideogramHasStyleRef) {
+      msExtras.style_type = "Auto";
     }
     if (ms.magic_prompt_option) msExtras.magic_prompt_option = ms.magic_prompt_option;
     if (ms.go_fast !== undefined) msExtras.go_fast = ms.go_fast;

@@ -23,6 +23,31 @@ if (ffmpegPath) ffmpeg.setFfmpegPath(ffmpegPath);
 /** Seconds until a presigned GET URL expires. */
 const PRESIGN_TTL = 3600;
 
+/**
+ * Run an S3 operation once, and if it throws, run it one more time after
+ * a short delay. Intended for transient network/DNS blips — any error is
+ * considered retryable. Logs both the failed first attempt and the final
+ * outcome so silent drops are impossible.
+ */
+async function withRetry<T>(
+  op: string,
+  ctx: Record<string, unknown>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    logger.warn({ err, op, ...ctx }, "s3 operation failed, retrying once");
+    await new Promise((r) => setTimeout(r, 500));
+    try {
+      return await fn();
+    } catch (err2) {
+      logger.error({ err: err2, op, ...ctx }, "s3 operation failed after retry");
+      throw err2;
+    }
+  }
+}
+
 function makeClient(): S3Client | null {
   const { bucket, region, endpoint, accessKeyId, secretAccessKey } = config.s3;
   if (!bucket || !accessKeyId || !secretAccessKey) return null;
@@ -49,8 +74,9 @@ export function sectionMeta(section: string): { ext: string; contentType: string
 }
 
 /**
- * Upload a Buffer to S3.
+ * Upload a Buffer to S3. Retries once on transient errors.
  * Returns the S3 key on success, null if S3 is not configured.
+ * Throws after two failed attempts — callers decide how to recover.
  */
 export async function uploadBuffer(
   key: string,
@@ -58,23 +84,30 @@ export async function uploadBuffer(
   contentType: string,
 ): Promise<string | null> {
   const client = makeClient();
-  if (!client) return null;
+  if (!client) {
+    logger.warn({ key }, "uploadBuffer: S3 not configured, skipping");
+    return null;
+  }
 
-  await client.send(
-    new PutObjectCommand({
-      Bucket: config.s3.bucket!,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-    }),
+  await withRetry("uploadBuffer", { key, contentType, size: buffer.byteLength }, () =>
+    client.send(
+      new PutObjectCommand({
+        Bucket: config.s3.bucket!,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      }),
+    ),
   );
 
   return key;
 }
 
 /**
- * Fetch a remote URL and upload the response body to S3.
- * Returns the S3 key on success, null if S3 is not configured or fetch fails.
+ * Fetch a remote URL and upload the response body to S3. Retries the
+ * fetch+upload pipeline once on failure. Returns the S3 key on success,
+ * null if S3 is not configured. Throws if the remote fetch or upload
+ * keeps failing after the retry.
  */
 export async function uploadFromUrl(
   key: string,
@@ -82,13 +115,25 @@ export async function uploadFromUrl(
   contentType: string,
 ): Promise<string | null> {
   const client = makeClient();
-  if (!client) return null;
+  if (!client) {
+    logger.warn({ key, url }, "uploadFromUrl: S3 not configured, skipping");
+    return null;
+  }
 
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to fetch file for S3 upload: ${response.status}`);
-
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return uploadBuffer(key, buffer, contentType);
+  return withRetry("uploadFromUrl", { key, url, contentType }, async () => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to fetch file for S3 upload: ${response.status}`);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await client.send(
+      new PutObjectCommand({
+        Bucket: config.s3.bucket!,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      }),
+    );
+    return key;
+  });
 }
 
 /**
@@ -101,27 +146,38 @@ export async function uploadFromUrl(
  */
 export async function getFileUrl(key: string, downloadFilename?: string): Promise<string | null> {
   const { bucket, publicUrl } = config.s3;
-  if (!bucket) return null;
+  if (!bucket) {
+    logger.warn({ key }, "getFileUrl: S3 bucket not configured");
+    return null;
+  }
 
   if (publicUrl) {
     return `${publicUrl.replace(/\/$/, "")}/${key}`;
   }
 
   const client = makeClient();
-  if (!client) return null;
+  if (!client) {
+    logger.warn({ key }, "getFileUrl: S3 client not configured");
+    return null;
+  }
 
-  return getSignedUrl(
-    client,
-    new GetObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      ChecksumMode: undefined,
-      ...(downloadFilename
-        ? { ResponseContentDisposition: `attachment; filename="${downloadFilename}"` }
-        : {}),
-    }),
-    { expiresIn: PRESIGN_TTL, unsignableHeaders: new Set(["x-amz-checksum-mode"]) },
-  );
+  try {
+    return await getSignedUrl(
+      client,
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        ChecksumMode: undefined,
+        ...(downloadFilename
+          ? { ResponseContentDisposition: `attachment; filename="${downloadFilename}"` }
+          : {}),
+      }),
+      { expiresIn: PRESIGN_TTL, unsignableHeaders: new Set(["x-amz-checksum-mode"]) },
+    );
+  } catch (err) {
+    logger.error({ err, key }, "getFileUrl: failed to sign URL");
+    return null;
+  }
 }
 
 /**
@@ -230,17 +286,23 @@ export async function generateVideoThumbnail(buf: Buffer): Promise<Buffer | null
  */
 export async function deleteFile(key: string): Promise<boolean> {
   const client = makeClient();
-  if (!client) return true;
+  if (!client) {
+    logger.warn({ key }, "deleteFile: S3 not configured, treating as success");
+    return true;
+  }
 
   try {
-    await client.send(
-      new DeleteObjectCommand({
-        Bucket: config.s3.bucket!,
-        Key: key,
-      }),
+    await withRetry("deleteFile", { key }, () =>
+      client.send(
+        new DeleteObjectCommand({
+          Bucket: config.s3.bucket!,
+          Key: key,
+        }),
+      ),
     );
     return true;
-  } catch {
+  } catch (err) {
+    logger.error({ err, key }, "deleteFile: failed to delete after retry");
     return false;
   }
 }
