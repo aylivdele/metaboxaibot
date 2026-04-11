@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
 import type { HeyGenAvatar, UserAvatar } from "../../types.js";
+import { minimizeMiniApp } from "../../utils/telegram.js";
 
 const PAGE_SIZE = 20;
 
@@ -123,6 +124,7 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
       await api.userAvatars.startCreation("heygen");
       setCreateHint(true);
       setTimeout(() => setCreateHint(false), 5000);
+      minimizeMiniApp();
     } finally {
       setCreating(false);
     }

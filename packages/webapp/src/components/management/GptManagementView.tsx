@@ -4,6 +4,7 @@ import { useI18n } from "../../i18n.js";
 import type { Dialog, Model, UserState } from "../../types.js";
 import { ChatHistory } from "./ChatHistory.js";
 import { SettingsPanel } from "./SettingsPanel.js";
+import { minimizeMiniApp } from "../../utils/telegram.js";
 
 type ModelFilter = "all" | "images" | "voice" | "web";
 
@@ -95,6 +96,7 @@ export function GptManagementView() {
     setState((s) => (s ? { ...s, gptDialogId: dialog.id, gptModelId: dialog.modelId } : s));
     setActivatedPopup(true);
     setTimeout(() => setActivatedPopup(false), 3000);
+    minimizeMiniApp();
   };
 
   const handleRename = async (id: string) => {
@@ -115,6 +117,7 @@ export function GptManagementView() {
       setIsCreating(false);
       setActivatedPopup(true);
       setTimeout(() => setActivatedPopup(false), 3000);
+      setSettingsDialog(dialog);
     } finally {
       setCreating(false);
     }

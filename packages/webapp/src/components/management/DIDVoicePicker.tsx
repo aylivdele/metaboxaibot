@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
 import type { DIDVoice, UserVoice } from "../../types.js";
+import { VoiceList, type VoiceListItem } from "./VoiceList.js";
 
 interface DIDVoicePickerProps {
   voiceId: string;
@@ -20,8 +21,6 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
   const [langFilter, setLangFilter] = useState("all");
   const [genderFilter, setGenderFilter] = useState("all");
   const [providerFilter, setProviderFilter] = useState("all");
-  const [playingId, setPlayingId] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (tab === "official" && voices.length === 0) {
@@ -42,30 +41,16 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
     }
   }, [tab, voices.length]);
 
-  const stopAudio = () => {
-    audioRef.current?.pause();
-    setPlayingId(null);
+  const selectOfficial = (item: VoiceListItem) => {
+    const voice = voices.find((v) => v.id === item.id);
+    if (!voice) return;
+    onChange("voice_id", voice.id);
+    onChange("voice_provider", voice.provider);
   };
 
-  const togglePreview = (id: string, previewUrl: string) => {
-    if (playingId === id) {
-      stopAudio();
-      return;
-    }
-    stopAudio();
-    const audio = new Audio(previewUrl);
-    audioRef.current = audio;
-    audio.play().catch(() => void 0);
-    setPlayingId(id);
-    audio.onended = () => setPlayingId(null);
-  };
-
-  const selectOfficial = (id: string, provider: string) => {
-    onChange("voice_id", id);
-    onChange("voice_provider", provider);
-  };
-
-  const selectClonedVoice = (voice: UserVoice) => {
+  const selectCloned = (item: VoiceListItem) => {
+    const voice = myVoices.find((v) => v.id === item.id);
+    if (!voice) return;
     onChange("voice_id", voice.externalId ?? "");
     onChange("voice_provider", "elevenlabs");
   };
@@ -88,24 +73,46 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
       (providerFilter === "all" || v.provider === providerFilter),
   );
 
+  const officialItems: VoiceListItem[] = filtered.map((voice) => {
+    const langLabel = voice.languages.map((l) => l.language).join(", ");
+    const previewUrl = voice.languages.find((l) => l.previewUrl)?.previewUrl;
+    return {
+      id: voice.id,
+      name: voice.name,
+      meta:
+        `${voice.provider} · ${langLabel}` +
+        (voice.gender
+          ? ` · ${voice.gender === "male" ? "М" : voice.gender === "female" ? "Ж" : voice.gender}`
+          : ""),
+      hasPreview: !!previewUrl,
+      resolvePreviewUrl: previewUrl ? () => previewUrl : undefined,
+    };
+  });
+
+  const mineItems: VoiceListItem[] = myVoices.map((v) => ({
+    id: v.id,
+    name: v.name,
+    meta: `ElevenLabs · ${new Date(v.createdAt).toLocaleDateString()}`,
+    hasPreview: v.hasAudio,
+    resolvePreviewUrl: v.hasAudio
+      ? async () => (await api.userVoices.previewUrl(v.id)).url
+      : undefined,
+  }));
+
+  const mineSelectedId = myVoices.find((v) => v.externalId === voiceId)?.id ?? null;
+
   return (
     <div className="voice-picker">
       <div className="voice-picker__tabs">
         <button
           className={`voice-picker__tab${tab === "official" ? " voice-picker__tab--active" : ""}`}
-          onClick={() => {
-            stopAudio();
-            setTab("official");
-          }}
+          onClick={() => setTab("official")}
         >
           {t("uploads.officialVoices")}
         </button>
         <button
           className={`voice-picker__tab${tab === "mine" ? " voice-picker__tab--active" : ""}`}
-          onClick={() => {
-            stopAudio();
-            setTab("mine");
-          }}
+          onClick={() => setTab("mine")}
         >
           {t("uploads.myVoices")}
         </button>
@@ -151,86 +158,25 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
                 ))}
               </div>
             </div>
-            <div className="voice-picker__list">
-              {filtered.map((voice) => {
-                const langLabel = voice.languages.map((l) => l.language).join(", ");
-                const previewUrl = voice.languages.find((l) => l.previewUrl)?.previewUrl;
-                const isPlaying = playingId === voice.id;
-                return (
-                  <div
-                    key={voice.id}
-                    className={`voice-picker__item${voiceId === voice.id ? " voice-picker__item--selected" : ""}`}
-                    onClick={() => selectOfficial(voice.id, voice.provider)}
-                  >
-                    <div className="voice-picker__item-info">
-                      <span className="voice-picker__item-name">{voice.name}</span>
-                      <span className="voice-picker__item-meta">
-                        {voice.provider} · {langLabel}
-                        {voice.gender
-                          ? ` · ${voice.gender === "male" ? "М" : voice.gender === "female" ? "Ж" : voice.gender}`
-                          : ""}
-                      </span>
-                    </div>
-                    {previewUrl && (
-                      <button
-                        className={`voice-picker__preview-btn${isPlaying ? " voice-picker__preview-btn--playing" : ""}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          togglePreview(voice.id, previewUrl);
-                        }}
-                        title={isPlaying ? "Стоп" : "Прослушать"}
-                      >
-                        {isPlaying ? "⏹" : "▶"}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-              {filtered.length === 0 && (
-                <div className="voice-picker__empty">Голоса не найдены</div>
-              )}
-            </div>
+            <VoiceList
+              items={officialItems}
+              selectedId={voiceId}
+              onSelect={selectOfficial}
+              emptyText="Голоса не найдены"
+            />
           </>
         ))}
 
       {tab === "mine" &&
         (myVoicesLoading ? (
           <div className="voice-picker__loading">Загрузка…</div>
-        ) : myVoices.length === 0 ? (
-          <div className="voice-picker__empty">{t("uploads.emptyVoices")}</div>
         ) : (
-          <div className="voice-picker__list">
-            {myVoices.map((voice) => {
-              const isSelected = voiceId === voice.externalId;
-              const isPlaying = playingId === voice.id;
-              return (
-                <div
-                  key={voice.id}
-                  className={`voice-picker__item${isSelected ? " voice-picker__item--selected" : ""}`}
-                  onClick={() => selectClonedVoice(voice)}
-                >
-                  <div className="voice-picker__item-info">
-                    <span className="voice-picker__item-name">{voice.name}</span>
-                    <span className="voice-picker__item-meta">
-                      ElevenLabs · {new Date(voice.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {voice.previewUrl && (
-                    <button
-                      className={`voice-picker__preview-btn${isPlaying ? " voice-picker__preview-btn--playing" : ""}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePreview(voice.id, voice.previewUrl!);
-                      }}
-                      title={isPlaying ? "Стоп" : "Прослушать"}
-                    >
-                      {isPlaying ? "⏹" : "▶"}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <VoiceList
+            items={mineItems}
+            selectedId={mineSelectedId}
+            onSelect={selectCloned}
+            emptyText={t("uploads.emptyVoices")}
+          />
         ))}
     </div>
   );

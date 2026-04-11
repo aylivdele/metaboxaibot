@@ -320,6 +320,13 @@ function GalleryTab() {
   );
 }
 
+/**
+ * Module-level handle to the single audio element currently playing across all
+ * gallery cards. Starting a new playback invokes `stop` on the previous one so
+ * overlapping clips are not possible.
+ */
+let activeGalleryAudio: { stop: () => void } | null = null;
+
 function AudioPlayButton({
   resolveUrl,
   title,
@@ -331,8 +338,16 @@ function AudioPlayButton({
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const stop = () => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setPlaying(false);
+    setLoading(false);
+  };
+
   useEffect(() => {
     return () => {
+      if (activeGalleryAudio?.stop === stop) activeGalleryAudio = null;
       audioRef.current?.pause();
       audioRef.current = null;
     };
@@ -341,17 +356,21 @@ function AudioPlayButton({
   const toggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (playing || loading) {
-      audioRef.current?.pause();
-      setPlaying(false);
-      setLoading(false);
+      stop();
+      if (activeGalleryAudio?.stop === stop) activeGalleryAudio = null;
       return;
     }
+    // Halt any other card that is currently playing before we start.
+    activeGalleryAudio?.stop();
+    activeGalleryAudio = { stop };
+
     setLoading(true);
     let url: string;
     try {
       url = await resolveUrl();
     } catch {
       setLoading(false);
+      if (activeGalleryAudio?.stop === stop) activeGalleryAudio = null;
       return;
     }
     const audio = new Audio(url);
@@ -364,10 +383,14 @@ function AudioPlayButton({
       },
       { once: true },
     );
-    audio.onended = () => setPlaying(false);
+    audio.onended = () => {
+      setPlaying(false);
+      if (activeGalleryAudio?.stop === stop) activeGalleryAudio = null;
+    };
     audio.play().catch(() => {
       setLoading(false);
       setPlaying(false);
+      if (activeGalleryAudio?.stop === stop) activeGalleryAudio = null;
     });
   };
 

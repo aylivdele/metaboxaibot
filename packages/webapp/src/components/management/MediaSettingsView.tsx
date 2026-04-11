@@ -13,6 +13,7 @@ import {
   groupByFamily,
   isActiveSection,
 } from "../../utils/mediaSettingsViewHelpers.js";
+import { minimizeMiniApp } from "../../utils/telegram.js";
 
 // ── MediaSettingsView ─────────────────────────────────────────────────────────
 
@@ -94,6 +95,7 @@ export function MediaSettingsView({
     await api.state.activate(section, modelId);
     setActivatedPopup(true);
     setTimeout(() => setActivatedPopup(false), 3000);
+    minimizeMiniApp();
   };
 
   const handleSettingChange = (modelId: string, key: string, value: unknown) => {
