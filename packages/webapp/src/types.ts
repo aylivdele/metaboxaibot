@@ -79,6 +79,7 @@ export interface ModelSettingDef {
     | "voice-picker"
     | "did-voice-picker"
     | "elevenlabs-voice-picker"
+    | "openai-voice-picker"
     | "color"
     | "avatar-picker"
     | "motion-picker";

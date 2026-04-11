@@ -6,6 +6,7 @@ import { CustomSlider } from "./CustomSlider.js";
 import { HeyGenVoicePicker } from "./HeyGenVoicePicker.js";
 import { DIDVoicePicker } from "./DIDVoicePicker.js";
 import { ElevenLabsVoicePicker } from "./ElevenLabsVoicePicker.js";
+import { OpenAIVoicePicker } from "./OpenAIVoicePicker.js";
 import { HeyGenAvatarPicker } from "./HeyGenAvatarPicker.js";
 import { HiggsFieldMotionPicker } from "./HiggsFieldMotionPicker.js";
 import type { MotionEntry } from "./HiggsFieldMotionPicker.js";
@@ -158,6 +159,9 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
                 voiceId={String(values["voice_id"] ?? "")}
                 onChange={onChange}
               />
+            )}
+            {def.type === "openai-voice-picker" && (
+              <OpenAIVoicePicker voice={String(val ?? "")} onChange={onChange} />
             )}
             {def.type === "avatar-picker" && (
               <HeyGenAvatarPicker

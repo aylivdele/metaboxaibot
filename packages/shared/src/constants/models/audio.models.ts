@@ -44,20 +44,8 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
       {
         key: "voice",
         label: "Голос",
-        description:
-          "Тембр и стиль диктора. Alloy и Echo — нейтральные, Onyx — глубокий мужской, Nova и Shimmer — женские.",
-        type: "select",
-        options: [
-          { value: "alloy", label: "Alloy" },
-          { value: "ash", label: "Ash" },
-          { value: "coral", label: "Coral" },
-          { value: "echo", label: "Echo" },
-          { value: "fable", label: "Fable" },
-          { value: "nova", label: "Nova" },
-          { value: "onyx", label: "Onyx" },
-          { value: "sage", label: "Sage" },
-          { value: "shimmer", label: "Shimmer" },
-        ],
+        description: "Тембр и стиль диктора. Нажмите ▶ чтобы прослушать сэмпл.",
+        type: "openai-voice-picker",
         default: "onyx",
       },
       {
