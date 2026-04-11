@@ -787,7 +787,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       "Китайская видеомодель с отличным качеством движения персонажей. Генерирует 6-секундные клипы с высокой плавностью.",
     section: "video",
     provider: "minimax",
-    costUsdPerRequest: 0.25,
+    costUsdPerRequest: 0.43,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: false,
