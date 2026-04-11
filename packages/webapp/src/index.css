@@ -180,6 +180,8 @@ textarea::placeholder {
   overflow-x: hidden;
   padding-bottom: var(--nav-h);
   scroll-behavior: smooth;
+  transform: translateZ(0);
+  will-change: scroll-position;
 }
 
 /* ── Language Picker ───────────────────────────────────────────────────────── */
