@@ -5,7 +5,13 @@ import type { LLMInput, MessageAttachment } from "../ai/llm/base.adapter.js";
 import { AI_MODELS } from "@metabox/shared";
 import { userStateService } from "./user-state.service.js";
 import { getFileUrl } from "./s3.service.js";
-import { extractPdfTextFromS3, buildDocumentPromptBlock } from "./document-extract.service.js";
+import {
+  extractPdfTextFromS3,
+  extractTextFromS3,
+  buildDocumentPromptBlock,
+  isTextClassMime,
+} from "./document-extract.service.js";
+import type { MessageRecord } from "../ai/llm/base.adapter.js";
 import { logger } from "../logger.js";
 
 export class DocumentNotSupportedError extends Error {
@@ -58,10 +64,23 @@ export const chatService = {
     const adapter = createLLMAdapter(dialog.modelId);
     const model = AI_MODELS[dialog.modelId];
 
-    // Gate: if the user attached documents but the model supports neither native
-    // documents nor text-extract fallback, reject before any DB writes.
-    const hasDocs = !!documentAttachments?.length;
-    if (hasDocs && model && !model.supportsDocuments && !model.documentTextExtractFallback) {
+    // Split attachments into two classes:
+    //  - text-class (.txt, .csv, .docx, .xlsx, etc.) — always extracted + inlined.
+    //  - native-class (.pdf) — native content blocks for supporting models,
+    //    extract+inline fallback otherwise.
+    const allDocs = documentAttachments ?? [];
+    const textClassDocs = allDocs.filter((d) => isTextClassMime(d.mimeType));
+    const nativeClassDocs = allDocs.filter((d) => d.mimeType === "application/pdf");
+    const hasDocs = allDocs.length > 0;
+
+    // Gate: native-class PDFs on a model with neither flag — reject before any DB writes.
+    // Text-class documents are always accepted (they work on any model via inline extract).
+    if (
+      nativeClassDocs.length > 0 &&
+      model &&
+      !model.supportsDocuments &&
+      !model.documentTextExtractFallback
+    ) {
       throw new DocumentNotSupportedError();
     }
 
@@ -71,24 +90,31 @@ export const chatService = {
     // Check balance > 0 cause we dont know how much outputTokens will be generated
     await checkBalance(userId, 0);
 
-    // If model uses text-extract fallback, pull PDFs from S3, extract text,
-    // and inline it into the prompt. Documents are NOT passed to the adapter.
-    let effectivePrompt = content;
-    if (hasDocs && model?.documentTextExtractFallback) {
-      const blocks: string[] = [];
-      for (const doc of documentAttachments!) {
+    // Build effectivePrompt by inlining any text-class docs, plus native PDFs
+    // for text-extract fallback models. Original `content` stays untouched in DB.
+    const inlineBlocks: string[] = [];
+    for (const doc of textClassDocs) {
+      const text = await extractTextFromS3(doc.s3Key, doc.mimeType, doc.name);
+      if (text === null) throw new DocumentExtractFailedError(doc.name);
+      inlineBlocks.push(buildDocumentPromptBlock(doc.name, text));
+    }
+    if (nativeClassDocs.length > 0 && model?.documentTextExtractFallback) {
+      for (const doc of nativeClassDocs) {
         const text = await extractPdfTextFromS3(doc.s3Key);
         if (text === null) throw new DocumentExtractFailedError(doc.name);
-        blocks.push(buildDocumentPromptBlock(doc.name, text));
+        inlineBlocks.push(buildDocumentPromptBlock(doc.name, text));
       }
-      effectivePrompt = `${blocks.join("\n\n")}\n\n${content}`;
     }
+    const effectivePrompt = inlineBlocks.length
+      ? `${inlineBlocks.join("\n\n")}\n\n${content}`
+      : content;
 
-    // For native-document models, presign URLs for each attachment right before the call.
+    // For native-document models, presign URLs for PDF attachments right before the call.
+    // Text-class docs are never passed to the adapter — they live in effectivePrompt.
     let currentDocAttachments: MessageAttachment[] | undefined;
-    if (hasDocs && model?.supportsDocuments) {
+    if (nativeClassDocs.length > 0 && model?.supportsDocuments) {
       currentDocAttachments = await Promise.all(
-        documentAttachments!.map(async (d) => ({
+        nativeClassDocs.map(async (d) => ({
           ...d,
           url: (await getFileUrl(d.s3Key)) ?? undefined,
         })),
@@ -123,25 +149,13 @@ export const chatService = {
 
     if (dialog.contextStrategy === "db_history") {
       const history = await dialogService.getHistory(dialogId, adapter.contextMaxMessages);
-      // For native-document models, presign URLs for every historical attachment
-      // so the adapter can build document blocks for prior turns. Text-extract
-      // fallback models already have docs inlined as text in the stored content.
-      if (model?.supportsDocuments) {
-        input.history = await Promise.all(
-          history.map(async (m) => {
-            if (!m.attachments?.length) return m;
-            const withUrls: MessageAttachment[] = await Promise.all(
-              m.attachments.map(async (a) => ({
-                ...a,
-                url: (await getFileUrl(a.s3Key)) ?? undefined,
-              })),
-            );
-            return { ...m, attachments: withUrls };
-          }),
-        );
-      } else {
-        input.history = history;
-      }
+      // For every historical message: re-inline text-class attachments by reading
+      // them from S3 on each turn (mirrors how claude.ai re-sends extracted text).
+      // Additionally, for native-doc models, presign URLs for PDF attachments so
+      // the adapter can rebuild document content blocks for prior turns.
+      input.history = await Promise.all(
+        history.map(async (m) => augmentHistoryMessage(m, model?.supportsDocuments === true)),
+      );
     } else if (dialog.contextStrategy === "provider_chain") {
       input.previousResponseId = dialog.providerLastResponseId ?? undefined;
     }
@@ -211,6 +225,56 @@ export const chatService = {
     return { text: responseText, tokensUsed };
   },
 };
+
+/**
+ * Rebuilds a historical message for adapter consumption:
+ *  - Text-class attachments are extracted from S3 on every turn and inlined
+ *    into the message content as `<document>` blocks (silent skip on failure,
+ *    so a single corrupted file doesn't block the whole dialog).
+ *  - PDF attachments are kept on `attachments[]` with a freshly presigned URL
+ *    (only useful for adapters that build native document blocks).
+ */
+interface HistoryMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  attachments?: StoredAttachment[];
+}
+
+async function augmentHistoryMessage(
+  m: HistoryMessage,
+  presignNativePdfs: boolean,
+): Promise<MessageRecord> {
+  const atts = m.attachments ?? [];
+  if (atts.length === 0) return { id: m.id, role: m.role, content: m.content };
+
+  const textDocs = atts.filter((a) => isTextClassMime(a.mimeType));
+  const nativeDocs = atts.filter((a) => a.mimeType === "application/pdf");
+
+  const blocks: string[] = [];
+  for (const d of textDocs) {
+    const text = await extractTextFromS3(d.s3Key, d.mimeType, d.name);
+    if (text !== null) blocks.push(buildDocumentPromptBlock(d.name, text));
+  }
+  const augmentedContent = blocks.length ? `${blocks.join("\n\n")}\n\n${m.content}` : m.content;
+
+  let presignedNative: MessageAttachment[] | undefined;
+  if (presignNativePdfs && nativeDocs.length > 0) {
+    presignedNative = await Promise.all(
+      nativeDocs.map(async (d) => ({
+        ...d,
+        url: (await getFileUrl(d.s3Key)) ?? undefined,
+      })),
+    );
+  }
+
+  return {
+    id: m.id,
+    role: m.role,
+    content: augmentedContent,
+    ...(presignedNative?.length ? { attachments: presignedNative } : {}),
+  };
+}
 
 /** Strip <think>...</think> reasoning blocks from model output before saving. */
 function stripThinkingBlocks(text: string): string {

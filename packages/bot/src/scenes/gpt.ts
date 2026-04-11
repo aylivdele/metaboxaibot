@@ -44,6 +44,35 @@ const documentGroupBuffer = new Map<string, DocumentGroupEntry>();
 /** Max document file size that we can download from Telegram Bot API. */
 const MAX_DOC_SIZE = 20 * 1024 * 1024;
 
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+const ALLOWED_DOC_MIMES = new Set<string>([
+  "application/pdf",
+  "text/plain",
+  "text/markdown",
+  "text/csv",
+  "text/comma-separated-values",
+  "text/html",
+  "text/xml",
+  "application/json",
+  DOCX_MIME,
+  XLSX_MIME,
+]);
+
+const EXT_TO_MIME: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".txt": "text/plain",
+  ".md": "text/markdown",
+  ".csv": "text/csv",
+  ".json": "application/json",
+  ".html": "text/html",
+  ".htm": "text/html",
+  ".xml": "text/xml",
+  ".docx": DOCX_MIME,
+  ".xlsx": XLSX_MIME,
+};
+
 /** Default model for new GPT dialogs (user can change via Management). */
 const DEFAULT_GPT_MODEL = "o4-mini";
 /** Minimum ms between Telegram message edits (rate-limit safety). */
@@ -313,13 +342,21 @@ export async function handleGptDocument(ctx: BotContext): Promise<void> {
   if (!ctx.user || !ctx.message?.document) return;
 
   const doc = ctx.message.document;
-  const mime = doc.mime_type ?? "application/octet-stream";
-  const name = doc.file_name ?? "document.pdf";
+  const rawMime = doc.mime_type ?? "application/octet-stream";
+  const name = doc.file_name ?? "document";
   const size = doc.file_size ?? 0;
 
-  if (mime !== "application/pdf") {
-    await ctx.reply(ctx.t.gpt.docOnlyPdf);
-    return;
+  // Resolve mime: whitelist check, fall back to extension inference for
+  // generic application/octet-stream uploads from Telegram clients.
+  const ext = name.toLowerCase().match(/\.[a-z0-9]+$/)?.[0];
+  let mime = rawMime;
+  if (!ALLOWED_DOC_MIMES.has(mime)) {
+    const inferred = ext ? EXT_TO_MIME[ext] : undefined;
+    if (inferred) mime = inferred;
+    else {
+      await ctx.reply(ctx.t.gpt.docUnsupportedType);
+      return;
+    }
   }
   if (size > MAX_DOC_SIZE) {
     await ctx.reply(ctx.t.gpt.docTooLarge);
@@ -342,13 +379,13 @@ export async function handleGptDocument(ctx: BotContext): Promise<void> {
     const res = await fetch(tgUrl);
     if (!res.ok) throw new Error(`Telegram download failed: ${res.status}`);
     const buffer = Buffer.from(await res.arrayBuffer());
-    const s3Key = `chat-docs/${ctx.user.id}/${randomUUID()}.pdf`;
+    const s3Key = `chat-docs/${ctx.user.id}/${randomUUID()}${ext ?? ""}`;
     const uploaded = await uploadBuffer(s3Key, buffer, mime);
     if (!uploaded) throw new Error("S3 upload returned false");
     attachment = { s3Key, mimeType: mime, name, size };
   } catch (err) {
     logger.error(err, "handleGptDocument: download/upload failed");
-    await ctx.reply(ctx.t.errors.noTool);
+    await ctx.reply(ctx.t.gpt.docUploadFailed);
     return;
   }
 

@@ -42,10 +42,11 @@ export interface Translations {
     newDialogCreated: string;
     photoDefaultPrompt: string;
     docDefaultPrompt: string;
-    docOnlyPdf: string;
+    docUnsupportedType: string;
     docTooLarge: string;
     docModelNotSupported: string;
     docExtractFailed: string;
+    docUploadFailed: string;
     backToMain: string;
     dialogSelected: string;
   };
