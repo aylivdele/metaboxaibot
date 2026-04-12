@@ -778,6 +778,43 @@ for (const model of Object.values(GPT_MODELS)) {
   }
 }
 
+// ── Apply thinking/reasoning flag ─────────────────────────────────────────────
+// Models that support a thinking/reasoning mode (extended thinking, reasoning
+// effort, thinking budget, etc.). Responses from these models may take
+// significantly longer (up to 10 minutes).
+const THINKING_MODEL_IDS = new Set([
+  // OpenAI o-series
+  "o4-mini",
+  "o3-mini",
+  // GPT-5 family (all have reasoning_effort)
+  "gpt-5.4-pro",
+  "gpt-5.4",
+  "gpt-5-pro",
+  // Anthropic (extended thinking)
+  "claude-opus",
+  "claude-opus-4-5",
+  "claude-sonnet",
+  "claude-sonnet-4-5",
+  // Google Gemini (thinking budget)
+  "gemini-3-pro",
+  "gemini-3.1-pro",
+  "gemini-2-flash",
+  // DeepSeek R1 (always-on reasoning)
+  "deepseek-r1",
+  // xAI Grok (reasoning)
+  "grok-4",
+  "grok-4-fast",
+  // Qwen thinking
+  "qwen-3-max-thinking",
+  "qwen-3-thinking",
+]);
+for (const [id, model] of Object.entries(GPT_MODELS)) {
+  if (THINKING_MODEL_IDS.has(id)) {
+    model.supportsThinking = true;
+    model.description += " 🧠 Поддерживает режим размышлений.";
+  }
+}
+
 // ── Apply settings ────────────────────────────────────────────────────────────
 // Models with explicitly defined settings (e.g. gpt-5 family, o-series) are skipped.
 // All other LLM models get LLM_SETTINGS + provider-specific extras.

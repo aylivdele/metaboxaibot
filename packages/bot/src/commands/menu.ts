@@ -1,18 +1,21 @@
 import type { BotContext } from "../types/context.js";
 import { buildMainMenuKeyboard } from "../keyboards/main-menu.keyboard.js";
 import { userStateService, dialogService } from "@metabox/api/services";
-import { config, generateWebToken } from "@metabox/shared";
+import { config, generateWebToken, AI_MODELS, buildDialogHint } from "@metabox/shared";
 import type { Section } from "@metabox/shared";
 import { buildDesignModelKeyboard } from "../scenes/design.js";
 import { buildVideoModelKeyboard } from "../scenes/video.js";
 
-/** Returns the active dialog name for a section, or undefined. */
-async function activeDialogLabel(userId: bigint, section: string): Promise<string | undefined> {
+/** Returns the active dialog label + modelId for a section, or undefined. */
+async function activeDialogInfo(
+  userId: bigint,
+  section: string,
+): Promise<{ label: string; modelId: string } | undefined> {
   const dialogId = await userStateService.getDialogForSection(userId, section as Section);
   if (!dialogId) return undefined;
   const dialog = await dialogService.findById(dialogId);
   if (!dialog) return undefined;
-  return dialog.title ?? dialog.modelId;
+  return { label: dialog.title ?? dialog.modelId, modelId: dialog.modelId };
 }
 
 export async function handleMenu(ctx: BotContext): Promise<void> {
@@ -26,15 +29,20 @@ export async function handleMenu(ctx: BotContext): Promise<void> {
 
 export async function handleGpt(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
-  const dialogLabel = await activeDialogLabel(ctx.user.id, "gpt");
+  const info = await activeDialogInfo(ctx.user.id, "gpt");
   // If a dialog is already active — go straight to GPT_ACTIVE so the user
   // can start chatting immediately without pressing an extra button.
-  const newState = dialogLabel ? "GPT_ACTIVE" : "GPT_SECTION";
+  const newState = info ? "GPT_ACTIVE" : "GPT_SECTION";
   await userStateService.setState(ctx.user.id, newState, "gpt");
 
-  const text = dialogLabel
-    ? `${ctx.t.gpt.sectionTitle}\n\n💬 Активный диалог: ${dialogLabel}`
+  let text = info
+    ? `${ctx.t.gpt.sectionTitle}\n\n💬 Активный диалог: ${info.label}`
     : ctx.t.gpt.sectionTitle;
+
+  if (info) {
+    const hint = buildDialogHint(ctx.t, AI_MODELS[info.modelId]);
+    if (hint) text += `\n\n${hint}`;
+  }
 
   const webappUrl = config.bot.webappUrl;
   const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";

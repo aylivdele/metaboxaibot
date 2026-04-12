@@ -4,7 +4,14 @@ import { dialogService } from "../services/dialog.service.js";
 import { userStateService } from "../services/user-state.service.js";
 import { getFileUrl } from "../services/s3.service.js";
 import { db } from "../db.js";
-import { getT, AI_MODELS, config, generateWebToken, type Section } from "@metabox/shared";
+import {
+  getT,
+  buildDialogHint,
+  AI_MODELS,
+  config,
+  generateWebToken,
+  type Section,
+} from "@metabox/shared";
 import type { Language } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
@@ -205,13 +212,18 @@ async function sendDialogSelectedNotification(
     });
   }
 
-  // Always send dialog-selected confirmation
+  // Always send dialog-selected confirmation + capability hints
+  const model = AI_MODELS[modelId];
   const confirmText = t.gpt.dialogSelected
     .replace("{title}", dialogLabel)
     .replace("{model}", modelName);
+
+  const hint = buildDialogHint(t, model);
+  const fullText = hint ? `${confirmText}\n\n${hint}` : confirmText;
+
   await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: String(userId), text: confirmText }),
+    body: JSON.stringify({ chat_id: String(userId), text: fullText }),
   });
 }

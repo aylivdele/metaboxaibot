@@ -224,4 +224,49 @@ export const userStateService = {
           "updatedAt" = NOW()
     `;
   },
+
+  // ── Per-dialog settings ──────────────────────────────────────────────────
+  // Stored in the same modelSettings JSON under key "dialog:<dialogId>".
+
+  dialogSettingsKey(dialogId: string): string {
+    return `dialog:${dialogId}`;
+  },
+
+  async getDialogSettings(userId: bigint, dialogId: string): Promise<Record<string, unknown>> {
+    const all = await this.getModelSettings(userId);
+    return all[this.dialogSettingsKey(dialogId)] ?? {};
+  },
+
+  async setDialogSettings(
+    userId: bigint,
+    dialogId: string,
+    settings: Record<string, unknown>,
+  ): Promise<void> {
+    await this.setModelSettings(userId, this.dialogSettingsKey(dialogId), settings);
+  },
+
+  async deleteDialogSettings(userId: bigint, dialogId: string): Promise<void> {
+    const key = this.dialogSettingsKey(dialogId);
+    await db.$executeRaw`
+      UPDATE user_states
+      SET "modelSettings" = COALESCE("modelSettings", '{}'::jsonb) - ${key}::text,
+          "updatedAt" = NOW()
+      WHERE "userId" = ${userId}
+    `;
+  },
+
+  /**
+   * Resolves effective settings for a dialog: dialog-level overrides merged
+   * on top of model-level defaults. Callers get a single flat object.
+   */
+  async getEffectiveDialogSettings(
+    userId: bigint,
+    dialogId: string,
+    modelId: string,
+  ): Promise<Record<string, unknown>> {
+    const all = await this.getModelSettings(userId);
+    const modelLevel = all[modelId] ?? {};
+    const dialogLevel = all[this.dialogSettingsKey(dialogId)] ?? {};
+    return { ...modelLevel, ...dialogLevel };
+  },
 };

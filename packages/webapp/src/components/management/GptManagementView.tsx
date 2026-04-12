@@ -46,6 +46,8 @@ export function GptManagementView() {
   const [activatedPopup, setActivatedPopup] = useState(false);
   const [viewingDialog, setViewingDialog] = useState<Dialog | null>(null);
   const [settingsDialog, setSettingsDialog] = useState<Dialog | null>(null);
+  const [dialogSettings, setDialogSettings] = useState<Record<string, unknown>>({});
+  const [dialogSettingsLoading, setDialogSettingsLoading] = useState(false);
   const [filter, setFilter] = useState<ModelFilter>("all");
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -64,21 +66,28 @@ export function GptManagementView() {
     setLoading(false);
   }, []);
 
-  const handleSettingChange = (modelId: string, key: string, value: unknown) => {
-    setAllModelSettings((prev) => ({
-      ...prev,
-      [modelId]: { ...(prev[modelId] ?? {}), [key]: value },
-    }));
-    const dKey = `${modelId}__${key}`;
+  const handleDialogSettingChange = (dialogId: string, key: string, value: unknown) => {
+    setDialogSettings((prev) => ({ ...prev, [key]: value }));
+    const dKey = `dlg_${dialogId}__${key}`;
     clearTimeout(debounceRef.current[dKey]);
     debounceRef.current[dKey] = setTimeout(() => {
-      void api.modelSettings.set(modelId, { [key]: value });
+      void api.modelSettings.setForDialog(dialogId, { [key]: value });
     }, 800);
   };
 
   useEffect(() => {
     loadData().catch(console.error);
   }, [loadData]);
+
+  useEffect(() => {
+    if (!settingsDialog) return;
+    setDialogSettingsLoading(true);
+    api.modelSettings
+      .getForDialog(settingsDialog.id)
+      .then((ds) => setDialogSettings(ds))
+      .catch(() => setDialogSettings({}))
+      .finally(() => setDialogSettingsLoading(false));
+  }, [settingsDialog?.id]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this dialog?")) return;
@@ -131,6 +140,9 @@ export function GptManagementView() {
     const dlgModel = models.find((m) => m.id === settingsDialog.modelId);
     return (
       <div className="page">
+        {activatedPopup && (
+          <div className="activated-popup">{t("manage.dialogActivatedPopup")}</div>
+        )}
         <div className="page-header">
           <button className="back-btn" onClick={() => setSettingsDialog(null)}>
             {t("common.back")}
@@ -139,16 +151,25 @@ export function GptManagementView() {
           {dlgModel && <p className="page-subtitle">{dlgModel.name}</p>}
         </div>
         {dlgModel && dlgModel.settings.length > 0 ? (
-          <div className="model-settings-panel">
-            <SettingsPanel
-              settings={dlgModel.settings}
-              values={allModelSettings[dlgModel.id] ?? {}}
-              onChange={(key, val) => handleSettingChange(dlgModel.id, key, val)}
-            />
-          </div>
+          dialogSettingsLoading ? (
+            <div className="page-loading">{t("common.loading")}</div>
+          ) : (
+            <div className="model-settings-panel">
+              <SettingsPanel
+                settings={dlgModel.settings}
+                values={{ ...(allModelSettings[dlgModel.id] ?? {}), ...dialogSettings }}
+                onChange={(key, val) => handleDialogSettingChange(settingsDialog.id, key, val)}
+              />
+            </div>
+          )
         ) : (
           <div className="empty-state">{t("manage.noSettings")}</div>
         )}
+        <div style={{ padding: "16px" }}>
+          <button className="new-dialog-btn" onClick={() => void handleActivate(settingsDialog)}>
+            {t("manage.startChat")}
+          </button>
+        </div>
       </div>
     );
   }

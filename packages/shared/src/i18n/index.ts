@@ -50,6 +50,15 @@ export interface Translations {
     contextOverflow: string;
     backToMain: string;
     dialogSelected: string;
+    dialogHint: {
+      intro: string;
+      prompt: string;
+      attachHeader: string;
+      images: string;
+      files: string;
+      extractNote: string;
+      thinkingWarning: string;
+    };
   };
   design: {
     sectionTitle: string;
@@ -301,4 +310,55 @@ export async function preloadLocales(languages: Language[]): Promise<void> {
  */
 export function getT(lang: Language): Translations {
   return cache.get(lang) ?? (cache.get("en") as Translations);
+}
+
+/**
+ * Builds a capability hint for a GPT dialog based on the model's features.
+ * Used both in the mini-app activation route and the bot's new-dialog flow.
+ */
+export function buildDialogHint(
+  t: Translations,
+  model:
+    | {
+        supportsImages: boolean;
+        supportsDocuments?: boolean;
+        documentTextExtractFallback?: boolean;
+        supportsThinking?: boolean;
+      }
+    | undefined,
+): string {
+  if (!model) return "";
+
+  const lines: string[] = [t.gpt.dialogHint.intro, t.gpt.dialogHint.prompt];
+
+  const supportsImages = model.supportsImages;
+  const supportsNativePdf = model.supportsDocuments === true;
+  const supportsExtractFallback = model.documentTextExtractFallback === true;
+  const supportsAnyDocs = supportsNativePdf || supportsExtractFallback;
+
+  if (!supportsImages && !supportsAnyDocs) return lines.join("\n");
+
+  lines.push(t.gpt.dialogHint.attachHeader);
+
+  if (supportsImages) {
+    lines.push(t.gpt.dialogHint.images);
+  }
+
+  if (supportsAnyDocs) {
+    const allFormats = "PDF, TXT, MD, CSV, JSON, DOCX, XLSX";
+    lines.push(t.gpt.dialogHint.files.replace("{formats}", allFormats));
+
+    if (supportsNativePdf) {
+      const extractedFormats = "TXT, MD, CSV, JSON, DOCX, XLSX";
+      lines.push(t.gpt.dialogHint.extractNote.replace("{formats}", extractedFormats));
+    } else {
+      lines.push(t.gpt.dialogHint.extractNote.replace("{formats}", allFormats));
+    }
+  }
+
+  if (model.supportsThinking) {
+    lines.push(t.gpt.dialogHint.thinkingWarning);
+  }
+
+  return lines.join("\n");
 }

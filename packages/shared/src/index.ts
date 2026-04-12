@@ -46,7 +46,7 @@ export { config } from "./config.js";
 export type { Config } from "./config.js";
 
 // i18n
-export { getT, preloadLocales } from "./i18n/index.js";
+export { getT, preloadLocales, buildDialogHint } from "./i18n/index.js";
 export type { Translations } from "./i18n/index.js";
 export {
   MODEL_TRANSLATIONS,

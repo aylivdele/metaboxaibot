@@ -58,6 +58,17 @@ export default {
       "📚 The message is too large for the current model. Trim attachments or pick a model with a bigger context window in ⚙ Management.",
     backToMain: "🏠 Main Menu",
     dialogSelected: "✅ Dialog selected: {title}\nModel: {model}",
+    dialogHint: {
+      intro: "💬 The conversation takes place in the chat.",
+      prompt: "✍ Send a prompt as a message — the model will start generating a response.",
+      attachHeader: "📎 You can also attach to your message:",
+      images: "🖼 Images and photos",
+      files: "📄 Files — {formats}",
+      extractNote:
+        "🤖 The bot will extract text from files and attach it to the prompt ({formats})",
+      thinkingWarning:
+        "⏳ This model supports a thinking mode — response time may take up to 10 minutes depending on context size and the configured thinking level.",
+    },
   },
   design: {
     sectionTitle: "🎨 AI Design",

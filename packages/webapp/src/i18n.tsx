@@ -263,6 +263,7 @@ const translations = {
     "imageSettings.selectModel": "Select model",
     "imageSettings.activatedPopup": "Model activated. Return to the bot to start using it.",
     "manage.dialogActivatedPopup": "Dialog activated. Return to the chat to work with it.",
+    "manage.startChat": "Start chatting",
 
     // Video settings
     "videoSettings.title": "Video Settings",
@@ -565,6 +566,7 @@ const translations = {
     "imageSettings.selectModel": "Выберите модель",
     "imageSettings.activatedPopup": "Модель активирована. Вернитесь в бот для работы с ней.",
     "manage.dialogActivatedPopup": "Диалог активирован. Вернитесь в чат для работы с ним.",
+    "manage.startChat": "Начать общение",
 
     // Video settings
     "videoSettings.title": "Настройки видео",

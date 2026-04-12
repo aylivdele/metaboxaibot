@@ -2,6 +2,7 @@ import { db } from "../db.js";
 import { AI_MODELS } from "@metabox/shared";
 import type { Section } from "@metabox/shared";
 import type { Dialog, Message, Prisma } from "@prisma/client";
+import { userStateService } from "./user-state.service.js";
 
 /** Shape of one entry in Message.attachments JSON array. */
 export interface StoredAttachment {
@@ -23,7 +24,7 @@ export const dialogService = {
     const model = AI_MODELS[params.modelId];
     if (!model) throw new Error(`Unknown model: ${params.modelId}`);
 
-    return db.dialog.create({
+    const dialog = await db.dialog.create({
       data: {
         userId: params.userId,
         section: params.section,
@@ -32,6 +33,26 @@ export const dialogService = {
         contextStrategy: model.contextStrategy,
       },
     });
+
+    // Copy settings from the most recent non-deleted dialog with the same model
+    const donor = await db.dialog.findFirst({
+      where: {
+        userId: params.userId,
+        modelId: params.modelId,
+        isDeleted: false,
+        id: { not: dialog.id },
+      },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true },
+    });
+    if (donor) {
+      const donorSettings = await userStateService.getDialogSettings(params.userId, donor.id);
+      if (Object.keys(donorSettings).length > 0) {
+        await userStateService.setDialogSettings(params.userId, dialog.id, donorSettings);
+      }
+    }
+
+    return dialog;
   },
 
   async findById(dialogId: string): Promise<Dialog | null> {
@@ -47,10 +68,13 @@ export const dialogService = {
 
   async softDelete(dialogId: string, userId: bigint): Promise<void> {
     await db.dialog.update({ where: { id: dialogId }, data: { isDeleted: true } });
-    await db.userState.update({
-      where: { userId, gptDialogId: dialogId },
-      data: { gptDialogId: null },
-    });
+    await db.userState
+      .update({
+        where: { userId, gptDialogId: dialogId },
+        data: { gptDialogId: null },
+      })
+      .catch(() => void 0);
+    await userStateService.deleteDialogSettings(userId, dialogId);
   },
 
   async rename(dialogId: string, title: string): Promise<Dialog> {

@@ -142,6 +142,11 @@ export interface AIModel {
    */
   supportsDocuments?: boolean;
   /**
+   * Model supports a thinking/reasoning mode (extended thinking, reasoning effort, etc.).
+   * When enabled responses may take significantly longer (up to 10 minutes).
+   */
+  supportsThinking?: boolean;
+  /**
    * Model does NOT accept PDFs natively — the chat service extracts text from each PDF
    * on the server (via pdf-parse) and inlines it into the prompt as
    * `<document name="...">...</document>` blocks before invoking the adapter.

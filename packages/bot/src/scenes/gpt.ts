@@ -11,7 +11,7 @@ import {
 } from "@metabox/api/services";
 import type { StoredAttachment } from "@metabox/api/services";
 import { logger } from "../logger.js";
-import { config } from "@metabox/shared";
+import { config, AI_MODELS, buildDialogHint } from "@metabox/shared";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { InlineKeyboard } from "grammy";
 import { toMarkdownV2, closeOpenMarkdownV2 } from "../utils/markdown.js";
@@ -204,7 +204,10 @@ export async function createNewDialog(
   await userStateService.setState(ctx.user.id, "GPT_ACTIVE", "gpt");
   await userStateService.setDialogForSection(ctx.user.id, "gpt", dialog.id);
 
-  await ctx.reply(ctx.t.gpt.newDialogCreated);
+  const model = AI_MODELS[modelId];
+  const hint = buildDialogHint(ctx.t, model);
+  const text = hint ? `${ctx.t.gpt.newDialogCreated}\n\n${hint}` : ctx.t.gpt.newDialogCreated;
+  await ctx.reply(text);
   return dialog.id;
 }
 

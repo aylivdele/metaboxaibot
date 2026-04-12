@@ -307,6 +307,13 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ modelId, settings }),
       }),
+    getForDialog: (dialogId: string) =>
+      request<Record<string, unknown>>(`/model-settings/dialog/${dialogId}`),
+    setForDialog: (dialogId: string, settings: Record<string, unknown>) =>
+      request<{ success: boolean }>(`/model-settings/dialog/${dialogId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ settings }),
+      }),
   },
 
   admin: {

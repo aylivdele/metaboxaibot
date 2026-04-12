@@ -109,8 +109,7 @@ export const chatService = {
       throw new DocumentNotSupportedError();
     }
 
-    const allModelSettings = await userStateService.getModelSettings(userId);
-    const ms = allModelSettings[dialog.modelId] ?? {};
+    const ms = await userStateService.getEffectiveDialogSettings(userId, dialogId, dialog.modelId);
 
     const extractCache: ExtractCache = new Map();
 

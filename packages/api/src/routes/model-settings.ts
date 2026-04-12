@@ -27,4 +27,29 @@ export const modelSettingsRoutes: FastifyPluginAsync = async (fastify) => {
       return { success: true };
     },
   );
+
+  /** GET /model-settings/dialog/:dialogId — returns dialog-level overrides */
+  fastify.get<{ Params: { dialogId: string } }>(
+    "/model-settings/dialog/:dialogId",
+    async (request) => {
+      const { userId } = request as AuthRequest;
+      const { dialogId } = request.params;
+      return userStateService.getDialogSettings(userId, dialogId);
+    },
+  );
+
+  /** PATCH /model-settings/dialog/:dialogId — merge dialog-level settings */
+  fastify.patch<{ Params: { dialogId: string }; Body: { settings: Record<string, unknown> } }>(
+    "/model-settings/dialog/:dialogId",
+    async (request) => {
+      const { userId } = request as AuthRequest;
+      const { dialogId } = request.params;
+      const { settings } = request.body;
+      if (typeof settings !== "object" || settings === null) {
+        throw { statusCode: 400, message: "settings object is required" };
+      }
+      await userStateService.setDialogSettings(userId, dialogId, settings);
+      return { success: true };
+    },
+  );
 };
