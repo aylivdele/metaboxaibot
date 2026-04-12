@@ -109,8 +109,7 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     id: "kling",
     name: "🎥 Kling",
     section: "video",
-    description:
-      "Генерирует видео длиной до 10 секунд. Лучше всех передаёт движения людей. Pro-вариант повышает качество и детализацию.",
+    description: "Генерирует видео длиной до 15 секунд. Лучше всех передаёт движения людей.",
     defaultModelId: "kling",
     members: [
       { modelId: "kling", variantLabel: "Standard" },

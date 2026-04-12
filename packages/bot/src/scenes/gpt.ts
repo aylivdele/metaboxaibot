@@ -11,11 +11,12 @@ import {
 } from "@metabox/api/services";
 import type { StoredAttachment } from "@metabox/api/services";
 import { logger } from "../logger.js";
-import { config, AI_MODELS, buildDialogHint } from "@metabox/shared";
+import { config, AI_MODELS, buildDialogHint, generateWebToken } from "@metabox/shared";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { InlineKeyboard } from "grammy";
 import { toMarkdownV2, closeOpenMarkdownV2 } from "../utils/markdown.js";
 import { randomUUID } from "crypto";
+import { transcribeAndReply } from "../utils/voice-transcribe.js";
 
 /** Media group buffer: groups multiple photos sent at once before processing. */
 interface MediaGroupEntry {
@@ -221,22 +222,46 @@ export async function handleNewGptDialog(ctx: BotContext): Promise<void> {
   await createNewDialog(ctx, modelId);
 }
 
+// ── No-dialog prompt ─────────────────────────────────────────────────────────
+
+async function replyNoActiveDialog(ctx: BotContext): Promise<void> {
+  const webappUrl = config.bot.webappUrl;
+  if (!webappUrl || !ctx.user) {
+    await ctx.reply(ctx.t.gpt.noActiveDialog);
+    return;
+  }
+  const token = generateWebToken(ctx.user.id, config.bot.token);
+  const kb = new InlineKeyboard().webApp(
+    ctx.t.gpt.createDialog,
+    `${webappUrl}?page=management&section=gpt&action=new&wtoken=${token}`,
+  );
+  await ctx.reply(ctx.t.gpt.noActiveDialog, { reply_markup: kb });
+}
+
 // ── Incoming message in active GPT dialog ────────────────────────────────────
 
-export async function handleGptMessage(ctx: BotContext): Promise<void> {
-  if (!ctx.user || !ctx.message?.text) return;
+/**
+ * Executes a text prompt in the active GPT dialog.
+ * Used by handleGptMessage (text) and the voice-prompt callback.
+ */
+export async function executeGptPrompt(ctx: BotContext, text: string): Promise<void> {
+  if (!ctx.user) return;
 
-  const gptDialogId: string | null | undefined =
-    (await userStateService.get(ctx.user.id))?.gptDialogId ??
-    (await createNewDialog(ctx, DEFAULT_GPT_MODEL));
+  const gptDialogId = (await userStateService.get(ctx.user.id))?.gptDialogId ?? null;
   if (!gptDialogId) {
+    await replyNoActiveDialog(ctx);
     return;
   }
 
   const chatId = ctx.chat?.id;
   if (!chatId) return;
 
-  await streamGptResponse(ctx, chatId, gptDialogId, ctx.message.text);
+  await streamGptResponse(ctx, chatId, gptDialogId, text);
+}
+
+export async function handleGptMessage(ctx: BotContext): Promise<void> {
+  if (!ctx.user || !ctx.message?.text) return;
+  await executeGptPrompt(ctx, ctx.message.text);
 }
 
 // ── Photo / document image in active GPT dialog ───────────────────────────────
@@ -244,10 +269,9 @@ export async function handleGptMessage(ctx: BotContext): Promise<void> {
 export async function handleGptPhoto(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
 
-  const gptDialogId: string | null | undefined =
-    (await userStateService.get(ctx.user.id))?.gptDialogId ??
-    (await createNewDialog(ctx, DEFAULT_GPT_MODEL));
+  const gptDialogId = (await userStateService.get(ctx.user.id))?.gptDialogId ?? null;
   if (!gptDialogId) {
+    await replyNoActiveDialog(ctx);
     return;
   }
 
@@ -347,6 +371,12 @@ export async function handleGptPhoto(ctx: BotContext): Promise<void> {
 export async function handleGptDocument(ctx: BotContext): Promise<void> {
   if (!ctx.user || !ctx.message?.document) return;
 
+  const gptDialogId = (await userStateService.get(ctx.user.id))?.gptDialogId ?? null;
+  if (!gptDialogId) {
+    await replyNoActiveDialog(ctx);
+    return;
+  }
+
   const doc = ctx.message.document;
   const rawMime = doc.mime_type ?? "application/octet-stream";
   const name = doc.file_name ?? "document";
@@ -368,11 +398,6 @@ export async function handleGptDocument(ctx: BotContext): Promise<void> {
     await ctx.reply(ctx.t.gpt.docTooLarge);
     return;
   }
-
-  const gptDialogId: string | null | undefined =
-    (await userStateService.get(ctx.user.id))?.gptDialogId ??
-    (await createNewDialog(ctx, DEFAULT_GPT_MODEL));
-  if (!gptDialogId) return;
 
   const chatId = ctx.chat?.id;
   if (!chatId) return;
@@ -446,6 +471,20 @@ export async function handleGptDocument(ctx: BotContext): Promise<void> {
     const prompt = caption || ctx.t.gpt.docDefaultPrompt;
     await streamGptResponse(ctx, chatId, gptDialogId, prompt, undefined, undefined, [attachment]);
   }
+}
+
+// ── Voice / audio message in active GPT dialog ─────────────────────────────────
+
+export async function handleGptVoice(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+
+  const gptDialogId = (await userStateService.get(ctx.user.id))?.gptDialogId ?? null;
+  if (!gptDialogId) {
+    await replyNoActiveDialog(ctx);
+    return;
+  }
+
+  await transcribeAndReply(ctx, "gpt");
 }
 
 // ── Management — opens Mini App ───────────────────────────────────────────────

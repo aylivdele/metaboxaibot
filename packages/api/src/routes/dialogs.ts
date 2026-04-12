@@ -189,6 +189,12 @@ async function sendDialogSelectedNotification(
 
     const webappUrl = config.bot.webappUrl;
     const token = webappUrl ? generateWebToken(userId, config.bot.token) : "";
+    const newDialogBtn = webappUrl
+      ? {
+          text: t.gpt.newDialog,
+          web_app: { url: `${webappUrl}?page=management&section=gpt&action=new&wtoken=${token}` },
+        }
+      : { text: t.gpt.newDialog };
     const managementBtn = webappUrl
       ? {
           text: t.gpt.management,
@@ -204,7 +210,7 @@ async function sendDialogSelectedNotification(
         chat_id: String(userId),
         text: sectionText,
         reply_markup: {
-          keyboard: [[{ text: t.gpt.newDialog }], [managementBtn], [{ text: t.common.backToMain }]],
+          keyboard: [[newDialogBtn], [managementBtn], [{ text: t.common.backToMain }]],
           resize_keyboard: true,
           is_persistent: true,
         },

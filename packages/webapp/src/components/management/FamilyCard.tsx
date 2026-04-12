@@ -141,6 +141,12 @@ export function FamilyCard({
         </div>
       )}
 
+      <div className="family-card__header">
+        <span className="family-card__name">{selected.name}</span>
+      </div>
+
+      <p className="family-card__desc">{selected.descriptionOverride || selected.description}</p>
+
       {selected.settings.length > 0 && (
         <div className="family-card__row family-card__row--settings">
           <SettingsPanel

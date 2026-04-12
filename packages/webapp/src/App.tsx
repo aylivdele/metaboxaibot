@@ -12,14 +12,15 @@ import { AiboxLogo } from "./components/AiboxLogo.js";
 import { api } from "./api/client.js";
 import type { Page, UserProfile } from "./types.js";
 
-function parseHash(): { page: Page; section?: string } {
+function parseHash(): { page: Page; section?: string; action?: string } {
   const validPages: Page[] = ["profile", "management", "tariffs", "referral", "admin"];
   // Prefer query params (?page=...) — avoids conflict with Telegram's #tgWebAppData hash injection
   const params = new URLSearchParams(window.location.search);
   const qPage = params.get("page");
   const qSection = params.get("section") ?? undefined;
+  const qAction = params.get("action") ?? undefined;
   if (qPage && validPages.includes(qPage as Page)) {
-    return { page: qPage as Page, section: qSection };
+    return { page: qPage as Page, section: qSection, action: qAction };
   }
   // Fallback: legacy hash routing (#page or #page/section)
   const [pagePart, sectionPart] = window.location.hash.slice(1).split("/");
@@ -138,7 +139,9 @@ function AppContent() {
             }
           />
         )}
-        {page === "management" && <ManagementPage initialSection={initial.section} />}
+        {page === "management" && (
+          <ManagementPage initialSection={initial.section} initialAction={initial.action} />
+        )}
         {page === "tariffs" && (
           <TariffsPage profile={profile} onLinkMetabox={() => setPage("linkMetabox")} />
         )}

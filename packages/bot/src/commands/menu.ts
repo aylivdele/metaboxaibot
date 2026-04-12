@@ -46,6 +46,12 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
 
   const webappUrl = config.bot.webappUrl;
   const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
+  const newDialogBtn = webappUrl
+    ? {
+        text: ctx.t.gpt.newDialog,
+        web_app: { url: `${webappUrl}?page=management&section=gpt&action=new&wtoken=${token}` },
+      }
+    : { text: ctx.t.gpt.newDialog };
   const managementBtn = webappUrl
     ? {
         text: ctx.t.gpt.management,
@@ -55,11 +61,7 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
 
   await ctx.reply(text, {
     reply_markup: {
-      keyboard: [
-        [{ text: ctx.t.gpt.newDialog }],
-        [managementBtn],
-        [{ text: ctx.t.common.backToMain }],
-      ],
+      keyboard: [[newDialogBtn], [managementBtn], [{ text: ctx.t.common.backToMain }]],
       resize_keyboard: true,
       is_persistent: true,
     },

@@ -23,6 +23,7 @@ import {
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
+import { transcribeAndReply } from "../utils/voice-transcribe.js";
 
 // ── Random design pending messages (Russian) ────────────────────────────────
 
@@ -184,11 +185,11 @@ export async function activateDesignModel(ctx: BotContext, modelId: string): Pro
       ctx.user.language,
       model,
     );
-    await ctx.reply(`🎨 ${modelName}\n\n${modelDesc}\n\n${costLine}`, {
+    await ctx.reply(`🎨 ${modelName}\n\n${modelDesc}\n\n${costLine}\n\n${ctx.t.voice.inputHint}`, {
       reply_markup: kb,
     });
   } else {
-    await ctx.reply(ctx.t.design.modelActivated);
+    await ctx.reply(`${ctx.t.design.modelActivated}\n\n${ctx.t.voice.inputHint}`);
   }
 }
 
@@ -223,8 +224,12 @@ export async function handleDesignFamilySelect(ctx: BotContext): Promise<void> {
 
 // ── Incoming prompt in DESIGN_ACTIVE state ────────────────────────────────────
 
-export async function handleDesignMessage(ctx: BotContext): Promise<void> {
-  if (!ctx.user || !ctx.message?.text) return;
+/**
+ * Executes a text prompt in the active design session.
+ * Used by handleDesignMessage (text) and the voice-prompt callback.
+ */
+export async function executeDesignPrompt(ctx: BotContext, prompt: string): Promise<void> {
+  if (!ctx.user) return;
   const chatId = ctx.chat?.id;
   if (!chatId) return;
 
@@ -256,7 +261,6 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
   const imageSettings = await userStateService.getImageSettings(ctx.user.id);
   const aspectRatio = imageSettings[modelId]?.aspectRatio;
 
-  const prompt = ctx.message.text;
   const pendingMsg = await ctx.reply(pickDesignPending(ctx));
 
   try {
@@ -295,6 +299,16 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
       await ctx.reply(ctx.t.design.generationFailed);
     }
   }
+}
+
+export async function handleDesignMessage(ctx: BotContext): Promise<void> {
+  if (!ctx.user || !ctx.message?.text) return;
+  await executeDesignPrompt(ctx, ctx.message.text);
+}
+
+export async function handleDesignVoice(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await transcribeAndReply(ctx, "design");
 }
 
 // ── Incoming photo or image document in DESIGN_ACTIVE state — set as reference ─

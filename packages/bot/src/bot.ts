@@ -16,12 +16,14 @@ import {
   handleGptMessage,
   handleGptPhoto,
   handleGptDocument,
+  handleGptVoice,
 } from "./scenes/gpt.js";
 import {
   buildDesignModelKeyboard,
   handleDesignModelSelect,
   handleDesignFamilySelect,
   handleDesignMessage,
+  handleDesignVoice,
   handleDesignPhoto,
   handleDesignRefSelect,
 } from "./scenes/design.js";
@@ -32,6 +34,8 @@ import {
   handleVideoPhoto,
   handleVideoVideo,
   handleVideoVoice,
+  handleVideoAvatarVoiceCallback,
+  handleVideoTranscribeCallback,
   handleNewVideoDialog,
   handleVideoAvatars,
   handleAvatarPhotoCapture,
@@ -40,9 +44,11 @@ import {
 import {
   handleAudioSubSection,
   handleAudioMessage,
+  handleAudioVoice,
   handleVoiceCloneUpload,
 } from "./scenes/audio.js";
 import { handleSendOriginal } from "./handlers/send-original.handler.js";
+import { handleVoicePromptCallback } from "./handlers/voice-prompt.handler.js";
 import {
   handleMergeChoice,
   handleMergeCancel,
@@ -157,6 +163,12 @@ export function createBot(token: string): Bot<BotContext> {
     if (section === "video") return handleVideo(ctx);
   });
 
+  // ── Voice transcription prompt callback ──────────────────────────────────
+  bot.callbackQuery(/^vp:/, handleVoicePromptCallback);
+  // ── Video avatar voice choice callbacks ─────────────────────────────────
+  bot.callbackQuery(/^va:/, handleVideoAvatarVoiceCallback);
+  bot.callbackQuery(/^vt:/, handleVideoTranscribeCallback);
+
   // ── Audio model selection callback ───────────────────────────────────────
   bot.callbackQuery(/^audio_model:/, async (ctx) => {
     const modelId = ctx.callbackQuery.data.split(":")[1];
@@ -241,12 +253,14 @@ export function createBot(token: string): Bot<BotContext> {
       if (ctx.message?.photo) return handleGptPhoto(ctx);
       if (ctx.message?.document?.mime_type?.startsWith("image/")) return handleGptPhoto(ctx);
       if (ctx.message?.document) return handleGptDocument(ctx);
+      if (ctx.message?.voice || ctx.message?.audio) return handleGptVoice(ctx);
       return handleGptMessage(ctx);
     }
     if (state?.state === "DESIGN_ACTIVE") {
       // Photo or image file sent in design state → set as img2img reference
       if (ctx.message?.photo) return handleDesignPhoto(ctx);
       if (ctx.message?.document?.mime_type?.startsWith("image/")) return handleDesignPhoto(ctx);
+      if (ctx.message?.voice || ctx.message?.audio) return handleDesignVoice(ctx);
       return handleDesignMessage(ctx);
     }
     if (state?.state === "VIDEO_ACTIVE") {
@@ -268,6 +282,7 @@ export function createBot(token: string): Bot<BotContext> {
         await ctx.reply(ctx.t.audio.voiceCloneNeedsAudio);
         return;
       }
+      if (ctx.message?.voice || ctx.message?.audio) return handleAudioVoice(ctx);
       return handleAudioMessage(ctx);
     }
 

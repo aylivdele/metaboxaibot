@@ -91,6 +91,10 @@
     "./services/throttle": {
       "types": "./src/services/throttle.service.ts",
       "default": "./dist/services/throttle.service.js"
+    },
+    "./services/transcription": {
+      "types": "./src/services/transcription.service.ts",
+      "default": "./dist/services/transcription.service.js"
     }
   },
   "dependencies": {

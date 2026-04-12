@@ -24,6 +24,38 @@ import {
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
+import {
+  transcribeAndReply,
+  storeTranscription as storeVoiceText,
+} from "../utils/voice-transcribe.js";
+
+// ── Avatar voice choice store (TTL 10 min) ──────────────────────────────────
+
+interface AvatarVoiceEntry {
+  uploadedKey: string | null;
+  tgUrl: string;
+  expiresAt: number;
+}
+
+const avatarVoiceStore = new Map<string, AvatarVoiceEntry>();
+
+function storeAvatarVoice(
+  userId: bigint,
+  id: string,
+  entry: Omit<AvatarVoiceEntry, "expiresAt">,
+): void {
+  avatarVoiceStore.set(`${userId}:${id}`, { ...entry, expiresAt: Date.now() + 10 * 60 * 1000 });
+}
+
+function getAvatarVoice(userId: bigint, id: string): AvatarVoiceEntry | null {
+  const key = `${userId}:${id}`;
+  const entry = avatarVoiceStore.get(key);
+  if (!entry || entry.expiresAt < Date.now()) {
+    avatarVoiceStore.delete(key);
+    return null;
+  }
+  return entry;
+}
 
 // ── Random video pending messages (Russian) ──────────────────────────────────
 
@@ -187,19 +219,22 @@ async function activateVideoModel(ctx: BotContext, modelId: string): Promise<voi
     });
 
     let hint = ctx.t.video.hintVideoDefault;
+    let appendVoiceHint = true;
     switch (modelId) {
       case "heygen":
         hint = ctx.t.video.hintHeygen;
+        appendVoiceHint = false; // avatar hints already mention voice
         break;
       case "d-id":
         hint = ctx.t.video.hintDid;
+        appendVoiceHint = false;
         break;
       case "higgsfield-lite":
       case "higgsfield":
       case "higgsfield-preview":
         hint = ctx.t.video.hintHiggsfield;
     }
-    await ctx.reply(hint);
+    await ctx.reply(appendVoiceHint ? `${hint}\n\n${ctx.t.voice.inputHint}` : hint);
   } else {
     await ctx.reply(ctx.t.video.modelActivated);
   }
@@ -233,8 +268,12 @@ export async function handleVideoFamilySelect(ctx: BotContext): Promise<void> {
 
 // ── Incoming prompt in VIDEO_ACTIVE state ─────────────────────────────────────
 
-export async function handleVideoMessage(ctx: BotContext): Promise<void> {
-  if (!ctx.user || !ctx.message?.text) return;
+/**
+ * Executes a text prompt in the active video session.
+ * Used by handleVideoMessage (text) and the voice-prompt callback.
+ */
+export async function executeVideoPrompt(ctx: BotContext, prompt: string): Promise<void> {
+  if (!ctx.user) return;
   const chatId = ctx.chat?.id;
   if (!chatId) return;
 
@@ -251,8 +290,6 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
   // For HeyGen/D-ID: pick up any previously saved raw voice recording (one-shot)
   const rawVoiceS3Key =
     (await userStateService.getAndClearVideoRefVoiceUrl(ctx.user.id)) ?? undefined;
-
-  const prompt = ctx.message.text;
 
   // Resolve full model settings (webapp-saved) for EL TTS check
   const allModelSettings = await userStateService.getModelSettings(ctx.user.id);
@@ -338,6 +375,11 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
       await ctx.reply(ctx.t.video.generationFailed);
     }
   }
+}
+
+export async function handleVideoMessage(ctx: BotContext): Promise<void> {
+  if (!ctx.user || !ctx.message?.text) return;
+  await executeVideoPrompt(ctx, ctx.message.text);
 }
 
 // ── New video dialog ──────────────────────────────────────────────────────────
@@ -664,8 +706,8 @@ export async function handleHeygenAvatarCancel(ctx: BotContext): Promise<void> {
 }
 
 // ── Voice/audio handler in VIDEO_ACTIVE state ────────────────────────────────
-// For avatar models (HeyGen, D-ID): start generation immediately (lip-sync, no prompt needed).
-// For other models: save as one-shot reference for the next text message.
+// Non-avatar models: transcribe speech → offer as text prompt.
+// Avatar models (HeyGen, D-ID): offer choice — use as lip-sync audio OR transcribe.
 
 export async function handleVideoVoice(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
@@ -679,27 +721,62 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
   const state = await userStateService.get(userId);
   const modelId = state?.videoModelId ?? "kling";
 
+  if (!AVATAR_MODELS.has(modelId)) {
+    // Non-avatar model: transcribe voice → offer as prompt
+    await transcribeAndReply(ctx, "video");
+    return;
+  }
+
+  // Avatar model: upload to S3, then show choice buttons
   const file = await ctx.api.getFile(audioMsg.file_id);
   const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
 
-  // Determine content type: voice messages are ogg, audio files vary
   const isVoice = !!ctx.message?.voice;
   const contentType = isVoice ? "audio/ogg" : (ctx.message?.audio?.mime_type ?? "audio/mpeg");
   const ext = isVoice ? "ogg" : (file.file_path?.split(".").pop() ?? "mp3");
 
-  // Upload to S3 — store key, not presigned URL
   const s3Key = `voice/${userId.toString()}/${file.file_id}.${ext}`;
   const uploadedKey = await s3Service.uploadFromUrl(s3Key, tgUrl, contentType).catch(() => null);
 
-  if (!AVATAR_MODELS.has(modelId)) {
-    // Non-avatar model: save as one-shot reference (using S3 key if available, else TG URL)
-    const refValue = uploadedKey ?? tgUrl;
-    await userStateService.setVideoRefVoiceUrl(userId, refValue);
-    await ctx.reply(ctx.t.video.videoVoiceSaved);
+  // Generate an ID and store voice data for both callback paths
+  const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  storeAvatarVoice(userId, id, { uploadedKey, tgUrl });
+
+  const kb = new InlineKeyboard()
+    .text(ctx.t.voice.avatarChoiceUseAudio, `va:${id}`)
+    .row()
+    .text(ctx.t.voice.avatarChoiceTranscribe, `vt:${id}`);
+
+  await ctx.reply(ctx.t.video.videoVoiceSaved, { reply_markup: kb });
+}
+
+/**
+ * Callback: user chose to use voice as raw audio for avatar lip-sync.
+ * Continues the previous avatar voice flow.
+ */
+export async function handleVideoAvatarVoiceCallback(ctx: BotContext): Promise<void> {
+  await ctx.answerCallbackQuery();
+  if (!ctx.user) return;
+
+  const id = ctx.callbackQuery?.data?.slice(3); // "va:{id}" → id
+  if (!id) return;
+
+  const entry = getAvatarVoice(ctx.user.id, id);
+  if (!entry) {
+    await ctx.reply(ctx.t.voice.expired);
     return;
   }
 
-  // Avatar model: trigger generation immediately — raw audio is the voice, no text prompt needed
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  // Remove choice buttons
+  await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => void 0);
+
+  const userId = ctx.user.id;
+  const state = await userStateService.get(userId);
+  const modelId = state?.videoModelId ?? "kling";
+
   const allModelSettings = await userStateService.getModelSettings(userId);
   const fullModelSettings = allModelSettings[modelId] ?? {};
   const videoSettings = await userStateService.getVideoSettings(userId);
@@ -715,7 +792,7 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
       duration: modelSettings?.duration,
       modelSettings: {
         ...fullModelSettings,
-        ...(uploadedKey ? { voice_s3key: uploadedKey } : { voice_url: tgUrl }),
+        ...(entry.uploadedKey ? { voice_s3key: entry.uploadedKey } : { voice_url: entry.tgUrl }),
       },
       userId,
     },
@@ -738,9 +815,9 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
       sendOriginalLabel: ctx.t.common.sendOriginal,
       aspectRatio: modelSettings?.aspectRatio,
       duration: modelSettings?.duration,
-      extraModelSettings: uploadedKey
-        ? { voice_s3key: uploadedKey, voice_url: "" }
-        : { voice_url: tgUrl, voice_s3key: "" },
+      extraModelSettings: entry.uploadedKey
+        ? { voice_s3key: entry.uploadedKey, voice_url: "" }
+        : { voice_url: entry.tgUrl, voice_s3key: "" },
     });
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
@@ -752,8 +829,76 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
     } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
       await replyInsufficientTokens(ctx);
     } else {
-      logger.error(err, "Video voice error");
+      logger.error(err, "Video avatar voice error");
       await ctx.reply(ctx.t.video.generationFailed);
     }
+  }
+}
+
+/**
+ * Callback: user chose to transcribe voice instead of using as avatar audio.
+ */
+export async function handleVideoTranscribeCallback(ctx: BotContext): Promise<void> {
+  await ctx.answerCallbackQuery();
+  if (!ctx.user) return;
+
+  const id = ctx.callbackQuery?.data?.slice(3); // "vt:{id}" → id
+  if (!id) return;
+
+  // Remove choice buttons
+  await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => void 0);
+
+  // We need to get the original audio to transcribe it. The avatar voice store
+  // has the S3 key / TG URL. Download and transcribe.
+  const entry = getAvatarVoice(ctx.user.id, id);
+  if (!entry) {
+    await ctx.reply(ctx.t.voice.expired);
+    return;
+  }
+
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  const pendingMsg = await ctx.reply(ctx.t.voice.transcribing);
+
+  try {
+    const url = entry.uploadedKey
+      ? await (async () => {
+          const { getFileUrl } = await import("@metabox/api/services/s3");
+          return (await getFileUrl(entry.uploadedKey!)) ?? entry.tgUrl;
+        })()
+      : entry.tgUrl;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+    const buffer = Buffer.from(await res.arrayBuffer());
+
+    const { transcribeAudio } = await import("@metabox/api/services/transcription");
+    const lang = ctx.user!.language === "ru" ? "ru" : undefined;
+    const text = await transcribeAudio(buffer, "audio/ogg", lang);
+
+    await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+
+    if (!text.trim()) {
+      await ctx.reply(ctx.t.voice.failed);
+      return;
+    }
+
+    // Store and show transcription with "Use as prompt" button
+    const { randomBytes } = await import("crypto");
+    const vpId = randomBytes(6).toString("hex");
+    storeVoiceText(ctx.user!.id, vpId, text);
+
+    const { escapeMarkdownV2 } = await import("../utils/voice-transcribe.js");
+    const header = escapeMarkdownV2(ctx.t.voice.transcriptionResult);
+    const hint = escapeMarkdownV2(ctx.t.voice.transcriptionHint);
+    const md2Text = `${header}\n\n\`\`\`\n${text}\n\`\`\`\n\n${hint}`;
+
+    const kb = new InlineKeyboard().text(ctx.t.voice.useAsPrompt, `vp:video:${vpId}`);
+    await ctx.reply(md2Text, { parse_mode: "MarkdownV2", reply_markup: kb });
+  } catch (err) {
+    logger.error(err, "handleVideoTranscribeCallback: failed");
+    await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+    await ctx.reply(ctx.t.voice.failed);
   }
 }

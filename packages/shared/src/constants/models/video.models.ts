@@ -45,7 +45,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
   kling: {
     id: "kling",
     name: "🎥 Kling 3.0",
-    description: "Генерирует видео до 10 секунд со звуком. Лучше всех передаёт движения людей.",
+    description: "Генерирует видео до 15 секунд со звуком. Лучше всех передаёт движения людей.",
     section: "video",
     provider: "fal",
     familyId: "kling",
@@ -73,7 +73,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
   "kling-pro": {
     id: "kling-pro",
     name: "🎥 Kling 3.0 Pro",
-    description: "Генерирует видео до 10 секунд со звуком. Лучше всех передаёт движения людей.",
+    description: "Генерирует видео до 15 секунд со звуком. Лучше всех передаёт движения людей.",
     section: "video",
     provider: "fal",
     familyId: "kling",

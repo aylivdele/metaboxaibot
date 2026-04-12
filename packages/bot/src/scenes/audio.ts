@@ -7,6 +7,7 @@ import { AI_MODELS, config, generateWebToken, resolveModelDisplay } from "@metab
 import { logger } from "../logger.js";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
+import { transcribeAndReply } from "../utils/voice-transcribe.js";
 import { uploadBuffer, buildS3Key } from "@metabox/api/services/s3";
 
 // ── Sub-section entry points ──────────────────────────────────────────────────
@@ -52,13 +53,15 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
         ctx.user.language,
         model,
       );
-      await ctx.reply(`${modelName}\n\n${modelDesc}\n\n${hint}\n\n${costLine}`, {
-        reply_markup: kb,
-      });
+      await ctx.reply(
+        `${modelName}\n\n${modelDesc}\n\n${hint}\n\n${costLine}\n\n${ctx.t.voice.inputHint}`,
+        { reply_markup: kb },
+      );
       return;
     }
   }
 
+  // voice-clone: no voice transcription hint (audio is used for cloning, not prompts)
   await ctx.reply(hint);
 }
 
@@ -232,14 +235,17 @@ async function evictOneElevenLabsVoice(): Promise<boolean> {
 
 // ── Incoming prompt in AUDIO_ACTIVE state ─────────────────────────────────────
 
-export async function handleAudioMessage(ctx: BotContext): Promise<void> {
-  if (!ctx.user || !ctx.message?.text) return;
+/**
+ * Executes a text prompt in the active audio session.
+ * Used by handleAudioMessage (text) and the voice-prompt callback.
+ */
+export async function executeAudioPrompt(ctx: BotContext, prompt: string): Promise<void> {
+  if (!ctx.user) return;
   const chatId = ctx.chat?.id;
   if (!chatId) return;
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.audioModelId ?? "tts-openai";
-  const prompt = ctx.message.text;
 
   const pendingMsg = await ctx.reply(ctx.t.audio.processing);
 
@@ -273,4 +279,14 @@ export async function handleAudioMessage(ctx: BotContext): Promise<void> {
       await ctx.reply(ctx.t.audio.generationFailed);
     }
   }
+}
+
+export async function handleAudioMessage(ctx: BotContext): Promise<void> {
+  if (!ctx.user || !ctx.message?.text) return;
+  await executeAudioPrompt(ctx, ctx.message.text);
+}
+
+export async function handleAudioVoice(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await transcribeAndReply(ctx, "audio");
 }

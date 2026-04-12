@@ -6,7 +6,13 @@ import { VoicesView } from "../components/management/VoicesView.js";
 
 type ManageTab = "gpt" | "design" | "video" | "audio" | "uploads";
 
-export function ManagementPage({ initialSection }: { initialSection?: string }) {
+export function ManagementPage({
+  initialSection,
+  initialAction,
+}: {
+  initialSection?: string;
+  initialAction?: string;
+}) {
   const { t } = useI18n();
   const [tab, setTab] = useState<ManageTab>(
     initialSection === "design"
@@ -40,7 +46,7 @@ export function ManagementPage({ initialSection }: { initialSection?: string }) 
         ))}
       </div>
       <div className="manage-content">
-        {tab === "gpt" && <GptManagementView />}
+        {tab === "gpt" && <GptManagementView initialAction={initialAction} />}
         {tab === "design" && <MediaSettingsView section="design" />}
         {tab === "video" && <MediaSettingsView section="video" />}
         {tab === "audio" && (

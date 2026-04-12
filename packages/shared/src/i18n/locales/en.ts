@@ -56,6 +56,8 @@ export default {
     docUploadFailed: "Failed to upload the file, please try again.",
     contextOverflow:
       "📚 The message is too large for the current model. Trim attachments or pick a model with a bigger context window in ⚙ Management.",
+    noActiveDialog: "💬 You need to create a dialog and choose a model first.",
+    createDialog: "➕ Create dialog",
     backToMain: "🏠 Main Menu",
     dialogSelected: "✅ Dialog selected: {title}\nModel: {model}",
     dialogHint: {
@@ -346,6 +348,19 @@ export default {
   payments: {
     success: "✅ Payment successful! Tokens have been credited to your balance.",
     error: "⚠️ Payment received but tokens could not be credited. Please contact support.",
+  },
+  voice: {
+    transcribing: "🎤 Recognizing speech...",
+    transcriptionResult: "🎤 Transcription of your recording:",
+    transcriptionHint:
+      "To use as a prompt — press the button below. To edit, copy the text and send the edited version in the chat.",
+    useAsPrompt: "▶️ Use as prompt",
+    expired: "⏳ Recording expired, please send a voice message again.",
+    failed: "❌ Could not recognize speech. Please try again.",
+    inputHint:
+      "🎤 You can also send a voice message — the bot will transcribe it and offer to use it as a prompt.",
+    avatarChoiceUseAudio: "🎙 Use audio for avatar",
+    avatarChoiceTranscribe: "🎤 Transcribe as prompt",
   },
   linkMetabox: {
     title: "Metabox Learning",

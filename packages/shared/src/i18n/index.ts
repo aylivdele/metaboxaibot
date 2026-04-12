@@ -48,6 +48,8 @@ export interface Translations {
     docExtractFailed: string;
     docUploadFailed: string;
     contextOverflow: string;
+    noActiveDialog: string;
+    createDialog: string;
     backToMain: string;
     dialogSelected: string;
     dialogHint: {
@@ -268,6 +270,17 @@ export interface Translations {
     success: string;
     error: string;
   };
+  voice: {
+    transcribing: string;
+    transcriptionResult: string;
+    transcriptionHint: string;
+    useAsPrompt: string;
+    expired: string;
+    failed: string;
+    inputHint: string;
+    avatarChoiceUseAudio: string;
+    avatarChoiceTranscribe: string;
+  };
   linkMetabox: {
     title: string;
     subtitle: string;
@@ -355,6 +368,8 @@ export function buildDialogHint(
       lines.push(t.gpt.dialogHint.extractNote.replace("{formats}", allFormats));
     }
   }
+
+  lines.push(t.voice.inputHint);
 
   if (model.supportsThinking) {
     lines.push(t.gpt.dialogHint.thinkingWarning);

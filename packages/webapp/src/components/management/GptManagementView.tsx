@@ -30,7 +30,7 @@ function formatModelPrice(
   return m.provider;
 }
 
-export function GptManagementView() {
+export function GptManagementView({ initialAction }: { initialAction?: string } = {}) {
   const { t } = useI18n();
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const [models, setModels] = useState<Model[]>([]);
@@ -41,7 +41,7 @@ export function GptManagementView() {
   const [loading, setLoading] = useState(true);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
+  const [isCreating, setIsCreating] = useState(initialAction === "new");
   const [creating, setCreating] = useState(false);
   const [activatedPopup, setActivatedPopup] = useState(false);
   const [viewingDialog, setViewingDialog] = useState<Dialog | null>(null);
