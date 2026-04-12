@@ -309,7 +309,8 @@ export async function handleStart(ctx: BotContext): Promise<void> {
       })();
     }
   }
-  const welcomeBilingual = `${getT("ru").start.welcome}\n\n${getT("en").start.welcome}`;
+  const landingUrl = config.metabox.landingUrl;
+  const welcomeBilingual = `${getT("ru").start.welcome.replace("{landingUrl}", landingUrl)}\n\n${getT("en").start.welcome.replace("{landingUrl}", landingUrl)}`;
   await ctx.reply(welcomeBilingual, {
     reply_markup: buildLanguageKeyboard(),
     parse_mode: "HTML",

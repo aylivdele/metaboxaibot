@@ -125,6 +125,7 @@ export const config = {
    */
   metabox: {
     apiUrl: opt("METABOX_API_URL"),
+    landingUrl: optDefault("METABOX_LANDING_URL", "https://meta-box.ru"),
     internalKey: opt("METABOX_INTERNAL_KEY"),
     ssoSecret: opt("METABOX_SSO_SECRET"),
   },

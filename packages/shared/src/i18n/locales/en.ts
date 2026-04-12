@@ -1,9 +1,9 @@
 export default {
   start: {
     welcome:
-      '🔶 Welcome to Metabox! By continuing, you agree to the <a href="https://google.com">Terms of Service</a>. Please choose your language:',
+      '🔶 Finally! We\'ve been waiting. This is Metabox — all the best AI tools, one click away. By continuing, you agree to our <a href="{landingUrl}/documents/terms_of_use_en.html">Terms of Use</a> (lawyers made us write this). Pick your language:',
     tokensGranted:
-      '⚡ 5.50 tokens have been credited for you to explore the bot. To learn more about your account and plans, click the "Profile" button below.',
+      '⚡ 7.50 tokens have been credited for you to explore the bot. To learn more about your account and plans, click the "Profile" button below.',
     yourBalance:
       '💰 Your balance: {balance} tokens. To view your account and plans, click the "Profile" button below.',
     restart: "Restart",

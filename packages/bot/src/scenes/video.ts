@@ -25,6 +25,24 @@ import {
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 
+// ── Random video pending messages (Russian) ──────────────────────────────────
+
+const VIDEO_PENDING_RU = [
+  "⏳ Монтаж в процессе. Нейросеть режет, клеит и добавляет магии. Пару минут — и скинем результат.",
+  "🎥 Ваше видео в производстве. Бюджет — ноль, ожидание — пара минут, результат — бесценен. Пришлём, как будет готово.",
+  "🪄 Нейросеть взяла камеру и ушла на съёмочную площадку. Обычно укладывается в несколько минут. Ждём вместе.",
+  "🧠 Миллиарды нейронов сейчас рендерят ваше видео. Это займёт пару минут — но оно того стоит. Сразу скинем.",
+  "🚀 Запрос принят, рендер запущен. Пока ждёте — можно успеть налить чай. Видео прилетит, как только будет готово.",
+  "🎬 Тссс, идёт съёмка! Нейросеть работает над вашим видео. Несколько минут — и отправим вам готовый ролик. Без рекламы, обещаем.",
+];
+
+function pickVideoPending(ctx: BotContext): string {
+  if (ctx.user?.language === "ru") {
+    return VIDEO_PENDING_RU[Math.floor(Math.random() * VIDEO_PENDING_RU.length)];
+  }
+  return ctx.t.video.asyncPending;
+}
+
 // ── ElevenLabs TTS pre-generation for lip-sync ────────────────────────────────
 
 const AVATAR_MODELS = new Set(["heygen", "d-id"]);
@@ -240,7 +258,7 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
   const allModelSettings = await userStateService.getModelSettings(ctx.user.id);
   const fullModelSettings = allModelSettings[modelId] ?? {};
 
-  const pendingMsg = await ctx.reply(ctx.t.video.queuing);
+  const pendingMsg = await ctx.reply(pickVideoPending(ctx));
 
   try {
     // If avatar model + EL cloned voice selected + no raw audio override → pre-generate TTS
@@ -262,7 +280,7 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
     }
 
     await ctx.api
-      .editMessageText(chatId, pendingMsg.message_id, ctx.t.video.queuing)
+      .editMessageText(chatId, pendingMsg.message_id, pickVideoPending(ctx))
       .catch(() => void 0);
 
     // Build voice override: raw recording > EL TTS > nothing (adapter uses configured voice_id)
@@ -308,7 +326,7 @@ export async function handleVideoMessage(ctx: BotContext): Promise<void> {
     });
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
-    await ctx.reply(ctx.t.video.asyncPending);
+    await ctx.reply(pickVideoPending(ctx));
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     if (err instanceof Error && err.message === "NO_SUBSCRIPTION") {
@@ -502,7 +520,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       await ctx.reply(ctx.t.video.imageIgnoredUnsupported).catch(() => void 0);
     }
 
-    const pendingMsg = await ctx.reply(ctx.t.video.queuing);
+    const pendingMsg = await ctx.reply(pickVideoPending(ctx));
 
     try {
       await videoGenerationService.submitVideo({
@@ -517,7 +535,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       });
 
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
-      await ctx.reply(ctx.t.video.asyncPending);
+      await ctx.reply(pickVideoPending(ctx));
     } catch (err: unknown) {
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
       if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
@@ -726,7 +744,7 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
     });
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
-    await ctx.reply(ctx.t.video.asyncPending);
+    await ctx.reply(pickVideoPending(ctx));
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     if (err instanceof Error && err.message === "NO_SUBSCRIPTION") {

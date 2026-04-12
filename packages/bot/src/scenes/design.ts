@@ -24,6 +24,24 @@ import {
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 
+// ── Random design pending messages (Russian) ────────────────────────────────
+
+const DESIGN_PENDING_RU = [
+  "⏳ Нейросеть взяла кисточку и начала рисовать. Скинем результат, как только шедевр будет готов.",
+  "🎨 Картинка в работе! Нейросеть старается. Иногда даже высовывает язык от усердия. Пришлём, как будет готово.",
+  "🖼 Генерируем картинку. Да, мы тоже хотим посмотреть, что получится. Ждём вместе с вами.",
+  "⏳ Нейросеть приняла заказ и ушла творить. Не переживайте — она не прокрастинирует. Обычно.",
+  "🚀 Запрос улетел, картинка на подходе. Пока ждёте — можете моргнуть. Но не слишком долго, а то пропустите.",
+  "🎬 Тишина на площадке! Нейросеть генерирует ваш кадр. Как только скажет «снято» — сразу пришлём.",
+];
+
+function pickDesignPending(ctx: BotContext): string {
+  if (ctx.user?.language === "ru") {
+    return DESIGN_PENDING_RU[Math.floor(Math.random() * DESIGN_PENDING_RU.length)];
+  }
+  return ctx.t.design.asyncPending;
+}
+
 // ── Sync image delivery (mirrors image.processor.ts logic) ───────────────────
 
 const PHOTO_MAX_URL = 5 * 1024 * 1024;
@@ -239,7 +257,7 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
   const aspectRatio = imageSettings[modelId]?.aspectRatio;
 
   const prompt = ctx.message.text;
-  const pendingMsg = await ctx.reply(ctx.t.design.generating);
+  const pendingMsg = await ctx.reply(pickDesignPending(ctx));
 
   try {
     const result = await generationService.submitImage({
@@ -262,7 +280,7 @@ export async function handleDesignMessage(ctx: BotContext): Promise<void> {
       await sendSyncImageResult(ctx, modelId, result, caption);
     } else {
       // Async — worker will notify when done
-      await ctx.reply(ctx.t.design.asyncPending);
+      await ctx.reply(pickDesignPending(ctx));
     }
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
@@ -367,7 +385,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
 
     const imageSettings = await userStateService.getImageSettings(ctx.user.id);
     const aspectRatio = imageSettings[modelId]?.aspectRatio;
-    const pendingMsg = await ctx.reply(ctx.t.design.generating);
+    const pendingMsg = await ctx.reply(pickDesignPending(ctx));
 
     try {
       const result = await generationService.submitImage({
@@ -387,7 +405,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
         const captionText = `🎨 ${caption.slice(0, 200)} ${ctx.t.design.withReference}`;
         await sendSyncImageResult(ctx, modelId, result, captionText);
       } else {
-        await ctx.reply(ctx.t.design.asyncPending);
+        await ctx.reply(pickDesignPending(ctx));
       }
     } catch (err: unknown) {
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);

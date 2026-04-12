@@ -25,4 +25,4 @@ export const SECTION_BY_STATE: Partial<Record<BotState, Section>> = {
   VIDEO_ACTIVE: "video",
 };
 
-export const WELCOME_BONUS_TOKENS = 5.5;
+export const WELCOME_BONUS_TOKENS = 7.5;
