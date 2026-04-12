@@ -17,109 +17,129 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
   // ── GPT ─────────────────────────────────────────────────────────────────────
   "gpt-5.4-pro": {
     name: "🧠 GPT 5.4 Pro",
-    description: "The most powerful OpenAI model — maximum accuracy and the deepest reasoning.",
+    description:
+      "The most powerful OpenAI model. Maximum accuracy and deep reasoning. Much more expensive than GPT 5.4 — for tasks demanding flawless precision.",
   },
   "gpt-5.4": {
     name: "💬 GPT 5.4",
-    description: "OpenAI flagship with a great balance of intelligence and speed.",
+    description:
+      "Next-gen OpenAI flagship — smarter and faster than GPT 5 Pro. Best balance of intelligence, speed and cost in the lineup.",
   },
   "gpt-5-pro": {
     name: "💡 GPT 5 Pro",
-    description: "Previous OpenAI flagship — solid balance of intelligence and speed.",
+    description:
+      "Previous-gen OpenAI flagship. Highest reasoning level only — for the hardest tasks. More expensive than GPT 5.4.",
   },
   "gpt-5-nano": {
     name: "✨ GPT 5 Nano",
-    description: "Lightest and cheapest in the GPT 5 lineup — instant responses.",
+    description:
+      "Lightest and cheapest in the GPT 5 lineup — instant responses for simple tasks. No image support.",
   },
   "o4-mini": {
     name: "🔬 GPT-o4 Mini",
-    description: "OpenAI reasoning model — chain-of-thought for complex tasks at a low price.",
+    description:
+      "Latest OpenAI reasoning model — chain-of-thought for complex tasks. Understands images, smarter than o3 Mini.",
   },
   "o3-mini": {
     name: "🔩 GPT-o3 Mini",
-    description: "Compact OpenAI reasoning model — great price-to-accuracy ratio.",
+    description:
+      "Previous compact OpenAI reasoning model. No image support — for text-based chain-of-thought tasks.",
   },
   "claude-opus": {
     name: "🎭 Claude 4.6 Opus",
     description:
-      "Anthropic's most intelligent model, best for complex analytical and creative tasks. Understands images.",
+      "Latest and most intelligent Anthropic model (version 4.6). Best for complex analytical and creative tasks. Understands images.",
   },
   "claude-opus-4-5": {
     name: "🃏 Claude 4.5 Opus",
-    description: "Previous Anthropic flagship — deep analysis and long texts. Understands images.",
+    description:
+      "Previous-gen Opus (version 4.5). Deep analysis and long texts. Slightly weaker reasoning than 4.6, but proven stability.",
   },
   "claude-sonnet": {
     name: "📜 Claude 4.6 Sonnet",
     description:
-      "Fast and smart — Anthropic's best price-to-quality ratio. Excellent for code, text and analysis.",
+      "Latest Sonnet (version 4.6) — Anthropic's best price-to-quality ratio. Faster and cheaper than Opus, excellent for code, text and analysis.",
   },
   "claude-sonnet-4-5": {
     name: "🖊️ Claude 4.5 Sonnet",
-    description: "Reliable Anthropic workhorse, great for code and writing.",
+    description:
+      "Previous-gen Sonnet (version 4.5). Reliable workhorse, slightly weaker than 4.6. Great for code and writing.",
   },
   "claude-haiku": {
     name: "🍃 Claude 4.5 Haiku",
-    description: "Anthropic's fastest and cheapest model — instant responses for simple tasks.",
+    description:
+      "Anthropic's fastest and cheapest model. Instant responses for simple tasks, understands images. Weaker reasoning than Sonnet and Opus.",
   },
   "gemini-3-pro": {
     name: "💎 Gemini 3 Pro",
-    description: "Google's flagship — massive context and multimodality. Supports web search.",
+    description:
+      "Google's flagship — context up to 1M tokens and multimodality. Supports web search. Base version of 3 Pro.",
   },
   "gemini-3.1-pro": {
     name: "💍 Gemini 3.1 Pro",
-    description: "Updated Gemini 3 Pro with improved instruction following. Web search.",
+    description:
+      "Updated Gemini 3 Pro (version 3.1) — better instruction following and more accurate answers. Same price as 3.0. Web search.",
   },
   "gemini-2-flash": {
     name: "🌟 Gemini 2.5 Flash",
     description:
-      "Fast and affordable Google model with reasoning — great price-to-quality. Supports web search.",
+      "Fast and affordable Google model with reasoning. Great price-to-quality, ~7× cheaper than Pro. Web search.",
   },
   "gemini-2-flash-lite": {
     name: "⭐ Gemini 2.5 Flash Lite",
-    description: "Google's lightest and cheapest model — ideal for simple tasks at minimal cost.",
+    description:
+      "Google's lightest and cheapest model. For simple tasks at minimal cost. No image support or web search.",
   },
   "deepseek-r1": {
     name: "🔍 DeepSeek R1",
     description:
-      "Reasoning model from China, competitor to o1 — strong at math and code. Open weights.",
+      "Reasoning model from China — strong at math and code, thinks step by step. Slower than V3, but more accurate for complex tasks.",
   },
   "deepseek-v3": {
     name: "🐋 DeepSeek V3",
-    description: "Fast model, excellent for general tasks and text generation at very low cost.",
+    description:
+      "Fast DeepSeek model for general tasks and text generation. No step-by-step reasoning — faster than R1, but less accurate for complex tasks.",
   },
   "grok-4": {
     name: "🤖 Grok 4",
-    description: "xAI (Elon Musk) flagship — powerful reasoning with access to X data.",
+    description:
+      "xAI flagship — maximum reasoning quality, 256K context. More expensive than Grok 4 Fast, but more accurate for complex tasks.",
   },
   "grok-4-fast": {
-    name: "🏎️ Grok 4-fast",
-    description: "Accelerated Grok 4 from xAI — fast responses with reasoning.",
+    name: "🏎️ Grok 4 Fast",
+    description:
+      "Accelerated Grok 4 from xAI. Context up to 2M tokens, ~10× cheaper than standard Grok 4. Fast responses with reasoning.",
   },
   "perplexity-sonar-pro": {
     name: "🌐 Perplexity Sonar Pro + Internet",
-    description: "Powerful AI search with deep answers — real-time data from the internet.",
+    description:
+      "Powerful AI search with deep answers from the internet. More expensive than Sonar, but more thorough source analysis and detailed responses.",
   },
   "perplexity-sonar-research": {
     name: "🔭 Perplexity Sonar Deep Research",
-    description: "Autonomous researcher — analyzes dozens of sources in one query.",
+    description:
+      "Autonomous researcher — analyzes dozens of sources per query. Ideal for deep research, slower than regular Sonar.",
   },
   "perplexity-sonar": {
     name: "📡 Perplexity Sonar + Internet",
-    description: "Fast AI search with real-time internet data.",
+    description:
+      "Fast and affordable AI search with real-time internet data. Basic version — for quick questions without deep analysis.",
   },
   "qwen-3-max-thinking": {
     name: "🧮 Qwen 3 Max Thinking",
-    description: "Alibaba's largest reasoning model — competitor to GPT and Claude.",
+    description:
+      "Alibaba's largest reasoning model. Maximum quality in the Qwen lineup — for the hardest tasks. More expensive than Qwen 3 Thinking.",
   },
   "qwen-3-thinking": {
     name: "💭 Qwen 3 Thinking",
-    description: "Alibaba's mid-size reasoning model — strong at code and math.",
+    description:
+      "Alibaba's mid-size reasoning model — cheaper than Max, but strong at code and math. Best price-to-quality in the Qwen lineup.",
   },
   // ── Audio ────────────────────────────────────────────────────────────────────
   "tts-openai": {
     name: "🔊 Speech Synthesis (OpenAI)",
     description:
-      "OpenAI text-to-speech. Multiple voices, natural intonation and fast generation for any text.",
+      "OpenAI text-to-speech. Fast generation, natural intonation. Cheaper than ElevenLabs, but fewer voices and no cloned voice support.",
   },
   "voice-clone": {
     name: "🎤 Voice Cloning",
@@ -128,12 +148,13 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
   },
   "tts-el": {
     name: "🔊 Speech Synthesis (ElevenLabs)",
-    description: "ElevenLabs text-to-speech with a wide library of voices or your cloned voices.",
+    description:
+      "ElevenLabs text-to-speech — wide voice library + your cloned voices. Higher quality and expressiveness than OpenAI TTS, but more expensive.",
   },
   suno: {
     name: "🎵 Music Generation (Suno)",
     description:
-      "Generates full music tracks with vocals and arrangement from a text description of style and mood.",
+      "Generates full music tracks with vocals and arrangement. Set style, mood and song lyrics. Up to 4 minutes. Slower than ElevenLabs, but with full vocals.",
   },
   "sounds-el": {
     name: "🔔 Sound Effects (ElevenLabs)",
@@ -143,18 +164,18 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
   "music-el": {
     name: "🎶 Music (ElevenLabs)",
     description:
-      "Generates background music, ambient and musical atmospheres from a text description.",
+      "Generates background music, ambient and atmospheres via ElevenLabs. Instrumental only (no vocals), up to 22 seconds. Faster than Suno. English prompts recommended.",
   },
   // ── Design ───────────────────────────────────────────────────────────────────
   "nano-banana-pro": {
     name: "🍌 Nano Banana PRO",
     description:
-      "Generates realistic photos and lets you edit details with words: 'remove background', 'add a hat', 'make it evening'.",
+      "Generates realistic photos and lets you edit details with words. PRO — maximum quality up to 4K, more expensive than the standard version.",
   },
   "nano-banana-2": {
     name: "🍌 Nano Banana 2",
     description:
-      "Generates and edits realistic photos from text commands. Supports web search and enhanced thinking for precise prompt following.",
+      "Generates and edits realistic photos from text commands. Standard — cheaper than PRO, supports web search and enhanced thinking mode for complex prompts.",
   },
   midjourney: {
     name: "🎨 MidJourney v7",
@@ -179,114 +200,115 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
   "ideogram-quality": {
     name: "✍️ Ideogram v3.0 Quality",
     description:
-      "Best at rendering readable text in images. Ideal for logos, posters, covers and ads. Maximum quality.",
+      "Best at rendering readable text in images. Ideal for logos, posters and ads. Quality — maximum detail and precision, slowest and most expensive option.",
   },
   "ideogram-balanced": {
     name: "✍️ Ideogram v3.0 Balanced",
     description:
-      "Best at rendering readable text in images. Ideal for logos, posters, covers and ads. Balanced quality and speed.",
+      "Best at rendering readable text in images. Ideal for logos, posters and ads. Balanced — optimal quality-to-speed ratio, mid-range price.",
   },
   "ideogram-turbo": {
     name: "✍️ Ideogram v3.0 Turbo",
     description:
-      "Best at rendering readable text in images. Ideal for logos, posters, covers and ads. Fast and budget-friendly.",
+      "Best at rendering readable text in images. Ideal for logos, posters and ads. Turbo — fastest and cheapest option, slightly lower detail.",
   },
   "imagen-4-fast": {
     name: "🔮 Imagen 4 Fast",
     description:
-      "Fast Google Imagen 4. High photorealism and accurate text-following with minimal wait time.",
+      "Google Imagen 4 — high photorealism. Fast — cheapest and quickest option, no 2K support. Great for rapid iterations.",
   },
   "imagen-4": {
     name: "🔮 Imagen 4",
-    description: "Standard Google Imagen 4. High photorealism and accurate text-following.",
+    description:
+      "Google Imagen 4 — high photorealism. Standard — quality-to-price balance with 2K support. Optimal choice for most tasks.",
   },
   "imagen-4-ultra": {
     name: "🔮 Imagen 4 Ultra",
     description:
-      "Maximum quality Google Imagen 4. Highest detail and photorealism for professional tasks.",
+      "Google Imagen 4 — high photorealism. Ultra — maximum detail and rendering quality for professional tasks, 2K support.",
   },
   flux: {
     name: "⚡ FLUX.2",
     description:
-      "Maximally realistic photos in seconds. Best choice for fast, photo-realistic results.",
+      "Maximally realistic photos in seconds. Standard — fine-tuned generation control (steps, CFG, acceleration, LoRA). Cheaper than Pro, more parameters.",
   },
   "flux-pro": {
     name: "⚡ FLUX.2 Pro",
     description:
-      "Professional FLUX.2 — maximum quality, better prompt adherence, supports editing uploaded images.",
+      "Professional FLUX.2 — maximum quality and prompt adherence. Fewer manual settings, but higher out-of-the-box results.",
   },
   "recraft-v3": {
     name: "🖌️ Recraft v3",
     description:
-      "Quickly creates illustrations, icons and graphics in a consistent style. Great for design and presentations.",
+      "Previous-gen Recraft — wide selection of styles and sub-styles (realism, illustration, vector), artistic level control. Proven stability.",
   },
   "recraft-v4": {
     name: "🖌️ Recraft V4",
     description:
-      "Built for design and marketing: clean composition, precise text rendering and professional polish.",
+      "Recraft V4 Standard — new generation for design and marketing. Clean composition and precise text rendering. Cheaper than Pro, lower detail.",
   },
   "recraft-v4-pro": {
     name: "💠 Recraft V4 Pro",
     description:
-      "Extended Recraft V4 with higher resolution and detail. Ideal for demanding design projects.",
+      "Recraft V4 Pro — maximum resolution and detail for raster images. Ideal for demanding design projects, production-ready without edits.",
   },
   "recraft-v4-vector": {
     name: "📐 Recraft V4 Vector (SVG)",
     description:
-      "Generates scalable SVG vectors — perfect for logos, illustrations and icons. Scales to any size without quality loss.",
+      "Recraft V4 Vector — generates SVG vectors for logos, icons and illustrations. Scales to any size without quality loss. Cheaper than Pro Vector.",
   },
   "recraft-v4-pro-vector": {
     name: "📐 Recraft V4 Pro Vector (SVG)",
     description:
-      "Professional vector generation with maximum SVG quality. For complex illustrations and branding.",
+      "Recraft V4 Pro Vector — maximum SVG generation quality. For complex illustrations and branding requiring flawless detail and scalability.",
   },
   "seedream-5": {
     name: "🛍️ Seedream 5.0 (ByteDance)",
     description:
-      "Perfect for product photos, clothing and catalogs. Creates clean, professional images for sales.",
+      "Perfect for product photos, clothing and catalogs. Version 5.0 — improved quality and realism compared to 4.5.",
   },
   "seedream-4.5": {
     name: "🛍️ Seedream 4.5",
     description:
-      "Previous Seedream — slightly simpler but faster and cheaper. Good for bulk product photo generation.",
+      "Previous Seedream — slightly simpler than 5.0, but proven stability. Good for bulk product photo generation.",
   },
   // ── Video ────────────────────────────────────────────────────────────────────
   kling: {
     name: "🎥 Kling 3.0",
     description:
-      "Generates videos up to 10 seconds with audio. Best at reproducing human movements.",
+      "Generates videos up to 15 seconds with audio. Best at reproducing human movements. Standard version — faster and cheaper than Pro.",
   },
   "kling-pro": {
     name: "🎥 Kling 3.0 Pro",
     description:
-      "Pro version — generates videos up to 10 seconds with audio. Best at reproducing human movements.",
+      "Generates videos up to 15 seconds with audio. Best at reproducing human movements. Pro version — higher detail and movement quality.",
   },
   "higgsfield-lite": {
     name: "🎬 Higgsfield Lite",
     description:
-      "Specializes in realistic human animation — facial expressions, gestures and body movements look natural.",
+      "Realistic human animation — facial expressions, gestures and body movements. Lite — fastest and most affordable Higgsfield version.",
   },
   higgsfield: {
     name: "🎬 Higgsfield Turbo",
     description:
-      "Turbo version. Specializes in realistic human animation — facial expressions, gestures and body movements look natural.",
+      "Realistic human animation — facial expressions, gestures and body movements. Turbo — quality-to-speed balance, higher detail than Lite.",
   },
   "higgsfield-preview": {
     name: "🎬 Higgsfield Preview",
     description:
-      "Flagship version with maximum quality — most realistic lighting, detail and cinematic quality.",
+      "Realistic human animation — facial expressions, gestures and body movements. Preview — flagship version with maximum quality, lighting and cinematic feel.",
     descriptionOverride:
       "Flagship version with maximum quality — most realistic lighting, detail and cinematic quality.",
   },
   veo: {
     name: "📽️ Veo 3",
     description:
-      "Google video with audio and voices. Supports vertical format for Reels and Shorts. Send a photo with text — the video starts from your photo.",
+      "Google video with audio and voices. Supports vertical format for Reels and Shorts. Standard — maximum quality, higher detail than Fast. Send a photo with text — the video starts from your photo.",
   },
   "veo-fast": {
     name: "📽️ Veo 3 Fast",
     description:
-      "Fast and more affordable Veo 3 from Google. With audio and voices. Send a photo with text — the video starts from your photo.",
+      "Fast and more affordable Veo 3 from Google. With audio and voices, slightly lower detail than Standard. Supports 4K. Send a photo with text — the video starts from your photo.",
   },
   sora: {
     name: "🌌 Sora 2",
@@ -306,17 +328,17 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
   seedance: {
     name: "💃 Seedance 1.5 Pro (ByteDance)",
     description:
-      "Creates video with expressive and unusual movement. Great for creative and stylized clips.",
+      "Creates video with expressive movement and audio generation. Previous generation — proven stability, up to 12 seconds. Great for creative and stylized clips.",
   },
   "seedance-2": {
     name: "💃 Seedance 2.0 (ByteDance)",
     description:
-      "Latest ByteDance video model with built-in audio generation. Supports up to 15 seconds, wide range of aspect ratios.",
+      "Latest ByteDance video model — significantly higher quality and realism compared to 1.5. Built-in audio, up to 15 seconds, wide range of aspect ratios.",
   },
   "seedance-2-fast": {
     name: "💃 Seedance 2.0 Fast (ByteDance)",
     description:
-      "Faster and cheaper version of Seedance 2.0 with similar quality. Built-in audio, up to 15 seconds.",
+      "Accelerated Seedance 2.0 — faster and ~20% cheaper than standard with similar quality. Built-in audio, up to 15 seconds.",
   },
   "luma-ray2": {
     name: "☀️ Luma: Ray 2",
@@ -334,14 +356,14 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
       "Fast videos with cool special effects: explosions, melting, compression. Perfect for TikTok and Reels.",
   },
   "hailuo-fast": {
-    name: "🎞️ Hailuo 2.3",
+    name: "🎞️ Hailuo 2.3 Fast",
     description:
-      "Fast Hailuo 2.3 by MiniMax — ~40% cheaper with similar quality. Requires a photo as the first frame.",
+      "Fast Hailuo 2.3 by MiniMax — ~40% cheaper than standard with similar quality. Slightly lower detail. Requires a photo as the first frame.",
   },
   hailuo: {
     name: "🎞️ Hailuo 2.3",
     description:
-      "MiniMax video model with 1080p support and 10-second clips. Accepts a photo as the first frame.",
+      "Standard Hailuo 2.3 by MiniMax — maximum quality, 1080p support and 10-second clips. Accepts a photo as the first frame.",
   },
   wan: {
     name: "🏯 Wan 2.6 (Alibaba)",
@@ -674,7 +696,8 @@ export const SETTING_TRANSLATIONS_EN: Record<string, SettingTranslation> = {
   },
   model_version: {
     label: "Model version",
-    description: "V4_5 — recommended (up to 8 min), V5 / V5_5 — latest versions.",
+    description:
+      "V4 — basic, V4.5 — recommended (up to 8 min, stable quality), V4.5+ — higher detail, V5 — new generation, V5.5 — latest (experimental).",
     options: { V4_5: "V4.5 (recommended)", V5_5: "V5.5 (latest)" },
   },
   make_instrumental: {

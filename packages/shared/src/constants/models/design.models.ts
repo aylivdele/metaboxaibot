@@ -293,7 +293,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "nano-banana-pro",
     name: "🍌 Nano Banana PRO",
     description:
-      "Генерирует реалистичные фото и позволяет менять детали прямо словами: «убери фон», «добавь шляпу», «сделай вечер».",
+      "Генерирует реалистичные фото и позволяет менять детали словами. PRO — максимальное качество до 4K, дороже стандартной версии.",
     section: "design",
     provider: "fal",
     familyId: "nano-banana",
@@ -377,7 +377,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "nano-banana-2",
     name: "🍌 Nano Banana 2",
     description:
-      "Генерирует реалистичные фото и редактирует их по текстовым командам. Поддерживает поиск в интернете и усиленное мышление для точного следования промпту.",
+      "Генерирует реалистичные фото и редактирует их по текстовым командам. Standard — дешевле PRO, поддерживает поиск в интернете и режим усиленного мышления для сложных промптов.",
     section: "design",
     provider: "fal",
     familyId: "nano-banana",
@@ -872,7 +872,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "ideogram-quality",
     name: "✍️ Ideogram v3.0 Quality",
     description:
-      "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров, обложек и рекламы. Максимальное качество.",
+      "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров и рекламы. Quality — максимальная детализация и точность, самый медленный и дорогой вариант.",
     section: "design",
     provider: "ideogram",
     familyId: "ideogram",
@@ -909,7 +909,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "ideogram-balanced",
     name: "✍️ Ideogram v3.0 Balanced",
     description:
-      "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров, обложек и рекламы. Баланс качества и скорости.",
+      "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров и рекламы. Balanced — оптимальный баланс качества и скорости, средняя цена.",
     section: "design",
     provider: "ideogram",
     familyId: "ideogram",
@@ -946,7 +946,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "ideogram-turbo",
     name: "✍️ Ideogram v3.0 Turbo",
     description:
-      "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров, обложек и рекламы. Быстрая и бюджетная версия.",
+      "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров и рекламы. Turbo — самый быстрый и дешёвый вариант, чуть ниже детализация.",
     section: "design",
     provider: "ideogram",
     familyId: "ideogram",
@@ -983,7 +983,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "imagen-4-fast",
     name: "🔮 Imagen 4 Fast",
     description:
-      "Быстрая версия Imagen 4 от Google. Высокая фотореалистичность и точное следование текстовым описаниям при минимальном времени ожидания.",
+      "Imagen 4 от Google — высокая фотореалистичность. Fast — самый быстрый и дешёвый вариант, без поддержки 2K разрешения. Подходит для быстрых итераций.",
     section: "design",
     provider: "google",
     familyId: "imagen",
@@ -1031,7 +1031,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "imagen-4",
     name: "🔮 Imagen 4",
     description:
-      "Стандартная версия Imagen 4 от Google. Высокая фотореалистичность и точное следование текстовым описаниям.",
+      "Imagen 4 от Google — высокая фотореалистичность. Standard — баланс качества и цены, поддержка 2K разрешения. Оптимальный выбор для большинства задач.",
     section: "design",
     provider: "google",
     familyId: "imagen",
@@ -1090,7 +1090,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "imagen-4-ultra",
     name: "🔮 Imagen 4 Ultra",
     description:
-      "Максимальное качество Imagen 4 от Google. Наивысшая детализация и фотореалистичность для профессиональных задач.",
+      "Imagen 4 от Google — высокая фотореалистичность. Ultra — максимальная детализация и качество рендеринга для профессиональных задач, поддержка 2K.",
     section: "design",
     provider: "google",
     familyId: "imagen",
@@ -1149,7 +1149,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "flux",
     name: "⚡ FLUX.2",
     description:
-      "Максимально реалистичные фото за секунды. Лучший выбор, когда нужно быстро и неотличимо от настоящего снимка.",
+      "Максимально реалистичные фото за секунды. Standard — тонкая настройка генерации (шаги, CFG, ускорение, LoRA). Дешевле Pro, больше параметров.",
     section: "design",
     provider: "fal",
     familyId: "flux",
@@ -1176,7 +1176,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "flux-pro",
     name: "⚡ FLUX.2 Pro",
     description:
-      "Профессиональная версия FLUX.2 — максимальное качество, точнее следует промпту, поддерживает редактирование загруженных изображений.",
+      "Профессиональная версия FLUX.2 — максимальное качество и точность следования промпту. Меньше ручных настроек, но выше результат из коробки.",
     section: "design",
     provider: "fal",
     familyId: "flux",
@@ -1203,7 +1203,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "recraft-v3",
     name: "🖌️ Recraft v3",
     description:
-      "Быстро создаёт иллюстрации, иконки и графику в едином стиле. Отлично подходит для дизайна и презентаций.",
+      "Предыдущее поколение Recraft — широкий выбор стилей и под-стилей (реализм, иллюстрация, вектор), настройка художественности. Проверенная стабильность.",
     section: "design",
     provider: "recraft",
     familyId: "recraft",
@@ -1361,7 +1361,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "recraft-v4",
     name: "🖌️ Recraft V4",
     description:
-      "Recraft V4 создан специально для дизайна и маркетинга: чистая композиция, точный рендеринг текста и профессиональная полировка. Результат готов для кампании, презентации или страницы продукта без пост-обработки.",
+      "Recraft V4 Standard — новое поколение для дизайна и маркетинга. Чистая композиция и точный рендеринг текста. Дешевле Pro, меньше детализация.",
     section: "design",
     provider: "recraft",
     familyId: "recraft",
@@ -1406,7 +1406,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "recraft-v4-pro",
     name: "💠 Recraft V4 Pro",
     description:
-      "Расширенная версия Recraft V4 с повышенным разрешением и детализацией. Идеальна для ответственных дизайн-проектов, где требуется максимальная визуальная точность — без правок, прямо в производство.",
+      "Recraft V4 Pro — максимальное разрешение и детализация растровых изображений. Идеален для ответственных дизайн-проектов, готовых в производство без правок.",
     section: "design",
     provider: "recraft",
     familyId: "recraft",
@@ -1451,7 +1451,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "recraft-v4-vector",
     name: "📐 Recraft V4 Vector (SVG)",
     description:
-      "Генерирует масштабируемые SVG-векторы — идеально для логотипов, иллюстраций и иконок. Результат масштабируется без потери качества до любого размера и готов к прямому использованию в вёрстке и полиграфии.",
+      "Recraft V4 Vector — генерирует SVG-векторы для логотипов, иконок и иллюстраций. Масштабируются без потери качества. Стандартная версия — дешевле Pro Vector.",
     section: "design",
     provider: "recraft",
     familyId: "recraft",
@@ -1495,7 +1495,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "recraft-v4-pro-vector",
     name: "📐 Recraft V4 Pro Vector (SVG)",
     description:
-      "Профессиональная векторная генерация с максимальным качеством SVG. Подходит для сложных иллюстраций, брендинга и любого дизайна, требующего безупречной масштабируемости и детализации.",
+      "Recraft V4 Pro Vector — максимальное качество SVG-генерации. Подходит для сложных иллюстраций и брендинга, где требуется безупречная детализация и масштабируемость.",
     section: "design",
     provider: "recraft",
     familyId: "recraft",
@@ -1539,7 +1539,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "seedream-5",
     name: "🛍️ Seedream 5.0 (ByteDance)",
     description:
-      "Идеально для товарных фото, одежды и каталогов. Создаёт чистые, профессиональные изображения для продаж.",
+      "Идеально для товарных фото, одежды и каталогов. Версия 5.0 — улучшенное качество и реалистичность по сравнению с 4.5.",
     section: "design",
     provider: "fal",
     familyId: "seedream",
@@ -1561,7 +1561,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     id: "seedream-4.5",
     name: "🛍️ Seedream 4.5",
     description:
-      "Предыдущая версия Seedream — чуть проще, но быстрее и дешевле. Подойдёт для массовой генерации товарных фото.",
+      "Предыдущая версия Seedream — чуть проще, чем 5.0, но проверенная стабильность. Подойдёт для массовой генерации товарных фото.",
     section: "design",
     provider: "fal",
     familyId: "seedream",

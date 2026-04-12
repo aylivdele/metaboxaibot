@@ -92,13 +92,12 @@ export function FamilyCard({
     selected.description;
   const currentValues = allModelSettings[selected.id] ?? {};
   const cost = modelCostLabel(selected, currentValues, t);
-  const familyLabel =
-    members[0]?.familyName ?? familyId.charAt(0).toUpperCase() + familyId.slice(1);
+  const nameLabel = selected.name;
 
   return (
     <div className={`family-card${isGloballyActive ? " family-card--active" : ""}`}>
       <div className="family-card__header">
-        <span className="family-card__name">{familyLabel}</span>
+        <span className="family-card__name">{nameLabel}</span>
         {isGloballyActive && (
           <span className="family-card__badge">{t("imageSettings.active")}</span>
         )}
@@ -140,12 +139,6 @@ export function FamilyCard({
           </div>
         </div>
       )}
-
-      <div className="family-card__header">
-        <span className="family-card__name">{selected.name}</span>
-      </div>
-
-      <p className="family-card__desc">{selected.descriptionOverride || selected.description}</p>
 
       {selected.settings.length > 0 && (
         <div className="family-card__row family-card__row--settings">

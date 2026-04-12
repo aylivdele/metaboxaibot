@@ -45,7 +45,8 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
   kling: {
     id: "kling",
     name: "🎥 Kling 3.0",
-    description: "Генерирует видео до 15 секунд со звуком. Лучше всех передаёт движения людей.",
+    description:
+      "Генерирует видео до 15 секунд со звуком. Лучше всех передаёт движения людей. Стандартная версия — быстрее и дешевле Pro.",
     section: "video",
     provider: "fal",
     familyId: "kling",
@@ -73,7 +74,8 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
   "kling-pro": {
     id: "kling-pro",
     name: "🎥 Kling 3.0 Pro",
-    description: "Генерирует видео до 15 секунд со звуком. Лучше всех передаёт движения людей.",
+    description:
+      "Генерирует видео до 15 секунд со звуком. Лучше всех передаёт движения людей. Pro-версия — повышенная детализация и качество движений.",
     section: "video",
     provider: "fal",
     familyId: "kling",
@@ -102,7 +104,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "higgsfield-lite",
     name: "🎬 Higgsfield Lite",
     description:
-      "Специализируется на реалистичной анимации людей — мимика, жесты, движения тела выглядят естественно.",
+      "Реалистичная анимация людей — мимика, жесты и движения тела. Lite — самая быстрая и бюджетная версия Higgsfield.",
     section: "video",
     provider: "higgsfield",
     familyId: "higgsfield",
@@ -153,7 +155,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "higgsfield",
     name: "🎬 Higgsfield Turbo",
     description:
-      "Специализируется на реалистичной анимации людей — мимика, жесты, движения тела выглядят естественно.",
+      "Реалистичная анимация людей — мимика, жесты и движения тела. Turbo — баланс качества и скорости, выше детализация чем Lite.",
     section: "video",
     provider: "higgsfield",
     familyId: "higgsfield",
@@ -204,7 +206,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "higgsfield-preview",
     name: "🎬 Higgsfield Preview",
     description:
-      "Специализируется на реалистичной анимации людей — мимика, жесты, движения тела выглядят естественно.",
+      "Реалистичная анимация людей — мимика, жесты и движения тела. Preview — флагманская версия с максимальным качеством, освещением и кинематографичностью.",
     section: "video",
     provider: "higgsfield",
     familyId: "higgsfield",
@@ -257,7 +259,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "veo",
     name: "📽️ Veo 3",
     description:
-      "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Отправьте фото вместе с текстом — видео начнется с вашего фото.",
+      "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Standard — максимальное качество, выше детализация чем Fast. Отправьте фото вместе с текстом — видео начнется с вашего фото.",
     section: "video",
     provider: "google",
     familyId: "veo",
@@ -335,7 +337,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "veo-fast",
     name: "📽️ Veo 3 Fast",
     description:
-      "Быстрая и более доступная версия Veo 3 от Google. Со звуком и голосами. Отправьте фото вместе с текстом — видео начнется с вашего фото.",
+      "Быстрая и более доступная версия Veo 3 от Google. Со звуком и голосами, но чуть ниже детализация чем Standard. Поддерживает 4K. Отправьте фото вместе с текстом — видео начнется с вашего фото.",
     section: "video",
     provider: "google",
     familyId: "veo",
@@ -678,7 +680,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "seedance",
     name: "💃 Seedance 1.5 Pro (ByteDance)",
     description:
-      "Создаёт видео с выразительным и необычным движением. Хорош для креативных и стилизованных роликов.",
+      "Создаёт видео с выразительным движением и генерацией звука. Предыдущее поколение — проверенная стабильность, до 12 секунд. Хорош для креативных и стилизованных роликов.",
     section: "video",
     provider: "fal",
     // Per-video-token billing: $2.4/M tokens with audio (default), $1.2/M without audio.
@@ -730,7 +732,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "seedance-2",
     name: "💃 Seedance 2.0 (ByteDance)",
     description:
-      "Новейшая видеомодель ByteDance со встроенной генерацией звука. Поддерживает до 15 секунд, широкий выбор соотношений сторон.",
+      "Новейшая видеомодель ByteDance — значительно выше качество и реалистичность движений по сравнению с 1.5. Встроенный звук, до 15 секунд, широкий выбор соотношений сторон.",
     section: "video",
     provider: "fal",
     // Per-video-token billing: $14/M tokens.
@@ -777,7 +779,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "seedance-2-fast",
     name: "💃 Seedance 2.0 Fast (ByteDance)",
     description:
-      "Ускоренная версия Seedance 2.0 — быстрее и дешевле при схожем качестве. Встроенная генерация звука, до 15 секунд.",
+      "Ускоренная версия Seedance 2.0 — быстрее и ~20% дешевле стандарта при схожем качестве. Встроенная генерация звука, до 15 секунд.",
     section: "video",
     provider: "fal",
     // Per-video-token billing: $11.2/M tokens (fast).
@@ -967,7 +969,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "hailuo-fast",
     name: "🎞️ Hailuo 2.3 Fast",
     description:
-      "Быстрая версия Hailuo 2.3 от MiniMax — ~40% дешевле стандарта при схожем качестве. Требует фото как первый кадр.",
+      "Быстрая версия Hailuo 2.3 от MiniMax — ~40% дешевле стандартной при схожем качестве. Чуть ниже детализация. Требует фото как первый кадр.",
     section: "video",
     provider: "minimax",
     familyId: "minimax",
@@ -1013,7 +1015,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "hailuo",
     name: "🎞️ Hailuo 2.3",
     description:
-      "Видеомодель MiniMax с поддержкой 1080p и 10-секундных клипов. Принимает фото как первый кадр.",
+      "Стандартная версия Hailuo 2.3 от MiniMax — максимальное качество, поддержка 1080p и 10-секундных клипов. Принимает фото как первый кадр.",
     section: "video",
     provider: "minimax",
     familyId: "minimax",

@@ -250,7 +250,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "gpt-5.4-pro": {
     id: "gpt-5.4-pro",
     name: "🧠 GPT 5.4 Pro",
-    description: "Самая мощная модель OpenAI, максимальная точность и глубина рассуждений.",
+    description:
+      "Самая мощная модель OpenAI. Максимальная точность, глубокие рассуждения. Значительно дороже GPT 5.4 — для задач, где важна безупречная точность.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -268,7 +269,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "gpt-5.4": {
     id: "gpt-5.4",
     name: "💬 GPT 5.4",
-    description: "Флагман OpenAI, отличный баланс интеллекта и скорости.",
+    description:
+      "Флагман OpenAI нового поколения — умнее и быстрее GPT 5 Pro. Лучший баланс интеллекта, скорости и цены в линейке.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -286,7 +288,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "gpt-5-pro": {
     id: "gpt-5-pro",
     name: "💡 GPT 5 Pro",
-    description: "Предыдущий флагман OpenAI, хороший баланс интеллекта и скорости.",
+    description:
+      "Предыдущее поколение флагмана OpenAI. Только максимальный уровень рассуждений — для самых сложных задач. Дороже GPT 5.4.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -320,7 +323,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "gpt-5-nano": {
     id: "gpt-5-nano",
     name: "✨ GPT 5 Nano",
-    description: "Самая лёгкая и дешёвая в линейке GPT 5, мгновенные ответы.",
+    description:
+      "Самая лёгкая и дешёвая в линейке GPT 5 — мгновенные ответы для простых задач. Не поддерживает изображения.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -337,7 +341,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "o4-mini": {
     id: "o4-mini",
     name: "🔬 GPT-o4 Mini",
-    description: "Reasoning-модель OpenAI, цепочка рассуждений для сложных задач за низкую цену.",
+    description:
+      "Новейшая reasoning-модель OpenAI — цепочка рассуждений для сложных задач. Понимает изображения, умнее o3 Mini.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -371,7 +376,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "o3-mini": {
     id: "o3-mini",
     name: "🔩 GPT-o3 Mini",
-    description: "Компактная reasoning-модель OpenAI, отличное соотношение цена/точность.",
+    description:
+      "Предыдущая компактная reasoning-модель OpenAI. Не понимает изображения — для текстовых задач с цепочкой рассуждений.",
     section: "gpt",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -390,7 +396,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     id: "claude-opus",
     name: "🎭 Claude 4.6 Opus",
     description:
-      "Самая умная модель Anthropic, лучшая для сложных аналитических и творческих задач. Понимает изображения.",
+      "Новейшая и самая умная модель Anthropic (версия 4.6). Лучшая для сложных аналитических и творческих задач. Понимает изображения.",
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
@@ -407,7 +413,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     id: "claude-opus-4-5",
     name: "🃏 Claude 4.5 Opus",
     description:
-      "Предыдущий флагман Anthropic, глубокий анализ и длинные тексты. Понимает изображения.",
+      "Предыдущее поколение Opus (версия 4.5). Глубокий анализ и длинные тексты. Чуть слабее 4.6 в рассуждениях, но проверенная стабильность.",
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
@@ -424,7 +430,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     id: "claude-sonnet",
     name: "📜 Claude 4.6 Sonnet",
     description:
-      "Быстрая и умная, лучший баланс цена/качество у Anthropic. Отлично справляется с кодом, текстами и анализом.",
+      "Новейший Sonnet (версия 4.6) — лучший баланс цена/качество у Anthropic. Быстрее и дешевле Opus, отлично для кода, текстов и анализа.",
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
@@ -440,7 +446,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "claude-sonnet-4-5": {
     id: "claude-sonnet-4-5",
     name: "🖊️ Claude 4.5 Sonnet",
-    description: "Надёжная рабочая лошадка Anthropic, отлично для кода и текстов.",
+    description:
+      "Предыдущее поколение Sonnet (версия 4.5). Надёжная рабочая лошадка, чуть слабее 4.6. Отлично для кода и текстов.",
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
@@ -456,7 +463,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "claude-haiku": {
     id: "claude-haiku",
     name: "🍃 Claude 4.5 Haiku",
-    description: "Самая быстрая и дешёвая модель Anthropic, мгновенные ответы для простых задач.",
+    description:
+      "Самая быстрая и дешёвая модель Anthropic. Мгновенные ответы для простых задач, понимает изображения. Слабее Sonnet и Opus в рассуждениях.",
     section: "gpt",
     provider: "anthropic",
     costUsdPerRequest: 0,
@@ -475,7 +483,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     id: "gemini-3-pro",
     name: "💎 Gemini 3 Pro",
     description:
-      "Флагман Google, огромный контекст и мультимодальность. Поддерживает поиск в интернете.",
+      "Флагман Google, контекст до 1M токенов и мультимодальность. Поддерживает поиск в интернете. Базовая версия 3 Pro.",
     section: "gpt",
     provider: "google",
     costUsdPerRequest: 0,
@@ -492,7 +500,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     id: "gemini-3.1-pro",
     name: "💍 Gemini 3.1 Pro",
     description:
-      "Обновлённый Gemini 3 Pro с улучшенным следованием инструкциям. Поиск в интернете.",
+      "Обновлённый Gemini 3 Pro (версия 3.1) — лучше следует инструкциям и точнее отвечает. Та же цена, что и 3.0. Поиск в интернете.",
     section: "gpt",
     provider: "google",
     costUsdPerRequest: 0,
@@ -509,7 +517,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     id: "gemini-2-flash",
     name: "🌟 Gemini 2.5 Flash",
     description:
-      "Быстрая и дешёвая модель Google с reasoning, отличное соотношение цена/качество. Поддерживает поиск в интернете.",
+      "Быстрая и дешёвая модель Google с reasoning. Отличное соотношение цена/качество, дешевле Pro в ~7 раз. Поиск в интернете.",
     section: "gpt",
     provider: "google",
     costUsdPerRequest: 0,
@@ -526,7 +534,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     id: "gemini-2-flash-lite",
     name: "⭐ Gemini 2.5 Flash Lite",
     description:
-      "Самая лёгкая и дешёвая модель Google, идеальна для простых задач с минимальными затратами.",
+      "Самая лёгкая и дешёвая модель Google. Для простых задач с минимальными затратами. Без изображений и поиска в интернете.",
     section: "gpt",
     provider: "google",
     costUsdPerRequest: 0,
@@ -545,7 +553,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     id: "deepseek-r1",
     name: "🔍 DeepSeek R1",
     description:
-      "Reasoning-модель из Китая, конкурент o1, сильна в математике и коде. Открытые веса.",
+      "Reasoning-модель из Китая — сильна в математике и коде, думает пошагово. Медленнее V3, но точнее для сложных задач.",
     section: "gpt",
     provider: "deepseek",
     costUsdPerRequest: 0,
@@ -562,7 +570,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     id: "deepseek-v3",
     name: "🐋 DeepSeek V3",
     description:
-      "Быстрая модель, отличная для общих задач и генерации текста при очень низкой стоимости.",
+      "Быстрая модель DeepSeek для общих задач и генерации текста. Без пошагового reasoning — быстрее R1, но менее точна в сложных задачах.",
     section: "gpt",
     provider: "deepseek",
     costUsdPerRequest: 0,
@@ -580,7 +588,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "grok-4": {
     id: "grok-4",
     name: "🤖 Grok 4",
-    description: "Флагман xAI (Илон Маск), мощные рассуждения с доступом к данным X.",
+    description:
+      "Флагман xAI — максимальное качество рассуждений, контекст 256K. Дороже Grok 4 Fast, но точнее для сложных задач.",
     section: "gpt",
     provider: "xai",
     costUsdPerRequest: 0,
@@ -597,7 +606,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "grok-4-fast": {
     id: "grok-4-fast",
     name: "🏎️ Grok 4 Fast",
-    description: "Ускоренная модель флагмана Grok 4 от xAI. Быстрые ответы с рассуждением.",
+    description:
+      "Ускоренная версия Grok 4 от xAI. Контекст до 2M токенов, в ~10 раз дешевле стандартного Grok 4. Быстрые ответы с рассуждением.",
     section: "gpt",
     provider: "xai",
     costUsdPerRequest: 0,
@@ -616,7 +626,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "perplexity-sonar-pro": {
     id: "perplexity-sonar-pro",
     name: "🌐 Perplexity Sonar Pro + Internet",
-    description: "Мощный AI-поиск с глубокими ответами. Актуальные данные из интернета.",
+    description:
+      "Мощный AI-поиск с глубокими ответами из интернета. Дороже Sonar, но точнее анализирует источники и даёт более развёрнутые ответы.",
     section: "gpt",
     provider: "perplexity",
     costUsdPerRequest: 0,
@@ -632,7 +643,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "perplexity-sonar-research": {
     id: "perplexity-sonar-research",
     name: "🔭 Perplexity Sonar Deep Research",
-    description: "Автономный исследователь, анализирует десятки источников за один запрос.",
+    description:
+      "Автономный исследователь — анализирует десятки источников за один запрос. Идеален для глубокого ресёрча, дольше обычного Sonar.",
     section: "gpt",
     provider: "perplexity",
     costUsdPerRequest: 0,
@@ -648,7 +660,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "perplexity-sonar": {
     id: "perplexity-sonar",
     name: "📡 Perplexity Sonar + Internet",
-    description: "Быстрый AI-поиск с актуальными данными из интернета.",
+    description:
+      "Быстрый и дешёвый AI-поиск с актуальными данными из интернета. Базовая версия — для оперативных вопросов без глубокого анализа.",
     section: "gpt",
     provider: "perplexity",
     costUsdPerRequest: 0,
@@ -666,7 +679,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "qwen-3-max-thinking": {
     id: "qwen-3-max-thinking",
     name: "🧮 Qwen 3 Max Thinking",
-    description: "Крупнейшая reasoning-модель Alibaba, конкурент GPT и Claude.",
+    description:
+      "Крупнейшая reasoning-модель Alibaba. Максимальное качество в линейке Qwen — для самых сложных задач. Дороже Qwen 3 Thinking.",
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,
@@ -686,7 +700,8 @@ export const GPT_MODELS: Record<string, AIModel> = {
   "qwen-3-thinking": {
     id: "qwen-3-thinking",
     name: "💭 Qwen 3 Thinking",
-    description: "Reasoning-модель Alibaba среднего размера, сильна в коде и математике.",
+    description:
+      "Reasoning-модель Alibaba среднего размера — дешевле Max, но сильна в коде и математике. Оптимальный баланс цена/качество в линейке Qwen.",
     section: "gpt",
     provider: "alibaba",
     costUsdPerRequest: 0,

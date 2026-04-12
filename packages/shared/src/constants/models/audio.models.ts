@@ -6,7 +6,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     id: "tts-openai",
     name: "🔊 Синтез речи (OpenAI)",
     description:
-      "Синтез речи от OpenAI. Несколько голосов, естественная интонация и быстрая генерация для любого текста.",
+      "Синтез речи от OpenAI. Быстрая генерация, естественная интонация. Дешевле ElevenLabs, но меньше голосов и нет клонированных.",
     section: "audio",
     provider: "openai",
     costUsdPerRequest: 0,
@@ -113,7 +113,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     id: "tts-el",
     name: "🔊 Синтез речи (ElevenLabs)",
     description:
-      "Синтез речи от ElevenLabs с выбором из широкой библиотеки голосов или ваших клонированных голосов.",
+      "Синтез речи от ElevenLabs — широкая библиотека голосов + ваши клонированные. Выше качество и выразительность, чем OpenAI TTS, но дороже.",
     section: "audio",
     provider: "elevenlabs",
     costUsdPerRequest: 0,
@@ -197,7 +197,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     id: "suno",
     name: "🎵 Генерация музыки (Suno)",
     description:
-      "Генерирует полноценные музыкальные треки с вокалом и аранжировкой по текстовому описанию стиля и настроения.",
+      "Генерирует полноценные музыкальные треки с вокалом и аранжировкой. Можно задать стиль, настроение и текст песни. До 4 минут. Дольше ElevenLabs, но с полноценным вокалом.",
     section: "audio",
     provider: "suno",
     costUsdPerRequest: 0.06, // ~$0.030–$0.040/track (apipass.net proxy)
@@ -213,7 +213,8 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
       {
         key: "model_version",
         label: "Версия модели",
-        description: "V4_5 — рекомендуется (до 8 мин), V5 / V5_5 — последние версии.",
+        description:
+          "V4 — базовая, V4.5 — рекомендуется (до 8 мин, стабильное качество), V4.5+ — повышенная детализация, V5 — новое поколение, V5.5 — последняя (экспериментальная).",
         type: "select",
         options: [
           { value: "V4", label: "V4" },
@@ -293,7 +294,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     id: "music-el",
     name: "🎶 Музыка (ElevenLabs)",
     description:
-      "Генерирует фоновую музыку, амбиент и музыкальные атмосферы по текстовому описанию через ElevenLabs.",
+      "Генерирует фоновую музыку, амбиент и атмосферы через ElevenLabs. Инструментал без вокала, до 22 секунд. Быстрее Suno, но без пения. Промпт лучше на английском.",
     section: "audio",
     provider: "elevenlabs",
     costUsdPerRequest: 0,
