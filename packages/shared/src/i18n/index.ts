@@ -47,6 +47,7 @@ export interface Translations {
     docModelNotSupported: string;
     docExtractFailed: string;
     docUploadFailed: string;
+    contextOverflow: string;
     backToMain: string;
     dialogSelected: string;
   };

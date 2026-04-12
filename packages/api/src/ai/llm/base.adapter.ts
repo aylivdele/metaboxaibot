@@ -1,4 +1,5 @@
-import type { ContextStrategy } from "@metabox/shared";
+import { AI_MODELS, type ContextStrategy } from "@metabox/shared";
+import { truncateInputDefault } from "./truncate.js";
 
 export interface MessageAttachment {
   /** S3 key of the stored file (persisted in DB). */
@@ -57,6 +58,12 @@ export interface LLMInput {
   thinkingBudget?: number;
   /** OpenAI chat models: seed for reproducible outputs. */
   seed?: number;
+  /**
+   * User-configured override for the model's physical context window
+   * (in tokens). Defaults to `AI_MODELS[modelId].contextWindow` when absent.
+   * Used by token-aware history truncation.
+   */
+  contextWindowOverride?: number;
 }
 
 export interface LLMOutput {
@@ -84,4 +91,36 @@ export interface LLMAdapter {
   readonly contextMaxMessages: number;
   chat(input: LLMInput): Promise<LLMOutput>;
   chatStream(input: LLMInput): AsyncGenerator<string, StreamResult | void, unknown>;
+}
+
+/** Fallback context window when model has no explicit value. */
+const DEFAULT_CONTEXT_WINDOW = 100_000;
+
+/**
+ * Abstract base class for LLM adapters with built-in token-aware history
+ * truncation. Adapters call `this.truncateInput(input)` at the top of their
+ * `chatStream()` to drop oldest history pairs until the request fits the
+ * context window. Adapters with provider-side context (OpenAI Responses API
+ * `previous_response_id`) override `truncateInput` to skip truncation on the
+ * fast path.
+ */
+export abstract class BaseLLMAdapter implements LLMAdapter {
+  abstract readonly contextStrategy: ContextStrategy;
+  abstract readonly contextMaxMessages: number;
+  protected abstract readonly modelId: string;
+
+  abstract chat(input: LLMInput): Promise<LLMOutput>;
+  abstract chatStream(input: LLMInput): AsyncGenerator<string, StreamResult | void, unknown>;
+
+  protected truncateInput(input: LLMInput): LLMInput {
+    return truncateInputDefault(input, this.getContextWindow(input));
+  }
+
+  protected getContextWindow(input: LLMInput): number {
+    if (input.contextWindowOverride && input.contextWindowOverride > 0) {
+      return input.contextWindowOverride;
+    }
+    const model = AI_MODELS[this.modelId];
+    return model?.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
+  }
 }

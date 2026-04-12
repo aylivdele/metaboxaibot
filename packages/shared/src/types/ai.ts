@@ -152,6 +152,12 @@ export interface AIModel {
   contextStrategy: ContextStrategy;
   contextMaxMessages: number; // актуально для db_history: сколько сообщений отправлять
   /**
+   * Physical context window of the model in tokens. Used by the chat service to
+   * truncate history before sending and to power the user-configurable
+   * `context_window` setting (which defaults to this value).
+   */
+  contextWindow?: number;
+  /**
    * USD per megapixel for models with per-megapixel billing (e.g. FLUX).
    * When set, costUsdPerRequest must be 0; actual cost = ceil(px/1_000_000) × this rate.
    * The megapixels value is computed from the actual output image dimensions.

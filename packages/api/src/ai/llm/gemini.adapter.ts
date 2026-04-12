@@ -1,10 +1,10 @@
 import { GoogleGenAI, type Content, type GenerateContentResponse, type Part } from "@google/genai";
-import type {
-  LLMAdapter,
-  LLMInput,
-  LLMOutput,
-  MessageRecord,
-  StreamResult,
+import {
+  BaseLLMAdapter,
+  type LLMInput,
+  type LLMOutput,
+  type MessageRecord,
+  type StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { fetchWithLog, logCall } from "../../utils/fetch.js";
@@ -21,18 +21,17 @@ const MODEL_MAP: Record<string, string> = {
  * Google Gemini adapter (db_history strategy).
  * Sends last N messages from DB as chat history.
  */
-export class GeminiAdapter implements LLMAdapter {
+export class GeminiAdapter extends BaseLLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
+  protected readonly modelId: string;
 
   private ai: GoogleGenAI;
   private apiModel: string;
 
-  constructor(
-    private readonly modelId: string,
-    contextMaxMessages = 50,
-    apiKey = config.ai.google,
-  ) {
+  constructor(modelId: string, contextMaxMessages = 50, apiKey = config.ai.google) {
+    super();
+    this.modelId = modelId;
     this.ai = new GoogleGenAI({ apiKey: apiKey! });
     this.apiModel = MODEL_MAP[modelId] ?? modelId;
     this.contextMaxMessages = contextMaxMessages;
@@ -47,6 +46,7 @@ export class GeminiAdapter implements LLMAdapter {
   }
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
+    input = this.truncateInput(input);
     const history: Content[] = (input.history ?? []).map((m: MessageRecord) => ({
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],

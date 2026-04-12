@@ -2,6 +2,7 @@ export {
   chatService,
   DocumentNotSupportedError,
   DocumentExtractFailedError,
+  ContextOverflowError,
 } from "./chat.service.js";
 export type { SendMessageParams, SendMessageResult } from "./chat.service.js";
 export { dialogService } from "./dialog.service.js";

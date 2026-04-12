@@ -1,10 +1,10 @@
 import OpenAI from "openai";
-import type {
-  LLMAdapter,
-  LLMInput,
-  LLMOutput,
-  MessageRecord,
-  StreamResult,
+import {
+  BaseLLMAdapter,
+  type LLMInput,
+  type LLMOutput,
+  type MessageRecord,
+  type StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
@@ -19,18 +19,17 @@ const MODEL_MAP: Record<string, string> = {
  * Perplexity adapter (db_history strategy).
  * Uses OpenAI-compatible API. All models have built-in web search.
  */
-export class PerplexityAdapter implements LLMAdapter {
+export class PerplexityAdapter extends BaseLLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
+  protected readonly modelId: string;
 
   private client: OpenAI;
   private apiModel: string;
 
-  constructor(
-    private readonly modelId: string,
-    contextMaxMessages = 20,
-    apiKey = config.ai.perplexity,
-  ) {
+  constructor(modelId: string, contextMaxMessages = 20, apiKey = config.ai.perplexity) {
+    super();
+    this.modelId = modelId;
     this.client = new OpenAI({
       apiKey,
       baseURL: "https://api.perplexity.ai",
@@ -48,6 +47,7 @@ export class PerplexityAdapter implements LLMAdapter {
   }
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
+    input = this.truncateInput(input);
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       ...(input.systemPrompt ? [{ role: "system" as const, content: input.systemPrompt }] : []),
       ...(input.history ?? []).map((m: MessageRecord) => ({

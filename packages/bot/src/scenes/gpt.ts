@@ -7,6 +7,7 @@ import {
   getFileUrl,
   DocumentNotSupportedError,
   DocumentExtractFailedError,
+  ContextOverflowError,
 } from "@metabox/api/services";
 import type { StoredAttachment } from "@metabox/api/services";
 import { logger } from "../logger.js";
@@ -178,6 +179,8 @@ async function streamGptResponse(
       await ctx.reply(ctx.t.gpt.docModelNotSupported);
     } else if (err instanceof DocumentExtractFailedError) {
       await ctx.reply(ctx.t.gpt.docExtractFailed);
+    } else if (err instanceof ContextOverflowError) {
+      await ctx.reply(ctx.t.gpt.contextOverflow);
     } else {
       await ctx.reply(ctx.t.errors.noTool);
     }

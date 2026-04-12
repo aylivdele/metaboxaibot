@@ -7,12 +7,37 @@ import { userStateService } from "./user-state.service.js";
 import { getFileUrl } from "./s3.service.js";
 import {
   extractPdfTextFromS3,
-  extractTextFromS3,
+  extractTextFromS3Cached,
   buildDocumentPromptBlock,
   isTextClassMime,
 } from "./document-extract.service.js";
 import type { MessageRecord } from "../ai/llm/base.adapter.js";
+import { ContextOverflowError, isContextOverflowError } from "../ai/llm/truncate.js";
 import { logger } from "../logger.js";
+
+export { ContextOverflowError } from "../ai/llm/truncate.js";
+
+/**
+ * Per-request memoiser for `extractTextFromS3Cached` calls. Eliminates the
+ * N+1 pattern when the same s3Key appears in multiple history messages
+ * (e.g. a CSV re-attached every turn). Lives only for the duration of one
+ * `sendMessageStream` invocation.
+ */
+type ExtractCache = Map<string, Promise<string | null>>;
+
+function getOrExtract(
+  cache: ExtractCache,
+  s3Key: string,
+  mimeType: string,
+  name: string,
+): Promise<string | null> {
+  let p = cache.get(s3Key);
+  if (!p) {
+    p = extractTextFromS3Cached(s3Key, mimeType, name);
+    cache.set(s3Key, p);
+  }
+  return p;
+}
 
 export class DocumentNotSupportedError extends Error {
   constructor() {
@@ -87,6 +112,8 @@ export const chatService = {
     const allModelSettings = await userStateService.getModelSettings(userId);
     const ms = allModelSettings[dialog.modelId] ?? {};
 
+    const extractCache: ExtractCache = new Map();
+
     // Check balance > 0 cause we dont know how much outputTokens will be generated
     await checkBalance(userId, 0);
 
@@ -94,7 +121,7 @@ export const chatService = {
     // for text-extract fallback models. Original `content` stays untouched in DB.
     const inlineBlocks: string[] = [];
     for (const doc of textClassDocs) {
-      const text = await extractTextFromS3(doc.s3Key, doc.mimeType, doc.name);
+      const text = await getOrExtract(extractCache, doc.s3Key, doc.mimeType, doc.name);
       if (text === null) throw new DocumentExtractFailedError(doc.name);
       inlineBlocks.push(buildDocumentPromptBlock(doc.name, text));
     }
@@ -145,6 +172,7 @@ export const chatService = {
         : {}),
       ...(ms.thinking_budget !== undefined ? { thinkingBudget: ms.thinking_budget as number } : {}),
       ...(ms.seed != null ? { seed: ms.seed as number } : {}),
+      ...(ms.context_window != null ? { contextWindowOverride: ms.context_window as number } : {}),
     };
 
     if (dialog.contextStrategy === "db_history") {
@@ -154,7 +182,9 @@ export const chatService = {
       // Additionally, for native-doc models, presign URLs for PDF attachments so
       // the adapter can rebuild document content blocks for prior turns.
       input.history = await Promise.all(
-        history.map(async (m) => augmentHistoryMessage(m, model?.supportsDocuments === true)),
+        history.map((m) =>
+          augmentHistoryMessage(m, model?.supportsDocuments === true, extractCache),
+        ),
       );
     } else if (dialog.contextStrategy === "provider_chain") {
       input.previousResponseId = dialog.providerLastResponseId ?? undefined;
@@ -177,15 +207,21 @@ export const chatService = {
       "chat.sendMessageStream: user message saved",
     );
 
-    // Stream response — iterate manually to capture the generator return value
+    // Stream response — iterate manually to capture the generator return value.
+    // For provider_chain (OpenAI Responses): if the chained call overflows the
+    // context window, fall back to sending the full conversation history as
+    // messages (truncated by the adapter) — user never sees an overflow error.
+    // The retry happens BEFORE any chunks are yielded to the user.
     const chunks: string[] = [];
-    const gen = adapter.chatStream(input);
-
     let inputTokensUsed: number | undefined;
     let outputTokensUsed: number | undefined;
     let providerUsdCost: number | undefined;
 
-    try {
+    const runStream = async function* (
+      this: void,
+      runInput: LLMInput,
+    ): AsyncGenerator<string, void, unknown> {
+      const gen = adapter.chatStream(runInput);
       while (true) {
         const next = await gen.next();
         if (next.done) {
@@ -198,10 +234,41 @@ export const chatService = {
           inputTokensUsed = result?.inputTokensUsed;
           outputTokensUsed = result?.outputTokensUsed;
           providerUsdCost = result?.providerUsdCost;
-          break;
+          return;
         }
         chunks.push(next.value);
         yield next.value;
+      }
+    };
+
+    try {
+      try {
+        yield* runStream(input);
+      } catch (err) {
+        const canRetry =
+          dialog.contextStrategy === "provider_chain" &&
+          input.previousResponseId !== undefined &&
+          chunks.length === 0 &&
+          isContextOverflowError(err) &&
+          !(err instanceof ContextOverflowError);
+        if (!canRetry) throw err;
+
+        logger.warn(
+          { dialogId, modelId: dialog.modelId },
+          "chat.sendMessageStream: provider context overflow — retrying with full history",
+        );
+        const history = await dialogService.getHistory(dialogId, 1000);
+        const augmented = await Promise.all(
+          history.map((m) =>
+            augmentHistoryMessage(m, model?.supportsDocuments === true, extractCache),
+          ),
+        );
+        const retryInput: LLMInput = {
+          ...input,
+          history: augmented,
+          previousResponseId: undefined,
+        };
+        yield* runStream(retryInput);
       }
     } catch (err) {
       await dialogService.markMessageFailed(userMessage.id);
@@ -244,6 +311,7 @@ interface HistoryMessage {
 async function augmentHistoryMessage(
   m: HistoryMessage,
   presignNativePdfs: boolean,
+  extractCache: ExtractCache,
 ): Promise<MessageRecord> {
   const atts = m.attachments ?? [];
   if (atts.length === 0) return { id: m.id, role: m.role, content: m.content };
@@ -253,7 +321,7 @@ async function augmentHistoryMessage(
 
   const blocks: string[] = [];
   for (const d of textDocs) {
-    const text = await extractTextFromS3(d.s3Key, d.mimeType, d.name);
+    const text = await getOrExtract(extractCache, d.s3Key, d.mimeType, d.name);
     if (text !== null) blocks.push(buildDocumentPromptBlock(d.name, text));
   }
   const augmentedContent = blocks.length ? `${blocks.join("\n\n")}\n\n${m.content}` : m.content;

@@ -207,6 +207,26 @@ const REASONING_MODEL_SETTINGS: ModelSettingDef[] = [
   },
 ];
 
+/**
+ * Context window slider — limits how much of the model's physical context
+ * window the chat service is allowed to fill before truncating history.
+ * Built dynamically per-model so the slider's `max` matches the model's
+ * `contextWindow`. Min 32K, step 1K.
+ */
+function contextWindowSetting(modelMaxTokens: number): ModelSettingDef {
+  return {
+    key: "context_window",
+    label: "Контекстное окно",
+    description:
+      "Максимальный размер истории диалога в токенах. Старые сообщения автоматически отбрасываются, чтобы запрос уложился в этот лимит.",
+    type: "slider",
+    min: 32_000,
+    max: modelMaxTokens,
+    step: 1_000,
+    default: modelMaxTokens,
+  };
+}
+
 /** Reasoning effort for Grok 3 Mini — only supports low/high (no medium). */
 const GROK_MINI_REASONING: ModelSettingDef = {
   key: "reasoning_effort",
@@ -705,6 +725,48 @@ export const GPT_MODELS: Record<string, AIModel> = {
   // },
 };
 
+// ── Apply context window sizes (in tokens) ───────────────────────────────────
+// Physical context windows per provider/model. Used by token-aware truncation
+// in chat.service and the user-configurable `context_window` setting.
+const CONTEXT_WINDOWS: Record<string, number> = {
+  // OpenAI gpt-5 family: 400K
+  "gpt-5.4-pro": 400_000,
+  "gpt-5.4": 400_000,
+  "gpt-5-pro": 400_000,
+  "gpt-5-nano": 400_000,
+  // OpenAI o-series: 200K
+  "o4-mini": 200_000,
+  "o3-mini": 200_000,
+  // Anthropic Claude: 200K
+  "claude-opus": 200_000,
+  "claude-opus-4-5": 200_000,
+  "claude-sonnet": 200_000,
+  "claude-sonnet-4-5": 200_000,
+  "claude-haiku": 200_000,
+  // Google Gemini: 1M
+  "gemini-3-pro": 1_000_000,
+  "gemini-3.1-pro": 1_000_000,
+  "gemini-2-flash": 1_000_000,
+  "gemini-2-flash-lite": 1_000_000,
+  // DeepSeek: 128K
+  "deepseek-r1": 128_000,
+  "deepseek-v3": 128_000,
+  // xAI Grok: 256K (grok-4) / 2M (grok-4-fast)
+  "grok-4": 256_000,
+  "grok-4-fast": 2_000_000,
+  // Perplexity Sonar: 128K
+  "perplexity-sonar-pro": 200_000,
+  "perplexity-sonar-research": 128_000,
+  "perplexity-sonar": 128_000,
+  // Qwen 3: 256K
+  "qwen-3-max-thinking": 256_000,
+  "qwen-3-thinking": 256_000,
+};
+for (const [id, model] of Object.entries(GPT_MODELS)) {
+  const cw = CONTEXT_WINDOWS[id];
+  if (cw) model.contextWindow = cw;
+}
+
 // ── Apply document-input capability flags ────────────────────────────────────
 // OpenAI Responses API and Anthropic accept PDFs natively via content blocks.
 // All other providers get server-side text extraction fallback.
@@ -768,4 +830,14 @@ for (const [id, model] of Object.entries(GPT_MODELS)) {
     extras.push(THINKING_BUDGET);
   }
   model.settings = [...LLM_SETTINGS, ...extras];
+}
+
+// ── Append context window slider to every text model ────────────────────────
+// Slider is rendered last so it appears at the bottom of the settings sheet.
+// Min 32K, step 1K, max = model's physical context window. Default = max
+// (token-aware truncation only kicks in when the user lowers it).
+for (const model of Object.values(GPT_MODELS)) {
+  if (!model.contextWindow) continue;
+  if (!model.settings) model.settings = [];
+  model.settings.push(contextWindowSetting(model.contextWindow));
 }

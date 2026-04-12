@@ -1,10 +1,10 @@
 import OpenAI from "openai";
-import type {
-  LLMAdapter,
-  LLMInput,
-  LLMOutput,
-  MessageRecord,
-  StreamResult,
+import {
+  BaseLLMAdapter,
+  type LLMInput,
+  type LLMOutput,
+  type MessageRecord,
+  type StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
@@ -20,19 +20,18 @@ const MODEL_MAP: Record<string, string> = {
  * Alibaba Qwen adapter (db_history strategy).
  * Uses OpenAI-compatible API via DashScope.
  */
-export class QwenAdapter implements LLMAdapter {
+export class QwenAdapter extends BaseLLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
+  protected readonly modelId: string;
 
   private client: OpenAI;
   private apiModel: string;
 
-  constructor(
-    private readonly model: string,
-    contextMaxMessages = 40,
-    apiKey = config.ai.qwen,
-  ) {
+  constructor(model: string, contextMaxMessages = 40, apiKey = config.ai.qwen) {
+    super();
     if (!apiKey) throw new Error("[QwenAdapter] QWEN_API_KEY is not set");
+    this.modelId = model;
     this.client = new OpenAI({
       apiKey,
       baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
@@ -50,6 +49,7 @@ export class QwenAdapter implements LLMAdapter {
   }
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
+    input = this.truncateInput(input);
     const messages: OpenAI.ChatCompletionMessageParam[] = [
       ...(input.systemPrompt ? [{ role: "system" as const, content: input.systemPrompt }] : []),
       ...(input.history ?? []).map((m: MessageRecord) => ({

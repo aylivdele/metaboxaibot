@@ -1,10 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type {
-  LLMAdapter,
-  LLMInput,
-  LLMOutput,
-  MessageRecord,
-  StreamResult,
+import {
+  BaseLLMAdapter,
+  type LLMInput,
+  type LLMOutput,
+  type MessageRecord,
+  type StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
@@ -21,18 +21,17 @@ const MODEL_MAP: Record<string, string> = {
  * Anthropic Claude adapter (db_history strategy).
  * Sends the last N messages from DB with each request.
  */
-export class AnthropicAdapter implements LLMAdapter {
+export class AnthropicAdapter extends BaseLLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
+  protected readonly modelId: string;
 
   private client: Anthropic;
   private apiModel: string;
 
-  constructor(
-    private readonly modelId: string,
-    contextMaxMessages = 50,
-    apiKey = config.ai.anthropic,
-  ) {
+  constructor(modelId: string, contextMaxMessages = 50, apiKey = config.ai.anthropic) {
+    super();
+    this.modelId = modelId;
     this.client = new Anthropic({ apiKey });
     this.apiModel = MODEL_MAP[modelId] ?? modelId;
     this.contextMaxMessages = contextMaxMessages;
@@ -47,6 +46,7 @@ export class AnthropicAdapter implements LLMAdapter {
   }
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
+    input = this.truncateInput(input);
     const messages = this.buildMessages(input);
     logCall(this.apiModel, "chatStream", {
       temperature: input.temperature,

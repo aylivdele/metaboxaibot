@@ -54,6 +54,8 @@ export default {
       "📄 The current model does not support documents. Change the model via ⚙ Management.",
     docExtractFailed: "📄 Could not read the document. It may be password-protected or corrupted.",
     docUploadFailed: "Failed to upload the file, please try again.",
+    contextOverflow:
+      "📚 The message is too large for the current model. Trim attachments or pick a model with a bigger context window in ⚙ Management.",
     backToMain: "🏠 Main Menu",
     dialogSelected: "✅ Dialog selected: {title}\nModel: {model}",
   },

@@ -102,6 +102,36 @@ export async function extractTextFromS3(
   }
 }
 
+// ── Module-level LRU + TTL cache for extracted text ─────────────────────────
+// Saves S3 GET + parsing on cross-request hits when the same document is
+// re-attached to history each turn. Per-request dedup happens upstream via
+// a Map passed to chat.service helpers.
+const EXTRACT_TTL_MS = 5 * 60 * 1000;
+const EXTRACT_MAX_ENTRIES = 100;
+const extractLru = new Map<string, { text: string | null; expiresAt: number }>();
+
+/** S3 extract with module-level TTL cache. Identical contract to extractTextFromS3. */
+export async function extractTextFromS3Cached(
+  s3Key: string,
+  mimeType: string,
+  fileName: string,
+): Promise<string | null> {
+  const now = Date.now();
+  const hit = extractLru.get(s3Key);
+  if (hit && hit.expiresAt > now) {
+    extractLru.delete(s3Key);
+    extractLru.set(s3Key, hit);
+    return hit.text;
+  }
+  const text = await extractTextFromS3(s3Key, mimeType, fileName);
+  if (extractLru.size >= EXTRACT_MAX_ENTRIES) {
+    const oldest = extractLru.keys().next().value;
+    if (oldest !== undefined) extractLru.delete(oldest);
+  }
+  extractLru.set(s3Key, { text, expiresAt: now + EXTRACT_TTL_MS });
+  return text;
+}
+
 /** Wraps extracted document text as an XML-ish block for prompt inclusion. */
 export function buildDocumentPromptBlock(name: string, text: string): string {
   return `<document name="${name}">\n${text}\n</document>`;
