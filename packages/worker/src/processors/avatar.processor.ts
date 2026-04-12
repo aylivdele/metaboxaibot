@@ -8,6 +8,11 @@ import { HeyGenAvatarAdapter } from "@metabox/api/ai/avatar/heygen";
 import { logger } from "../logger.js";
 import { config } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
+import {
+  submitWithThrottle,
+  isRateLimitDeferredError,
+  isRateLimitLongWindowError,
+} from "../utils/submit-with-throttle.js";
 
 const telegram = new Api(config.bot.token);
 
@@ -50,7 +55,15 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
       const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
       const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
 
-      const { externalId } = await adapter.create(imgBuffer, contentType);
+      const { externalId } = await submitWithThrottle({
+        modelId: provider,
+        provider,
+        section: "avatar",
+        job,
+        queue: getAvatarQueue(),
+        jobName: "create",
+        submit: () => adapter.create(imgBuffer, contentType),
+      });
 
       await userAvatarService.updateStatus(userAvatarId, { status: "creating", externalId });
 
@@ -63,6 +76,23 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
 
       logger.info({ userAvatarId, externalId }, "Avatar creation submitted, poll scheduled");
     } catch (err) {
+      if (isRateLimitDeferredError(err)) {
+        logger.info(
+          { userAvatarId, provider, delayMs: err.delayMs },
+          "Avatar create deferred by throttle",
+        );
+        return;
+      }
+      if (isRateLimitLongWindowError(err)) {
+        await userAvatarService.updateStatus(userAvatarId, { status: "failed" });
+        await telegram
+          .sendMessage(
+            telegramChatId,
+            "❌ Аватары временно недоступны из-за лимитов провайдера. Попробуйте позже.",
+          )
+          .catch(() => void 0);
+        return;
+      }
       logger.error({ userAvatarId, err }, "Avatar creation failed");
       await userAvatarService.updateStatus(userAvatarId, { status: "failed" });
       await notifyTechError(err, { jobId: userAvatarId, section: "avatar", modelId: provider });

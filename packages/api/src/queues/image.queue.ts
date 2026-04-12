@@ -1,6 +1,5 @@
 import { Queue } from "bullmq";
-import { Redis } from "ioredis";
-import { config } from "@metabox/shared";
+import { getRedis } from "../redis.js";
 
 export interface ImageJobData {
   /** GenerationJob.id in DB */
@@ -29,17 +28,6 @@ export interface ImageJobData {
   lastIntervalMs?: number;
 }
 
-let _connection: Redis | undefined;
-
-function getConnection(): Redis {
-  if (!_connection) {
-    _connection = new Redis(config.redis.url, {
-      maxRetriesPerRequest: null,
-    });
-  }
-  return _connection;
-}
-
 export function getImageQueue(): Queue<ImageJobData> {
-  return new Queue<ImageJobData>("image", { connection: getConnection() });
+  return new Queue<ImageJobData>("image", { connection: getRedis() });
 }

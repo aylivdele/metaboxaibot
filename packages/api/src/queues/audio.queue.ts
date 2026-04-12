@@ -1,6 +1,5 @@
 import { Queue } from "bullmq";
-import { Redis } from "ioredis";
-import { config } from "@metabox/shared";
+import { getRedis } from "../redis.js";
 
 export interface AudioJobData {
   /** GenerationJob.id in DB */
@@ -25,17 +24,6 @@ export interface AudioJobData {
   lastIntervalMs?: number;
 }
 
-let _connection: Redis | undefined;
-
-function getConnection(): Redis {
-  if (!_connection) {
-    _connection = new Redis(config.redis.url, {
-      maxRetriesPerRequest: null,
-    });
-  }
-  return _connection;
-}
-
 export function getAudioQueue(): Queue<AudioJobData> {
-  return new Queue<AudioJobData>("audio", { connection: getConnection() });
+  return new Queue<AudioJobData>("audio", { connection: getRedis() });
 }

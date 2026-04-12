@@ -28,6 +28,11 @@ import { parseMp4Info } from "@metabox/api/utils/mp4-duration";
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
+import {
+  submitWithThrottle,
+  isRateLimitDeferredError,
+  isRateLimitLongWindowError,
+} from "../utils/submit-with-throttle.js";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
 
@@ -93,13 +98,21 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
           BigInt(userIdStr),
           modelId,
         );
-        providerJobId = await adapter.submit({
-          prompt: effectivePrompt,
-          imageUrl,
-          aspectRatio,
-          duration,
-          modelSettings,
-          userId: BigInt(userIdStr),
+        providerJobId = await submitWithThrottle({
+          modelId,
+          provider: modelMeta?.provider,
+          section: "video",
+          job,
+          queue: getVideoQueue(),
+          submit: () =>
+            adapter.submit({
+              prompt: effectivePrompt,
+              imageUrl,
+              aspectRatio,
+              duration,
+              modelSettings,
+              userId: BigInt(userIdStr),
+            }),
         });
         logger.info({ dbJobId, modelId, providerJobId }, "Submitted video generation task");
         await db.generationJob.update({
@@ -288,6 +301,19 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Video job completed");
   } catch (err) {
+    if (isRateLimitDeferredError(err)) {
+      logger.info({ dbJobId, modelId, delayMs: err.delayMs }, "Video job deferred by throttle");
+      return;
+    }
+    if (isRateLimitLongWindowError(err)) {
+      const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "failed", error: msg },
+      });
+      await telegram.sendMessage(telegramChatId, msg).catch(() => void 0);
+      throw new UnrecoverableError(msg);
+    }
     const userMsg = resolveUserFacingMessage(err, t);
     if (userMsg !== null) {
       logger.warn({ dbJobId, err }, "Video job rejected: user-facing error");

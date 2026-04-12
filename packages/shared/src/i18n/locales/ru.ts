@@ -207,6 +207,8 @@ export default {
     generationStillRunning: "{modelName}\nВсё ещё генерирую, ожидайте...",
     generationTimedOut24h:
       "❌ {modelName}: генерация не завершилась за 24 часа и была отменена. Попробуйте снова.",
+    modelTemporarilyUnavailable:
+      "❌ {modelName} временно недоступна из-за лимитов провайдера. Попробуйте позже или выберите другую модель.",
     // HeyGen
     heygenBlockedWords:
       "❌ Запрос содержит запрещённые слова или контент. Измените текст и попробуйте снова.",

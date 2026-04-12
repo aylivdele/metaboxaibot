@@ -158,6 +158,7 @@ export interface Translations {
     generationFailed: string;
     generationStillRunning: string;
     generationTimedOut24h: string;
+    modelTemporarilyUnavailable: string;
     // HeyGen
     heygenBlockedWords: string;
     heygenNsfw: string;

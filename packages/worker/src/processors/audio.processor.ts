@@ -11,6 +11,11 @@ import { config, AI_MODELS, getT } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
 import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
 import { getIntervalForElapsed } from "../utils/poll-schedule.js";
+import {
+  submitWithThrottle,
+  isRateLimitDeferredError,
+  isRateLimitLongWindowError,
+} from "../utils/submit-with-throttle.js";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
 
@@ -93,11 +98,19 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
 
       if (!adapter.isAsync && adapter.generate) {
         // Sync adapter — generate inline, then fall through to finalize.
-        audioResult = await adapter.generate({
-          prompt: effectivePrompt,
-          voiceId,
-          sourceAudioUrl,
-          modelSettings,
+        audioResult = await submitWithThrottle({
+          modelId,
+          provider: modelMeta?.provider,
+          section: "audio",
+          job,
+          queue: getAudioQueue(),
+          submit: () =>
+            adapter.generate!({
+              prompt: effectivePrompt,
+              voiceId,
+              sourceAudioUrl,
+              modelSettings,
+            }),
         });
       } else {
         // Async adapter (Suno) — submit then schedule poll.
@@ -108,11 +121,19 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
           providerJobId = existingJob.providerJobId;
           logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
         } else {
-          providerJobId = await adapter.submit({
-            prompt: effectivePrompt,
-            voiceId,
-            sourceAudioUrl,
-            modelSettings,
+          providerJobId = await submitWithThrottle({
+            modelId,
+            provider: modelMeta?.provider,
+            section: "audio",
+            job,
+            queue: getAudioQueue(),
+            submit: () =>
+              adapter.submit!({
+                prompt: effectivePrompt,
+                voiceId,
+                sourceAudioUrl,
+                modelSettings,
+              }),
           });
           await db.generationJob.update({
             where: { id: dbJobId },
@@ -216,6 +237,19 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Audio job completed");
   } catch (err) {
+    if (isRateLimitDeferredError(err)) {
+      logger.info({ dbJobId, modelId, delayMs: err.delayMs }, "Audio job deferred by throttle");
+      return;
+    }
+    if (isRateLimitLongWindowError(err)) {
+      const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "failed", error: msg },
+      });
+      await telegram.sendMessage(telegramChatId, msg).catch(() => void 0);
+      throw new UnrecoverableError(msg);
+    }
     const providerMsg = resolveUserFacingMessage(err, t);
     if (providerMsg !== null) {
       logger.warn({ dbJobId, err }, "Audio job rejected: user-facing error");

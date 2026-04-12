@@ -109,3 +109,46 @@ export async function notifyTechError(err: unknown, ctx: ErrorContext): Promise<
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+export interface RateLimitNotificationContext {
+  section?: string;
+  modelId: string;
+  cooldownMs: number;
+  reason: string;
+  isLongWindow: boolean;
+}
+
+/**
+ * Sends a rate-limit / throttle notification to ALERT_CHAT_ID. Distinct from
+ * `notifyTechError` so the on-call thread can be filtered visually.
+ * Does not throw — always resolves.
+ */
+export async function notifyRateLimit(ctx: RateLimitNotificationContext): Promise<void> {
+  const chatId = config.alerts.chatId;
+  if (!chatId) return;
+
+  const threadId = config.alerts.threadId;
+
+  const icon = ctx.isLongWindow ? "⛔" : "⏳";
+  const kind = ctx.isLongWindow ? "Long-window quota" : "Rate limit";
+  const label = [ctx.section, ctx.modelId].filter(Boolean).join("/") || ctx.modelId;
+  const header = `${icon} <b>${kind}</b> [${label}]`;
+
+  const cooldownLabel =
+    ctx.cooldownMs >= 60_000
+      ? `${Math.round(ctx.cooldownMs / 60_000)}m`
+      : `${Math.round(ctx.cooldownMs / 1000)}s`;
+
+  const text = [
+    header,
+    `cooldown: <code>${cooldownLabel}</code>`,
+    `<pre>${escapeHtml(ctx.reason.slice(0, 1500))}</pre>`,
+  ].join("\n");
+
+  await telegram
+    .sendMessage(chatId, text, {
+      parse_mode: "HTML",
+      ...(threadId ? { message_thread_id: threadId } : {}),
+    })
+    .catch(() => void 0);
+}

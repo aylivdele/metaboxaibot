@@ -83,6 +83,14 @@
     "./utils/replicate-error": {
       "types": "./src/utils/replicate-error.ts",
       "default": "./dist/utils/replicate-error.js"
+    },
+    "./utils/rate-limit-error": {
+      "types": "./src/utils/rate-limit-error.ts",
+      "default": "./dist/utils/rate-limit-error.js"
+    },
+    "./services/throttle": {
+      "types": "./src/services/throttle.service.ts",
+      "default": "./dist/services/throttle.service.js"
     }
   },
   "dependencies": {

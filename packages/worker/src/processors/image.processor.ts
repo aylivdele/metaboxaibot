@@ -23,6 +23,11 @@ import { InputFile } from "grammy";
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
+import {
+  submitWithThrottle,
+  isRateLimitDeferredError,
+  isRateLimitLongWindowError,
+} from "../utils/submit-with-throttle.js";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
 
@@ -89,12 +94,20 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
           BigInt(userIdStr),
           modelId,
         );
-        providerJobId = await adapter.submit({
-          prompt: effectivePrompt,
-          negativePrompt,
-          imageUrl: job.data.sourceImageUrl,
-          aspectRatio,
-          modelSettings,
+        providerJobId = await submitWithThrottle({
+          modelId,
+          provider: modelMeta?.provider,
+          section: "image",
+          job,
+          queue: getImageQueue(),
+          submit: () =>
+            adapter.submit!({
+              prompt: effectivePrompt,
+              negativePrompt,
+              imageUrl: job.data.sourceImageUrl,
+              aspectRatio,
+              modelSettings,
+            }),
         });
         await db.generationJob.update({
           where: { id: dbJobId },
@@ -317,6 +330,19 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Image job completed");
   } catch (err) {
+    if (isRateLimitDeferredError(err)) {
+      logger.info({ dbJobId, modelId, delayMs: err.delayMs }, "Image job deferred by throttle");
+      return;
+    }
+    if (isRateLimitLongWindowError(err)) {
+      const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "failed", error: msg },
+      });
+      await telegram.sendMessage(telegramChatId, msg).catch(() => void 0);
+      throw new UnrecoverableError(msg);
+    }
     const userMsg = resolveUserFacingMessage(err, t);
     if (userMsg !== null) {
       logger.warn({ dbJobId, err }, "Image job rejected: user-facing error");
