@@ -4,7 +4,7 @@ import { useI18n } from "../i18n.js";
 import type { UserProfile } from "../types.js";
 
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME ?? "MetaboxAIBot";
-const METABOX_LANDING_URL = import.meta.env.VITE_METABOX_LANDING_URL ?? "https://meta-box.ru";
+const METABOX_APP_URL = import.meta.env.VITE_METABOX_APP_URL ?? "https://app.metabox.global";
 
 function useCopy(timeout = 2000) {
   const [copied, setCopied] = useState(false);
@@ -51,7 +51,7 @@ export function ReferralPage({ onLinkMetabox }: { onLinkMetabox: () => void }) {
 
   const referralCode = partnerData?.referralCode || profile?.metaboxReferralCode;
   const botLink = referralCode ? `https://t.me/${BOT_USERNAME}?start=ref_${referralCode}` : null;
-  const metaboxLink = referralCode ? `${METABOX_LANDING_URL}/?promo=${referralCode}` : null;
+  const metaboxLink = referralCode ? `${METABOX_APP_URL}/register/?promo=${referralCode}` : null;
 
   const botCopy = useCopy();
   const metaboxCopy = useCopy();

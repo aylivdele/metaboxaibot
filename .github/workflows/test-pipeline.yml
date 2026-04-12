@@ -194,6 +194,7 @@ jobs:
           VITE_BOT_USERNAME: ${{ secrets.TEST_VITE_BOT_USERNAME }}
           VITE_LEARNING_URL: ${{ secrets.TEST_VITE_LEARNING_URL }}
           VITE_METABOX_LANDING_URL: ${{ secrets.TEST_VITE_METABOX_LANDING_URL }}
+          VITE_METABOX_APP_URL: ${{ secrets.TEST_VITE_METABOX_APP_URL }}
       - name: Clear webapp dir on test VPS
         uses: appleboy/ssh-action@v1
         with:
