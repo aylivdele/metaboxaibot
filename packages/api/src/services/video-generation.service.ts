@@ -92,7 +92,15 @@ export const videoGenerationService = {
       5;
 
     const estimatedVideoTokens = model.costUsdPerMVideoToken
-      ? computeVideoTokens(model, effectiveAspectRatio, effectiveDuration)
+      ? computeVideoTokens(
+          model,
+          effectiveAspectRatio,
+          effectiveDuration,
+          undefined,
+          undefined,
+          undefined,
+          modelSettings.resolution as string | undefined,
+        )
       : undefined;
     const estimatedCost = calculateCost(
       model,

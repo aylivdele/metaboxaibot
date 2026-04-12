@@ -114,7 +114,15 @@ function buildActivationCostLine(
 
   const estimatedVideoTokens =
     model.costUsdPerMVideoToken && defaultDuration
-      ? computeVideoTokens(model, undefined, defaultDuration)
+      ? computeVideoTokens(
+          model,
+          undefined,
+          defaultDuration,
+          undefined,
+          undefined,
+          undefined,
+          modelSettings?.resolution as string | undefined,
+        )
       : undefined;
 
   const cost = calculateCost(

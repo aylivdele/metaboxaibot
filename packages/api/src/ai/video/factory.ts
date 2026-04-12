@@ -11,7 +11,14 @@ import { AlibabaVideoAdapter } from "./alibaba.adapter.js";
 import { MinimaxVideoAdapter } from "./minimax.adapter.js";
 
 /** FAL.ai-backed video models */
-const FAL_MODELS = new Set(["kling", "kling-pro", "pika", "seedance"]);
+const FAL_MODELS = new Set([
+  "kling",
+  "kling-pro",
+  "pika",
+  "seedance",
+  "seedance-2",
+  "seedance-2-fast",
+]);
 
 /** Replicate-backed video models */
 const REPLICATE_MODELS = new Set(["sora"]);

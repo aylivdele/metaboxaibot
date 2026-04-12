@@ -300,6 +300,8 @@ export function usdToTokens(usd: number): number {
  * videoTokens = (width × height × fps × duration) / 1024
  *
  * Prefer actual dimensions (parsed from the generated MP4) over aspect-ratio estimates.
+ * When estimating, resolution (e.g. "720p") determines the short side of the frame,
+ * and the aspect ratio determines the long side proportionally.
  */
 export function computeVideoTokens(
   model: AIModel,
@@ -308,6 +310,7 @@ export function computeVideoTokens(
   actualWidth?: number,
   actualHeight?: number,
   actualFps?: number,
+  resolution?: string,
 ): number {
   if (!model.videoFps) return 0;
 
@@ -318,17 +321,29 @@ export function computeVideoTokens(
     w = actualWidth;
     h = actualHeight;
   } else {
-    // Fallback: estimate from aspect ratio at the model's default resolution
-    const RESOLUTION: Record<string, [number, number]> = {
-      "16:9": [1280, 720],
-      "9:16": [720, 1280],
-      "1:1": [720, 720],
-      "4:3": [960, 720],
-      "3:4": [720, 960],
-    };
-    [w, h] = RESOLUTION[aspectRatio ?? "16:9"] ?? [1280, 720];
+    [w, h] = estimateVideoDimensions(aspectRatio ?? "16:9", resolution ?? "720p");
   }
 
   const fps = actualFps ?? model.videoFps;
   return (w * h * fps * duration) / 1024;
+}
+
+/**
+ * Estimate pixel dimensions from aspect ratio and resolution string.
+ * Resolution (e.g. "720p") sets the short side; the long side is computed
+ * from the aspect ratio.  For square ratios both sides equal the base.
+ */
+export function estimateVideoDimensions(aspectRatio: string, resolution: string): [number, number] {
+  const base = parseInt(resolution, 10) || 720;
+
+  const match = aspectRatio.match(/^(\d+):(\d+)$/);
+  if (!match) return [base, base]; // "auto" or unknown → square at base
+
+  const rw = Number(match[1]);
+  const rh = Number(match[2]);
+
+  if (rw === rh) return [base, base];
+
+  const long = Math.round((base * Math.max(rw, rh)) / Math.min(rw, rh));
+  return rw > rh ? [long, base] : [base, long];
 }

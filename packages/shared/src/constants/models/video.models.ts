@@ -726,6 +726,100 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     ],
   },
 
+  "seedance-2": {
+    id: "seedance-2",
+    name: "💃 Seedance 2.0 (ByteDance)",
+    description:
+      "Новейшая видеомодель ByteDance со встроенной генерацией звука. Поддерживает до 15 секунд, широкий выбор соотношений сторон.",
+    section: "video",
+    provider: "fal",
+    // Per-video-token billing: $14/M tokens.
+    // tokens = (w × h × 24 × duration) / 1024; 720p 5s ≈ $0.30
+    costUsdPerRequest: 0,
+    costUsdPerMVideoToken: 14.0,
+    videoFps: 24,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+    durationRange: { min: 4, max: 15 },
+    settings: [
+      mkAspectRatio(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"], { auto: "Авто" }),
+      mkDurationSlider(4, 15),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        default: "720p",
+      },
+      {
+        key: "generate_audio",
+        label: "Генерировать аудио",
+        description:
+          "Включить автоматическую генерацию звукового сопровождения к видео. Стоимость одинакова с аудио и без.",
+        type: "toggle",
+        default: true,
+      },
+    ],
+  },
+
+  "seedance-2-fast": {
+    id: "seedance-2-fast",
+    name: "💃 Seedance 2.0 Fast (ByteDance)",
+    description:
+      "Ускоренная версия Seedance 2.0 — быстрее и дешевле при схожем качестве. Встроенная генерация звука, до 15 секунд.",
+    section: "video",
+    provider: "fal",
+    // Per-video-token billing: $11.2/M tokens (fast).
+    // tokens = (w × h × 24 × duration) / 1024; 720p 5s ≈ $0.24
+    costUsdPerRequest: 0,
+    costUsdPerMVideoToken: 11.2,
+    videoFps: 24,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+    durationRange: { min: 4, max: 15 },
+    settings: [
+      mkAspectRatio(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"], { auto: "Авто" }),
+      mkDurationSlider(4, 15),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        default: "720p",
+      },
+      {
+        key: "generate_audio",
+        label: "Генерировать аудио",
+        description:
+          "Включить автоматическую генерацию звукового сопровождения к видео. Стоимость одинакова с аудио и без.",
+        type: "toggle",
+        default: true,
+      },
+    ],
+  },
+
   "luma-ray2": {
     id: "luma-ray2",
     name: "☀️ Luma: Ray 2",

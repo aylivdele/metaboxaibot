@@ -54,7 +54,15 @@ export function buildCostLine(
   // Per-video-token models (e.g. Seedance): estimate with default duration
   const estimatedVideoTokens =
     model.costUsdPerMVideoToken && defaultDuration
-      ? computeVideoTokens(model, undefined, defaultDuration)
+      ? computeVideoTokens(
+          model,
+          modelSettings.aspect_ratio as string | undefined,
+          defaultDuration,
+          undefined,
+          undefined,
+          undefined,
+          modelSettings.resolution as string | undefined,
+        )
       : undefined;
 
   const cost = calculateCost(

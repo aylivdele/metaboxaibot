@@ -308,6 +308,16 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
     description:
       "Creates video with expressive and unusual movement. Great for creative and stylized clips.",
   },
+  "seedance-2": {
+    name: "💃 Seedance 2.0 (ByteDance)",
+    description:
+      "Latest ByteDance video model with built-in audio generation. Supports up to 15 seconds, wide range of aspect ratios.",
+  },
+  "seedance-2-fast": {
+    name: "💃 Seedance 2.0 Fast (ByteDance)",
+    description:
+      "Faster and cheaper version of Seedance 2.0 with similar quality. Built-in audio, up to 15 seconds.",
+  },
   "luma-ray2": {
     name: "☀️ Luma: Ray 2",
     description:

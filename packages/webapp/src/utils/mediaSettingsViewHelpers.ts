@@ -96,14 +96,24 @@ export function getPickerIdForModel(modelId: string, models: Model[]): string {
   return m.familyId ? `family__${m.familyId}` : `standalone__${m.id}`;
 }
 
-/** Matches the backend's computeVideoTokens resolution map. */
-const VIDEO_RESOLUTION: Record<string, [number, number]> = {
-  "16:9": [1280, 720],
-  "9:16": [720, 1280],
-  "1:1": [720, 720],
-  "4:3": [960, 720],
-  "3:4": [720, 960],
-};
+/**
+ * Estimate pixel dimensions from aspect ratio and resolution string.
+ * Matches the backend's computeVideoTokens / estimateVideoDimensions logic.
+ */
+function estimateVideoDimensions(aspectRatio: string, resolution: string): [number, number] {
+  const base = parseInt(resolution, 10) || 720;
+
+  const match = aspectRatio.match(/^(\d+):(\d+)$/);
+  if (!match) return [base, base]; // "auto" or unknown → square at base
+
+  const rw = Number(match[1]);
+  const rh = Number(match[2]);
+
+  if (rw === rh) return [base, base];
+
+  const long = Math.round((base * Math.max(rw, rh)) / Math.min(rw, rh));
+  return rw > rh ? [long, base] : [base, long];
+}
 
 function resolveAddons(m: Model, values: Record<string, unknown>): number {
   if (!m.tokenCostAddons?.length) return 0;
@@ -131,7 +141,10 @@ export function modelCostLabel(
     const duration = Number(
       values["duration"] ?? m.settings.find((s) => s.key === "duration")?.default ?? 5,
     );
-    const [w, h] = VIDEO_RESOLUTION[aspectRatio] ?? [1280, 720];
+    const resolution = String(
+      values["resolution"] ?? m.settings.find((s) => s.key === "resolution")?.default ?? "720p",
+    );
+    const [w, h] = estimateVideoDimensions(aspectRatio, resolution);
     const fps = m.videoFps || 24;
     const videoTokens = (w * h * fps * duration) / 1024;
     const cost = (m.tokenCostPerMVideoToken * videoTokens) / 1_000_000;
