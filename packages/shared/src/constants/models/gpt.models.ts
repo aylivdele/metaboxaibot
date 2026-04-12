@@ -596,7 +596,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
   },
   "grok-4-fast": {
     id: "grok-4-fast",
-    name: "🏎️ Grok 4-fast",
+    name: "🏎️ Grok 4 Fast",
     description: "Ускоренная модель флагмана Grok 4 от xAI. Быстрые ответы с рассуждением.",
     section: "gpt",
     provider: "xai",

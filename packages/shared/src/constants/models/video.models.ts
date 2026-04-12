@@ -871,7 +871,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
 
   "hailuo-fast": {
     id: "hailuo-fast",
-    name: "🎞️ Hailuo 2.3",
+    name: "🎞️ Hailuo 2.3 Fast",
     description:
       "Быстрая версия Hailuo 2.3 от MiniMax — ~40% дешевле стандарта при схожем качестве. Требует фото как первый кадр.",
     section: "video",

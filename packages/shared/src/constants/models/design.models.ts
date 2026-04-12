@@ -733,7 +733,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
   },
   "stable-diffusion": {
     id: "stable-diffusion",
-    name: "🌊 Stable Diffusion 3.5",
+    name: "🌊 Stable Diffusion 3.5 Medium",
     description:
       "Генерирует детальные изображения в любом стиле: от фотореализма до аниме и фэнтези. Отличается гибкостью. Работает только с промптами на анлгийском языке!",
     section: "design",
