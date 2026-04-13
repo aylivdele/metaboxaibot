@@ -29,6 +29,7 @@ import {
   getActiveSlot,
   clearActiveSlot,
   buildMediaInputStatusMenu,
+  resolveMediaInputUrls,
 } from "../utils/media-input-state.js";
 
 // ── Random design pending messages (Russian) ────────────────────────────────
@@ -83,14 +84,13 @@ async function resolveSyncSource(
 
 async function sendSyncImageResult(
   ctx: BotContext,
-  modelId: string,
+  _modelId: string,
   result: SubmitImageResult,
   caption: string,
 ): Promise<void> {
-  const { imageUrl, filename = "image.png", s3Key, dbJobId, assistantMessageId } = result;
+  const { imageUrl, filename = "image.png", s3Key, dbJobId } = result;
   if (!imageUrl) return;
 
-  const model = AI_MODELS[modelId];
   const userId = ctx.user!.id;
 
   const { source, byteSize } = await resolveSyncSource(s3Key, imageUrl, filename);
@@ -104,8 +104,8 @@ async function sendSyncImageResult(
 
   // Build keyboard
   const kb = new InlineKeyboard();
-  if (model?.supportsImages && assistantMessageId) {
-    kb.text(ctx.t.design.refine, `design_ref_${assistantMessageId}`).row();
+  if (dbJobId) {
+    kb.text(ctx.t.design.refine, `design_ref_${dbJobId}`).row();
   }
   if (s3Key && config.api.publicUrl) {
     kb.url(
@@ -246,7 +246,7 @@ export async function handleDesignFamilySelect(ctx: BotContext): Promise<void> {
 // ── Media input status menu helper ──────────────────────────────────────────
 
 /** Sends an updated media-input status menu showing filled/empty slots. */
-async function sendDesignMediaInputStatus(ctx: BotContext): Promise<void> {
+export async function sendDesignMediaInputStatus(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
@@ -403,7 +403,7 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
       modelId,
       prompt,
       sourceImageUrl,
-      mediaInputs: hasMediaInputs ? mediaInputs : undefined,
+      mediaInputs: hasMediaInputs ? await resolveMediaInputUrls(mediaInputs) : undefined,
       telegramChatId: chatId,
       dialogId,
       sendOriginalLabel: ctx.t.common.sendOriginal,
@@ -642,40 +642,6 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   // No caption — save as ref and ask user to type a prompt
   await userStateService.setDesignRefMessage(ctx.user.id, dialogMsg.id);
   await ctx.reply(ctx.t.design.photoSaved);
-}
-
-// ── Callback: user tapped "Refine" under a generated image ───────────────────
-
-export async function handleDesignRefSelect(ctx: BotContext): Promise<void> {
-  if (!ctx.user) {
-    await ctx.answerCallbackQuery();
-    return;
-  }
-  const messageId = ctx.callbackQuery!.data!.replace("design_ref_", "");
-  await userStateService.setDesignRefMessage(ctx.user.id, messageId);
-  await ctx.answerCallbackQuery();
-  await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE");
-
-  const webappUrl = config.bot.webappUrl;
-  const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
-  const managementBtn = webappUrl
-    ? {
-        text: ctx.t.design.management,
-        web_app: { url: `${webappUrl}?page=management&section=design&wtoken=${token}` },
-      }
-    : { text: ctx.t.design.management };
-
-  await ctx.reply(ctx.t.design.photoSaved, {
-    reply_markup: {
-      keyboard: [
-        [{ text: ctx.t.design.chooseModel }],
-        [managementBtn],
-        [{ text: ctx.t.common.backToMain }],
-      ],
-      resize_keyboard: true,
-      is_persistent: true,
-    },
-  });
 }
 
 // ── Management — opens Mini App ───────────────────────────────────────────────

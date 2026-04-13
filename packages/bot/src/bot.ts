@@ -26,7 +26,6 @@ import {
   handleDesignMessage,
   handleDesignVoice,
   handleDesignPhoto,
-  handleDesignRefSelect,
   handleDesignMediaInput,
   handleDesignMediaInputCancel,
   handleDesignMediaInputRemove,
@@ -49,6 +48,14 @@ import {
   handleVideoMediaInputDone,
   handleVideoMediaInputRemove,
 } from "./scenes/video.js";
+import {
+  handleRefineEntry,
+  handleRefineUseActive,
+  handleRefineChooseModel,
+  handleRefineSection,
+  handleRefineModel,
+  handleRefineSlot,
+} from "./scenes/refine.js";
 import {
   handleAudioSubSection,
   handleAudioMessage,
@@ -146,7 +153,13 @@ export function createBot(token: string): Bot<BotContext> {
   bot.callbackQuery(/^design_family_/, handleDesignFamilySelect);
 
   // ── Design reference (img2img) callback ───────────────────────────────────
-  bot.callbackQuery(/^design_ref_/, handleDesignRefSelect);
+  // ── Refine flow (cross-section) ────────────────────────────────────────────
+  bot.callbackQuery(/^design_ref_/, handleRefineEntry);
+  bot.callbackQuery(/^ref_use:/, handleRefineUseActive);
+  bot.callbackQuery(/^ref_choose:/, handleRefineChooseModel);
+  bot.callbackQuery(/^ref_sec:/, handleRefineSection);
+  bot.callbackQuery(/^ref_mdl:/, handleRefineModel);
+  bot.callbackQuery(/^ref_slt:/, handleRefineSlot);
 
   // ── Video model selection callback ───────────────────────────────────────
   bot.callbackQuery(/^video_model_/, handleVideoModelSelect);

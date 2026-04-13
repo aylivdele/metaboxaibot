@@ -306,6 +306,14 @@ export interface Translations {
     readyForPrompt: string;
     cancel: string;
     uploadCancelled: string;
+    refineUseActive: string;
+    refineActiveLabel: string;
+    refineChooseModel: string;
+    refineNoSupport: string;
+    refineChooseSlot: string;
+    refineDesign: string;
+    refineVideo: string;
+    refineSaved: string;
   };
   linkMetabox: {
     title: string;

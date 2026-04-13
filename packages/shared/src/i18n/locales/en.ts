@@ -391,6 +391,15 @@ export default {
     readyForPrompt: "✅ Ready! Send a text prompt to start generation.",
     cancel: "Cancel",
     uploadCancelled: "Upload cancelled.",
+    refineUseActive: "Use this image in the active model?\nActive model: {model}",
+    refineActiveLabel: "✅ {model}",
+    refineChooseModel: "Choose model",
+    refineNoSupport:
+      "The active model does not support image inputs. Choose a model from the list below:",
+    refineChooseSlot: "Choose how to use the image:",
+    refineDesign: "🎨 Design",
+    refineVideo: "🎥 Video",
+    refineSaved: "✅ Image loaded into «{slot}».",
   },
   linkMetabox: {
     title: "Metabox Learning",

@@ -391,6 +391,15 @@ export default {
     readyForPrompt: "✅ Готово! Отправьте текстовый промпт для начала генерации.",
     cancel: "Отмена",
     uploadCancelled: "Загрузка отменена.",
+    refineUseActive: "Использовать изображение в активной модели?\nАктивная модель: {model}",
+    refineActiveLabel: "✅ {model}",
+    refineChooseModel: "Выбрать модель",
+    refineNoSupport:
+      "Активная модель не поддерживает использование изображений. Выберите модель из списка ниже:",
+    refineChooseSlot: "Выберите, в качестве чего использовать изображение:",
+    refineDesign: "🎨 Дизайн",
+    refineVideo: "🎥 Видео",
+    refineSaved: "✅ Изображение загружено в «{slot}».",
   },
   linkMetabox: {
     title: "Metabox Обучение",

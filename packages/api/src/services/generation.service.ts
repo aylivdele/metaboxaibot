@@ -60,6 +60,17 @@ export interface SubmitImageResult {
 }
 
 export const generationService = {
+  /** Fetch a generation job by ID (for refine button — returns s3Key and modelId). */
+  async getJobById(
+    id: string,
+  ): Promise<{ s3Key: string | null; modelId: string; section: string } | null> {
+    const job = await db.generationJob.findUnique({
+      where: { id },
+      select: { s3Key: true, modelId: true, section: true },
+    });
+    return job;
+  },
+
   async submitImage(params: SubmitImageParams): Promise<SubmitImageResult> {
     const {
       userId,

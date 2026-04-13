@@ -251,21 +251,16 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       filename: `${dbJobId}.${retryExt}`,
       contentType: `image/${retryExt}`,
     };
-    const model = AI_MODELS[modelId];
-
-    let assistantMessageId: string | undefined;
     if (dialogId) {
       const existingMsg = await db.message.findFirst({
         where: { dialogId, mediaUrl: outputUrl },
         select: { id: true },
       });
-      if (existingMsg) {
-        assistantMessageId = existingMsg.id;
-      } else {
+      if (!existingMsg) {
         await db.message.create({
           data: { dialogId, role: "user", content: prompt, tokensUsed: 0 },
         });
-        const assistantMsg = await db.message.create({
+        await db.message.create({
           data: {
             dialogId,
             role: "assistant",
@@ -275,14 +270,12 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
             tokensUsed: 0,
           },
         });
-        assistantMessageId = assistantMsg.id;
       }
     }
 
-    const refineRow =
-      model?.supportsImages && assistantMessageId
-        ? [{ text: "🔄 Доработать", callback_data: `design_ref_${assistantMessageId}` }]
-        : null;
+    const refineRow = dbJobId
+      ? [{ text: t.design.refine, callback_data: `design_ref_${dbJobId}` }]
+      : null;
     const downloadRow: InlineKeyboardButton[] | null =
       s3Key && config.api.publicUrl
         ? [

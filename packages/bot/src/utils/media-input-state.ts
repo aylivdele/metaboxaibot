@@ -1,5 +1,6 @@
 import type { Section, MediaInputSlot, Translations } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
+import { getFileUrl } from "@metabox/api/services";
 
 export interface ActiveUploadSlot {
   slotKey: string;
@@ -55,4 +56,25 @@ export function buildMediaInputStatusMenu(
 
   const text = allRequiredFilled ? t.mediaInput.readyForPrompt : "";
   return { text, kb };
+}
+
+/**
+ * Resolves media input values: s3Keys (no `http` prefix) are converted to
+ * presigned URLs via `getFileUrl`; existing URLs are passed through unchanged.
+ * Called right before generation so presigned URLs are fresh.
+ */
+export async function resolveMediaInputUrls(
+  inputs: Record<string, string[]>,
+): Promise<Record<string, string[]>> {
+  const resolved: Record<string, string[]> = {};
+  for (const [key, values] of Object.entries(inputs)) {
+    resolved[key] = await Promise.all(
+      values.map(async (v) => {
+        if (v.startsWith("http")) return v;
+        const url = await getFileUrl(v);
+        return url ?? v; // fallback to raw value if resolution fails
+      }),
+    );
+  }
+  return resolved;
 }

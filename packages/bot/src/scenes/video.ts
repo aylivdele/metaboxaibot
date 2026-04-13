@@ -33,6 +33,7 @@ import {
   getActiveSlot,
   clearActiveSlot,
   buildMediaInputStatusMenu,
+  resolveMediaInputUrls,
 } from "../utils/media-input-state.js";
 
 // ── Avatar voice choice store (TTL 10 min) ──────────────────────────────────
@@ -193,7 +194,7 @@ export function buildVideoModelKeyboard(savedModelId?: string | null): InlineKey
 
 // ── Model activation (shared logic) ──────────────────────────────────────────
 
-async function activateVideoModel(ctx: BotContext, modelId: string): Promise<void> {
+export async function activateVideoModel(ctx: BotContext, modelId: string): Promise<void> {
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "VIDEO_ACTIVE", "video");
   await userStateService.setModelForSection(ctx.user.id, "video", modelId);
@@ -290,7 +291,7 @@ export async function handleVideoFamilySelect(ctx: BotContext): Promise<void> {
 // ── Media input status menu helper ──────────────────────────────────────────
 
 /** Sends an updated media-input status menu showing filled/empty slots. */
-async function sendVideoMediaInputStatus(ctx: BotContext): Promise<void> {
+export async function sendVideoMediaInputStatus(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.videoModelId ?? "kling";
@@ -478,7 +479,7 @@ export async function executeVideoPrompt(ctx: BotContext, prompt: string): Promi
       modelId,
       prompt,
       imageUrl,
-      mediaInputs: hasMediaInputs ? mediaInputs : undefined,
+      mediaInputs: hasMediaInputs ? await resolveMediaInputUrls(mediaInputs) : undefined,
       telegramChatId: chatId,
       sendOriginalLabel: ctx.t.common.sendOriginal,
       aspectRatio: modelSettings?.aspectRatio,
