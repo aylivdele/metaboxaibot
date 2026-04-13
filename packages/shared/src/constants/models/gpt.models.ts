@@ -18,6 +18,9 @@ const TEMPERATURE_SETTING: ModelSettingDef = {
 /** Perplexity and Qwen require t < 2 (strictly), so cap at 1.99. */
 const TEMPERATURE_SETTING_CAPPED: ModelSettingDef = { ...TEMPERATURE_SETTING, max: 1.99 };
 
+/** Anthropic Claude accepts temperature 0..1 only. */
+const TEMPERATURE_SETTING_ANTHROPIC: ModelSettingDef = { ...TEMPERATURE_SETTING, max: 1 };
+
 /** Standard LLM controls: temperature, max output tokens, system prompt. */
 const LLM_SETTINGS: ModelSettingDef[] = [
   TEMPERATURE_SETTING,
@@ -887,7 +890,11 @@ for (const [id, model] of Object.entries(GPT_MODELS)) {
   if (GEMINI_THINKING_IDS.has(id)) {
     extras.push(THINKING_BUDGET);
   }
-  model.settings = [...LLM_SETTINGS, ...extras];
+  const temp =
+    ANTHROPIC_THINKING_IDS.has(id) || id === "claude-haiku"
+      ? TEMPERATURE_SETTING_ANTHROPIC
+      : TEMPERATURE_SETTING;
+  model.settings = [temp, ...LLM_SETTINGS.slice(1), ...extras];
 }
 
 // ── Append context window slider to every text model ────────────────────────

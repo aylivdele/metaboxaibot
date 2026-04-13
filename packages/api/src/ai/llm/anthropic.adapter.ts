@@ -64,7 +64,7 @@ export class AnthropicAdapter extends BaseLLMAdapter {
       model: this.apiModel,
       max_tokens: maxTokens,
       ...(input.temperature !== undefined && !input.extendedThinking
-        ? { temperature: input.temperature }
+        ? { temperature: Math.min(input.temperature, 1) }
         : {}),
       ...(input.systemPrompt ? { system: input.systemPrompt } : {}),
       ...(input.extendedThinking ? { thinking: { type: "enabled", budget_tokens: 10000 } } : {}),
