@@ -118,11 +118,14 @@ export async function transcribeAndReply(
     // Store the transcribed text before sending (so the callback can find it immediately)
     storeTranscription(ctx.user.id, id, text);
 
-    // Build MarkdownV2 message with copyable code block
+    // Build MarkdownV2 message with expandable blockquote for easy copying
     const header = escapeMarkdownV2(ctx.t.voice.transcriptionResult);
     const hint = escapeMarkdownV2(ctx.t.voice.transcriptionHint);
-    // Text inside ``` code block ``` does not need escaping
-    const md2Text = `${header}\n\n\`\`\`\n${text}\n\`\`\`\n\n${hint}`;
+    const quotedText = escapeMarkdownV2(text)
+      .split("\n")
+      .map((line) => `>${line}`)
+      .join("\n");
+    const md2Text = `${header}\n\n${quotedText}\n\n${hint}`;
 
     const kb = new InlineKeyboard().text(ctx.t.voice.useAsPrompt, `vp:${section}:${id}`);
 

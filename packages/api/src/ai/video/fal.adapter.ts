@@ -54,7 +54,13 @@ export class FalVideoAdapter implements VideoAdapter {
     const falInput = {
       prompt: input.prompt,
       ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
-      ...(input.duration ? { duration: input.duration } : {}),
+      ...(input.duration
+        ? {
+            duration: this.modelId.startsWith("seedance-2")
+              ? String(input.duration)
+              : input.duration,
+          }
+        : {}),
       ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
       ...msExtras,
     };
