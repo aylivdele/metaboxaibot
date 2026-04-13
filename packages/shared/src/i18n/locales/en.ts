@@ -76,7 +76,7 @@ export default {
     sectionTitle: "🎨 AI Design",
     sectionTooltip: "Choose a section to work with images 👇",
     management: "⚙ Management",
-    newDialog: "🎨 New Image",
+    newDialog: "🎨 Choose model",
     backToMain: "🏠 Back to Main Menu",
     modelActivated: "🎨 Model activated.\nSend me a prompt to generate an image.",
     generating: "🎨 Generating your image...",
@@ -128,7 +128,7 @@ export default {
     sectionTooltip: "Choose a section to work with video 👇",
     avatars: "👾 Avatars",
     lipSync: "🔄 Lip Sync",
-    newDialog: "🎬 New Video",
+    newDialog: "🎬 Choose model",
     backToMain: "🏠 Back to Main Menu",
     modelActivated:
       "🎬 Model activated.\nSend me a text prompt (and optionally attach an image) to generate a video.",
@@ -325,6 +325,15 @@ export default {
     falFeatureNotSupported: "❌ The requested feature is not supported by this model.",
     falOneOf: "❌ Invalid value. Allowed values: {expected}.",
     falOneOfField: "❌ Invalid value for field '{field}'. Allowed values: {expected}.",
+    // ElevenLabs
+    elevenlabsPromptTooLong:
+      "❌ Your prompt is too long ({current} characters). The maximum for sound generation is {max} characters. Please shorten your prompt and try again.",
+    // Suno
+    sunoPromptTooLong:
+      "❌ Your description is too long ({current} characters). The maximum for Suno is {max} characters. Please shorten it and try again.",
+    // Higgsfield
+    higgsfieldTooManyMotions:
+      "❌ Too many motion presets selected. The maximum is {max}. Remove extras in settings and try again.",
   },
   common: {
     backToMain: "🏠 Back to Main Menu",

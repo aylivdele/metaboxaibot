@@ -246,6 +246,12 @@ export interface Translations {
     falFeatureNotSupported: string;
     falOneOf: string;
     falOneOfField: string;
+    // ElevenLabs
+    elevenlabsPromptTooLong: string;
+    // Suno
+    sunoPromptTooLong: string;
+    // Higgsfield
+    higgsfieldTooManyMotions: string;
   };
   common: {
     backToMain: string;

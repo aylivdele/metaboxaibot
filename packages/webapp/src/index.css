@@ -3489,6 +3489,16 @@ textarea::placeholder {
   accent-color: var(--accent);
 }
 
+.motion-picker__limit-notice {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--hint);
+  background: var(--section-bg);
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
 .motion-picker__summary {
   margin-top: 8px;
   font-size: 12px;

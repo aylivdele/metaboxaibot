@@ -1,5 +1,5 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
-import { config } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { logger } from "../../logger.js";
 
@@ -91,6 +91,27 @@ export class HiggsFieldAdapter implements VideoAdapter {
 
     if (!res.ok) {
       const text = await res.text();
+      if (res.status === 422) {
+        try {
+          const parsed = JSON.parse(text) as {
+            detail?: Array<{ type?: string; ctx?: { max_length?: number } }>;
+          };
+          const tooLong = parsed.detail?.find(
+            (d) => d.type === "too_long" && d.ctx?.max_length != null,
+          );
+          if (tooLong) {
+            throw new UserFacingError(
+              `Higgsfield: too many motions (max ${tooLong.ctx!.max_length})`,
+              {
+                key: "higgsfieldTooManyMotions",
+                params: { max: tooLong.ctx!.max_length! },
+              },
+            );
+          }
+        } catch (e) {
+          if (e instanceof UserFacingError) throw e;
+        }
+      }
       throw new Error(`Higgsfield submit failed: ${res.status} ${text}`);
     }
 

@@ -12,9 +12,10 @@ import {
   isReplicateUserFacingError,
   getReplicateUserMessage,
 } from "@metabox/api/utils/replicate-error";
-import type { Translations } from "@metabox/shared";
+import { type Translations, UserFacingError, resolveUserFacingError } from "@metabox/shared";
 
 export function resolveUserFacingMessage(err: unknown, t: Translations): string | null {
+  if (err instanceof UserFacingError) return resolveUserFacingError(err, t.errors);
   if (isHeyGenUserFacingError(err)) return getHeyGenUserMessage(err, t);
   if (isRunwayUserFacingError(err)) return getRunwayUserMessage(err, t);
   if (isMinimaxUserFacingError(err)) return getMinimaxUserMessage(err, t);

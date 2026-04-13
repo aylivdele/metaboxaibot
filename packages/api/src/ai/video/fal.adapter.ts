@@ -9,8 +9,8 @@ const FAL_ENDPOINTS: Record<string, string> = {
   "kling-pro": "fal-ai/kling-video/v3/pro/text-to-video",
   pika: "fal-ai/pika/v2.2/text-to-video",
   seedance: "fal-ai/bytedance/seedance/v1.5/pro/text-to-video",
-  "seedance-2": "fal-ai/bytedance/seedance-2.0/text-to-video",
-  "seedance-2-fast": "fal-ai/bytedance/seedance-2.0/fast/text-to-video",
+  "seedance-2": "bytedance/seedance-2.0/text-to-video",
+  "seedance-2-fast": "bytedance/seedance-2.0/fast/text-to-video",
 };
 
 /** Image-to-video endpoint. Falls back to the T2V endpoint when absent. */
@@ -18,8 +18,8 @@ const FAL_I2V_ENDPOINTS: Record<string, string> = {
   kling: "fal-ai/kling-video/v3/standard/image-to-video",
   "kling-pro": "fal-ai/kling-video/v3/pro/image-to-video",
   seedance: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
-  "seedance-2": "fal-ai/bytedance/seedance-2.0/image-to-video",
-  "seedance-2-fast": "fal-ai/bytedance/seedance-2.0/fast/image-to-video",
+  "seedance-2": "bytedance/seedance-2.0/image-to-video",
+  "seedance-2-fast": "bytedance/seedance-2.0/fast/image-to-video",
   pika: "fal-ai/pika/v2.2/image-to-video",
 };
 

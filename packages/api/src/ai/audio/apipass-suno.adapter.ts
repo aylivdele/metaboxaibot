@@ -1,5 +1,5 @@
 import type { AudioAdapter, AudioInput, AudioResult } from "./base.adapter.js";
-import { config } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 
 const SUNOAPI_BASE = "https://api.sunoapi.org";
@@ -102,7 +102,16 @@ export class ApipassSunoAdapter implements AudioAdapter {
 
     const data = (await resp.json()) as SunoGenerateResponse;
     if (data.code !== 200 || !data.data?.taskId) {
-      throw new Error(`Suno API: ${data.msg ?? "no taskId in response"}`);
+      const msg = data.msg ?? "no taskId in response";
+      if (/cannot exceed \d+ characters/i.test(msg)) {
+        const match = msg.match(/exceed\s+(\d+)\s+characters/i);
+        const max = match ? Number(match[1]) : 500;
+        throw new UserFacingError(`Suno API: ${msg}`, {
+          key: "sunoPromptTooLong",
+          params: { max, current: input.prompt.length },
+        });
+      }
+      throw new Error(`Suno API: ${msg}`);
     }
     return data.data.taskId;
   }

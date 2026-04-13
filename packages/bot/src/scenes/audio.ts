@@ -3,7 +3,14 @@ import type { BotContext } from "../types/context.js";
 import { audioGenerationService, userStateService } from "@metabox/api/services";
 import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
 import { db } from "@metabox/api/db";
-import { AI_MODELS, config, generateWebToken, resolveModelDisplay } from "@metabox/shared";
+import {
+  AI_MODELS,
+  config,
+  generateWebToken,
+  resolveModelDisplay,
+  UserFacingError,
+  resolveUserFacingError,
+} from "@metabox/shared";
 import { logger } from "../logger.js";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
@@ -274,6 +281,8 @@ export async function executeAudioPrompt(ctx: BotContext, prompt: string): Promi
       await replyNoSubscription(ctx);
     } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
       await replyInsufficientTokens(ctx);
+    } else if (err instanceof UserFacingError) {
+      await ctx.reply(resolveUserFacingError(err, ctx.t.errors));
     } else {
       logger.error(err, "Audio message error");
       await ctx.reply(ctx.t.audio.generationFailed);

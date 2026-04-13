@@ -1,5 +1,5 @@
 import type { AudioAdapter, AudioInput, AudioResult } from "./base.adapter.js";
-import { config } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { logger } from "../../logger.js";
 
@@ -89,6 +89,27 @@ export class ElevenLabsAdapter implements AudioAdapter {
 
     if (!res.ok) {
       const text = await res.text();
+      if (res.status === 400) {
+        try {
+          const parsed = JSON.parse(text) as {
+            detail?: { code?: string; message?: string };
+          };
+          if (parsed.detail?.code === "text_too_long") {
+            const match = parsed.detail.message?.match(
+              /maximum.*?(\d+)\s*characters.*?received\s*(\d+)/i,
+            );
+            throw new UserFacingError(`ElevenLabs: prompt too long (max 450 chars)`, {
+              key: "elevenlabsPromptTooLong",
+              params: {
+                max: match ? Number(match[1]) : 450,
+                current: match ? Number(match[2]) : input.prompt.length,
+              },
+            });
+          }
+        } catch (e) {
+          if (e instanceof UserFacingError) throw e;
+        }
+      }
       throw new Error(`ElevenLabs sound generation failed: ${res.status} ${text}`);
     }
 

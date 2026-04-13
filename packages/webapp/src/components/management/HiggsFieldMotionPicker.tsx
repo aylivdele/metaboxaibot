@@ -62,11 +62,16 @@ export function HiggsFieldMotionPicker({ value, onChange }: HiggsFieldMotionPick
 
   const getStrength = (id: string) => value.find((e) => e.id === id)?.strength ?? 0.7;
 
+  const MAX_MOTIONS = 2;
+
   const toggle = (motion: HiggsFieldMotion) => {
     if (isSelected(motion.id)) {
       onChange(value.filter((e) => e.id !== motion.id));
-    } else {
+    } else if (value.length < MAX_MOTIONS) {
       onChange([...value, { id: motion.id, strength: 0.7 }]);
+    } else {
+      // FIFO: drop the oldest selected preset, add the new one
+      onChange([...value.slice(1), { id: motion.id, strength: 0.7 }]);
     }
   };
 
@@ -92,6 +97,11 @@ export function HiggsFieldMotionPicker({ value, onChange }: HiggsFieldMotionPick
           label: cat === "all" ? "Все категории" : cat,
         }))}
       />
+
+      <div className="motion-picker__limit-notice">
+        Можно выбрать не более {MAX_MOTIONS} пресетов. При выборе нового лишний будет заменён
+        автоматически.
+      </div>
 
       <div className="motion-picker__grid">
         {filtered.map((motion) => {

@@ -126,7 +126,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         key: "motions",
         label: "Пресеты движений",
         description:
-          "Выберите один или несколько пресетов движения камеры. Можно комбинировать несколько одновременно.",
+          "Выберите до 2 пресетов движения камеры. Можно комбинировать два пресета одновременно.",
         type: "motion-picker",
         default: null,
       },
@@ -177,7 +177,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         key: "motions",
         label: "Пресеты движений",
         description:
-          "Выберите один или несколько пресетов движения камеры. Можно комбинировать несколько одновременно.",
+          "Выберите до 2 пресетов движения камеры. Можно комбинировать два пресета одновременно.",
         type: "motion-picker",
         default: null,
       },
@@ -230,7 +230,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         key: "motions",
         label: "Пресеты движений",
         description:
-          "Выберите один или несколько пресетов движения камеры. Можно комбинировать несколько одновременно.",
+          "Выберите до 2 пресетов движения камеры. Можно комбинировать два пресета одновременно.",
         type: "motion-picker",
         default: null,
       },
@@ -683,6 +683,8 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       "Создаёт видео с выразительным движением и генерацией звука. Предыдущее поколение — проверенная стабильность, до 12 секунд. Хорош для креативных и стилизованных роликов.",
     section: "video",
     provider: "fal",
+    familyId: "seedance",
+    variantLabel: "1.5 Pro",
     // Per-video-token billing: $2.4/M tokens with audio (default), $1.2/M without audio.
     // tokens = (w × h × fps × duration) / 1024; 720p 5s ≈ $0.26 with audio
     costUsdPerRequest: 0,
@@ -735,6 +737,8 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       "Новейшая видеомодель ByteDance — значительно выше качество и реалистичность движений по сравнению с 1.5. Встроенный звук, до 15 секунд, широкий выбор соотношений сторон.",
     section: "video",
     provider: "fal",
+    familyId: "seedance",
+    variantLabel: "2.0 Standard",
     // Per-video-token billing: $14/M tokens.
     // tokens = (w × h × 24 × duration) / 1024; 720p 5s ≈ $0.30
     costUsdPerRequest: 0,
@@ -782,6 +786,8 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       "Ускоренная версия Seedance 2.0 — быстрее и ~20% дешевле стандарта при схожем качестве. Встроенная генерация звука, до 15 секунд.",
     section: "video",
     provider: "fal",
+    familyId: "seedance",
+    variantLabel: "2.0 Fast",
     // Per-video-token billing: $11.2/M tokens (fast).
     // tokens = (w × h × 24 × duration) / 1024; 720p 5s ≈ $0.24
     costUsdPerRequest: 0,
