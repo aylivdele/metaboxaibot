@@ -53,6 +53,10 @@ export const audioGenerationService = {
         section: "audio",
         modelId,
         prompt,
+        inputData:
+          Object.keys(modelSettings).length > 0
+            ? { modelSettings: JSON.parse(JSON.stringify(modelSettings)) }
+            : undefined,
         status: "pending",
       },
     });

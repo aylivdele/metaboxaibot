@@ -121,7 +121,12 @@ export const videoGenerationService = {
         section: "video",
         modelId,
         prompt,
-        inputData: imageUrl ? { imageUrl } : undefined,
+        inputData: {
+          ...(imageUrl ? { imageUrl } : {}),
+          ...(Object.keys(modelSettings).length > 0
+            ? { modelSettings: JSON.parse(JSON.stringify(modelSettings)) }
+            : {}),
+        },
         status: "pending",
       },
     });

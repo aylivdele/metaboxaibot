@@ -8,7 +8,6 @@ import { SettingsPanel } from "./SettingsPanel";
 import { isActiveSection, modelCostLabel } from "../../utils/mediaSettingsViewHelpers";
 
 interface FamilyCardProps {
-  familyId: string;
   members: Model[];
   activeModelId: string;
   activeState?: string;
@@ -20,7 +19,6 @@ interface FamilyCardProps {
 }
 
 export function FamilyCard({
-  familyId,
   members,
   activeModelId,
   activeState,

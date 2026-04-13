@@ -91,7 +91,12 @@ export const generationService = {
         section: "image",
         modelId,
         prompt,
-        inputData: negativePrompt ? { negativePrompt } : undefined,
+        inputData: {
+          ...(negativePrompt ? { negativePrompt } : {}),
+          ...(Object.keys(modelSettings).length > 0
+            ? { modelSettings: modelSettings as Record<string, string | number | boolean | null> }
+            : {}),
+        },
         status: "pending",
       },
     });

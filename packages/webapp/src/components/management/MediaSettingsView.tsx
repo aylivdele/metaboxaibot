@@ -187,7 +187,6 @@ export function MediaSettingsView({
       {familyMembers && (
         <FamilyCard
           key={pickerId}
-          familyId={pickerId}
           members={familyMembers}
           activeModelId={activeModelId}
           activeState={stateStr}
