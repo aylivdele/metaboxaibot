@@ -73,7 +73,11 @@ export async function notifyTechError(err: unknown, ctx: TechErrorContext): Prom
   const truncated =
     errorText.length > maxErrorLen ? errorText.slice(0, maxErrorLen) + "\n…[truncated]" : errorText;
 
-  const text = [header, meta.length ? meta.join(" | ") : null, `<pre>${escapeHtml(truncated)}</pre>`]
+  const text = [
+    header,
+    meta.length ? meta.join(" | ") : null,
+    `<pre>${escapeHtml(truncated)}</pre>`,
+  ]
     .filter(Boolean)
     .join("\n");
 
