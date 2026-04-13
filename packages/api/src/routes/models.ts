@@ -37,6 +37,7 @@ function serializeModel(m: AIModel) {
     section: m.section,
     provider: m.provider,
     supportsImages: m.supportsImages,
+    supportsDocuments: m.supportsDocuments ?? false,
     supportsVoice: m.supportsVoice,
     supportsWeb: m.supportsWeb,
     isAsync: m.isAsync,

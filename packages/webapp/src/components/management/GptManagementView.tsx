@@ -6,7 +6,7 @@ import { ChatHistory } from "./ChatHistory.js";
 import { SettingsPanel } from "./SettingsPanel.js";
 import { closeMiniApp } from "../../utils/telegram.js";
 
-type ModelFilter = "all" | "images" | "voice" | "web";
+type ModelFilter = "images" | "files" | "web";
 
 function formatModelPrice(
   m: Model,
@@ -48,7 +48,7 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
   const [settingsDialog, setSettingsDialog] = useState<Dialog | null>(null);
   const [dialogSettings, setDialogSettings] = useState<Record<string, unknown>>({});
   const [dialogSettingsLoading, setDialogSettingsLoading] = useState(false);
-  const [filter, setFilter] = useState<ModelFilter>("all");
+  const [filters, setFilters] = useState<Set<ModelFilter>>(new Set());
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const loadData = useCallback(async () => {
@@ -101,10 +101,14 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
   };
 
   const handleActivate = async (dialog: Dialog) => {
+    const alreadyActive =
+      state?.gptDialogId === dialog.id &&
+      (state?.section === "gpt" || state?.state === "GPT_ACTIVE");
+    if (alreadyActive) {
+      return;
+    }
     await api.dialogs.activate(dialog.id);
     setState((s) => (s ? { ...s, gptDialogId: dialog.id, gptModelId: dialog.modelId } : s));
-    setActivatedPopup(true);
-    setTimeout(() => setActivatedPopup(false), 3000);
     closeMiniApp();
   };
 
@@ -165,10 +169,29 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
         ) : (
           <div className="empty-state">{t("manage.noSettings")}</div>
         )}
-        <div style={{ padding: "16px" }}>
-          <button className="new-dialog-btn" onClick={() => void handleActivate(settingsDialog)}>
+        <div className="family-card__btn-row" style={{ padding: "0 16px 16px" }}>
+          <button
+            className="family-card__activate-btn"
+            onClick={() => void handleActivate(settingsDialog)}
+          >
             {t("manage.startChat")}
           </button>
+          {dlgModel && dlgModel.settings.length > 0 && (
+            <button
+              className="family-card__reset-btn"
+              onClick={() => {
+                const defaults: Record<string, unknown> = {};
+                for (const def of dlgModel.settings) {
+                  defaults[def.key] = def.default ?? null;
+                }
+                setDialogSettings(defaults);
+                void api.modelSettings.setForDialog(settingsDialog.id, defaults);
+              }}
+              title={t("imageSettings.resetTitle")}
+            >
+              {t("imageSettings.reset")}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -194,11 +217,18 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
           </div>
 
           <div className="model-filter-bar">
-            {(["all", "images", "voice", "web"] as ModelFilter[]).map((f) => (
+            {(["images", "files", "web"] as ModelFilter[]).map((f) => (
               <button
                 key={f}
-                className={`model-filter-btn${filter === f ? " model-filter-btn--active" : ""}`}
-                onClick={() => setFilter(f)}
+                className={`model-filter-btn${filters.has(f) ? " model-filter-btn--active" : ""}`}
+                onClick={() =>
+                  setFilters((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(f)) next.delete(f);
+                    else next.add(f);
+                    return next;
+                  })
+                }
               >
                 {t(`manage.filter.${f}` as Parameters<typeof t>[0])}
               </button>
@@ -207,23 +237,25 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
 
           <div className="model-legend">
             <span>{t("manage.legend.images")}</span>
-            <span>{t("manage.legend.voice")}</span>
+            <span>{t("manage.legend.files")}</span>
             <span>{t("manage.legend.web")}</span>
           </div>
 
           {models.filter((m) => {
-            if (filter === "images") return m.supportsImages;
-            if (filter === "voice") return m.supportsVoice;
-            if (filter === "web") return m.supportsWeb;
+            if (filters.size === 0) return true;
+            if (filters.has("images") && !m.supportsImages) return false;
+            if (filters.has("files") && !m.supportsDocuments) return false;
+            if (filters.has("web") && !m.supportsWeb) return false;
             return true;
           }).length === 0 ? (
             <div className="empty-state">{t("manage.noModels")}</div>
           ) : (
             models
               .filter((m) => {
-                if (filter === "images") return m.supportsImages;
-                if (filter === "voice") return m.supportsVoice;
-                if (filter === "web") return m.supportsWeb;
+                if (filters.size === 0) return true;
+                if (filters.has("images") && !m.supportsImages) return false;
+                if (filters.has("files") && !m.supportsDocuments) return false;
+                if (filters.has("web") && !m.supportsWeb) return false;
                 return true;
               })
               .map((m) => (
@@ -244,7 +276,7 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
                     )}{" "}
                     · {m.provider}
                     {m.supportsImages && " · 🖼"}
-                    {m.supportsVoice && " · 🎙"}
+                    {m.supportsDocuments && " · 📄"}
                     {m.supportsWeb && " · 🌐"}
                   </div>
                 </div>

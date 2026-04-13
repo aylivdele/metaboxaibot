@@ -17,6 +17,25 @@ import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-err
 import { transcribeAndReply } from "../utils/voice-transcribe.js";
 import { uploadBuffer, buildS3Key } from "@metabox/api/services/s3";
 
+// ── Random audio pending messages (Russian) ──────────────────────────────────
+
+const AUDIO_PENDING_RU = [
+  "🎧 Звук в работе. Нейросеть сейчас в студии — наушники надела, микрофон включила. Скоро пришлём.",
+  "🎵 Генерируем аудио. Нейросеть настраивает частоты, крутит ручки и делает вид, что понимает в звуке. Результат скоро будет.",
+  "🔊 Аудио на подходе. Нейросеть записывает дубль. Первый. Ладно, сразу чистовой — она же профи. Пришлём, как будет готово.",
+  "🎤 Ваш запрос ушёл в звуковую студию. Там ни окон, ни дверей — только нейросеть и микрофон. Ждите результат с минуты на минуту.",
+  "🎶 Тишина в эфире! Нейросеть записывает ваше аудио. Не шумите — она чувствительная. Скинем, как только будет готово.",
+  "🎙 Саундчек пройден, запись пошла. Нейросеть старается не кашлять в микрофон. Аудио прилетит совсем скоро.",
+  "🔉 Нейросеть в звукозаписывающей будке. Не стучите в стекло — она сосредоточена. Результат вот-вот будет.",
+];
+
+function pickAudioPending(ctx: BotContext): string {
+  if (ctx.user?.language === "ru") {
+    return AUDIO_PENDING_RU[Math.floor(Math.random() * AUDIO_PENDING_RU.length)];
+  }
+  return ctx.t.audio.asyncPending;
+}
+
 // ── Sub-section entry points ──────────────────────────────────────────────────
 
 /**
@@ -273,7 +292,7 @@ export async function executeAudioPrompt(ctx: BotContext, prompt: string): Promi
       await ctx.replyWithAudio(audio, { caption: `🎧 ${prompt.slice(0, 200)}` });
     } else {
       // Async (Suno music) — worker will notify when done
-      await ctx.reply(ctx.t.audio.asyncPending);
+      await ctx.reply(pickAudioPending(ctx));
     }
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);

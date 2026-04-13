@@ -180,6 +180,7 @@ export interface Model {
   /** Per-variant description override shown instead of family description. */
   descriptionOverride: string | null;
   supportsImages: boolean;
+  supportsDocuments: boolean;
   supportsVoice: boolean;
   supportsWeb: boolean;
   isAsync: boolean;

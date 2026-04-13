@@ -107,6 +107,12 @@ export const dialogsRoutes: FastifyPluginAsync = async (fastify) => {
     if (!dialog) return reply.code(404).send({ error: "Dialog not found" });
     if (dialog.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
 
+    const state = await userStateService.get(userId);
+
+    if (state?.gptDialogId === dialog.id && state.state === "GPT_ACTIVE") {
+      return { success: true };
+    }
+
     await userStateService.setDialogForSection(userId, dialog.section as Section, id);
 
     // Notify user in chat (fire-and-forget)
