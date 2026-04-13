@@ -71,6 +71,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
           { value: "wav", label: "WAV" },
         ],
         default: "mp3",
+        advanced: true,
       },
       {
         key: "instructions",
@@ -79,6 +80,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
           "Только для gpt-4o-mini-tts: укажите тон, эмоцию и стиль речи. Например: 'Говори медленно и торжественно' или 'Эмоциональный диктор новостей'.",
         type: "text",
         default: "",
+        advanced: true,
       },
     ],
   },
@@ -163,6 +165,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.5,
+        advanced: true,
       },
       {
         key: "similarity_boost",
@@ -173,6 +176,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.75,
+        advanced: true,
       },
       {
         key: "style",
@@ -183,6 +187,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.0,
+        advanced: true,
       },
       {
         key: "use_speaker_boost",
@@ -190,6 +195,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         description: "Усиление качества и чёткости голоса.",
         type: "toggle",
         default: true,
+        advanced: true,
       },
     ],
   },
@@ -279,6 +285,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.3,
+        advanced: true,
       },
       {
         key: "auto_translate_prompt",
@@ -336,6 +343,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.3,
+        advanced: true,
       },
     ],
   },

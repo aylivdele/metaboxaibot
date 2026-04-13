@@ -74,6 +74,8 @@ export interface ModelSettingDef {
   default: string | number | boolean | null;
   /** When this rule evaluates to true the setting is hidden in the UI. */
   unavailableIf?: UnavailableRule;
+  /** When true the setting is rendered inside a collapsible "Advanced" section. */
+  advanced?: boolean;
 }
 
 /** One specific model variant that belongs to a family (e.g. recraft-v4-pro). */

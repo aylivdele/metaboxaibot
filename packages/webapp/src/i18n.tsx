@@ -266,6 +266,7 @@ const translations = {
     "manage.settings": "Settings",
     "manage.delete": "Delete",
     "manage.confirmDelete": "Delete this dialog?",
+    "manage.advancedSettings": "Advanced settings",
 
     // Video settings
     "videoSettings.title": "Video Settings",
@@ -571,6 +572,7 @@ const translations = {
     "manage.settings": "Настройки",
     "manage.delete": "Удалить",
     "manage.confirmDelete": "Удалить этот диалог?",
+    "manage.advancedSettings": "Расширенные настройки",
 
     // Video settings
     "videoSettings.title": "Настройки видео",

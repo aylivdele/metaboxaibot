@@ -3022,6 +3022,32 @@ textarea::placeholder {
   color: var(--text-secondary);
 }
 
+.settings-panel__advanced {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.settings-panel__advanced-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 0;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.settings-panel__advanced-arrow {
+  transition: transform 0.2s;
+  font-size: 10px;
+}
+.settings-panel__advanced-arrow.open {
+  transform: rotate(180deg);
+}
+
 .family-card__row--settings {
   flex-direction: column;
   gap: 0;

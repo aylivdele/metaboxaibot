@@ -23,6 +23,7 @@ const KLING_SETTINGS: ModelSettingDef[] = [
     max: 1,
     step: 0.1,
     default: 0.5,
+    advanced: true,
   },
   {
     key: "negative_prompt",
@@ -30,6 +31,7 @@ const KLING_SETTINGS: ModelSettingDef[] = [
     description: "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
     type: "text",
     default: "",
+    advanced: true,
   },
   {
     key: "generate_audio",
@@ -147,6 +149,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         min: 1,
         max: 1000000,
         default: null,
+        advanced: true,
       },
     ],
   },
@@ -198,6 +201,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         min: 1,
         max: 1000000,
         default: null,
+        advanced: true,
       },
     ],
   },
@@ -251,6 +255,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         min: 1,
         max: 1000000,
         default: null,
+        advanced: true,
       },
     ],
   },
@@ -329,6 +334,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
           "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
         type: "text",
         default: "",
+        advanced: true,
       },
     ],
   },
@@ -405,6 +411,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
           "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
         type: "text",
         default: "",
+        advanced: true,
       },
     ],
   },
@@ -485,6 +492,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         min: 0,
         max: 4294967295,
         default: null,
+        advanced: true,
       },
       {
         key: "camera_horizontal",
@@ -496,6 +504,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         max: 10,
         step: 0.5,
         default: 0,
+        advanced: true,
       },
       {
         key: "camera_vertical",
@@ -507,6 +516,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         max: 10,
         step: 0.5,
         default: 0,
+        advanced: true,
       },
       {
         key: "camera_zoom",
@@ -518,6 +528,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         max: 10,
         step: 0.5,
         default: 0,
+        advanced: true,
       },
     ],
   },
@@ -565,6 +576,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         label: "Цвет фона",
         type: "color",
         default: "#FFFFFF",
+        advanced: true,
       },
       {
         key: "resolution",
@@ -600,6 +612,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         description: "Только для фото-аватара",
         type: "text",
         default: null,
+        advanced: true,
         unavailableIf: {
           and: [
             { key: "avatar_id", present: true },
@@ -612,6 +625,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         label: "Настроить голос",
         type: "toggle",
         default: false,
+        advanced: true,
       },
       {
         key: "voice_speed",
@@ -621,6 +635,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         max: 1.5,
         step: 0.1,
         default: 1.0,
+        advanced: true,
         unavailableIf: { key: "voice_settings_enabled", absent: true },
       },
       {
@@ -631,6 +646,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         max: 50,
         step: 1,
         default: 0,
+        advanced: true,
         unavailableIf: { key: "voice_settings_enabled", absent: true },
       },
       {
@@ -638,6 +654,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         label: "Язык голоса",
         type: "dropdown",
         default: null,
+        advanced: true,
         options: [
           { value: "", label: "auto" },
           { value: "ru-RU", label: "🇷🇺 Русский" },
@@ -959,6 +976,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         description: "Что НЕ должно появляться в видео.",
         type: "text",
         default: "",
+        advanced: true,
       },
       {
         key: "seed",
@@ -967,6 +985,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         type: "number",
         min: 0,
         default: null,
+        advanced: true,
       },
     ],
   },
@@ -1130,6 +1149,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
           "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
         type: "text",
         default: "",
+        advanced: true,
       },
       {
         key: "seed",
@@ -1139,6 +1159,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         min: 0,
         max: 2147483647,
         default: null,
+        advanced: true,
       },
     ],
   },

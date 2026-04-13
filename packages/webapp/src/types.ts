@@ -89,6 +89,7 @@ export interface ModelSettingDef {
   step?: number;
   default: string | number | boolean | null;
   unavailableIf?: UnavailableRule;
+  advanced?: boolean;
 }
 
 export interface ElevenLabsVoice {

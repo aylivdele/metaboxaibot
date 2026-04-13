@@ -12,6 +12,7 @@ const TEMPERATURE_SETTING: ModelSettingDef = {
   max: 2,
   step: 0.05,
   default: 1.0,
+  advanced: true,
 };
 
 /** Perplexity and Qwen require t < 2 (strictly), so cap at 1.99. */
@@ -38,6 +39,7 @@ const LLM_SETTINGS: ModelSettingDef[] = [
       "Скрытая инструкция, которую ИИ всегда соблюдает: задайте роль, стиль или ограничения для всего диалога.",
     type: "text",
     default: "",
+    advanced: true,
   },
 ];
 
@@ -49,6 +51,7 @@ const PERPLEXITY_SYSTEM_PROMPT: ModelSettingDef = {
   type: "text",
   default:
     "Отвечай на языке пользователя. Используй только Telegram Markdown: *жирный*, _курсив_, `код`, ```блок кода```. Не используй заголовки (##) и двойные звёздочки (**). Ссылки на источники указывай в конце ответа нумерованным списком с полными URL.",
+  advanced: true,
 };
 
 /** Extra setting for Perplexity search models. */
@@ -89,6 +92,7 @@ const PERPLEXITY_DOMAIN_FILTER: ModelSettingDef = {
     "Ограничить поиск конкретными доменами (через запятую, напр. wikipedia.org, bbc.com). Пусто — без ограничений.",
   type: "text",
   default: "",
+  advanced: true,
 };
 
 /** Reasoning effort for OpenAI o-series and Grok reasoning models (low/medium/high). */
@@ -204,6 +208,7 @@ const REASONING_MODEL_SETTINGS: ModelSettingDef[] = [
       "Скрытая инструкция, которую ИИ всегда соблюдает: задайте роль, стиль или ограничения для всего диалога.",
     type: "text",
     default: "",
+    advanced: true,
   },
 ];
 
@@ -224,6 +229,7 @@ function contextWindowSetting(modelMaxTokens: number): ModelSettingDef {
     max: modelMaxTokens,
     step: 1_000,
     default: modelMaxTokens,
+    advanced: true,
   };
 }
 

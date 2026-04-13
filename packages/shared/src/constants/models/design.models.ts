@@ -13,6 +13,7 @@ const FLUX_SETTINGS: ModelSettingDef[] = [
     max: 50,
     step: 1,
     default: 28,
+    advanced: true,
   },
   {
     key: "guidance_scale",
@@ -24,6 +25,7 @@ const FLUX_SETTINGS: ModelSettingDef[] = [
     max: 10,
     step: 0.5,
     default: 2.5,
+    advanced: true,
   },
   {
     key: "acceleration",
@@ -37,6 +39,7 @@ const FLUX_SETTINGS: ModelSettingDef[] = [
       { value: "high", label: "High" },
     ],
     default: "regular",
+    advanced: true,
   },
   {
     key: "enable_prompt_expansion",
@@ -56,6 +59,7 @@ const FLUX_SETTINGS: ModelSettingDef[] = [
       { value: "webp", label: "WebP" },
     ],
     default: "png",
+    advanced: true,
   },
   {
     key: "seed",
@@ -64,6 +68,7 @@ const FLUX_SETTINGS: ModelSettingDef[] = [
     type: "number",
     min: 0,
     default: null,
+    advanced: true,
   },
 ];
 
@@ -79,6 +84,7 @@ const FLUX_PRO_SETTINGS: ModelSettingDef[] = [
       { value: "png", label: "PNG" },
     ],
     default: "jpeg",
+    advanced: true,
   },
   {
     key: "seed",
@@ -87,6 +93,7 @@ const FLUX_PRO_SETTINGS: ModelSettingDef[] = [
     type: "number",
     min: 0,
     default: null,
+    advanced: true,
   },
 ];
 
@@ -156,6 +163,7 @@ const IDEOGRAM_SETTINGS: ModelSettingDef[] = [
     label: "Художественный пресет",
     description: "Готовый художественный стиль для изображения (только модели V3).",
     type: "dropdown",
+    advanced: true,
     unavailableIf: {
       or: [
         { key: "style_type", eq: "Realistic" },
@@ -247,6 +255,7 @@ const IDEOGRAM_SETTINGS: ModelSettingDef[] = [
     description: "Что НЕ должно быть на картинке: перечислите нежелательные объекты или стили.",
     type: "text",
     default: "",
+    advanced: true,
   },
   {
     key: "seed",
@@ -256,6 +265,7 @@ const IDEOGRAM_SETTINGS: ModelSettingDef[] = [
     min: 0,
     max: 2147483647,
     default: null,
+    advanced: true,
   },
 ];
 
@@ -271,6 +281,7 @@ const SEEDREAM_SETTINGS: ModelSettingDef[] = [
     max: 10,
     step: 0.5,
     default: 2.5,
+    advanced: true,
   },
   {
     key: "seed",
@@ -280,6 +291,7 @@ const SEEDREAM_SETTINGS: ModelSettingDef[] = [
     min: 0,
     max: 2147483647,
     default: null,
+    advanced: true,
   },
 ];
 
@@ -361,6 +373,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "webp", label: "WebP" },
         ],
         default: "png",
+        advanced: true,
       },
       {
         key: "enable_web_search",
@@ -440,6 +453,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "webp", label: "WebP" },
         ],
         default: "png",
+        advanced: true,
       },
       {
         key: "enable_web_search",
@@ -517,6 +531,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "schnell", label: "Schnell" },
         ],
         default: "dev",
+        advanced: true,
       },
       {
         key: "num_inference_steps",
@@ -527,6 +542,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 50,
         step: 1,
         default: 28,
+        advanced: true,
       },
       {
         key: "guidance_scale",
@@ -537,6 +553,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 10,
         step: 0.5,
         default: 3,
+        advanced: true,
       },
       {
         key: "prompt_strength",
@@ -547,6 +564,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.8,
+        advanced: true,
       },
       {
         key: "go_fast",
@@ -554,6 +572,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         description: "fp8-квантизация вместо bf16. Быстрее, чуть ниже качество.",
         type: "toggle",
         default: false,
+        advanced: true,
       },
       {
         key: "output_format",
@@ -566,6 +585,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "webp", label: "WebP" },
         ],
         default: "png",
+        advanced: true,
       },
       {
         key: "output_quality",
@@ -576,6 +596,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 100,
         step: 1,
         default: 80,
+        advanced: true,
       },
       {
         key: "extra_lora",
@@ -583,6 +604,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         description: "URL или путь к LoRA-весам (HuggingFace, CivitAI, Replicate, .safetensors).",
         type: "text",
         default: null,
+        advanced: true,
       },
       {
         key: "lora_scale",
@@ -593,6 +615,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 3,
         step: 0.1,
         default: 1,
+        advanced: true,
       },
       {
         key: "extra_lora_scale",
@@ -603,6 +626,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 3,
         step: 0.1,
         default: 1,
+        advanced: true,
       },
       {
         key: "seed",
@@ -611,6 +635,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         type: "number",
         min: 0,
         default: null,
+        advanced: true,
       },
       {
         key: "disable_safety_checker",
@@ -618,6 +643,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         description: "Отключить проверку безопасности контента.",
         type: "toggle",
         default: false,
+        advanced: true,
       },
     ],
   },
@@ -694,6 +720,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "webp", label: "WebP" },
         ],
         default: "png",
+        advanced: true,
       },
       {
         key: "output_compression",
@@ -705,6 +732,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 100,
         step: 1,
         default: 100,
+        advanced: true,
       },
       {
         key: "background",
@@ -728,6 +756,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "low", label: "Low" },
         ],
         default: "auto",
+        advanced: true,
       },
     ],
   },
@@ -766,6 +795,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           "Что НЕ должно быть на картинке: перечислите нежелательные объекты, стили или черты.",
         type: "text",
         default: "",
+        advanced: true,
       },
       {
         key: "cfg",
@@ -777,6 +807,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 10,
         step: 0.5,
         default: 5,
+        advanced: true,
       },
       {
         key: "prompt_strength",
@@ -788,6 +819,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.85,
+        advanced: true,
       },
       {
         key: "output_format",
@@ -800,6 +832,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "jpeg", label: "JPEG" },
         ],
         default: "png",
+        advanced: true,
       },
       {
         key: "seed",
@@ -808,6 +841,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         type: "number",
         min: 0,
         default: null,
+        advanced: true,
       },
     ],
   },
@@ -1011,6 +1045,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "png", label: "PNG" },
         ],
         default: "jpg",
+        advanced: true,
       },
       {
         key: "safety_filter_level",
@@ -1024,6 +1059,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "block_low_and_above", label: "Строгий" },
         ],
         default: "block_only_high",
+        advanced: true,
       },
     ],
   },
@@ -1070,6 +1106,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "png", label: "PNG" },
         ],
         default: "jpg",
+        advanced: true,
       },
       {
         key: "safety_filter_level",
@@ -1083,6 +1120,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "block_low_and_above", label: "Строгий" },
         ],
         default: "block_only_high",
+        advanced: true,
       },
     ],
   },
@@ -1129,6 +1167,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "png", label: "PNG" },
         ],
         default: "jpg",
+        advanced: true,
       },
       {
         key: "safety_filter_level",
@@ -1142,6 +1181,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "block_low_and_above", label: "Строгий" },
         ],
         default: "block_only_high",
+        advanced: true,
       },
     ],
   },
@@ -1343,6 +1383,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 5,
         step: 1,
         default: 2,
+        advanced: true,
       },
       {
         key: "strength",
@@ -1354,6 +1395,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.5,
+        advanced: true,
       },
     ],
   },
@@ -1389,6 +1431,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.5,
+        advanced: true,
       },
       {
         key: "seed",
@@ -1399,6 +1442,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         min: 0,
         max: 2147483647,
         default: null,
+        advanced: true,
       },
     ],
   },
@@ -1434,6 +1478,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.5,
+        advanced: true,
       },
       {
         key: "seed",
@@ -1444,6 +1489,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         min: 0,
         max: 2147483647,
         default: null,
+        advanced: true,
       },
     ],
   },
@@ -1478,6 +1524,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.5,
+        advanced: true,
       },
       {
         key: "seed",
@@ -1488,6 +1535,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         min: 0,
         max: 2147483647,
         default: null,
+        advanced: true,
       },
     ],
   },
@@ -1522,6 +1570,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         max: 1,
         step: 0.05,
         default: 0.5,
+        advanced: true,
       },
       {
         key: "seed",
@@ -1532,6 +1581,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         min: 0,
         max: 2147483647,
         default: null,
+        advanced: true,
       },
     ],
   },
