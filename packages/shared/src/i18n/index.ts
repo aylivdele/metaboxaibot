@@ -92,6 +92,8 @@ export interface Translations {
     sounds: string;
     backToMain: string;
     ttsActivated: string;
+    chooseTtsProvider: string;
+    chooseMusicProvider: string;
     ttsElActivated: string;
     voiceCloneActivated: string;
     voiceCloneNeedsAudio: string;

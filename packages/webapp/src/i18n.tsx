@@ -263,6 +263,9 @@ const translations = {
     "imageSettings.activatedPopup": "Model activated. Return to the bot to start using it.",
     "manage.dialogActivatedPopup": "Dialog activated. Return to the chat to work with it.",
     "manage.startChat": "Start chatting",
+    "manage.settings": "Settings",
+    "manage.delete": "Delete",
+    "manage.confirmDelete": "Delete this dialog?",
 
     // Video settings
     "videoSettings.title": "Video Settings",
@@ -565,6 +568,9 @@ const translations = {
     "imageSettings.activatedPopup": "Модель активирована. Вернитесь в бот для работы с ней.",
     "manage.dialogActivatedPopup": "Диалог активирован. Вернитесь в чат для работы с ним.",
     "manage.startChat": "Начать общение",
+    "manage.settings": "Настройки",
+    "manage.delete": "Удалить",
+    "manage.confirmDelete": "Удалить этот диалог?",
 
     // Video settings
     "videoSettings.title": "Настройки видео",

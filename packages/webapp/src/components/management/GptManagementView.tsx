@@ -39,8 +39,6 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
     {},
   );
   const [loading, setLoading] = useState(true);
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
   const [isCreating, setIsCreating] = useState(initialAction === "new");
   const [creating, setCreating] = useState(false);
   const [activatedPopup, setActivatedPopup] = useState(false);
@@ -49,6 +47,9 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
   const [dialogSettings, setDialogSettings] = useState<Record<string, unknown>>({});
   const [dialogSettingsLoading, setDialogSettingsLoading] = useState(false);
   const [filters, setFilters] = useState<Set<ModelFilter>>(new Set());
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editTitleValue, setEditTitleValue] = useState("");
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const loadData = useCallback(async () => {
@@ -82,6 +83,7 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
   useEffect(() => {
     if (!settingsDialog) return;
     setDialogSettingsLoading(true);
+    setEditingTitle(false);
     api.modelSettings
       .getForDialog(settingsDialog.id)
       .then((ds) => setDialogSettings(ds))
@@ -90,8 +92,12 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
   }, [settingsDialog?.id]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this dialog?")) return;
-    await api.dialogs.delete(id);
+    if (!confirm(t("manage.confirmDelete"))) return;
+    try {
+      await api.dialogs.delete(id);
+    } catch {
+      return;
+    }
     setDialogs((ds) => ds.filter((d) => d.id !== id));
     if (state?.gptDialogId === id) {
       setState((s) => (s ? { ...s, gptDialogId: null } : s));
@@ -112,12 +118,15 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
     closeMiniApp();
   };
 
-  const handleRename = async (id: string) => {
-    if (!renameValue.trim()) return;
-    await api.dialogs.rename(id, renameValue.trim());
-    setDialogs((ds) => ds.map((d) => (d.id === id ? { ...d, title: renameValue.trim() } : d)));
-    setRenamingId(null);
-    setRenameValue("");
+  const handleRename = async (id: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    const trimmed = newTitle.trim();
+    await api.dialogs.rename(id, trimmed);
+    setDialogs((ds) => ds.map((d) => (d.id === id ? { ...d, title: trimmed } : d)));
+    if (settingsDialog?.id === id) {
+      setSettingsDialog((prev) => (prev ? { ...prev, title: trimmed } : prev));
+    }
+    setEditingTitle(false);
   };
 
   const handleCreateDialog = async (modelId: string) => {
@@ -151,7 +160,40 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
           <button className="back-btn" onClick={() => setSettingsDialog(null)}>
             {t("common.back")}
           </button>
-          <h2>{settingsDialog.title ?? settingsDialog.modelId}</h2>
+          {editingTitle ? (
+            <div className="dialog-title-edit">
+              <input
+                className="dialog-title-edit__input"
+                value={editTitleValue}
+                onChange={(e) => setEditTitleValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleRename(settingsDialog.id, editTitleValue);
+                  if (e.key === "Escape") setEditingTitle(false);
+                }}
+                autoFocus
+              />
+              <button
+                className="action-btn action-btn--primary"
+                onClick={() => void handleRename(settingsDialog.id, editTitleValue)}
+              >
+                ✓
+              </button>
+              <button className="action-btn" onClick={() => setEditingTitle(false)}>
+                ✕
+              </button>
+            </div>
+          ) : (
+            <h2
+              className="dialog-title-editable"
+              onClick={() => {
+                setEditTitleValue(settingsDialog.title ?? "");
+                setEditingTitle(true);
+              }}
+            >
+              {settingsDialog.title ?? settingsDialog.modelId}
+              <span className="dialog-title-editable__icon">✏️</span>
+            </h2>
+          )}
           {dlgModel && <p className="page-subtitle">{dlgModel.name}</p>}
         </div>
         {dlgModel && dlgModel.settings.length > 0 ? (
@@ -200,7 +242,7 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
   if (loading) return <div className="page-loading">{t("common.loading")}</div>;
 
   return (
-    <div className="page">
+    <div className="page" onClick={() => menuOpenId && setMenuOpenId(null)}>
       {activatedPopup && <div className="activated-popup">{t("manage.dialogActivatedPopup")}</div>}
       <div className="page-header">
         <h2>{t("manage.title")}</h2>
@@ -292,83 +334,73 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
           {dialogs.length === 0 ? (
             <div className="empty-state">{t("manage.noDialogs")}</div>
           ) : (
-            dialogs.map((d) => (
-              <div
-                key={d.id}
-                className={`dialog-item${state?.gptDialogId === d.id ? " dialog-item--active" : ""}`}
-              >
-                {renamingId === d.id ? (
-                  <div className="dialog-item__rename">
-                    <input
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") void handleRename(d.id);
-                        if (e.key === "Escape") setRenamingId(null);
-                      }}
-                      autoFocus
-                    />
-                    <button
-                      className="action-btn action-btn--primary"
-                      onClick={() => void handleRename(d.id)}
-                    >
-                      ✓
-                    </button>
-                    <button className="action-btn" onClick={() => setRenamingId(null)}>
-                      ✕
-                    </button>
+            dialogs.map((d) => {
+              const isActive = state?.gptDialogId === d.id;
+              return (
+                <div key={d.id} className={`dialog-item${isActive ? " dialog-item--active" : ""}`}>
+                  <div
+                    className="dialog-item__info"
+                    onClick={() => setSettingsDialog(d)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div className="dialog-item__title">{d.title ?? d.modelId}</div>
+                    <div className="dialog-item__meta">
+                      {d.modelId} · {new Date(d.updatedAt).toLocaleDateString()}
+                    </div>
                   </div>
-                ) : (
-                  <>
-                    <div
-                      className="dialog-item__info"
-                      onClick={() => setSettingsDialog(d)}
-                      style={{ cursor: "pointer" }}
+                  <div className="dialog-item__actions">
+                    <button
+                      className={`action-btn${isActive ? "" : " action-btn--primary"}`}
+                      onClick={() => void handleActivate(d)}
+                      title={t("manage.activate")}
                     >
-                      <div className="dialog-item__title">{d.title ?? d.modelId}</div>
-                      <div className="dialog-item__meta">
-                        {d.modelId} · {new Date(d.updatedAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <div className="dialog-item__actions">
-                      {state?.gptDialogId !== d.id && (
-                        <button
-                          className="action-btn action-btn--primary"
-                          onClick={() => void handleActivate(d)}
-                          title={t("manage.activate")}
-                        >
-                          ▶
-                        </button>
-                      )}
+                      {isActive ? "↗" : "▶"}
+                    </button>
+                    <button
+                      className="action-btn"
+                      onClick={() => setViewingDialog(d)}
+                      title={t("manage.history")}
+                    >
+                      💬
+                    </button>
+                    <div className="dialog-item__menu-wrap">
                       <button
                         className="action-btn"
-                        onClick={() => setViewingDialog(d)}
-                        title={t("manage.history")}
-                      >
-                        💬
-                      </button>
-                      <button
-                        className="action-btn"
-                        onClick={() => {
-                          setRenamingId(d.id);
-                          setRenameValue(d.title ?? "");
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMenuOpenId(menuOpenId === d.id ? null : d.id);
                         }}
-                        title="Rename"
+                        title={t("manage.settings")}
                       >
-                        ✏️
+                        ⚙️
                       </button>
-                      <button
-                        className="action-btn action-btn--danger"
-                        onClick={() => void handleDelete(d.id)}
-                        title="Delete"
-                      >
-                        🗑
-                      </button>
+                      {menuOpenId === d.id && (
+                        <div className="dialog-item__dropdown">
+                          <button
+                            className="dialog-item__dropdown-item"
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              setSettingsDialog(d);
+                            }}
+                          >
+                            {t("manage.settings")}
+                          </button>
+                          <button
+                            className="dialog-item__dropdown-item dialog-item__dropdown-item--danger"
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              void handleDelete(d.id);
+                            }}
+                          >
+                            {t("manage.delete")}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </>
-                )}
-              </div>
-            ))
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       )}

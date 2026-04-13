@@ -195,7 +195,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
   },
   suno: {
     id: "suno",
-    name: "🎵 Генерация музыки (Suno)",
+    name: "🎵 Suno (музыка с вокалом)",
     description:
       "Генерирует полноценные музыкальные треки с вокалом и аранжировкой. Можно задать стиль, настроение и текст песни. До 4 минут. Дольше ElevenLabs, но с полноценным вокалом.",
     section: "audio",
@@ -292,7 +292,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
   },
   "music-el": {
     id: "music-el",
-    name: "🎶 Музыка (ElevenLabs)",
+    name: "🎶 ElevenLabs (музыка без вокала)",
     description:
       "Генерирует фоновую музыку, амбиент и атмосферы через ElevenLabs. Инструментал без вокала, до 22 секунд. Быстрее Suno, но без пения. Промпт лучше на английском.",
     section: "audio",

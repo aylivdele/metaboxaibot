@@ -217,17 +217,19 @@ export function createBot(token: string): Bot<BotContext> {
       },
       // Audio section buttons
       [t.audio.tts]: async () => {
-        await ctx.reply("Выберите провайдер синтеза речи:", {
+        await ctx.reply(t.audio.chooseTtsProvider, {
           reply_markup: new InlineKeyboard()
             .text(t.audio.ttsOpenai, "audio_model:tts-openai")
+            .row()
             .text(t.audio.ttsEl, "audio_model:tts-el"),
         });
       },
       [t.audio.voiceClone]: () => handleAudioSubSection(ctx, "voice-clone"),
       [t.audio.music]: async () => {
-        await ctx.reply("Выберите провайдер генерации музыки:", {
+        await ctx.reply(t.audio.chooseMusicProvider, {
           reply_markup: new InlineKeyboard()
             .text(t.audio.musicSuno, "audio_model:suno")
+            .row()
             .text(t.audio.musicEl, "audio_model:music-el"),
         });
       },

@@ -101,6 +101,8 @@ export default {
     musicSuno: "🎵 Suno",
     sounds: "🔊 Генерация звуков",
     backToMain: "🏠 В главное меню",
+    chooseTtsProvider: "Выберите провайдера синтеза речи:",
+    chooseMusicProvider: "Выберите провайдера генерации музыки:",
     ttsActivated:
       "🗣 Синтез речи (OpenAI) активирован.\nОтправьте любой текст, и я преобразую его в речь.",
     ttsElActivated:

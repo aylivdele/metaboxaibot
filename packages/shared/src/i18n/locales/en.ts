@@ -101,6 +101,8 @@ export default {
     musicSuno: "🎵 Suno",
     sounds: "🔊 Sound Effects",
     backToMain: "🏠 Back to Main Menu",
+    chooseTtsProvider: "Choose a text-to-speech provider:",
+    chooseMusicProvider: "Choose a music generation provider:",
     ttsActivated:
       "🗣 Text-to-Speech (OpenAI) activated.\nSend me any text and I will convert it to speech.",
     ttsElActivated:
