@@ -21,7 +21,6 @@ import {
   type MediaInputSlot,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
-import { buildMediaInputStatusMenu } from "../utils/media-input-state.js";
 import { activateVideoModel, sendVideoMediaInputStatus } from "./video.js";
 import { activateDesignModel, sendDesignMediaInputStatus } from "./design.js";
 
