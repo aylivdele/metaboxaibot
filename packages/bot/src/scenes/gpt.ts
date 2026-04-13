@@ -15,6 +15,7 @@ import { config, AI_MODELS, buildDialogHint, generateWebToken } from "@metabox/s
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { InlineKeyboard } from "grammy";
 import { toMarkdownV2, closeOpenMarkdownV2 } from "../utils/markdown.js";
+import { notifyTechError } from "../utils/notify-tech.js";
 import { randomUUID } from "crypto";
 import { transcribeAndReply } from "../utils/voice-transcribe.js";
 
@@ -183,7 +184,12 @@ async function streamGptResponse(
     } else if (err instanceof ContextOverflowError) {
       await ctx.reply(ctx.t.gpt.contextOverflow);
     } else {
-      await ctx.reply(ctx.t.errors.noTool);
+      await ctx.reply(ctx.t.errors.unexpected);
+      void notifyTechError(err, {
+        section: "gpt",
+        dialogId,
+        userId: String(ctx.user!.id),
+      });
     }
   }
 }

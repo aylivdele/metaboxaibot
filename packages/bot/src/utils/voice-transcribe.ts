@@ -121,7 +121,7 @@ export async function transcribeAndReply(
     // Build MarkdownV2 message with expandable blockquote for easy copying
     const header = escapeMarkdownV2(ctx.t.voice.transcriptionResult);
     const hint = escapeMarkdownV2(ctx.t.voice.transcriptionHint);
-    const quotedText = "```".concat(escapeMarkdownV2(text), "```");
+    const quotedText = "```\n".concat(escapeMarkdownV2(text), "```\n");
     const md2Text = `${header}\n\n${quotedText}\n\n${hint}`;
 
     const kb = new InlineKeyboard().text(ctx.t.voice.useAsPrompt, `vp:${section}:${id}`);
