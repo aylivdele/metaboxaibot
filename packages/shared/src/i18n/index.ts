@@ -18,6 +18,8 @@ export interface Translations {
     metaboxLinkFailed: string;
     accountsMerged: string;
     selectLanguagePrompt: string;
+    onboarding: string;
+    onboardingGotIt: string;
   };
   menu: {
     profile: string;
@@ -53,12 +55,8 @@ export interface Translations {
     backToMain: string;
     dialogSelected: string;
     dialogHint: {
-      intro: string;
       prompt: string;
-      attachHeader: string;
-      images: string;
-      files: string;
-      extractNote: string;
+      attach: string;
       thinkingWarning: string;
     };
   };
@@ -341,43 +339,13 @@ export function buildDialogHint(
   t: Translations,
   model:
     | {
-        supportsImages: boolean;
-        supportsDocuments?: boolean;
-        documentTextExtractFallback?: boolean;
         supportsThinking?: boolean;
       }
     | undefined,
 ): string {
   if (!model) return "";
 
-  const lines: string[] = [t.gpt.dialogHint.intro, t.gpt.dialogHint.prompt];
-
-  const supportsImages = model.supportsImages;
-  const supportsNativePdf = model.supportsDocuments === true;
-  const supportsExtractFallback = model.documentTextExtractFallback === true;
-  const supportsAnyDocs = supportsNativePdf || supportsExtractFallback;
-
-  if (!supportsImages && !supportsAnyDocs) return lines.join("\n");
-
-  lines.push(t.gpt.dialogHint.attachHeader);
-
-  if (supportsImages) {
-    lines.push(t.gpt.dialogHint.images);
-  }
-
-  if (supportsAnyDocs) {
-    const allFormats = "PDF, TXT, MD, CSV, JSON, DOCX, XLSX";
-    lines.push(t.gpt.dialogHint.files.replace("{formats}", allFormats));
-
-    if (supportsNativePdf) {
-      const extractedFormats = "TXT, MD, CSV, JSON, DOCX, XLSX";
-      lines.push(t.gpt.dialogHint.extractNote.replace("{formats}", extractedFormats));
-    } else {
-      lines.push(t.gpt.dialogHint.extractNote.replace("{formats}", allFormats));
-    }
-  }
-
-  lines.push(t.voice.inputHint);
+  const lines: string[] = [t.gpt.dialogHint.prompt, t.gpt.dialogHint.attach];
 
   if (model.supportsThinking) {
     lines.push(t.gpt.dialogHint.thinkingWarning);

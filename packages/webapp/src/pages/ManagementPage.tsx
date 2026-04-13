@@ -9,9 +9,11 @@ type ManageTab = "gpt" | "design" | "video" | "audio" | "uploads";
 export function ManagementPage({
   initialSection,
   initialAction,
+  finishedOnboarding,
 }: {
   initialSection?: string;
   initialAction?: string;
+  finishedOnboarding: boolean;
 }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<ManageTab>(
@@ -34,6 +36,9 @@ export function ManagementPage({
 
   return (
     <div className="manage-root">
+      {!finishedOnboarding && (
+        <div className="manage-onboarding-banner">{t("manage.onboardingBanner")}</div>
+      )}
       <div className="manage-tabs">
         {(["gpt", "design", "video", "audio", "uploads"] as ManageTab[]).map((s) => (
           <button

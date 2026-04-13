@@ -140,7 +140,11 @@ function AppContent() {
           />
         )}
         {page === "management" && (
-          <ManagementPage initialSection={initial.section} initialAction={initial.action} />
+          <ManagementPage
+            initialSection={initial.section}
+            initialAction={initial.action}
+            finishedOnboarding={profile?.finishedOnboarding ?? true}
+          />
         )}
         {page === "tariffs" && (
           <TariffsPage profile={profile} onLinkMetabox={() => setPage("linkMetabox")} />

@@ -356,10 +356,19 @@ export async function handleLanguageSelect(ctx: BotContext): Promise<void> {
     await ctx.reply(balanceText, profileKb ? { reply_markup: profileKb } : undefined);
   }
 
-  // Main menu with reply keyboard
-  await ctx.reply(t.start.mainMenuTitle, {
-    reply_markup: buildMainMenuKeyboard(t, ctx.user?.id),
-  });
+  if (isNew) {
+    // Onboarding message with "Got it" button — main menu opens after
+    const onboardingKb = new InlineKeyboard().text(t.start.onboardingGotIt, "onboarding_ok");
+    await ctx.reply(t.start.onboarding, {
+      parse_mode: "HTML",
+      reply_markup: onboardingKb,
+    });
+  } else {
+    // Returning users get the main menu immediately
+    await ctx.reply(t.start.mainMenuTitle, {
+      reply_markup: buildMainMenuKeyboard(t, ctx.user?.id),
+    });
+  }
 
   // Set per-chat bot commands in user's language
   if (ctx.chat?.id) {
@@ -369,6 +378,20 @@ export async function handleLanguageSelect(ctx: BotContext): Promise<void> {
   }
 
   ctx.user = { ...updatedUser, isNew: false };
+}
+
+/**
+ * Callback handler for the onboarding "Got it" button (data: onboarding_ok).
+ * Removes the onboarding message and shows the main menu with reply keyboard.
+ */
+export async function handleOnboardingOk(ctx: BotContext): Promise<void> {
+  await ctx.answerCallbackQuery();
+  await ctx.deleteMessage().catch(() => void 0);
+
+  const t = ctx.t;
+  await ctx.reply(t.start.mainMenuTitle, {
+    reply_markup: buildMainMenuKeyboard(t, ctx.user?.id),
+  });
 }
 
 /**

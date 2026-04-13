@@ -267,6 +267,8 @@ const translations = {
     "manage.delete": "Delete",
     "manage.confirmDelete": "Delete this dialog?",
     "manage.advancedSettings": "Advanced settings",
+    "manage.onboardingBanner":
+      "\u26a0\ufe0f This app is for settings only. Choose an AI model and parameters, then go back to the Telegram chat \u2014 prompts and results only work there.",
 
     // Video settings
     "videoSettings.title": "Video Settings",
@@ -573,6 +575,8 @@ const translations = {
     "manage.delete": "Удалить",
     "manage.confirmDelete": "Удалить этот диалог?",
     "manage.advancedSettings": "Расширенные настройки",
+    "manage.onboardingBanner":
+      "\u26a0\ufe0f Это приложение только для настройки. Выберите нейросеть и параметры, а затем вернитесь в чат Telegram \u2014 промпты и результаты работают только там.",
 
     // Video settings
     "videoSettings.title": "Настройки видео",

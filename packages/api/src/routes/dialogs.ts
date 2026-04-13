@@ -236,6 +236,6 @@ async function sendDialogSelectedNotification(
   await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: String(userId), text: fullText }),
+    body: JSON.stringify({ chat_id: String(userId), text: fullText, parse_mode: "HTML" }),
   });
 }

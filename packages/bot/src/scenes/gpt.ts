@@ -214,7 +214,7 @@ export async function createNewDialog(
   const model = AI_MODELS[modelId];
   const hint = buildDialogHint(ctx.t, model);
   const text = hint ? `${ctx.t.gpt.newDialogCreated}\n\n${hint}` : ctx.t.gpt.newDialogCreated;
-  await ctx.reply(text);
+  await ctx.reply(text, { parse_mode: "HTML" });
   return dialog.id;
 }
 

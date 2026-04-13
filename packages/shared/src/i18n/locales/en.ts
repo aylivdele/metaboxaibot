@@ -21,6 +21,9 @@ export default {
     accountsMerged:
       "✅ Accounts merged! Your tokens and subscription have been transferred to your {siteUrl} account.",
     selectLanguagePrompt: "⚠️ Please choose a language to continue.",
+    onboarding:
+      "🎯 <b>So you don't end up wondering \"why isn't it working\":</b>\n\n<blockquote>Mini app (blue App button to the left of the text input) = settings. Chat = work. Open the app, pick an AI model, tweak the sliders. Come back to the chat, type your prompt, get the result. That's it. You're amazing. Rinse and repeat.</blockquote>\n\n❗ <b>One more time:</b>\nPrompts go here, in the Telegram chat",
+    onboardingGotIt: "Got it!",
   },
   menu: {
     profile: "👤 Profile",
@@ -59,17 +62,13 @@ export default {
     noActiveDialog: "💬 You need to create a dialog and choose a model first.",
     createDialog: "➕ Create dialog",
     backToMain: "🏠 Main Menu",
-    dialogSelected: "✅ Dialog selected: {title}\nModel: {model}",
+    dialogSelected: "✅ <b>Dialog:</b> {title}\n    <b>Model:</b> {model}",
     dialogHint: {
-      intro: "💬 The conversation takes place in the chat.",
-      prompt: "✍ Send a prompt as a message — the model will start generating a response.",
-      attachHeader: "📎 You can also attach to your message:",
-      images: "🖼 Images and photos",
-      files: "📄 Files — {formats}",
-      extractNote:
-        "🤖 The bot will extract text from files and attach it to the prompt ({formats})",
+      prompt: "✦ Type your prompt right here in the chat. You'll get the result here too",
+      attach:
+        "✦ You can attach images, files (PDF, DOCX, XLSX, etc.) or send a voice message — the bot will transcribe it automatically.",
       thinkingWarning:
-        "⏳ This model supports a thinking mode — response time may take up to 10 minutes depending on context size and the configured thinking level.",
+        "✦ If thinking mode is enabled, the response may take up to 10 minutes depending on dialog size and thinking depth.",
     },
   },
   design: {

@@ -7,6 +7,7 @@ import {
   handleLanguageSelect,
   handleLanguageMenu,
   handleLanguageChangeSelect,
+  handleOnboardingOk,
 } from "./commands/start.js";
 import { buildLanguageKeyboard } from "./keyboards/language.keyboard.js";
 import { handleMenu, handleGpt, handleDesign, handleAudio, handleVideo } from "./commands/menu.js";
@@ -129,6 +130,9 @@ export function createBot(token: string): Bot<BotContext> {
   bot.callbackQuery(/^lang_/, handleLanguageSelect);
   // In-menu language change (keeps current state, no welcome/balance) ────────
   bot.callbackQuery(/^langset_/, handleLanguageChangeSelect);
+
+  // ── Onboarding "Got it" callback ──────────────────────────────────────────
+  bot.callbackQuery("onboarding_ok", handleOnboardingOk);
 
   // ── Design model selection callback ──────────────────────────────────────
   bot.callbackQuery(/^design_model_/, handleDesignModelSelect);

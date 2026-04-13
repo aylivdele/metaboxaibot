@@ -102,6 +102,158 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     settings: [...KLING_SETTINGS],
   },
 
+  seedance: {
+    id: "seedance",
+    name: "💃 Seedance 1.5 Pro (ByteDance)",
+    description:
+      "Создаёт видео с выразительным движением и генерацией звука. Предыдущее поколение — проверенная стабильность, до 12 секунд. Хорош для креативных и стилизованных роликов.",
+    section: "video",
+    provider: "fal",
+    familyId: "seedance",
+    variantLabel: "1.5 Pro",
+    // Per-video-token billing: $2.4/M tokens with audio (default), $1.2/M without audio.
+    // tokens = (w × h × fps × duration) / 1024; 720p 5s ≈ $0.26 with audio
+    costUsdPerRequest: 0,
+    costUsdPerMVideoToken: 2.4,
+    costVariants: {
+      settingKey: "generate_audio",
+      map: { true: { costUsdPerMVideoToken: 2.4 }, false: { costUsdPerMVideoToken: 1.2 } },
+    },
+    videoFps: 24,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: null,
+    durationRange: { min: 4, max: 12 },
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1"]),
+      mkDurationSlider(4, 12),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        default: "720p",
+      },
+      {
+        key: "generate_audio",
+        label: "Генерировать аудио",
+        description: "Включить автоматическую генерацию звукового сопровождения к видео.",
+        type: "toggle",
+        default: true,
+      },
+    ],
+  },
+
+  "seedance-2": {
+    id: "seedance-2",
+    name: "💃 Seedance 2.0 (ByteDance)",
+    description:
+      "Новейшая видеомодель ByteDance — значительно выше качество и реалистичность движений по сравнению с 1.5. Встроенный звук, до 15 секунд, широкий выбор соотношений сторон.",
+    section: "video",
+    provider: "fal",
+    familyId: "seedance",
+    variantLabel: "2.0 Standard",
+    // Per-video-token billing: $14/M tokens.
+    // tokens = (w × h × 24 × duration) / 1024; 720p 5s ≈ $0.30
+    costUsdPerRequest: 0,
+    costUsdPerMVideoToken: 14.0,
+    videoFps: 24,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+    durationRange: { min: 4, max: 15 },
+    settings: [
+      mkAspectRatio(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"], { auto: "Авто" }),
+      mkDurationSlider(4, 15),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        default: "720p",
+      },
+      {
+        key: "generate_audio",
+        label: "Генерировать аудио",
+        description:
+          "Включить автоматическую генерацию звукового сопровождения к видео. Стоимость одинакова с аудио и без.",
+        type: "toggle",
+        default: true,
+      },
+    ],
+  },
+
+  "seedance-2-fast": {
+    id: "seedance-2-fast",
+    name: "💃 Seedance 2.0 Fast (ByteDance)",
+    description:
+      "Ускоренная версия Seedance 2.0 — быстрее и ~20% дешевле стандарта при схожем качестве. Встроенная генерация звука, до 15 секунд.",
+    section: "video",
+    provider: "fal",
+    familyId: "seedance",
+    variantLabel: "2.0 Fast",
+    // Per-video-token billing: $11.2/M tokens (fast).
+    // tokens = (w × h × 24 × duration) / 1024; 720p 5s ≈ $0.24
+    costUsdPerRequest: 0,
+    costUsdPerMVideoToken: 11.2,
+    videoFps: 24,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+    durationRange: { min: 4, max: 15 },
+    settings: [
+      mkAspectRatio(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"], { auto: "Авто" }),
+      mkDurationSlider(4, 15),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        default: "720p",
+      },
+      {
+        key: "generate_audio",
+        label: "Генерировать аудио",
+        description:
+          "Включить автоматическую генерацию звукового сопровождения к видео. Стоимость одинакова с аудио и без.",
+        type: "toggle",
+        default: true,
+      },
+    ],
+  },
+
   "higgsfield-lite": {
     id: "higgsfield-lite",
     name: "🎬 Higgsfield Lite",
@@ -689,158 +841,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
           { value: "id-ID", label: "🇮🇩 Bahasa Indonesia" },
         ],
         unavailableIf: { key: "voice_settings_enabled", absent: true },
-      },
-    ],
-  },
-
-  seedance: {
-    id: "seedance",
-    name: "💃 Seedance 1.5 Pro (ByteDance)",
-    description:
-      "Создаёт видео с выразительным движением и генерацией звука. Предыдущее поколение — проверенная стабильность, до 12 секунд. Хорош для креативных и стилизованных роликов.",
-    section: "video",
-    provider: "fal",
-    familyId: "seedance",
-    variantLabel: "1.5 Pro",
-    // Per-video-token billing: $2.4/M tokens with audio (default), $1.2/M without audio.
-    // tokens = (w × h × fps × duration) / 1024; 720p 5s ≈ $0.26 with audio
-    costUsdPerRequest: 0,
-    costUsdPerMVideoToken: 2.4,
-    costVariants: {
-      settingKey: "generate_audio",
-      map: { true: { costUsdPerMVideoToken: 2.4 }, false: { costUsdPerMVideoToken: 1.2 } },
-    },
-    videoFps: 24,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    supportedDurations: null,
-    durationRange: { min: 4, max: 12 },
-    settings: [
-      mkAspectRatio(["16:9", "9:16", "1:1"]),
-      mkDurationSlider(4, 12),
-      {
-        key: "resolution",
-        label: "Разрешение видео",
-        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
-        type: "select",
-        options: [
-          { value: "480p", label: "480p" },
-          { value: "720p", label: "720p" },
-          { value: "1080p", label: "1080p" },
-        ],
-        default: "720p",
-      },
-      {
-        key: "generate_audio",
-        label: "Генерировать аудио",
-        description: "Включить автоматическую генерацию звукового сопровождения к видео.",
-        type: "toggle",
-        default: true,
-      },
-    ],
-  },
-
-  "seedance-2": {
-    id: "seedance-2",
-    name: "💃 Seedance 2.0 (ByteDance)",
-    description:
-      "Новейшая видеомодель ByteDance — значительно выше качество и реалистичность движений по сравнению с 1.5. Встроенный звук, до 15 секунд, широкий выбор соотношений сторон.",
-    section: "video",
-    provider: "fal",
-    familyId: "seedance",
-    variantLabel: "2.0 Standard",
-    // Per-video-token billing: $14/M tokens.
-    // tokens = (w × h × 24 × duration) / 1024; 720p 5s ≈ $0.30
-    costUsdPerRequest: 0,
-    costUsdPerMVideoToken: 14.0,
-    videoFps: 24,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
-    durationRange: { min: 4, max: 15 },
-    settings: [
-      mkAspectRatio(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"], { auto: "Авто" }),
-      mkDurationSlider(4, 15),
-      {
-        key: "resolution",
-        label: "Разрешение видео",
-        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
-        type: "select",
-        options: [
-          { value: "480p", label: "480p" },
-          { value: "720p", label: "720p" },
-        ],
-        default: "720p",
-      },
-      {
-        key: "generate_audio",
-        label: "Генерировать аудио",
-        description:
-          "Включить автоматическую генерацию звукового сопровождения к видео. Стоимость одинакова с аудио и без.",
-        type: "toggle",
-        default: true,
-      },
-    ],
-  },
-
-  "seedance-2-fast": {
-    id: "seedance-2-fast",
-    name: "💃 Seedance 2.0 Fast (ByteDance)",
-    description:
-      "Ускоренная версия Seedance 2.0 — быстрее и ~20% дешевле стандарта при схожем качестве. Встроенная генерация звука, до 15 секунд.",
-    section: "video",
-    provider: "fal",
-    familyId: "seedance",
-    variantLabel: "2.0 Fast",
-    // Per-video-token billing: $11.2/M tokens (fast).
-    // tokens = (w × h × 24 × duration) / 1024; 720p 5s ≈ $0.24
-    costUsdPerRequest: 0,
-    costUsdPerMVideoToken: 11.2,
-    videoFps: 24,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
-    durationRange: { min: 4, max: 15 },
-    settings: [
-      mkAspectRatio(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"], { auto: "Авто" }),
-      mkDurationSlider(4, 15),
-      {
-        key: "resolution",
-        label: "Разрешение видео",
-        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
-        type: "select",
-        options: [
-          { value: "480p", label: "480p" },
-          { value: "720p", label: "720p" },
-        ],
-        default: "720p",
-      },
-      {
-        key: "generate_audio",
-        label: "Генерировать аудио",
-        description:
-          "Включить автоматическую генерацию звукового сопровождения к видео. Стоимость одинакова с аудио и без.",
-        type: "toggle",
-        default: true,
       },
     ],
   },

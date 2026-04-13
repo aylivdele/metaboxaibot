@@ -15,12 +15,21 @@ export async function deductTokens(
 ): Promise<void> {
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { subscriptionTokenBalance: true, tokenBalance: true },
+    select: {
+      subscriptionTokenBalance: true,
+      tokenBalance: true,
+      finishedOnboarding: true,
+      generationCount: true,
+    },
   });
 
   // Subscription tokens are spent first, then regular (purchased) tokens.
   const fromSub = Math.min(Number(user.subscriptionTokenBalance), amount);
   const fromRegular = amount - fromSub;
+
+  // Onboarding: count generations and flip the flag after 10
+  const newCount = user.generationCount + 1;
+  const shouldFinishOnboarding = !user.finishedOnboarding && newCount >= 10;
 
   await db.$transaction([
     db.user.update({
@@ -28,6 +37,8 @@ export async function deductTokens(
       data: {
         ...(fromSub > 0 ? { subscriptionTokenBalance: { decrement: fromSub } } : {}),
         ...(fromRegular > 0 ? { tokenBalance: { decrement: fromRegular } } : {}),
+        generationCount: { increment: 1 },
+        ...(shouldFinishOnboarding ? { finishedOnboarding: true } : {}),
       },
     }),
     db.tokenTransaction.create({
