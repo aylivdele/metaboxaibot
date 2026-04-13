@@ -87,6 +87,9 @@ model UserState {
   // Произвольные настройки моделей: { [modelId]: { [key]: string | number | boolean | null } }
   modelSettings Json?
 
+  // Медиа-входы для генерации: { [slotKey]: string[] } — массив URL по слотам (one-shot, сбрасывается после использования)
+  mediaInputs Json?
+
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

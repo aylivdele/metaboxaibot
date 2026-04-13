@@ -39,15 +39,17 @@ export class RunwayAdapter implements VideoAdapter {
   }
 
   validateRequest(input: VideoInput): VideoValidationError | null {
-    if (!input.imageUrl) return { key: "runwayRequiresImage" };
+    const imgUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+    if (!imgUrl) return { key: "runwayRequiresImage" };
     return null;
   }
 
   async submit(input: VideoInput): Promise<string> {
-    if (!input.imageUrl) throw new Error("Runway: imageUrl missing (validation bypassed)");
+    const imageUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+    if (!imageUrl) throw new Error("Runway: imageUrl missing (validation bypassed)");
 
     // Runway rejects Telegram URLs (application/octet-stream) — download and encode as data URL
-    const imgResp = await fetchWithLog(input.imageUrl);
+    const imgResp = await fetchWithLog(imageUrl);
     if (!imgResp.ok) throw new Error(`Runway: failed to fetch reference image: ${imgResp.status}`);
     const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
     const mimeType = imgResp.headers.get("content-type") ?? "image/jpeg";

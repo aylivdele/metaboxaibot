@@ -29,6 +29,7 @@ export class ReplicateVideoAdapter implements VideoAdapter {
 
   async submit(input: VideoInput): Promise<string> {
     const ms = input.modelSettings ?? {};
+    const referenceUrl = input.mediaInputs?.reference?.[0] ?? input.imageUrl;
 
     // Sora uses "seconds" (not "duration"), "input_reference" (not "image"),
     // and native aspect_ratio values "portrait"/"landscape" from model settings.
@@ -37,8 +38,8 @@ export class ReplicateVideoAdapter implements VideoAdapter {
 
     // Download image and pass as Blob — Replicate cannot fetch Telegram/S3 presigned URLs directly.
     let imageBlob: Blob | undefined;
-    if (input.imageUrl) {
-      const imgRes = await fetch(input.imageUrl);
+    if (referenceUrl) {
+      const imgRes = await fetch(referenceUrl);
       if (imgRes.ok) {
         const imgBuf = await imgRes.arrayBuffer();
         const mimeType = resolveImageMimeType(imgBuf, imgRes.headers.get("content-type"));
@@ -48,7 +49,7 @@ export class ReplicateVideoAdapter implements VideoAdapter {
 
     if (isSora) {
       if (imageBlob) predInput.input_reference = imageBlob;
-      else if (input.imageUrl) predInput.input_reference = input.imageUrl;
+      else if (referenceUrl) predInput.input_reference = referenceUrl;
       if (input.duration) predInput.seconds = input.duration;
       // aspect_ratio stored in modelSettings for Sora (portrait/landscape)
       const ar = ms.aspect_ratio as string | undefined;
@@ -57,7 +58,7 @@ export class ReplicateVideoAdapter implements VideoAdapter {
       if (ms.negative_prompt) predInput.negative_prompt = ms.negative_prompt;
       if (ms.seed != null) predInput.seed = ms.seed;
       if (imageBlob) predInput.image = imageBlob;
-      else if (input.imageUrl) predInput.image = input.imageUrl;
+      else if (referenceUrl) predInput.image = referenceUrl;
       if (input.duration) predInput.duration = input.duration;
       if (input.aspectRatio) predInput.aspect_ratio = input.aspectRatio;
     }

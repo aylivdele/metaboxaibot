@@ -34,7 +34,8 @@ export class VeoAdapter implements VideoAdapter {
   }
 
   validateRequest(input: VideoInput): VideoValidationError | null {
-    if (input.imageUrl && input.duration !== undefined && input.duration !== 8) {
+    const refUrl = input.mediaInputs?.reference?.[0] ?? input.imageUrl;
+    if (refUrl && input.duration !== undefined && input.duration !== 8) {
       return { key: "veoImageRequires8s" };
     }
     return null;
@@ -42,6 +43,7 @@ export class VeoAdapter implements VideoAdapter {
 
   async submit(input: VideoInput): Promise<string> {
     const ms = input.modelSettings ?? {};
+    const referenceUrl = input.mediaInputs?.reference?.[0] ?? input.imageUrl;
 
     const params: GenerateVideosParameters = {
       model: this.apiModel,
@@ -55,12 +57,12 @@ export class VeoAdapter implements VideoAdapter {
       },
     };
 
-    if (input.imageUrl) {
-      const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(input.imageUrl);
+    if (referenceUrl) {
+      const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(referenceUrl);
       if (isVideo) {
-        params.video = { uri: input.imageUrl };
+        params.video = { uri: referenceUrl };
       } else {
-        const imgResp = await fetchWithLog(input.imageUrl);
+        const imgResp = await fetchWithLog(referenceUrl);
         if (!imgResp.ok) throw new Error(`Veo: failed to fetch reference image: ${imgResp.status}`);
         const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
         const mimeType = resolveImageMimeType(imgBuffer, imgResp.headers.get("content-type"));
@@ -78,7 +80,7 @@ export class VeoAdapter implements VideoAdapter {
       personGeneration: ms.person_generation,
       resolution: ms.resolution,
       negativePrompt: ms.negative_prompt,
-      hasImage: !!input.imageUrl,
+      hasImage: !!referenceUrl,
     });
 
     const operation = await this.ai.models.generateVideos(params);

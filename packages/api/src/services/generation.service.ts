@@ -35,6 +35,8 @@ export interface SubmitImageParams {
   prompt: string;
   negativePrompt?: string;
   sourceImageUrl?: string;
+  /** Named media input slots: { [slotKey]: string[] } */
+  mediaInputs?: Record<string, string[]>;
   telegramChatId: number;
   /** If set, user/assistant messages are saved to this dialog for img2img context. */
   dialogId?: string;
@@ -93,6 +95,7 @@ export const generationService = {
         prompt,
         inputData: {
           ...(negativePrompt ? { negativePrompt } : {}),
+          ...(params.mediaInputs ? { mediaInputs: params.mediaInputs } : {}),
           ...(Object.keys(modelSettings).length > 0
             ? { modelSettings: modelSettings as Record<string, string | number | boolean | null> }
             : {}),
@@ -116,6 +119,7 @@ export const generationService = {
           prompt: effectivePrompt,
           negativePrompt,
           imageUrl: sourceImageUrl,
+          mediaInputs: params.mediaInputs,
           aspectRatio: effectiveAspectRatio,
           modelSettings,
         });
@@ -235,6 +239,7 @@ export const generationService = {
         prompt,
         negativePrompt,
         sourceImageUrl,
+        mediaInputs: params.mediaInputs,
         telegramChatId,
         dialogId,
         sendOriginalLabel,

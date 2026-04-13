@@ -32,8 +32,9 @@ export class DalleAdapter implements ImageAdapter {
 
   async generate(input: ImageInput): Promise<ImageResult> {
     // img2img: use DALL-E 2 variations when a reference image URL is provided
-    if (input.imageUrl) {
-      return this.generateVariation(input.imageUrl);
+    const imageUrl = input.mediaInputs?.edit?.[0] ?? input.imageUrl;
+    if (imageUrl) {
+      return this.generateVariation(imageUrl);
     }
 
     const ms = input.modelSettings ?? {};

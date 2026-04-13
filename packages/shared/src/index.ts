@@ -12,6 +12,8 @@ export type {
 export type { TransactionType, TransactionReason, TokenTransactionDto } from "./types/token.js";
 export type {
   AIModel,
+  MediaInputMode,
+  MediaInputSlot,
   ModelFamily,
   ModelFamilyMember,
   ModelSettingDef,

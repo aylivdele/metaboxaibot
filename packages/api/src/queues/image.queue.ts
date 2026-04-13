@@ -10,6 +10,8 @@ export interface ImageJobData {
   prompt: string;
   negativePrompt?: string;
   sourceImageUrl?: string;
+  /** Named media input slots: { [slotKey]: string[] } */
+  mediaInputs?: Record<string, string[]>;
   /** Telegram chat id to notify when done */
   telegramChatId: number;
   /** Dialog.id for saving messages and enabling img2img context. */

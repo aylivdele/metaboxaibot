@@ -78,6 +78,30 @@ export interface ModelSettingDef {
   advanced?: boolean;
 }
 
+// ── Media input slot types ───────────────────────────────────────────────────
+
+export type MediaInputMode =
+  | "first_frame"
+  | "last_frame"
+  | "reference"
+  | "edit"
+  | "style_reference";
+
+export interface MediaInputSlot {
+  /** Unique key for this slot within the model, used as storage key. */
+  slotKey: string;
+  /** What role the uploaded image plays. */
+  mode: MediaInputMode;
+  /** i18n label key resolved against t.mediaInput.* */
+  labelKey: string;
+  /** Maximum number of images this slot accepts (default 1). */
+  maxImages?: number;
+  /** When true the slot must be filled before generation can start. */
+  required?: boolean;
+}
+
+// ── Model family types ───────────────────────────────────────────────────────
+
 /** One specific model variant that belongs to a family (e.g. recraft-v4-pro). */
 export interface ModelFamilyMember {
   modelId: string;
@@ -137,6 +161,12 @@ export interface AIModel {
   supportsVoice: boolean;
   supportsWeb: boolean; // выход в интернет
   supportsVideo?: boolean;
+  /**
+   * Structured media input slots this model accepts (images, keyframes, references).
+   * When set, the bot shows per-slot upload buttons after model activation.
+   * When absent, falls back to legacy single-image behavior based on supportsImages.
+   */
+  mediaInputs?: MediaInputSlot[];
   /**
    * Model accepts PDF documents natively via content blocks (OpenAI Responses `input_file`,
    * Anthropic `document`). When set, the chat service forwards attachment s3Keys to the

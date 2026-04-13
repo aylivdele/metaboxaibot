@@ -287,6 +287,23 @@ export interface Translations {
     avatarChoiceUseAudio: string;
     avatarChoiceTranscribe: string;
   };
+  mediaInput: {
+    firstFrame: string;
+    lastFrame: string;
+    reference: string;
+    edit: string;
+    styleReference: string;
+    uploadPrompt: string;
+    uploadPromptMulti: string;
+    imageSaved: string;
+    imageSavedSingle: string;
+    slotRequired: string;
+    replace: string;
+    remove: string;
+    optional: string;
+    required: string;
+    doneUploading: string;
+  };
   linkMetabox: {
     title: string;
     subtitle: string;

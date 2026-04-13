@@ -72,14 +72,14 @@ export class HiggsFieldAdapter implements VideoAdapter {
     const enhancePrompt = (input.modelSettings?.enhance_prompt as boolean | undefined) ?? true;
     const seed = (input.modelSettings?.seed as number | null | undefined) ?? undefined;
 
+    const imageUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+
     const body: Record<string, unknown> = {
       model: this.dopModel,
       prompt: input.prompt,
       enhance_prompt: enhancePrompt,
       ...(seed != null ? { seed } : {}),
-      ...(input.imageUrl
-        ? { input_images: [{ type: "image_url", image_url: input.imageUrl }] }
-        : {}),
+      ...(imageUrl ? { input_images: [{ type: "image_url", image_url: imageUrl }] } : {}),
       ...(motions?.length ? { motions } : {}),
     };
 

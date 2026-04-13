@@ -45,6 +45,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     modelId,
     prompt,
     imageUrl,
+    mediaInputs,
     telegramChatId,
     sendOriginalLabel,
     aspectRatio,
@@ -108,6 +109,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
             adapter.submit({
               prompt: effectivePrompt,
               imageUrl,
+              mediaInputs,
               aspectRatio,
               duration,
               modelSettings,

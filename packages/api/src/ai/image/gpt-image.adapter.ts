@@ -26,6 +26,7 @@ export class GptImageAdapter implements ImageAdapter {
 
   async generate(input: ImageInput): Promise<ImageResult> {
     const ms = input.modelSettings ?? {};
+    const imageUrl = input.mediaInputs?.edit?.[0] ?? input.imageUrl;
     const quality = (ms.quality as string | undefined) ?? "medium";
     const size = (ms.size as string | undefined) ?? "1024x1024";
     const outputFormat = (ms.output_format as string | undefined) ?? "png";
@@ -33,11 +34,11 @@ export class GptImageAdapter implements ImageAdapter {
     const background = ms.background as string | undefined;
     const moderation = ms.moderation as string | undefined;
 
-    logCall("gpt-image-1.5", input.imageUrl ? "edit" : "generate", {
+    logCall("gpt-image-1.5", imageUrl ? "edit" : "generate", {
       quality,
       size,
       output_format: outputFormat,
-      has_image: !!input.imageUrl,
+      has_image: !!imageUrl,
     });
 
     const baseParams = {
@@ -53,9 +54,9 @@ export class GptImageAdapter implements ImageAdapter {
     let b64: string | null | undefined;
 
     try {
-      if (input.imageUrl) {
+      if (imageUrl) {
         // Image-to-image via Images Edit API
-        const imgResp = await fetch(input.imageUrl);
+        const imgResp = await fetch(imageUrl);
         if (!imgResp.ok) throw new Error(`Failed to fetch source image: ${imgResp.status}`);
         const buffer = Buffer.from(await imgResp.arrayBuffer());
         const imageFile = await toFile(buffer, "image.png", { type: "image/png" });

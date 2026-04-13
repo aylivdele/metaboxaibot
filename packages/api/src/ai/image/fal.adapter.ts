@@ -71,7 +71,8 @@ export class FalAdapter implements ImageAdapter {
   }
 
   async submit(input: ImageInput): Promise<string> {
-    const endpoint = this.selectEndpoint(input.imageUrl);
+    const imageUrl = input.mediaInputs?.edit?.[0] ?? input.imageUrl;
+    const endpoint = this.selectEndpoint(imageUrl);
     const ms = input.modelSettings ?? {};
     const msExtras: Record<string, unknown> = {};
     if (ms.num_inference_steps !== undefined) msExtras.num_inference_steps = ms.num_inference_steps;
@@ -95,10 +96,10 @@ export class FalAdapter implements ImageAdapter {
       ...(useAspectRatio
         ? { aspect_ratio: input.aspectRatio ?? "1:1" }
         : { image_size: this.resolveSize(input) }),
-      ...(input.imageUrl
+      ...(imageUrl
         ? IMAGE_URLS_ARRAY_MODELS.has(this.modelId)
-          ? { image_urls: [input.imageUrl] }
-          : { image_url: input.imageUrl }
+          ? { image_urls: [imageUrl] }
+          : { image_url: imageUrl }
         : {}),
       ...msExtras,
     };

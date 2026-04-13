@@ -63,14 +63,15 @@ export class AlibabaVideoAdapter implements VideoAdapter {
 
   async submit(input: VideoInput): Promise<string> {
     const ms = input.modelSettings ?? {};
-    const isI2V = !!input.imageUrl;
+    const imageUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+    const isI2V = !!imageUrl;
     const dashscopeModel = isI2V ? I2V_MODEL : T2V_MODEL;
 
     const resolution = (ms.resolution as string | undefined) ?? "720P";
     const duration = (ms.duration as number | undefined) ?? input.duration ?? 5;
 
     const apiInput: Record<string, unknown> = { prompt: input.prompt };
-    if (isI2V) apiInput.img_url = input.imageUrl;
+    if (isI2V) apiInput.img_url = imageUrl;
     if (ms.negative_prompt) apiInput.negative_prompt = ms.negative_prompt;
 
     const parameters: Record<string, unknown> = { duration };

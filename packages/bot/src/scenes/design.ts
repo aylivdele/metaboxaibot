@@ -24,6 +24,7 @@ import {
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 import { transcribeAndReply } from "../utils/voice-transcribe.js";
+import { setActiveSlot, getActiveSlot, clearActiveSlot } from "../utils/media-input-state.js";
 
 // ── Random design pending messages (Russian) ────────────────────────────────
 
@@ -167,6 +168,9 @@ export async function activateDesignModel(ctx: BotContext, modelId: string): Pro
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE", "design");
   await userStateService.setModelForSection(ctx.user.id, "design", modelId);
+  // Clear any leftover media inputs from a previous session
+  await userStateService.clearMediaInputs(ctx.user.id);
+  clearActiveSlot(ctx.user.id);
 
   const model = AI_MODELS[modelId];
   if (model) {
@@ -174,19 +178,31 @@ export async function activateDesignModel(ctx: BotContext, modelId: string): Pro
     const modelSettings = allSettings[modelId] ?? {};
     const costLine = buildCostLine(model, modelSettings, ctx.t);
     const webappUrl = config.bot.webappUrl;
-    const kb = webappUrl
-      ? new InlineKeyboard().webApp(
-          ctx.t.design.management,
-          `${webappUrl}?page=management&section=design`,
-        )
-      : undefined;
+    const kb = new InlineKeyboard();
+
+    // Add media input slot buttons
+    if (model.mediaInputs?.length) {
+      for (const slot of model.mediaInputs) {
+        const label =
+          ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+        const suffix = slot.required
+          ? ` ${ctx.t.mediaInput.required}`
+          : ` ${ctx.t.mediaInput.optional}`;
+        kb.text(`${label}${suffix}`, `mi:design:${slot.slotKey}`).row();
+      }
+    }
+
+    if (webappUrl) {
+      kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
+    }
+
     const { name: modelName, description: modelDesc } = resolveModelDisplay(
       modelId,
       ctx.user.language,
       model,
     );
     await ctx.reply(`🎨 ${modelName}\n\n${modelDesc}\n\n${costLine}\n\n${ctx.t.voice.inputHint}`, {
-      reply_markup: kb,
+      reply_markup: kb.inline_keyboard.length ? kb : undefined,
     });
   } else {
     await ctx.reply(`${ctx.t.design.modelActivated}\n\n${ctx.t.voice.inputHint}`);
@@ -222,6 +238,64 @@ export async function handleDesignFamilySelect(ctx: BotContext): Promise<void> {
   await activateDesignModel(ctx, modelId);
 }
 
+// ── Media input slot callback (mi:design:{slotKey}) ─────────────────────────
+
+export async function handleDesignMediaInput(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const data = ctx.callbackQuery?.data ?? "";
+  const slotKey = data.replace("mi:design:", "");
+  await ctx.answerCallbackQuery();
+
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.designModelId ?? "dall-e-3";
+  const model = AI_MODELS[modelId];
+  const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
+  if (!slot) return;
+
+  setActiveSlot(ctx.user.id, {
+    slotKey: slot.slotKey,
+    modelId,
+    maxImages: slot.maxImages ?? 1,
+    section: "design",
+  });
+
+  const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+  const maxImages = slot.maxImages ?? 1;
+  const msg =
+    maxImages > 1
+      ? ctx.t.mediaInput.uploadPromptMulti
+          .replace("{slot}", String(label))
+          .replace("{max}", String(maxImages))
+      : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
+  await ctx.reply(msg);
+}
+
+/** Callback for mi_done:{slotKey} — user finished uploading multi-image slot. */
+export async function handleDesignMediaInputDone(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.answerCallbackQuery();
+  clearActiveSlot(ctx.user.id);
+  await ctx.reply(ctx.t.mediaInput.doneUploading);
+}
+
+/** Callback for mi_remove:design:{slotKey} — clear a filled slot. */
+export async function handleDesignMediaInputRemove(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const data = ctx.callbackQuery?.data ?? "";
+  const slotKey = data.replace("mi_remove:design:", "");
+  await ctx.answerCallbackQuery();
+  await userStateService.clearMediaInputSlot(ctx.user.id, slotKey);
+
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.designModelId ?? "dall-e-3";
+  const model = AI_MODELS[modelId];
+  const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
+  const label = slot
+    ? (ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey)
+    : slotKey;
+  await ctx.reply(`🗑 ${label}`);
+}
+
 // ── Incoming prompt in DESIGN_ACTIVE state ────────────────────────────────────
 
 /**
@@ -235,6 +309,7 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
+  const model = AI_MODELS[modelId];
 
   // Auto-create dialog if none exists for this design session
   let dialogId = state?.designDialogId ?? null;
@@ -248,7 +323,27 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
     dialogId = dialog.id;
   }
 
-  // Resolve reference image (one-shot)
+  // Slot-based media inputs (one-shot — consumed and cleared)
+  const mediaInputs = await userStateService.getMediaInputs(ctx.user.id);
+  const hasMediaInputs = Object.keys(mediaInputs).length > 0;
+  clearActiveSlot(ctx.user.id);
+
+  // Check required slots before proceeding
+  if (model?.mediaInputs?.length) {
+    for (const slot of model.mediaInputs) {
+      if (slot.required && !mediaInputs[slot.slotKey]?.length) {
+        const label =
+          ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+        await ctx.reply(ctx.t.mediaInput.slotRequired.replace("{slot}", String(label)));
+        return;
+      }
+    }
+  }
+
+  // Clear media inputs (one-shot)
+  if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id);
+
+  // Resolve reference image (one-shot, legacy path)
   const refMessageId = state?.designRefMessageId ?? null;
   let sourceImageUrl: string | undefined;
   if (refMessageId) {
@@ -269,6 +364,7 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
       modelId,
       prompt,
       sourceImageUrl,
+      mediaInputs: hasMediaInputs ? mediaInputs : undefined,
       telegramChatId: chatId,
       dialogId,
       sendOriginalLabel: ctx.t.common.sendOriginal,
@@ -277,10 +373,8 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
 
-    const model = AI_MODELS[modelId];
-
     if (!result.isPending && result.imageUrl) {
-      const caption = `${model.name ?? modelId}: ${prompt.slice(0, 200)}${sourceImageUrl ? ` ${ctx.t.design.withReference}` : ""}`;
+      const caption = `${model?.name ?? modelId}: ${prompt.slice(0, 200)}${sourceImageUrl || hasMediaInputs ? ` ${ctx.t.design.withReference}` : ""}`;
       await sendSyncImageResult(ctx, modelId, result, caption);
     } else {
       // Async — worker will notify when done
@@ -367,7 +461,72 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
+  const model = AI_MODELS[modelId];
 
+  // Resolve file_id: highest-res photo or image document
+  const fileId = isPhoto ? ctx.message!.photo!.at(-1)!.file_id : ctx.message!.document!.file_id;
+  const file = await ctx.api.getFile(fileId);
+  const fileUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+
+  const caption = ctx.message.caption?.trim();
+
+  // ── Slot-based upload (new path) ──────────────────────────────────────────
+  const activeSlot = getActiveSlot(ctx.user.id);
+  if (activeSlot && activeSlot.section === "design") {
+    const current = await userStateService.getMediaInputs(ctx.user.id);
+    const existing = current[activeSlot.slotKey] ?? [];
+    if (existing.length >= activeSlot.maxImages) {
+      await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
+    }
+    await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, fileUrl);
+    const updatedCount = Math.min(existing.length + 1, activeSlot.maxImages);
+
+    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+    const label = slot
+      ? (ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey)
+      : activeSlot.slotKey;
+
+    if (activeSlot.maxImages === 1) {
+      clearActiveSlot(ctx.user.id);
+      await ctx.reply(ctx.t.mediaInput.imageSavedSingle.replace("{slot}", String(label)));
+    } else {
+      const msg = ctx.t.mediaInput.imageSaved
+        .replace("{slot}", String(label))
+        .replace("{n}", String(updatedCount))
+        .replace("{max}", String(activeSlot.maxImages));
+      const kb =
+        updatedCount >= activeSlot.maxImages
+          ? undefined
+          : new InlineKeyboard().text(
+              ctx.t.mediaInput.doneUploading,
+              `mi_done:${activeSlot.slotKey}`,
+            );
+      if (updatedCount >= activeSlot.maxImages) clearActiveSlot(ctx.user.id);
+      await ctx.reply(msg, { reply_markup: kb });
+    }
+
+    if (caption) {
+      await executeDesignPrompt(ctx, caption);
+    }
+    return;
+  }
+
+  // ── Auto-slot: no active slot, but model has mediaInputs → save to first slot ─
+  if (!caption && model?.mediaInputs?.length) {
+    const current = await userStateService.getMediaInputs(ctx.user.id);
+    const targetSlot =
+      model.mediaInputs.find((s) => !current[s.slotKey]?.length) ?? model.mediaInputs[0];
+    if (current[targetSlot.slotKey]?.length) {
+      await userStateService.clearMediaInputSlot(ctx.user.id, targetSlot.slotKey);
+    }
+    await userStateService.addMediaInput(ctx.user.id, targetSlot.slotKey, fileUrl);
+    const label =
+      ctx.t.mediaInput[targetSlot.labelKey as keyof typeof ctx.t.mediaInput] ?? targetSlot.labelKey;
+    await ctx.reply(ctx.t.mediaInput.imageSavedSingle.replace("{slot}", String(label)));
+    return;
+  }
+
+  // ── Legacy path: dialog-based reference ───────────────────────────────────
   // Auto-create dialog if none exists
   let dialogId = state?.designDialogId ?? null;
   if (!dialogId) {
@@ -380,22 +539,28 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     dialogId = dialog.id;
   }
 
-  // Resolve file_id: highest-res photo or image document
-  const fileId = isPhoto ? ctx.message!.photo!.at(-1)!.file_id : ctx.message!.document!.file_id;
-  const file = await ctx.api.getFile(fileId);
-  const fileUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
-
   // Save as a user message with mediaUrl
-  const msg = await dialogService.saveMessage(dialogId, "user", ctx.t.design.photoAsReference, {
-    mediaUrl: fileUrl,
-    mediaType: "image",
-  });
+  const dialogMsg = await dialogService.saveMessage(
+    dialogId,
+    "user",
+    ctx.t.design.photoAsReference,
+    {
+      mediaUrl: fileUrl,
+      mediaType: "image",
+    },
+  );
 
   // If photo came with a caption, treat it as a prompt and generate immediately
-  const caption = ctx.message.caption?.trim();
   if (caption) {
     const chatId = ctx.chat?.id;
     if (!chatId) return;
+
+    // If model has media input slots, save the photo to the first slot
+    let mediaInputs: Record<string, string[]> | undefined;
+    if (model?.mediaInputs?.length) {
+      const firstSlot = model.mediaInputs[0];
+      mediaInputs = { [firstSlot.slotKey]: [fileUrl] };
+    }
 
     const imageSettings = await userStateService.getImageSettings(ctx.user.id);
     const aspectRatio = imageSettings[modelId]?.aspectRatio;
@@ -407,6 +572,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
         modelId,
         prompt: caption,
         sourceImageUrl: fileUrl,
+        mediaInputs,
         telegramChatId: chatId,
         dialogId,
         sendOriginalLabel: ctx.t.common.sendOriginal,
@@ -436,7 +602,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   }
 
   // No caption — save as ref and ask user to type a prompt
-  await userStateService.setDesignRefMessage(ctx.user.id, msg.id);
+  await userStateService.setDesignRefMessage(ctx.user.id, dialogMsg.id);
   await ctx.reply(ctx.t.design.photoSaved);
 }
 

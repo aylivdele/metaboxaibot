@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { db } from "../db.js";
 import type { BotState, Section } from "@metabox/shared";
 import type { UserState } from "@prisma/client";
@@ -268,5 +269,48 @@ export const userStateService = {
     const modelLevel = all[modelId] ?? {};
     const dialogLevel = all[this.dialogSettingsKey(dialogId)] ?? {};
     return { ...modelLevel, ...dialogLevel };
+  },
+
+  // ── Media inputs (slot-based, one-shot) ────────────────────────────────────
+
+  /** Add a URL to a media input slot. Returns the updated map. */
+  async addMediaInput(
+    userId: bigint,
+    slotKey: string,
+    url: string,
+  ): Promise<Record<string, string[]>> {
+    const current = await this.getMediaInputs(userId);
+    const arr = current[slotKey] ?? [];
+    arr.push(url);
+    const updated = { ...current, [slotKey]: arr };
+    await db.userState.upsert({
+      where: { userId },
+      create: { userId, state: "IDLE", mediaInputs: updated },
+      update: { mediaInputs: updated },
+    });
+    return updated;
+  },
+
+  /** Get all media inputs for user: { [slotKey]: string[] } */
+  async getMediaInputs(userId: bigint): Promise<Record<string, string[]>> {
+    const state = await db.userState.findUnique({ where: { userId } });
+    if (!state?.mediaInputs) return {};
+    return state.mediaInputs as Record<string, string[]>;
+  },
+
+  /** Clear all media input slots (one-shot after generation). */
+  async clearMediaInputs(userId: bigint): Promise<void> {
+    await db.userState.update({ where: { userId }, data: { mediaInputs: Prisma.DbNull } });
+  },
+
+  /** Clear a specific slot. */
+  async clearMediaInputSlot(userId: bigint, slotKey: string): Promise<void> {
+    const current = await this.getMediaInputs(userId);
+    delete current[slotKey];
+    const hasSlots = Object.keys(current).length > 0;
+    await db.userState.update({
+      where: { userId },
+      data: { mediaInputs: hasSlots ? current : Prisma.DbNull },
+    });
   },
 };

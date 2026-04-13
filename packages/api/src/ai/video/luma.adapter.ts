@@ -50,11 +50,12 @@ export class LumaAdapter implements VideoAdapter {
     if (ms.resolution) body.resolution = ms.resolution;
     if (input.duration) body.duration = `${input.duration}s`;
 
-    if (input.imageUrl) {
-      body.keyframes = {
-        frame0: { type: "image", url: input.imageUrl },
-      };
-    }
+    const firstFrame = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+    const lastFrame = input.mediaInputs?.last_frame?.[0];
+    const keyframes: Record<string, unknown> = {};
+    if (firstFrame) keyframes.frame0 = { type: "image", url: firstFrame };
+    if (lastFrame) keyframes.frame1 = { type: "image", url: lastFrame };
+    if (Object.keys(keyframes).length > 0) body.keyframes = keyframes;
 
     const res = await fetchWithLog(`${LUMA_API}/generations`, {
       method: "POST",

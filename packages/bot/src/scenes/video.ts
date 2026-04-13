@@ -28,6 +28,7 @@ import {
   transcribeAndReply,
   storeTranscription as storeVoiceText,
 } from "../utils/voice-transcribe.js";
+import { setActiveSlot, getActiveSlot, clearActiveSlot } from "../utils/media-input-state.js";
 
 // ── Avatar voice choice store (TTL 10 min) ──────────────────────────────────
 
@@ -191,6 +192,9 @@ async function activateVideoModel(ctx: BotContext, modelId: string): Promise<voi
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "VIDEO_ACTIVE", "video");
   await userStateService.setModelForSection(ctx.user.id, "video", modelId);
+  // Clear any leftover media inputs from a previous session
+  await userStateService.clearMediaInputs(ctx.user.id);
+  clearActiveSlot(ctx.user.id);
 
   const model = AI_MODELS[modelId];
   if (model) {
@@ -203,19 +207,31 @@ async function activateVideoModel(ctx: BotContext, modelId: string): Promise<voi
       5;
     const costLine = buildCostLine(model, modelSettings, ctx.t, defaultDuration);
     const webappUrl = config.bot.webappUrl;
-    const kb = webappUrl
-      ? new InlineKeyboard().webApp(
-          ctx.t.video.management,
-          `${webappUrl}?page=management&section=video`,
-        )
-      : undefined;
+    const kb = new InlineKeyboard();
+
+    // Add media input slot buttons
+    if (model.mediaInputs?.length) {
+      for (const slot of model.mediaInputs) {
+        const label =
+          ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+        const suffix = slot.required
+          ? ` ${ctx.t.mediaInput.required}`
+          : ` ${ctx.t.mediaInput.optional}`;
+        kb.text(`${label}${suffix}`, `mi:video:${slot.slotKey}`).row();
+      }
+    }
+
+    if (webappUrl) {
+      kb.webApp(ctx.t.video.management, `${webappUrl}?page=management&section=video`);
+    }
+
     const { name: modelName, description: modelDesc } = resolveModelDisplay(
       modelId,
       ctx.user.language,
       model,
     );
     await ctx.reply(`${modelName}\n\n${modelDesc}\n\n${costLine}`, {
-      reply_markup: kb,
+      reply_markup: kb.inline_keyboard.length ? kb : undefined,
     });
 
     let hint = ctx.t.video.hintVideoDefault;
@@ -266,6 +282,64 @@ export async function handleVideoFamilySelect(ctx: BotContext): Promise<void> {
   await activateVideoModel(ctx, modelId);
 }
 
+// ── Media input slot callback (mi:video:{slotKey}) ──────────────────────────
+
+export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const data = ctx.callbackQuery?.data ?? "";
+  const slotKey = data.replace("mi:video:", "");
+  await ctx.answerCallbackQuery();
+
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.videoModelId ?? "kling";
+  const model = AI_MODELS[modelId];
+  const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
+  if (!slot) return;
+
+  setActiveSlot(ctx.user.id, {
+    slotKey: slot.slotKey,
+    modelId,
+    maxImages: slot.maxImages ?? 1,
+    section: "video",
+  });
+
+  const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+  const maxImages = slot.maxImages ?? 1;
+  const msg =
+    maxImages > 1
+      ? ctx.t.mediaInput.uploadPromptMulti
+          .replace("{slot}", String(label))
+          .replace("{max}", String(maxImages))
+      : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
+  await ctx.reply(msg);
+}
+
+/** Callback for mi_done:{slotKey} — user finished uploading multi-image slot. */
+export async function handleVideoMediaInputDone(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.answerCallbackQuery();
+  clearActiveSlot(ctx.user.id);
+  await ctx.reply(ctx.t.mediaInput.doneUploading);
+}
+
+/** Callback for mi_remove:video:{slotKey} — clear a filled slot. */
+export async function handleVideoMediaInputRemove(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const data = ctx.callbackQuery?.data ?? "";
+  const slotKey = data.replace("mi_remove:video:", "");
+  await ctx.answerCallbackQuery();
+  await userStateService.clearMediaInputSlot(ctx.user.id, slotKey);
+
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.videoModelId ?? "kling";
+  const model = AI_MODELS[modelId];
+  const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
+  const label = slot
+    ? (ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey)
+    : slotKey;
+  await ctx.reply(`🗑 ${label}`);
+}
+
 // ── Incoming prompt in VIDEO_ACTIVE state ─────────────────────────────────────
 
 /**
@@ -279,11 +353,32 @@ export async function executeVideoPrompt(ctx: BotContext, prompt: string): Promi
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.videoModelId ?? "kling";
+  const model = AI_MODELS[modelId];
 
   const videoSettings = await userStateService.getVideoSettings(ctx.user.id);
   const modelSettings = videoSettings[modelId];
 
-  // For D-ID: pick up any previously saved reference photo (one-shot)
+  // Slot-based media inputs (one-shot — consumed and cleared)
+  const mediaInputs = await userStateService.getMediaInputs(ctx.user.id);
+  const hasMediaInputs = Object.keys(mediaInputs).length > 0;
+  clearActiveSlot(ctx.user.id);
+
+  // Check required slots before proceeding
+  if (model?.mediaInputs?.length) {
+    for (const slot of model.mediaInputs) {
+      if (slot.required && !mediaInputs[slot.slotKey]?.length) {
+        const label =
+          ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+        await ctx.reply(ctx.t.mediaInput.slotRequired.replace("{slot}", String(label)));
+        return;
+      }
+    }
+  }
+
+  // Clear media inputs (one-shot)
+  if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id);
+
+  // For D-ID/HeyGen: pick up any previously saved reference photo (one-shot, legacy path)
   const imageUrl = (await userStateService.getAndClearVideoRefImageUrl(ctx.user.id)) ?? undefined;
   // For D-ID: pick up any previously saved driver video URL (one-shot)
   const driverUrl = (await userStateService.getAndClearVideoRefDriverUrl(ctx.user.id)) ?? undefined;
@@ -349,6 +444,7 @@ export async function executeVideoPrompt(ctx: BotContext, prompt: string): Promi
       modelId,
       prompt,
       imageUrl,
+      mediaInputs: hasMediaInputs ? mediaInputs : undefined,
       telegramChatId: chatId,
       sendOriginalLabel: ctx.t.common.sendOriginal,
       aspectRatio: modelSettings?.aspectRatio,
@@ -499,42 +595,81 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
   const file = await ctx.api.getFile(fileId);
   const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
 
-  // if (modelId === "heygen") {
-  //   const userId = ctx.user.id;
-  //   const s3Key = `avatar_photo/${userId.toString()}/${file.file_id}.jpg`;
-  //   const uploadedKey = await s3Service.uploadFromUrl(s3Key, tgUrl, "image/jpeg").catch(() => null);
-  //   const publicUrl = uploadedKey
-  //     ? ((await s3Service.getFileUrl(uploadedKey).catch(() => null)) ?? tgUrl)
-  //     : tgUrl;
-
-  //   await userUploadsService.create(userId, {
-  //     type: "avatar_photo",
-  //     name: ctx.t.video.myAvatarDefaultName,
-  //     url: publicUrl,
-  //     s3Key: uploadedKey ?? undefined,
-  //   });
-
-  //   // Auto-select: store in modelSettings so adapter picks it up on next generation
-  //   await userStateService.setModelSettings(userId, "heygen", {
-  //     avatar_photo_url: publicUrl,
-  //     avatar_photo_s3key: uploadedKey ?? "",
-  //     avatar_id: "",
-  //   });
-
-  //   await ctx.reply(ctx.t.video.avatarPhotoSaved);
-  //   return;
-  // }
-
-  // If caption is provided, treat it as a prompt and generate immediately.
-  // When the model doesn't support images, we still start generation with
-  // the caption as prompt and warn the user that the image is ignored.
-  const caption = ctx.message.caption?.trim();
   const model = AI_MODELS[modelId];
+  const caption = ctx.message.caption?.trim();
+
+  // ── Slot-based upload (new path) ──────────────────────────────────────────
+  const activeSlot = getActiveSlot(ctx.user.id);
+  if (activeSlot && activeSlot.section === "video") {
+    const current = await userStateService.getMediaInputs(ctx.user.id);
+    const existing = current[activeSlot.slotKey] ?? [];
+    if (existing.length >= activeSlot.maxImages) {
+      // Replace if max reached (single-image slot)
+      await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
+    }
+    await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, tgUrl);
+    const updatedCount = Math.min(existing.length + 1, activeSlot.maxImages);
+
+    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+    const label = slot
+      ? (ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey)
+      : activeSlot.slotKey;
+
+    if (activeSlot.maxImages === 1) {
+      clearActiveSlot(ctx.user.id);
+      await ctx.reply(ctx.t.mediaInput.imageSavedSingle.replace("{slot}", String(label)));
+    } else {
+      const msg = ctx.t.mediaInput.imageSaved
+        .replace("{slot}", String(label))
+        .replace("{n}", String(updatedCount))
+        .replace("{max}", String(activeSlot.maxImages));
+      const kb =
+        updatedCount >= activeSlot.maxImages
+          ? undefined
+          : new InlineKeyboard().text(
+              ctx.t.mediaInput.doneUploading,
+              `mi_done:${activeSlot.slotKey}`,
+            );
+      if (updatedCount >= activeSlot.maxImages) clearActiveSlot(ctx.user.id);
+      await ctx.reply(msg, { reply_markup: kb });
+    }
+
+    // If caption is also provided, use it as prompt and generate immediately
+    if (caption) {
+      await executeVideoPrompt(ctx, caption);
+    }
+    return;
+  }
+
+  // ── Auto-slot: no active slot, but model has mediaInputs → save to first slot ─
+  if (!caption && model?.mediaInputs?.length && !AVATAR_MODELS.has(modelId)) {
+    const current = await userStateService.getMediaInputs(ctx.user.id);
+    // Find first unfilled slot, or first slot if all filled
+    const targetSlot =
+      model.mediaInputs.find((s) => !current[s.slotKey]?.length) ?? model.mediaInputs[0];
+    if (current[targetSlot.slotKey]?.length) {
+      await userStateService.clearMediaInputSlot(ctx.user.id, targetSlot.slotKey);
+    }
+    await userStateService.addMediaInput(ctx.user.id, targetSlot.slotKey, tgUrl);
+    const label =
+      ctx.t.mediaInput[targetSlot.labelKey as keyof typeof ctx.t.mediaInput] ?? targetSlot.labelKey;
+    await ctx.reply(ctx.t.mediaInput.imageSavedSingle.replace("{slot}", String(label)));
+    return;
+  }
+
+  // ── Photo with caption → generate immediately ─────────────────────────────
   if (caption) {
     const chatId = ctx.chat?.id;
     if (!chatId) return;
 
     const supportsImages = model?.supportsImages ?? false;
+
+    // If model has media input slots, save the photo to the first slot
+    let mediaInputs: Record<string, string[]> | undefined;
+    if (supportsImages && model?.mediaInputs?.length) {
+      const firstSlot = model.mediaInputs[0];
+      mediaInputs = { [firstSlot.slotKey]: [tgUrl] };
+    }
 
     const videoSettings = await userStateService.getVideoSettings(ctx.user.id);
     const modelSettings = videoSettings[modelId];
@@ -570,6 +705,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
         modelId,
         prompt: caption,
         imageUrl: supportsImages ? tgUrl : undefined,
+        mediaInputs,
         telegramChatId: chatId,
         sendOriginalLabel: ctx.t.common.sendOriginal,
         aspectRatio: modelSettings?.aspectRatio,
@@ -590,7 +726,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     return;
   }
 
-  // No caption — save as one-shot reference for next text message
+  // No caption, no slots — legacy path: save as one-shot reference for next text message
   await userStateService.setVideoRefImageUrl(ctx.user.id, tgUrl);
   await ctx.reply(ctx.t.video.videoPhotoSaved);
 }

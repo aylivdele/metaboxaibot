@@ -1,7 +1,9 @@
 export interface VideoInput {
   prompt: string;
-  /** Source image URL for image-to-video generation */
+  /** @deprecated Use mediaInputs instead for models with structured slots. */
   imageUrl?: string;
+  /** Named media input slots: { [slotKey]: string[] } */
+  mediaInputs?: Record<string, string[]>;
   /** Duration in seconds (provider-dependent) */
   duration?: number;
   /** e.g. "16:9", "9:16", "1:1" */

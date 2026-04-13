@@ -15,6 +15,8 @@ export interface SubmitVideoParams {
   modelId: string;
   prompt: string;
   imageUrl?: string;
+  /** Named media input slots: { [slotKey]: string[] } */
+  mediaInputs?: Record<string, string[]>;
   telegramChatId: number;
   /** Pre-translated label for the "Send as file" inline button. */
   sendOriginalLabel?: string;
@@ -123,6 +125,7 @@ export const videoGenerationService = {
         prompt,
         inputData: {
           ...(imageUrl ? { imageUrl } : {}),
+          ...(params.mediaInputs ? { mediaInputs: params.mediaInputs } : {}),
           ...(Object.keys(modelSettings).length > 0
             ? { modelSettings: JSON.parse(JSON.stringify(modelSettings)) }
             : {}),
@@ -141,6 +144,7 @@ export const videoGenerationService = {
         modelId,
         prompt,
         imageUrl,
+        mediaInputs: params.mediaInputs,
         telegramChatId,
         sendOriginalLabel,
         aspectRatio: effectiveAspectRatio,

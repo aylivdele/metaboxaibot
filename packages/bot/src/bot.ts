@@ -27,6 +27,8 @@ import {
   handleDesignVoice,
   handleDesignPhoto,
   handleDesignRefSelect,
+  handleDesignMediaInput,
+  handleDesignMediaInputRemove,
 } from "./scenes/design.js";
 import {
   handleVideoModelSelect,
@@ -41,6 +43,9 @@ import {
   handleVideoAvatars,
   handleAvatarPhotoCapture,
   handleHeygenAvatarCancel,
+  handleVideoMediaInput,
+  handleVideoMediaInputDone,
+  handleVideoMediaInputRemove,
 } from "./scenes/video.js";
 import {
   handleAudioSubSection,
@@ -144,6 +149,13 @@ export function createBot(token: string): Bot<BotContext> {
   // ── Video model selection callback ───────────────────────────────────────
   bot.callbackQuery(/^video_model_/, handleVideoModelSelect);
   bot.callbackQuery(/^video_family_/, handleVideoFamilySelect);
+
+  // ── Media input slot callbacks ────────────────────────────────────────────
+  bot.callbackQuery(/^mi:video:/, handleVideoMediaInput);
+  bot.callbackQuery(/^mi:design:/, handleDesignMediaInput);
+  bot.callbackQuery(/^mi_done:/, handleVideoMediaInputDone); // section-agnostic: just clears active slot
+  bot.callbackQuery(/^mi_remove:video:/, handleVideoMediaInputRemove);
+  bot.callbackQuery(/^mi_remove:design:/, handleDesignMediaInputRemove);
 
   // ── Send original file callback ───────────────────────────────────────────
   bot.callbackQuery(/^orig_/, handleSendOriginal);

@@ -137,9 +137,11 @@ export class RecraftAdapter implements ImageAdapter {
 
     let url: string;
 
-    if (input.imageUrl) {
+    const imageUrl = input.mediaInputs?.edit?.[0] ?? input.imageUrl;
+
+    if (imageUrl) {
       // Image-to-image via multipart form
-      const imgResp = await fetchWithLog(input.imageUrl);
+      const imgResp = await fetchWithLog(imageUrl);
       if (!imgResp.ok) throw new Error(`Failed to fetch source image: ${imgResp.status}`);
       const imgBuf = await imgResp.arrayBuffer();
       // Detect actual MIME from magic bytes — S3/Telegram URLs often return application/octet-stream.
@@ -148,7 +150,7 @@ export class RecraftAdapter implements ImageAdapter {
 
       // Recraft imageToImage only accepts raster formats (PNG/JPEG/WebP)
       const isSvgMime = detectedMime === "image/svg+xml";
-      const isSvgUrl = input.imageUrl.split("?")[0].toLowerCase().endsWith(".svg");
+      const isSvgUrl = imageUrl.split("?")[0].toLowerCase().endsWith(".svg");
       if (isSvgMime || isSvgUrl) {
         throw new UserFacingError(
           "SVG is not supported as a reference image for Recraft img2img.",

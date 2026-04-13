@@ -87,9 +87,10 @@ export class MinimaxVideoAdapter implements VideoAdapter {
       prompt_optimizer: true,
     };
 
-    if (input.imageUrl && SUPPORTS_IMAGE.has(this.modelId)) {
-      body.first_frame_image = input.imageUrl;
-    }
+    const firstFrame = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+    const lastFrame = input.mediaInputs?.last_frame?.[0];
+    if (firstFrame && SUPPORTS_IMAGE.has(this.modelId)) body.first_frame_image = firstFrame;
+    if (lastFrame && SUPPORTS_IMAGE.has(this.modelId)) body.last_frame_image = lastFrame;
 
     const resp = await fetchWithLog(`${MINIMAX_API_BASE}/video_generation`, {
       method: "POST",

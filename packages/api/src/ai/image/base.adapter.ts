@@ -1,8 +1,10 @@
 export interface ImageInput {
   prompt: string;
   negativePrompt?: string;
-  /** Source image URL for img2img */
+  /** @deprecated Use mediaInputs instead for models with structured slots. */
   imageUrl?: string;
+  /** Named media input slots: { [slotKey]: string[] } */
+  mediaInputs?: Record<string, string[]>;
   width?: number;
   height?: number;
   /** Aspect ratio in "W:H" format, e.g. "16:9", "1:1". Each adapter converts to its own format. */

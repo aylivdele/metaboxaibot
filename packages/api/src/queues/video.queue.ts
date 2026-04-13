@@ -10,6 +10,8 @@ export interface VideoJobData {
   prompt: string;
   /** Optional source image URL for image-to-video */
   imageUrl?: string;
+  /** Named media input slots: { [slotKey]: string[] } */
+  mediaInputs?: Record<string, string[]>;
   /** Telegram chat id to notify when done */
   telegramChatId: number;
   /** Pre-translated label for the "Send as file" button. */

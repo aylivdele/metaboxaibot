@@ -42,7 +42,8 @@ export class FalVideoAdapter implements VideoAdapter {
   }
 
   async submit(input: VideoInput): Promise<string> {
-    const endpoint = this.selectEndpoint(input.imageUrl);
+    const imageUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+    const endpoint = this.selectEndpoint(imageUrl);
     const ms = input.modelSettings ?? {};
     const msExtras: Record<string, unknown> = {};
     if (ms.cfg_scale !== undefined) msExtras.cfg_scale = ms.cfg_scale;
@@ -53,7 +54,7 @@ export class FalVideoAdapter implements VideoAdapter {
     if (ms.seed != null) msExtras.seed = ms.seed;
     const falInput = {
       prompt: input.prompt,
-      ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
+      ...(imageUrl ? { image_url: imageUrl } : {}),
       ...(input.duration
         ? {
             duration: this.modelId.startsWith("seedance-2")

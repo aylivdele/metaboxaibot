@@ -82,11 +82,15 @@ export class ReplicateAdapter implements ImageAdapter {
     if (ms.num_inference_steps !== undefined) msExtras.num_inference_steps = ms.num_inference_steps;
     const stylePreset = ms.style_preset && ms.style_preset !== "None" ? ms.style_preset : undefined;
     if (stylePreset) msExtras.style_preset = stylePreset;
+    // Resolve image URL from structured media inputs, falling back to legacy imageUrl.
+    // Ideogram models use "style_ref" slot; other models use "edit" slot.
+    const imageUrl = IDEOGRAM_MODELS.has(this.modelId)
+      ? (input.mediaInputs?.style_ref?.[0] ?? input.imageUrl)
+      : (input.mediaInputs?.edit?.[0] ?? input.imageUrl);
     // Ideogram constraint: when style_preset, style_codes, or style_reference_images
     // is used, style_type must be Auto or General. A reference image sent by the
     // user becomes style_reference_images further down, so detect that here too.
-    const ideogramHasStyleRef =
-      IDEOGRAM_MODELS.has(this.modelId) && (!!stylePreset || !!input.imageUrl);
+    const ideogramHasStyleRef = IDEOGRAM_MODELS.has(this.modelId) && (!!stylePreset || !!imageUrl);
     if (ms.style_type && ms.style_type !== "None") {
       const styleType = ms.style_type as string;
       msExtras.style_type =
@@ -99,8 +103,7 @@ export class ReplicateAdapter implements ImageAdapter {
     if (ms.output_format) msExtras.output_format = ms.output_format;
     if (ms.output_quality !== undefined) msExtras.output_quality = ms.output_quality;
     // prompt_strength is img2img-only — skip for text-to-image to avoid API rejection
-    if (ms.prompt_strength !== undefined && input.imageUrl)
-      msExtras.prompt_strength = ms.prompt_strength;
+    if (ms.prompt_strength !== undefined && imageUrl) msExtras.prompt_strength = ms.prompt_strength;
     if (ms.lora_scale !== undefined) msExtras.lora_scale = ms.lora_scale;
     if (ms.extra_lora) msExtras.extra_lora = ms.extra_lora;
     if (ms.extra_lora_scale !== undefined) msExtras.extra_lora_scale = ms.extra_lora_scale;
@@ -127,22 +130,33 @@ export class ReplicateAdapter implements ImageAdapter {
           : { aspect_ratio: aspectRatio }
         : this.resolveSize(input);
 
-    // Download image and pass as Blob — Replicate cannot fetch Telegram/S3 presigned URLs directly.
+    // Download image(s) and pass as Blob — Replicate cannot fetch Telegram/S3 presigned URLs directly.
     let imageParam: Record<string, unknown> = {};
-    if (input.imageUrl) {
-      const imgRes = await fetch(input.imageUrl);
+    if (IDEOGRAM_MODELS.has(this.modelId)) {
+      // Ideogram: support multiple style reference images from the style_ref slot
+      const styleRefUrls = input.mediaInputs?.style_ref ?? (imageUrl ? [imageUrl] : []);
+      if (styleRefUrls.length > 0) {
+        const blobs = await Promise.all(
+          styleRefUrls.map(async (url) => {
+            const imgRes = await fetch(url);
+            if (imgRes.ok) {
+              const imgBuf = await imgRes.arrayBuffer();
+              const mimeType = resolveImageMimeType(imgBuf, imgRes.headers.get("content-type"));
+              return new Blob([imgBuf], { type: mimeType });
+            }
+            return url; // fallback to URL
+          }),
+        );
+        imageParam = { style_reference_images: blobs };
+      }
+    } else if (imageUrl) {
+      const imgRes = await fetch(imageUrl);
       if (imgRes.ok) {
         const imgBuf = await imgRes.arrayBuffer();
         const mimeType = resolveImageMimeType(imgBuf, imgRes.headers.get("content-type"));
-        const blob = new Blob([imgBuf], { type: mimeType });
-        imageParam = IDEOGRAM_MODELS.has(this.modelId)
-          ? { style_reference_images: [blob] }
-          : { image: blob };
+        imageParam = { image: new Blob([imgBuf], { type: mimeType }) };
       } else {
-        // Fall back to URL if download fails (non-critical)
-        imageParam = IDEOGRAM_MODELS.has(this.modelId)
-          ? { style_reference_images: [input.imageUrl] }
-          : { image: input.imageUrl };
+        imageParam = { image: imageUrl };
       }
     }
 

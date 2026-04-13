@@ -1,5 +1,21 @@
-import type { AIModel, ModelSettingDef } from "../../types/ai.js";
+import type { AIModel, MediaInputSlot, ModelSettingDef } from "../../types/ai.js";
 import { mkAspectRatio, mkDurationSelect, mkDurationSlider } from "./_helpers.js";
+
+const MI_FIRST_FRAME: MediaInputSlot = {
+  slotKey: "first_frame",
+  mode: "first_frame",
+  labelKey: "firstFrame",
+};
+const MI_LAST_FRAME: MediaInputSlot = {
+  slotKey: "last_frame",
+  mode: "last_frame",
+  labelKey: "lastFrame",
+};
+const MI_REFERENCE: MediaInputSlot = {
+  slotKey: "reference",
+  mode: "reference",
+  labelKey: "reference",
+};
 
 const KLING_SETTINGS: ModelSettingDef[] = [
   mkAspectRatio(["16:9", "9:16", "1:1"]),
@@ -69,6 +85,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    mediaInputs: [MI_FIRST_FRAME],
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
@@ -98,6 +115,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    mediaInputs: [MI_FIRST_FRAME],
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
@@ -128,6 +146,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    mediaInputs: [MI_FIRST_FRAME],
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: null,
     durationRange: { min: 4, max: 12 },
@@ -178,6 +197,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    mediaInputs: [MI_FIRST_FRAME],
     supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
     durationRange: { min: 4, max: 15 },
     settings: [
@@ -227,6 +247,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
+    mediaInputs: [MI_FIRST_FRAME],
     supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
     durationRange: { min: 4, max: 15 },
     settings: [
@@ -267,6 +288,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -319,6 +341,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -373,6 +396,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -427,6 +451,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
+    mediaInputs: [MI_REFERENCE],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -514,6 +539,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
+    mediaInputs: [MI_REFERENCE],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -581,6 +607,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
+    mediaInputs: [MI_REFERENCE],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -618,6 +645,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
+    mediaInputs: [{ ...MI_FIRST_FRAME, required: true }],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -866,6 +894,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -950,6 +979,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -999,6 +1029,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     provider: "minimax",
     familyId: "minimax",
     variantLabel: "Fast",
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
     // Default: 768P × 6s = $0.19. Exact price depends on resolution × duration — see costMatrix.
     costUsdPerRequest: 0.19,
     costMatrix: {
@@ -1045,6 +1076,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     provider: "minimax",
     familyId: "minimax",
     variantLabel: "Standard",
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
     // Default: 768P × 6s = $0.28. Exact price depends on resolution × duration — see costMatrix.
     costUsdPerRequest: 0.28,
     costMatrix: {
@@ -1112,6 +1144,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,

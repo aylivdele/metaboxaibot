@@ -105,6 +105,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
               prompt: effectivePrompt,
               negativePrompt,
               imageUrl: job.data.sourceImageUrl,
+              mediaInputs: job.data.mediaInputs,
               aspectRatio,
               modelSettings,
             }),
