@@ -144,6 +144,20 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     ],
   },
 
+  seedance: {
+    id: "seedance",
+    name: "💃 Seedance",
+    section: "video",
+    description:
+      "Видеомодель от ByteDance с выразительной динамикой и высокой детализацией. Версия 1.5 — доступная, 2.0 — флагман с улучшенным качеством, Fast — быстрая версия 2.0.",
+    defaultModelId: "seedance-2",
+    members: [
+      { modelId: "seedance", versionLabel: "1.5", variantLabel: "Pro" },
+      { modelId: "seedance-2", versionLabel: "2.0", variantLabel: "Standard" },
+      { modelId: "seedance-2-fast", versionLabel: "2.0", variantLabel: "Fast" },
+    ],
+  },
+
   minimax: {
     id: "minimax",
     name: "🎞️ Hailuo 2.3",
