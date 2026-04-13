@@ -388,6 +388,9 @@ export default {
     optional: "(необязательно)",
     required: "(обязательно)",
     doneUploading: "Готово ✓",
+    readyForPrompt: "✅ Готово! Отправьте текстовый промпт для начала генерации.",
+    cancel: "Отмена",
+    uploadCancelled: "Загрузка отменена.",
   },
   linkMetabox: {
     title: "Metabox Обучение",

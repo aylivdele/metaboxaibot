@@ -303,6 +303,9 @@ export interface Translations {
     optional: string;
     required: string;
     doneUploading: string;
+    readyForPrompt: string;
+    cancel: string;
+    uploadCancelled: string;
   };
   linkMetabox: {
     title: string;

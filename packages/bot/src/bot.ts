@@ -28,6 +28,7 @@ import {
   handleDesignPhoto,
   handleDesignRefSelect,
   handleDesignMediaInput,
+  handleDesignMediaInputCancel,
   handleDesignMediaInputRemove,
 } from "./scenes/design.js";
 import {
@@ -44,6 +45,7 @@ import {
   handleAvatarPhotoCapture,
   handleHeygenAvatarCancel,
   handleVideoMediaInput,
+  handleVideoMediaInputCancel,
   handleVideoMediaInputDone,
   handleVideoMediaInputRemove,
 } from "./scenes/video.js";
@@ -153,6 +155,8 @@ export function createBot(token: string): Bot<BotContext> {
   // ── Media input slot callbacks ────────────────────────────────────────────
   bot.callbackQuery(/^mi:video:/, handleVideoMediaInput);
   bot.callbackQuery(/^mi:design:/, handleDesignMediaInput);
+  bot.callbackQuery(/^mi_cancel:video$/, handleVideoMediaInputCancel);
+  bot.callbackQuery(/^mi_cancel:design$/, handleDesignMediaInputCancel);
   bot.callbackQuery(/^mi_done:/, handleVideoMediaInputDone); // section-agnostic: just clears active slot
   bot.callbackQuery(/^mi_remove:video:/, handleVideoMediaInputRemove);
   bot.callbackQuery(/^mi_remove:design:/, handleDesignMediaInputRemove);

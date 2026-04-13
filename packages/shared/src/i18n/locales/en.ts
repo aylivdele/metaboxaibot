@@ -388,6 +388,9 @@ export default {
     optional: "(optional)",
     required: "(required)",
     doneUploading: "Done ✓",
+    readyForPrompt: "✅ Ready! Send a text prompt to start generation.",
+    cancel: "Cancel",
+    uploadCancelled: "Upload cancelled.",
   },
   linkMetabox: {
     title: "Metabox Learning",

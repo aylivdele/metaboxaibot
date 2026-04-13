@@ -24,7 +24,12 @@ import {
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 import { transcribeAndReply } from "../utils/voice-transcribe.js";
-import { setActiveSlot, getActiveSlot, clearActiveSlot } from "../utils/media-input-state.js";
+import {
+  setActiveSlot,
+  getActiveSlot,
+  clearActiveSlot,
+  buildMediaInputStatusMenu,
+} from "../utils/media-input-state.js";
 
 // ── Random design pending messages (Russian) ────────────────────────────────
 
@@ -238,6 +243,21 @@ export async function handleDesignFamilySelect(ctx: BotContext): Promise<void> {
   await activateDesignModel(ctx, modelId);
 }
 
+// ── Media input status menu helper ──────────────────────────────────────────
+
+/** Sends an updated media-input status menu showing filled/empty slots. */
+async function sendDesignMediaInputStatus(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.designModelId ?? "dall-e-3";
+  const model = AI_MODELS[modelId];
+  if (!model?.mediaInputs?.length) return;
+
+  const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
+  const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "design", ctx.t);
+  await ctx.reply(text || ctx.t.mediaInput.doneUploading, { reply_markup: kb });
+}
+
 // ── Media input slot callback (mi:design:{slotKey}) ─────────────────────────
 
 export async function handleDesignMediaInput(ctx: BotContext): Promise<void> {
@@ -251,6 +271,9 @@ export async function handleDesignMediaInput(ctx: BotContext): Promise<void> {
   const model = AI_MODELS[modelId];
   const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
   if (!slot) return;
+
+  // Remove inline keyboard from the old menu message, keep the text for history
+  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
 
   setActiveSlot(ctx.user.id, {
     slotKey: slot.slotKey,
@@ -267,7 +290,31 @@ export async function handleDesignMediaInput(ctx: BotContext): Promise<void> {
           .replace("{slot}", String(label))
           .replace("{max}", String(maxImages))
       : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
-  await ctx.reply(msg);
+  const kb = new InlineKeyboard().text(ctx.t.mediaInput.cancel, `mi_cancel:design`);
+  await ctx.reply(msg, { reply_markup: kb });
+}
+
+/** Callback for mi_cancel:design — cancel active upload slot. */
+export async function handleDesignMediaInputCancel(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.answerCallbackQuery();
+  clearActiveSlot(ctx.user.id);
+  // Replace the waiting message text and show current status menu
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.designModelId ?? "dall-e-3";
+  const model = AI_MODELS[modelId];
+  if (model?.mediaInputs?.length) {
+    const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
+    const { text, kb } = buildMediaInputStatusMenu(
+      model.mediaInputs,
+      filledInputs,
+      "design",
+      ctx.t,
+    );
+    await ctx.editMessageText(text || ctx.t.mediaInput.uploadCancelled, { reply_markup: kb });
+  } else {
+    await ctx.editMessageText(ctx.t.mediaInput.uploadCancelled).catch(() => void 0);
+  }
 }
 
 /** Callback for mi_done:{slotKey} — user finished uploading multi-image slot. */
@@ -275,7 +322,7 @@ export async function handleDesignMediaInputDone(ctx: BotContext): Promise<void>
   if (!ctx.user) return;
   await ctx.answerCallbackQuery();
   clearActiveSlot(ctx.user.id);
-  await ctx.reply(ctx.t.mediaInput.doneUploading);
+  await sendDesignMediaInputStatus(ctx);
 }
 
 /** Callback for mi_remove:design:{slotKey} — clear a filled slot. */
@@ -285,15 +332,7 @@ export async function handleDesignMediaInputRemove(ctx: BotContext): Promise<voi
   const slotKey = data.replace("mi_remove:design:", "");
   await ctx.answerCallbackQuery();
   await userStateService.clearMediaInputSlot(ctx.user.id, slotKey);
-
-  const state = await userStateService.get(ctx.user.id);
-  const modelId = state?.designModelId ?? "dall-e-3";
-  const model = AI_MODELS[modelId];
-  const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
-  const label = slot
-    ? (ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey)
-    : slotKey;
-  await ctx.reply(`🗑 ${label}`);
+  await sendDesignMediaInputStatus(ctx);
 }
 
 // ── Incoming prompt in DESIGN_ACTIVE state ────────────────────────────────────
@@ -488,21 +527,22 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
 
     if (activeSlot.maxImages === 1) {
       clearActiveSlot(ctx.user.id);
-      await ctx.reply(ctx.t.mediaInput.imageSavedSingle.replace("{slot}", String(label)));
+      await sendDesignMediaInputStatus(ctx);
     } else {
       const msg = ctx.t.mediaInput.imageSaved
         .replace("{slot}", String(label))
         .replace("{n}", String(updatedCount))
         .replace("{max}", String(activeSlot.maxImages));
-      const kb =
-        updatedCount >= activeSlot.maxImages
-          ? undefined
-          : new InlineKeyboard().text(
-              ctx.t.mediaInput.doneUploading,
-              `mi_done:${activeSlot.slotKey}`,
-            );
-      if (updatedCount >= activeSlot.maxImages) clearActiveSlot(ctx.user.id);
-      await ctx.reply(msg, { reply_markup: kb });
+      if (updatedCount >= activeSlot.maxImages) {
+        clearActiveSlot(ctx.user.id);
+        await sendDesignMediaInputStatus(ctx);
+      } else {
+        const kb = new InlineKeyboard().text(
+          ctx.t.mediaInput.doneUploading,
+          `mi_done:${activeSlot.slotKey}`,
+        );
+        await ctx.reply(msg, { reply_markup: kb });
+      }
     }
 
     if (caption) {
@@ -520,9 +560,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
       await userStateService.clearMediaInputSlot(ctx.user.id, targetSlot.slotKey);
     }
     await userStateService.addMediaInput(ctx.user.id, targetSlot.slotKey, fileUrl);
-    const label =
-      ctx.t.mediaInput[targetSlot.labelKey as keyof typeof ctx.t.mediaInput] ?? targetSlot.labelKey;
-    await ctx.reply(ctx.t.mediaInput.imageSavedSingle.replace("{slot}", String(label)));
+    await sendDesignMediaInputStatus(ctx);
     return;
   }
 
