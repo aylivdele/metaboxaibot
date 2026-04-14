@@ -64,9 +64,9 @@ export default {
     backToMain: "🏠 Main Menu",
     dialogSelected: "✅ <b>Dialog:</b> {title}\n    <b>Model:</b> {model}",
     dialogHint: {
-      prompt: "✦ Type your prompt right here in the chat. You'll get the result here too",
-      attach:
-        "✦ You can attach images, files (PDF, DOCX, XLSX, etc.) or send a voice message — the bot will transcribe it automatically.",
+      prompt:
+        "✦ <b>Type⌨️/record🎙️ your prompt right here in the chat. You'll get the result here too</b>",
+      attach: "✦ You can attach images, files (PDF, DOCX, XLSX, etc.).",
       thinkingWarning:
         "✦ If thinking mode is enabled, the response may take up to 10 minutes depending on dialog size and thinking depth.",
     },

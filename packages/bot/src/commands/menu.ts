@@ -60,6 +60,7 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
     : { text: ctx.t.gpt.management };
 
   await ctx.reply(text, {
+    parse_mode: "HTML",
     reply_markup: {
       keyboard: [[newDialogBtn], [managementBtn], [{ text: ctx.t.common.backToMain }]],
       resize_keyboard: true,
