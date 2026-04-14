@@ -246,21 +246,54 @@ async function sendModelActivatedNotification(
     "higgsfield-preview": t.video.hintHiggsfield,
     "d-id": t.video.hintDid,
   };
-  const hint =
-    section === "audio"
-      ? (audioHints[modelId] ?? t.audio.activated)
-      : section === "video"
-        ? (videoHints[modelId] ?? t.video.hintVideoDefault)
-        : undefined;
 
   const lang = (user?.language ?? "en") as string;
   const { name: modelName, description: modelDesc } = resolveModelDisplay(modelId, lang, model);
-  const text =
-    modelId !== "voice-clone"
-      ? `${modelName}\n\n${modelDesc}\n\n${costLine}`
-      : `${modelName}\n\n${modelDesc}`;
-
   const webappUrl = config.bot.webappUrl;
+
+  // ── Audio section: mirror handleAudioSubSection — single message, no hint split ──
+  if (section === "audio") {
+    const audioHint = audioHints[modelId] ?? t.audio.activated;
+    if (modelId === "voice-clone") {
+      // voice-clone: plain label + hint, no inline kb
+      await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: String(userId),
+          text: `${t.audio.voiceClone}\n\n${audioHint}`,
+        }),
+      }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
+      return;
+    }
+    const audioText = `${modelName}\n\n${modelDesc}\n\n${audioHint}\n${t.voice.inputHint}\n\n${costLine}`;
+    const audioReplyMarkup = webappUrl
+      ? {
+          inline_keyboard: [
+            [
+              {
+                text: t.audio.management,
+                web_app: { url: `${webappUrl}?page=management&section=audio` },
+              },
+            ],
+          ],
+        }
+      : undefined;
+    await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: String(userId),
+        text: audioText,
+        ...(audioReplyMarkup ? { reply_markup: audioReplyMarkup } : {}),
+      }),
+    }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
+    return;
+  }
+
+  const hint = section === "video" ? (videoHints[modelId] ?? t.video.hintVideoDefault) : undefined;
+
+  const text = `${modelName}\n\n${modelDesc}\n\n${costLine}`;
 
   // Build the unified inline keyboard: media input slots (if any) + management.
   // Model activation clears media inputs, so all slots start empty.

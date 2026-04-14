@@ -80,7 +80,7 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
         model,
       );
       await ctx.reply(
-        `${modelName}\n\n${modelDesc}\n\n${hint}\n\n${costLine}\n\n${ctx.t.voice.inputHint}`,
+        `${modelName}\n\n${modelDesc}\n\n${hint}\n${ctx.t.voice.inputHint}\n\n${costLine}`,
         { reply_markup: kb },
       );
       return;
@@ -88,7 +88,7 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
   }
 
   // voice-clone: no voice transcription hint (audio is used for cloning, not prompts)
-  await ctx.reply(hint);
+  await ctx.reply(`${ctx.t.audio.voiceClone}\n\n${hint}`);
 }
 
 // ── Voice cloning: accepts audio/voice file, creates EL voice ────────────────
