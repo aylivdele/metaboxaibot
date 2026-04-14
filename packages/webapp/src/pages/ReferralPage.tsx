@@ -4,7 +4,13 @@ import { useI18n } from "../i18n.js";
 import type { UserProfile } from "../types.js";
 
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME ?? "MetaboxAIBot";
-const METABOX_APP_URL = import.meta.env.VITE_METABOX_APP_URL ?? "https://app.metabox.global";
+const METABOX_APP_URL =
+  (import.meta.env.VITE_METABOX_APP_URL as string | undefined) ?? "https://app.metabox.global";
+const names = METABOX_APP_URL.split(".");
+let LANDING_URL = "metabox.global";
+if (names.length > 1) {
+  LANDING_URL = `${names.at(-2)}.${names.at(-1)}`;
+}
 
 function useCopy(timeout = 2000) {
   const [copied, setCopied] = useState(false);
@@ -121,7 +127,7 @@ export function ReferralPage({ onLinkMetabox }: { onLinkMetabox: () => void }) {
 
       {/* Info about rewards */}
       <div className="referral-info">
-        <p>{t("referral.rewardInfo")}</p>
+        <p>{t("referral.rewardInfo").replace("{landing_url}", LANDING_URL)}</p>
       </div>
 
       {/* Bot referral link */}

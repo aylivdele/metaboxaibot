@@ -114,7 +114,7 @@ const translations = {
     "referral.perReferral": "Tokens per referral",
     "referral.rewardPerSub": "per referral with subscription",
     "referral.rewardInfo":
-      "Rewards are available to users with an active subscription or a course purchased on meta-box.ru. Invite via any link — the referral will be linked to you.",
+      "Rewards are available to users with an active subscription or a course purchased on {landing_url}. Invite via any link — the referral will be linked to you.",
     "referral.partnerBalance": "Partner Balance",
     "referral.totalEarned": "Total earned",
     "referral.withdraw": "Withdrawal request",
@@ -424,7 +424,7 @@ const translations = {
     "referral.perReferral": "Токенов за реферала",
     "referral.rewardPerSub": "за реферала с подпиской",
     "referral.rewardInfo":
-      "Вознаграждения начисляются пользователям с активной подпиской на бота или с приобретённым курсом/пакетом курсов на meta-box.ru. Приглашайте по любой из ссылок — реферал будет закреплён за вами.",
+      "Вознаграждения начисляются пользователям с активной подпиской на бота или с приобретённым курсом/пакетом курсов на {landing_url}. Приглашайте по любой из ссылок — реферал будет закреплён за вами.",
     "referral.partnerBalance": "Партнёрский баланс",
     "referral.totalEarned": "Всего заработано",
     "referral.withdraw": "Заявка на вывод",
