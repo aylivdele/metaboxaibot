@@ -62,7 +62,9 @@ export function ChatHistory({ dialog, onBack }: ChatHistoryProps) {
           {t("manage.back")}
         </button>
         <div className="chat-view__title">
-          <div className="chat-view__name">{dialog.title ?? dialog.modelId}</div>
+          <div className="chat-view__name">
+            {t("manage.dialog.history")}: {dialog.title ?? dialog.modelId}
+          </div>
           <div className="chat-view__model">{dialog.modelId}</div>
         </div>
       </div>
