@@ -39,8 +39,7 @@ export default {
     languageChanged: "✅ Язык изменён.",
   },
   gpt: {
-    sectionTitle:
-      "💡 GPTs/Claude/Gemini\n\n🎙 Голосом либо ✍ текстом, можно приложить 🖼 изображения и 📄 файлы — задавайте любые вопросы удобным способом и Metabox тут же найдёт решение.",
+    sectionTitle: "💡 GPTs/Claude/Gemini",
     activateEditor: "🔆 Активировать GPT Editor",
     management: "⚙ Управление",
     newDialog: "💬 Новый диалог",
@@ -66,7 +65,7 @@ export default {
     dialogSelected: "✅ <b>Диалог:</b> {title}\n    <b>Модель:</b> {model}",
     dialogHint: {
       prompt: "✦ <b>Пишите⌨️/записывайте🎙️ промпт прямо в чат. Результат получите тоже здесь</b>",
-      attach: "✦ К сообщению можно приложить изображения, файлы (PDF, DOCX, XLSX и др.).",
+      attach: "✦ К сообщению можно приложить 🖼 изображения, 📄 файлы (PDF, DOCX, XLSX и др.).",
       thinkingWarning:
         "✦ Если включён режим размышлений - ответ может занять до 10 минут в зависимости от размера диалога и глубины размышлений.",
     },

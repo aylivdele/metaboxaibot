@@ -111,10 +111,11 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
       state?.gptDialogId === dialog.id &&
       (state?.section === "gpt" || state?.state === "GPT_ACTIVE");
     if (alreadyActive) {
+      closeMiniApp();
       return;
     }
     await api.dialogs.activate(dialog.id);
-    setState((s) => (s ? { ...s, gptDialogId: dialog.id, gptModelId: dialog.modelId } : s));
+    // setState((s) => (s ? { ...s, gptDialogId: dialog.id, gptModelId: dialog.modelId } : s));
     closeMiniApp();
   };
 

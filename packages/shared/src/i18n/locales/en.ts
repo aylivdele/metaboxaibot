@@ -39,8 +39,7 @@ export default {
     languageChanged: "✅ Language changed.",
   },
   gpt: {
-    sectionTitle:
-      "💡 GPTs/Claude/Gemini\n\n🎙 With voice, ✍ text, 🖼 image — ask any questions in a convenient way and Metabox will instantly find a solution + 🌐 web access (only version 4 models).",
+    sectionTitle: "💡 GPTs/Claude/Gemini",
     activateEditor: "🔆 Activate GPT Editor",
     management: "⚙ Management",
     newDialog: "💬 New Dialog",

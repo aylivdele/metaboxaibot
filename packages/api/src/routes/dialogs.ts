@@ -208,13 +208,22 @@ async function sendDialogSelectedNotification(
         }
       : { text: t.gpt.management };
 
-    const sectionText = `${t.gpt.sectionTitle}\n\n💬 ${dialogLabel}`;
+    const model = AI_MODELS[modelId];
+    const confirmText = t.gpt.dialogSelected
+      .replace("{title}", dialogLabel)
+      .replace("{model}", modelName);
+
+    const hint = buildDialogHint(t, model);
+    const fullText = hint
+      ? `${t.gpt.sectionTitle}\n\n${confirmText}\n\n${hint}`
+      : `${t.gpt.sectionTitle}\n\n${confirmText}`;
+
     await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: String(userId),
-        text: sectionText,
+        text: fullText,
         reply_markup: {
           keyboard: [[newDialogBtn], [managementBtn], [{ text: t.common.backToMain }]],
           resize_keyboard: true,
@@ -222,6 +231,7 @@ async function sendDialogSelectedNotification(
         },
       }),
     });
+    return;
   }
 
   // Always send dialog-selected confirmation + capability hints
