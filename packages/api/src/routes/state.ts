@@ -261,26 +261,40 @@ async function sendModelActivatedNotification(
       : `${modelName}\n\n${modelDesc}`;
 
   const webappUrl = config.bot.webappUrl;
-  const replyMarkup = webappUrl
-    ? {
-        inline_keyboard: [
-          [
-            {
-              text: t.common.management,
-              web_app: { url: `${webappUrl}?page=management&section=${section}` },
-            },
-          ],
-        ],
-      }
-    : undefined;
 
+  // Build the unified inline keyboard: media input slots (if any) + management.
+  // Model activation clears media inputs, so all slots start empty.
+  const inlineKeyboard: { text: string; callback_data?: string; web_app?: { url: string } }[][] =
+    [];
+  if ((section === "video" || section === "design") && model.mediaInputs?.length) {
+    for (const slot of model.mediaInputs) {
+      const label = (t.mediaInput as Record<string, string>)[slot.labelKey] ?? slot.labelKey;
+      const suffix = slot.required ? ` ${t.mediaInput.required}` : ` ${t.mediaInput.optional}`;
+      inlineKeyboard.push([
+        { text: `${label}${suffix}`, callback_data: `mi:${section}:${slot.slotKey}` },
+      ]);
+    }
+  }
+  if (webappUrl) {
+    inlineKeyboard.push([
+      {
+        text: t.common.management,
+        web_app: { url: `${webappUrl}?page=management&section=${section}` },
+      },
+    ]);
+  }
+  const replyMarkup = inlineKeyboard.length ? { inline_keyboard: inlineKeyboard } : undefined;
+
+  // Send description first (no inline kb — it goes on the final message).
+  // If there's a hint, send it after the description with the inline kb.
+  // If there's no hint, attach the inline kb to the description.
   await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: String(userId),
       text,
-      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      ...(hint ? {} : replyMarkup ? { reply_markup: replyMarkup } : {}),
     }),
   }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
 
@@ -291,6 +305,7 @@ async function sendModelActivatedNotification(
       body: JSON.stringify({
         chat_id: String(userId),
         text: hint,
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       }),
     }).catch((reason) => logger.warn(reason, `Could not send model hint`));
   }

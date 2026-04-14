@@ -169,7 +169,11 @@ export function buildDesignModelKeyboard(savedModelId?: string | null): InlineKe
 
 // ── Model activation (shared logic) ──────────────────────────────────────────
 
-export async function activateDesignModel(ctx: BotContext, modelId: string): Promise<void> {
+export async function activateDesignModel(
+  ctx: BotContext,
+  modelId: string,
+  options: { suppressKeyboard?: boolean; sectionReplyKeyboard?: boolean } = {},
+): Promise<void> {
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE", "design");
   await userStateService.setModelForSection(ctx.user.id, "design", modelId);
@@ -185,20 +189,22 @@ export async function activateDesignModel(ctx: BotContext, modelId: string): Pro
     const webappUrl = config.bot.webappUrl;
     const kb = new InlineKeyboard();
 
-    // Add media input slot buttons
-    if (model.mediaInputs?.length) {
-      for (const slot of model.mediaInputs) {
-        const label =
-          ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
-        const suffix = slot.required
-          ? ` ${ctx.t.mediaInput.required}`
-          : ` ${ctx.t.mediaInput.optional}`;
-        kb.text(`${label}${suffix}`, `mi:design:${slot.slotKey}`).row();
+    if (!options.suppressKeyboard) {
+      // Add media input slot buttons
+      if (model.mediaInputs?.length) {
+        for (const slot of model.mediaInputs) {
+          const label =
+            ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+          const suffix = slot.required
+            ? ` ${ctx.t.mediaInput.required}`
+            : ` ${ctx.t.mediaInput.optional}`;
+          kb.text(`${label}${suffix}`, `mi:design:${slot.slotKey}`).row();
+        }
       }
-    }
 
-    if (webappUrl) {
-      kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
+      if (webappUrl) {
+        kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
+      }
     }
 
     const { name: modelName, description: modelDesc } = resolveModelDisplay(
@@ -206,8 +212,31 @@ export async function activateDesignModel(ctx: BotContext, modelId: string): Pro
       ctx.user.language,
       model,
     );
+    let replyMarkup: Parameters<typeof ctx.reply>[1] extends infer R
+      ? R extends { reply_markup?: infer M }
+        ? M | undefined
+        : never
+      : never = kb.inline_keyboard.length ? kb : undefined;
+    if (!replyMarkup && options.sectionReplyKeyboard) {
+      const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
+      const managementBtn = webappUrl
+        ? {
+            text: ctx.t.design.management,
+            web_app: { url: `${webappUrl}?page=management&section=design&wtoken=${token}` },
+          }
+        : { text: ctx.t.design.management };
+      replyMarkup = {
+        keyboard: [
+          [{ text: ctx.t.design.chooseModel }],
+          [managementBtn],
+          [{ text: ctx.t.common.backToMain }],
+        ],
+        resize_keyboard: true,
+        is_persistent: true,
+      };
+    }
     await ctx.reply(`🎨 ${modelName}\n\n${modelDesc}\n\n${costLine}\n\n${ctx.t.voice.inputHint}`, {
-      reply_markup: kb.inline_keyboard.length ? kb : undefined,
+      reply_markup: replyMarkup,
     });
   } else {
     await ctx.reply(`${ctx.t.design.modelActivated}\n\n${ctx.t.voice.inputHint}`);
@@ -246,7 +275,10 @@ export async function handleDesignFamilySelect(ctx: BotContext): Promise<void> {
 // ── Media input status menu helper ──────────────────────────────────────────
 
 /** Sends an updated media-input status menu showing filled/empty slots. */
-export async function sendDesignMediaInputStatus(ctx: BotContext): Promise<void> {
+export async function sendDesignMediaInputStatus(
+  ctx: BotContext,
+  options: { edit?: boolean } = {},
+): Promise<void> {
   if (!ctx.user) return;
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
@@ -255,7 +287,16 @@ export async function sendDesignMediaInputStatus(ctx: BotContext): Promise<void>
 
   const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
   const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "design", ctx.t);
-  await ctx.reply(text || ctx.t.mediaInput.doneUploading, { reply_markup: kb });
+  const webappUrl = config.bot.webappUrl;
+  if (webappUrl) {
+    kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
+  }
+  const body = text || ctx.t.mediaInput.doneUploading;
+  if (options.edit) {
+    await ctx.editMessageText(body, { reply_markup: kb }).catch(() => void 0);
+  } else {
+    await ctx.reply(body, { reply_markup: kb });
+  }
 }
 
 // ── Media input slot callback (mi:design:{slotKey}) ─────────────────────────
@@ -332,7 +373,7 @@ export async function handleDesignMediaInputRemove(ctx: BotContext): Promise<voi
   const slotKey = data.replace("mi_remove:design:", "");
   await ctx.answerCallbackQuery();
   await userStateService.clearMediaInputSlot(ctx.user.id, slotKey);
-  await sendDesignMediaInputStatus(ctx);
+  await sendDesignMediaInputStatus(ctx, { edit: true });
 }
 
 // ── Incoming prompt in DESIGN_ACTIVE state ────────────────────────────────────

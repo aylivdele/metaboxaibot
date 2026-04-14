@@ -134,14 +134,12 @@ export async function handleRefineEntry(ctx: BotContext): Promise<void> {
       .text(ctx.t.mediaInput.refineActiveLabel.replace("{model}", modelName), `ref_use:${jobId}`)
       .row()
       .text(ctx.t.mediaInput.refineChooseModel, `ref_choose:${jobId}`);
-    await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
     await ctx.reply(text, { reply_markup: kb });
   } else {
     // Step 2b: active model doesn't support
     const kb = new InlineKeyboard()
       .text(ctx.t.mediaInput.refineDesign, `ref_sec:d:${jobId}`)
       .text(ctx.t.mediaInput.refineVideo, `ref_sec:v:${jobId}`);
-    await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
     await ctx.reply(ctx.t.mediaInput.refineNoSupport, { reply_markup: kb });
   }
 }
@@ -230,14 +228,28 @@ export async function handleRefineModel(ctx: BotContext): Promise<void> {
   const compatibleSlots = getCompatibleSlots(model.mediaInputs, section);
   if (compatibleSlots.length === 0) return;
 
-  // Remove the inline keyboard from the chooser message
-  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
+  // Delete the chooser message
+  await ctx.deleteMessage().catch(() => void 0);
 
-  // Activate the model (sends activation message with hints)
+  // If section is changing, swap the persistent bottom reply keyboard.
+  const state = await userStateService.get(ctx.user.id);
+  const prevSection = state?.section;
+  const crossingSections = prevSection !== section;
+
+  // Activate the model (sends activation message with hints).
+  // Suppress the inline keyboard — the status menu sent next carries the
+  // unified media-input + management keyboard. When crossing sections,
+  // attach the section's persistent bottom reply keyboard to the activation msg.
   if (section === "video") {
-    await activateVideoModel(ctx, modelId);
+    await activateVideoModel(ctx, modelId, {
+      suppressKeyboard: true,
+      sectionReplyKeyboard: crossingSections,
+    });
   } else {
-    await activateDesignModel(ctx, modelId);
+    await activateDesignModel(ctx, modelId, {
+      suppressKeyboard: true,
+      sectionReplyKeyboard: crossingSections,
+    });
   }
 
   // Fill the slot

@@ -151,7 +151,7 @@ export default {
     hintDid:
       "📸 Send a photo with a face — it will become the avatar.\n\n✉️ Send text → the avatar will speak it. If a cloned ElevenLabs voice is selected, speech will be synthesised via ElevenLabs (extra TTS charge).\n🎙 Or send a voice message / audio file directly — the avatar will lip-sync to your recording without TTS.\n⚙ Voice and other settings are available on the Management page.",
     hintHiggsfield:
-      "📸 Send a photo to create an animation.\nYou can also pick several motion presets in Management section of Mini App.\n✉️ Once ready — send a text describing a video you want to generate.",
+      "🖼 Attach a photo via the «First Frame» button below — the video will be built from it.\n✉️ Then send a text prompt describing the video you want.\nYou can also pick several motion presets in the ⚙ Management section.",
     higgsfieldRequiresImage:
       "❌ Higgsfield requires an image to generate video. Please send a photo first, then your text prompt.",
     runwayRequiresImage:
@@ -165,7 +165,7 @@ export default {
     imageIgnoredUnsupported:
       "⚠️ This model does not support image input — your photo will be ignored.",
     hintVideoDefault:
-      "✉️ Send a text prompt to generate a video.\n🖼 Optionally attach an image — the video will start from it.",
+      "✉️ Send a text prompt to generate a video.\n🖼 To add images (first/last frame, reference etc.) — use the slot buttons below.",
     videoPhotoSaved: "📸 Photo saved for use in next generation.",
     videoDriverSaved: "🎬 Driver video saved for use in next generation.",
     videoVoiceSaved: "🎙 Voice sample saved. Now send the text for the avatar to speak.",
@@ -373,18 +373,18 @@ export default {
     avatarChoiceTranscribe: "🎤 Transcribe as prompt",
   },
   mediaInput: {
-    firstFrame: "🖼 First Frame",
-    lastFrame: "🖼 Last Frame",
-    reference: "🖼 Reference Image",
-    edit: "🖼 Source Image",
-    styleReference: "🖼 Style Reference",
+    firstFrame: "First Frame",
+    lastFrame: "Last Frame",
+    reference: "Reference Image",
+    edit: "Source Image",
+    styleReference: "Style Reference",
     uploadPrompt: 'Send a photo for "{slot}".',
     uploadPromptMulti: 'Send up to {max} photos for "{slot}".',
     imageSaved: "✅ {slot}: image {n}/{max} saved.",
     imageSavedSingle: "✅ {slot} uploaded.",
     slotRequired: '⚠️ "{slot}" is required. Please upload an image first.',
     replace: "🔄 Replace",
-    remove: "🗑 Remove",
+    remove: "Remove",
     optional: "(optional)",
     required: "(required)",
     doneUploading: "Done ✓",

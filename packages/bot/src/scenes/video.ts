@@ -194,7 +194,11 @@ export function buildVideoModelKeyboard(savedModelId?: string | null): InlineKey
 
 // ── Model activation (shared logic) ──────────────────────────────────────────
 
-export async function activateVideoModel(ctx: BotContext, modelId: string): Promise<void> {
+export async function activateVideoModel(
+  ctx: BotContext,
+  modelId: string,
+  options: { suppressKeyboard?: boolean; sectionReplyKeyboard?: boolean } = {},
+): Promise<void> {
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "VIDEO_ACTIVE", "video");
   await userStateService.setModelForSection(ctx.user.id, "video", modelId);
@@ -215,20 +219,22 @@ export async function activateVideoModel(ctx: BotContext, modelId: string): Prom
     const webappUrl = config.bot.webappUrl;
     const kb = new InlineKeyboard();
 
-    // Add media input slot buttons
-    if (model.mediaInputs?.length) {
-      for (const slot of model.mediaInputs) {
-        const label =
-          ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
-        const suffix = slot.required
-          ? ` ${ctx.t.mediaInput.required}`
-          : ` ${ctx.t.mediaInput.optional}`;
-        kb.text(`${label}${suffix}`, `mi:video:${slot.slotKey}`).row();
+    if (!options.suppressKeyboard) {
+      // Add media input slot buttons
+      if (model.mediaInputs?.length) {
+        for (const slot of model.mediaInputs) {
+          const label =
+            ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+          const suffix = slot.required
+            ? ` ${ctx.t.mediaInput.required}`
+            : ` ${ctx.t.mediaInput.optional}`;
+          kb.text(`${label}${suffix}`, `mi:video:${slot.slotKey}`).row();
+        }
       }
-    }
 
-    if (webappUrl) {
-      kb.webApp(ctx.t.video.management, `${webappUrl}?page=management&section=video`);
+      if (webappUrl) {
+        kb.webApp(ctx.t.video.management, `${webappUrl}?page=management&section=video`);
+      }
     }
 
     const { name: modelName, description: modelDesc } = resolveModelDisplay(
@@ -236,8 +242,38 @@ export async function activateVideoModel(ctx: BotContext, modelId: string): Prom
       ctx.user.language,
       model,
     );
+    const inlineKb = kb.inline_keyboard.length ? kb : undefined;
+    let sectionReplyMarkup:
+      | {
+          keyboard: { text: string; web_app?: { url: string } }[][];
+          resize_keyboard: boolean;
+          is_persistent: boolean;
+        }
+      | undefined;
+    if (options.sectionReplyKeyboard) {
+      const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
+      const managementBtn = webappUrl
+        ? {
+            text: ctx.t.video.management,
+            web_app: { url: `${webappUrl}?page=management&section=video&wtoken=${token}` },
+          }
+        : { text: ctx.t.video.management };
+      sectionReplyMarkup = {
+        keyboard: [
+          [{ text: ctx.t.video.newDialog }],
+          [{ text: ctx.t.video.avatars }, { text: ctx.t.video.lipSync }],
+          [managementBtn],
+          [{ text: ctx.t.common.backToMain }],
+        ],
+        resize_keyboard: true,
+        is_persistent: true,
+      };
+    }
+
+    // Description goes first; attach the persistent section reply keyboard here
+    // (if any), so the inline model menu can live on the final hint message.
     await ctx.reply(`${modelName}\n\n${modelDesc}\n\n${costLine}`, {
-      reply_markup: kb.inline_keyboard.length ? kb : undefined,
+      reply_markup: sectionReplyMarkup,
     });
 
     let hint = ctx.t.video.hintVideoDefault;
@@ -256,7 +292,9 @@ export async function activateVideoModel(ctx: BotContext, modelId: string): Prom
       case "higgsfield-preview":
         hint = ctx.t.video.hintHiggsfield;
     }
-    await ctx.reply(appendVoiceHint ? `${hint}\n\n${ctx.t.voice.inputHint}` : hint);
+    await ctx.reply(appendVoiceHint ? `${hint}\n\n${ctx.t.voice.inputHint}` : hint, {
+      reply_markup: inlineKb,
+    });
   } else {
     await ctx.reply(ctx.t.video.modelActivated);
   }
@@ -291,7 +329,10 @@ export async function handleVideoFamilySelect(ctx: BotContext): Promise<void> {
 // ── Media input status menu helper ──────────────────────────────────────────
 
 /** Sends an updated media-input status menu showing filled/empty slots. */
-export async function sendVideoMediaInputStatus(ctx: BotContext): Promise<void> {
+export async function sendVideoMediaInputStatus(
+  ctx: BotContext,
+  options: { edit?: boolean } = {},
+): Promise<void> {
   if (!ctx.user) return;
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.videoModelId ?? "kling";
@@ -300,7 +341,16 @@ export async function sendVideoMediaInputStatus(ctx: BotContext): Promise<void> 
 
   const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
   const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "video", ctx.t);
-  await ctx.reply(text || ctx.t.mediaInput.doneUploading, { reply_markup: kb });
+  const webappUrl = config.bot.webappUrl;
+  if (webappUrl) {
+    kb.webApp(ctx.t.video.management, `${webappUrl}?page=management&section=video`);
+  }
+  const body = text || ctx.t.mediaInput.doneUploading;
+  if (options.edit) {
+    await ctx.editMessageText(body, { reply_markup: kb }).catch(() => void 0);
+  } else {
+    await ctx.reply(body, { reply_markup: kb });
+  }
 }
 
 // ── Media input slot callback (mi:video:{slotKey}) ──────────────────────────
@@ -372,7 +422,7 @@ export async function handleVideoMediaInputRemove(ctx: BotContext): Promise<void
   const slotKey = data.replace("mi_remove:video:", "");
   await ctx.answerCallbackQuery();
   await userStateService.clearMediaInputSlot(ctx.user.id, slotKey);
-  await sendVideoMediaInputStatus(ctx);
+  await sendVideoMediaInputStatus(ctx, { edit: true });
 }
 
 // ── Incoming prompt in VIDEO_ACTIVE state ─────────────────────────────────────
