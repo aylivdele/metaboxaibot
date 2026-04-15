@@ -17,6 +17,36 @@ const MI_REFERENCE: MediaInputSlot = {
   labelKey: "reference",
 };
 
+/** Kling element slots: each accepts up to 4 images (1 frontal + 3 refs) OR 1 video. */
+const MI_REF_ELEMENTS: MediaInputSlot[] = [1, 2, 3, 4, 5].map((i) => ({
+  slotKey: `ref_element_${i}`,
+  mode: "reference_element",
+  labelKey: `refElement${i}`,
+  maxImages: 4,
+}));
+
+const KLING_MEDIA_INPUTS: MediaInputSlot[] = [MI_FIRST_FRAME, MI_LAST_FRAME, ...MI_REF_ELEMENTS];
+
+/** Seedance 2 reference-to-video slots. */
+const MI_REF_IMAGES: MediaInputSlot = {
+  slotKey: "ref_images",
+  mode: "reference_image",
+  labelKey: "referenceImages",
+  maxImages: 9,
+};
+const MI_REF_VIDEOS: MediaInputSlot = {
+  slotKey: "ref_videos",
+  mode: "reference_video",
+  labelKey: "referenceVideos",
+  maxImages: 3,
+};
+const MI_REF_AUDIOS: MediaInputSlot = {
+  slotKey: "ref_audios",
+  mode: "reference_audio",
+  labelKey: "referenceAudios",
+  maxImages: 3,
+};
+
 const KLING_SETTINGS: ModelSettingDef[] = [
   mkAspectRatio(["16:9", "9:16", "1:1"]),
   {
@@ -85,7 +115,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    mediaInputs: [MI_FIRST_FRAME],
+    mediaInputs: KLING_MEDIA_INPUTS,
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
@@ -115,7 +145,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    mediaInputs: [MI_FIRST_FRAME],
+    mediaInputs: KLING_MEDIA_INPUTS,
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
@@ -146,7 +176,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    mediaInputs: [MI_FIRST_FRAME],
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     supportedDurations: null,
     durationRange: { min: 4, max: 12 },
@@ -197,7 +227,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    mediaInputs: [MI_FIRST_FRAME],
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REF_IMAGES, MI_REF_VIDEOS, MI_REF_AUDIOS],
     supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
     durationRange: { min: 4, max: 15 },
     settings: [
@@ -247,7 +277,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    mediaInputs: [MI_FIRST_FRAME],
+    mediaInputs: [MI_FIRST_FRAME, MI_REF_IMAGES, MI_REF_VIDEOS, MI_REF_AUDIOS],
     supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
     durationRange: { min: 4, max: 15 },
     settings: [

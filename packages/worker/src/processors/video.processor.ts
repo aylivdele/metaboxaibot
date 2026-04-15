@@ -247,9 +247,21 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
               actualFps ?? undefined,
             )
           : undefined;
+        const refVideos = (mediaInputs as Record<string, string[]> | undefined)?.ref_videos ?? [];
+        const hasVideoInputs = refVideos.length > 0;
         await deductTokens(
           BigInt(userIdStr),
-          calculateCost(model, 0, 0, undefined, videoTokens, modelSettings, effectiveDuration),
+          calculateCost(
+            model,
+            0,
+            0,
+            undefined,
+            videoTokens,
+            modelSettings,
+            effectiveDuration,
+            undefined,
+            { hasVideoInputs },
+          ),
           modelId,
         );
       }

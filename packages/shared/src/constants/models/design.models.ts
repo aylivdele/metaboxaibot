@@ -6,6 +6,18 @@ const MI_EDIT: MediaInputSlot = {
   mode: "edit",
   labelKey: "edit",
 };
+const MI_EDIT_4: MediaInputSlot = {
+  slotKey: "edit",
+  mode: "edit",
+  labelKey: "edit",
+  maxImages: 4,
+};
+const MI_EDIT_10: MediaInputSlot = {
+  slotKey: "edit",
+  mode: "edit",
+  labelKey: "edit",
+  maxImages: 10,
+};
 const MI_STYLE_REF: MediaInputSlot = {
   slotKey: "style_ref",
   mode: "style_reference",
@@ -328,7 +340,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_EDIT],
+    mediaInputs: [MI_EDIT_4],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -421,7 +433,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_EDIT],
+    mediaInputs: [MI_EDIT_4],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -1217,13 +1229,13 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     variantLabel: "Standard",
     costUsdPerRequest: 0,
     costUsdPerMPixel: 0.012, // $0.012/MP, billed as ceil(px/1_000_000)
-    // img2img: FAL resizes every input to 1 MP and charges a flat $0.012
+    // img2img: FAL resizes every input to 1 MP and charges a flat $0.012 per image
     costUsdPerMPixelInput: 0.012,
     costUsdPerMPixelInputFixed: true,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_EDIT],
+    mediaInputs: [MI_EDIT_4],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -1247,12 +1259,12 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     // $0.03 for first MP + $0.015 per extra MP: base=$0.015, perMP=$0.015 → ceil formula
     costUsdPerMPixelBase: 0.015,
     costUsdPerMPixel: 0.015,
-    // img2img: +$0.015 per ceil-MP of the actual input image
+    // img2img: +$0.015 per ceil-MP of each input image (sum of ceil per image)
     costUsdPerMPixelInput: 0.015,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_EDIT],
+    mediaInputs: [MI_EDIT_4],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -1626,7 +1638,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_EDIT],
+    mediaInputs: [MI_EDIT_10],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -1649,7 +1661,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_EDIT],
+    mediaInputs: [MI_EDIT_10],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,

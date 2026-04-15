@@ -377,8 +377,26 @@ export default {
     reference: "Reference Image",
     edit: "Source Image",
     styleReference: "Style Reference",
+    refElement1: "Element 1",
+    refElement2: "Element 2",
+    refElement3: "Element 3",
+    refElement4: "Element 4",
+    refElement5: "Element 5",
+    refElementHint:
+      "Upload options for this element:\n• 1 image — used as the frontal view\n• 2–4 images — first is the frontal view, the rest (up to 3) are reference views from other angles\n• 1 video — used as the element video (mutually exclusive with images)\n\nReference elements in the prompt as @Element1, @Element2, etc.\n\nSend photos or a video now.",
+    referenceImages: "Reference Images",
+    referenceVideos: "Reference Videos",
+    referenceAudios: "Reference Audios",
+    referenceImagesHint:
+      "Reference images for video generation:\n• Up to 9 images\n• JPEG, PNG, or WebP, up to 30 MB each\n• Total files across all modalities must not exceed 12\n\nReference them in the prompt as @Image1, @Image2, etc.\n\nSend photos one at a time.",
+    referenceVideosHint:
+      "Reference videos for generation:\n• Up to 3 videos\n• Combined duration 2–15 seconds\n• Total size under 50 MB\n• Each video between ~480p and ~720p\n\nReference them in the prompt as @Video1, @Video2, etc.\n\nSend videos one at a time.",
+    referenceAudiosHint:
+      "Reference audios for generation:\n• Up to 3 files\n• Combined duration ≤ 15 seconds\n• Max 15 MB each (MP3, WAV)\n• When audio is provided, at least one reference image or video is required\n\nReference them in the prompt as @Audio1, @Audio2, etc.\n\nSend audio files one at a time.",
     uploadPrompt: 'Send a photo for "{slot}".',
     uploadPromptMulti: 'Send up to {max} photos for "{slot}".',
+    uploadPromptElement:
+      'Send 1–4 photos or 1 video for "{slot}". First photo = frontal view; the rest (up to 3) = reference views.',
     imageSaved: "✅ {slot}: image {n}/{max} saved.",
     imageSavedSingle: "✅ {slot} uploaded.",
     slotRequired: '⚠️ "{slot}" is required. Please upload an image first.',

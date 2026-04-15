@@ -85,7 +85,11 @@ export type MediaInputMode =
   | "last_frame"
   | "reference"
   | "edit"
-  | "style_reference";
+  | "style_reference"
+  | "reference_element"
+  | "reference_image"
+  | "reference_video"
+  | "reference_audio";
 
 export interface MediaInputSlot {
   /** Unique key for this slot within the model, used as storage key. */

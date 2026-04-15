@@ -164,12 +164,24 @@ interface MediaOpts {
    * model has `costUsdPerMPixelInputFixed === true` (flat fee).
    */
   inputMegapixels?: number;
+  /**
+   * Per-image megapixel sizes for multi-image inputs (img2img with N images).
+   * When set, overrides `inputMegapixels`/`hasInputImage`:
+   *   - fixed:    cost += length * costUsdPerMPixelInput
+   *   - per-MP:   cost += sum(ceil(mp_i)) * costUsdPerMPixelInput
+   */
+  inputImagesMegapixels?: number[];
   /** True when an input image is present. Needed for flat-fee input billing. */
   hasInputImage?: boolean;
   videoTokens?: number;
   durationSeconds?: number;
   charCount?: number;
   modelSettings?: Record<string, unknown>;
+  /**
+   * When true, indicates reference video inputs were provided (e.g. Seedance r2v).
+   * Applies a 0.6× multiplier on per-video-token cost per provider pricing.
+   */
+  hasVideoInputs?: boolean;
 }
 
 /**
@@ -203,12 +215,23 @@ function computeMediaBaseUsd(model: AIModel, rates: ResolvedRates, opts: MediaOp
   if (model.costUsdPerMPixel && megapixels) {
     let cost = (model.costUsdPerMPixelBase ?? 0) + Math.ceil(megapixels) * model.costUsdPerMPixel;
     // Optional image-to-image input surcharge
-    if (model.costUsdPerMPixelInput && opts.hasInputImage) {
-      if (model.costUsdPerMPixelInputFixed) {
-        // Flat fee regardless of input size (provider normalizes input to 1 MP).
-        cost += model.costUsdPerMPixelInput;
-      } else if (opts.inputMegapixels !== undefined && opts.inputMegapixels > 0) {
-        cost += Math.ceil(opts.inputMegapixels) * model.costUsdPerMPixelInput;
+    if (model.costUsdPerMPixelInput) {
+      const perImage = opts.inputImagesMegapixels;
+      if (perImage && perImage.length > 0) {
+        if (model.costUsdPerMPixelInputFixed) {
+          // Flat fee per image (provider normalizes each input to 1 MP).
+          cost += perImage.length * model.costUsdPerMPixelInput;
+        } else {
+          // Sum of ceil(MP) per image.
+          const totalCeil = perImage.reduce((sum, mp) => sum + Math.ceil(mp), 0);
+          cost += totalCeil * model.costUsdPerMPixelInput;
+        }
+      } else if (opts.hasInputImage) {
+        if (model.costUsdPerMPixelInputFixed) {
+          cost += model.costUsdPerMPixelInput;
+        } else if (opts.inputMegapixels !== undefined && opts.inputMegapixels > 0) {
+          cost += Math.ceil(opts.inputMegapixels) * model.costUsdPerMPixelInput;
+        }
       }
     }
     return cost;
@@ -216,7 +239,9 @@ function computeMediaBaseUsd(model: AIModel, rates: ResolvedRates, opts: MediaOp
 
   // 3. Per-video-token
   if (rates.costPerMVideoToken && videoTokens) {
-    return (videoTokens / 1_000_000) * rates.costPerMVideoToken;
+    const base = (videoTokens / 1_000_000) * rates.costPerMVideoToken;
+    // Seedance r2v pricing: ×0.6 when reference video inputs are provided.
+    return opts.hasVideoInputs ? base * 0.6 : base;
   }
 
   // 4. Per-second (flat fee + duration charge)
@@ -284,17 +309,24 @@ export function calculateCost(
   modelSettings?: Record<string, unknown>,
   durationSeconds?: number,
   charCount?: number,
-  extra?: { inputMegapixels?: number; hasInputImage?: boolean },
+  extra?: {
+    inputMegapixels?: number;
+    inputImagesMegapixels?: number[];
+    hasInputImage?: boolean;
+    hasVideoInputs?: boolean;
+  },
 ): number {
   const rates = resolveRates(model, inputTokens, modelSettings);
   const mediaUsd = computeMediaBaseUsd(model, rates, {
     megapixels,
     inputMegapixels: extra?.inputMegapixels,
+    inputImagesMegapixels: extra?.inputImagesMegapixels,
     hasInputImage: extra?.hasInputImage,
     videoTokens,
     durationSeconds,
     charCount,
     modelSettings,
+    hasVideoInputs: extra?.hasVideoInputs,
   });
   const addonUsd = computeAddonUsd(model, modelSettings);
   const llmUsd = computeLlmUsd(rates, inputTokens, outputTokens);

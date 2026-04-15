@@ -71,7 +71,8 @@ export class FalAdapter implements ImageAdapter {
   }
 
   async submit(input: ImageInput): Promise<string> {
-    const imageUrl = input.mediaInputs?.edit?.[0] ?? input.imageUrl;
+    const editUrls = input.mediaInputs?.edit ?? (input.imageUrl ? [input.imageUrl] : []);
+    const imageUrl = editUrls[0];
     const endpoint = this.selectEndpoint(imageUrl);
     const ms = input.modelSettings ?? {};
     const msExtras: Record<string, unknown> = {};
@@ -98,7 +99,7 @@ export class FalAdapter implements ImageAdapter {
         : { image_size: this.resolveSize(input) }),
       ...(imageUrl
         ? IMAGE_URLS_ARRAY_MODELS.has(this.modelId)
-          ? { image_urls: [imageUrl] }
+          ? { image_urls: editUrls }
           : { image_url: imageUrl }
         : {}),
       ...msExtras,

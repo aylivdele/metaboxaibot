@@ -380,12 +380,25 @@ export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
   const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
   const maxImages = slot.maxImages ?? 1;
   const msg =
-    maxImages > 1
-      ? ctx.t.mediaInput.uploadPromptMulti
-          .replace("{slot}", String(label))
-          .replace("{max}", String(maxImages))
-      : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
+    slot.mode === "reference_element"
+      ? ctx.t.mediaInput.uploadPromptElement.replace("{slot}", String(label))
+      : maxImages > 1
+        ? ctx.t.mediaInput.uploadPromptMulti
+            .replace("{slot}", String(label))
+            .replace("{max}", String(maxImages))
+        : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
   const kb = new InlineKeyboard().text(ctx.t.mediaInput.cancel, `mi_cancel:video`);
+  const hint =
+    slot.mode === "reference_element"
+      ? ctx.t.mediaInput.refElementHint
+      : slot.mode === "reference_image"
+        ? ctx.t.mediaInput.referenceImagesHint
+        : slot.mode === "reference_video"
+          ? ctx.t.mediaInput.referenceVideosHint
+          : slot.mode === "reference_audio"
+            ? ctx.t.mediaInput.referenceAudiosHint
+            : null;
+  if (hint) await ctx.reply(hint);
   await ctx.reply(msg, { reply_markup: kb });
 }
 
@@ -819,10 +832,53 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
 
 export async function handleVideoVideo(ctx: BotContext): Promise<void> {
   if (!ctx.user || !ctx.message?.video) return;
-  const modelId = await userStateService.get(ctx.user.id).then((s) => s?.videoModelId);
-  if (!modelId || !AI_MODELS[modelId]?.supportsVideo) return;
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.videoModelId;
+  if (!modelId) return;
+  const model = AI_MODELS[modelId];
   const file = await ctx.api.getFile(ctx.message.video.file_id);
   const fileUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+
+  // Active reference_element slot: videos are exclusive (replace any images).
+  const activeSlot = getActiveSlot(ctx.user.id);
+  if (activeSlot && activeSlot.section === "video") {
+    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+    if (slot?.mode === "reference_element") {
+      await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
+      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, fileUrl);
+      clearActiveSlot(ctx.user.id);
+      await sendVideoMediaInputStatus(ctx);
+      return;
+    }
+    if (slot?.mode === "reference_video") {
+      const current = await userStateService.getMediaInputs(ctx.user.id);
+      const existing = current[activeSlot.slotKey] ?? [];
+      if (existing.length >= activeSlot.maxImages) {
+        await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
+      }
+      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, fileUrl);
+      const updatedCount = Math.min(existing.length + 1, activeSlot.maxImages);
+      if (updatedCount >= activeSlot.maxImages) {
+        clearActiveSlot(ctx.user.id);
+        await sendVideoMediaInputStatus(ctx);
+      } else {
+        const kb = new InlineKeyboard().text(
+          ctx.t.mediaInput.doneUploading,
+          `mi_done:${activeSlot.slotKey}`,
+        );
+        const label =
+          ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+        const m = ctx.t.mediaInput.imageSaved
+          .replace("{slot}", String(label))
+          .replace("{n}", String(updatedCount))
+          .replace("{max}", String(activeSlot.maxImages));
+        await ctx.reply(m, { reply_markup: kb });
+      }
+      return;
+    }
+  }
+
+  if (!model?.supportsVideo) return;
   await userStateService.setVideoRefDriverUrl(ctx.user.id, fileUrl);
   await ctx.reply(ctx.t.video.videoDriverSaved);
 }
@@ -940,6 +996,41 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
   const userId = ctx.user.id;
   const state = await userStateService.get(userId);
   const modelId = state?.videoModelId ?? "kling";
+  const model = AI_MODELS[modelId];
+
+  // Active reference_audio slot: capture audio URL into slot.
+  const activeSlot = getActiveSlot(userId);
+  if (activeSlot && activeSlot.section === "video") {
+    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+    if (slot?.mode === "reference_audio") {
+      const file = await ctx.api.getFile(audioMsg.file_id);
+      const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+      const current = await userStateService.getMediaInputs(userId);
+      const existing = current[activeSlot.slotKey] ?? [];
+      if (existing.length >= activeSlot.maxImages) {
+        await userStateService.clearMediaInputSlot(userId, activeSlot.slotKey);
+      }
+      await userStateService.addMediaInput(userId, activeSlot.slotKey, tgUrl);
+      const updatedCount = Math.min(existing.length + 1, activeSlot.maxImages);
+      if (updatedCount >= activeSlot.maxImages) {
+        clearActiveSlot(userId);
+        await sendVideoMediaInputStatus(ctx);
+      } else {
+        const kb = new InlineKeyboard().text(
+          ctx.t.mediaInput.doneUploading,
+          `mi_done:${activeSlot.slotKey}`,
+        );
+        const label =
+          ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+        const m = ctx.t.mediaInput.imageSaved
+          .replace("{slot}", String(label))
+          .replace("{n}", String(updatedCount))
+          .replace("{max}", String(activeSlot.maxImages));
+        await ctx.reply(m, { reply_markup: kb });
+      }
+      return;
+    }
+  }
 
   if (!AVATAR_MODELS.has(modelId)) {
     // Non-avatar model: transcribe voice → offer as prompt

@@ -23,8 +23,18 @@ const FAL_I2V_ENDPOINTS: Record<string, string> = {
   pika: "fal-ai/pika/v2.2/image-to-video",
 };
 
+/** Reference-to-video endpoint (used when any ref_{images,videos,audios} slot is filled). */
+const FAL_R2V_ENDPOINTS: Record<string, string> = {
+  "seedance-2": "bytedance/seedance-2.0/reference-to-video",
+  "seedance-2-fast": "bytedance/seedance-2.0/fast/reference-to-video",
+};
+
 /** Separator used to pack endpoint+requestId into a single opaque string. */
 const SEP = "||";
+
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url);
+}
 
 export class FalVideoAdapter implements VideoAdapter {
   constructor(
@@ -43,7 +53,6 @@ export class FalVideoAdapter implements VideoAdapter {
 
   async submit(input: VideoInput): Promise<string> {
     const imageUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
-    const endpoint = this.selectEndpoint(imageUrl);
     const ms = input.modelSettings ?? {};
     const msExtras: Record<string, unknown> = {};
     if (ms.cfg_scale !== undefined) msExtras.cfg_scale = ms.cfg_scale;
@@ -52,9 +61,63 @@ export class FalVideoAdapter implements VideoAdapter {
     if (ms.resolution) msExtras.resolution = ms.resolution;
     if (ms.motion_strength !== undefined) msExtras.motion_strength = ms.motion_strength;
     if (ms.seed != null) msExtras.seed = ms.seed;
+
+    const klingExtras: Record<string, unknown> = {};
+    if (this.modelId === "kling" || this.modelId === "kling-pro") {
+      const lastFrame = input.mediaInputs?.last_frame?.[0];
+      if (lastFrame) klingExtras.end_image_url = lastFrame;
+
+      const elements: Array<Record<string, unknown>> = [];
+      for (let i = 1; i <= 5; i++) {
+        const urls = input.mediaInputs?.[`ref_element_${i}`] ?? [];
+        if (urls.length === 0) continue;
+        const videoUrl = urls.find((u) => isVideoUrl(u));
+        if (videoUrl) {
+          elements.push({ video_url: videoUrl });
+          continue;
+        }
+        const [frontal, ...refs] = urls;
+        if (!frontal) continue;
+        elements.push({
+          frontal_image_url: frontal,
+          reference_image_urls: refs.length > 0 ? refs.slice(0, 3) : [frontal],
+        });
+      }
+      if (elements.length > 0) klingExtras.elements = elements;
+    }
+
+    // Seedance: last_frame → end_image_url (supported by v1.5 i2v and v2 i2v).
+    const seedanceExtras: Record<string, unknown> = {};
+    let seedanceR2VEndpoint: string | undefined;
+    if (this.modelId === "seedance" || this.modelId === "seedance-2") {
+      const lastFrame = input.mediaInputs?.last_frame?.[0];
+      if (lastFrame) seedanceExtras.end_image_url = lastFrame;
+    }
+    // Seedance 2 / 2-fast: reference-to-video mode when any ref slot is populated.
+    if (FAL_R2V_ENDPOINTS[this.modelId]) {
+      const refImages = input.mediaInputs?.ref_images ?? [];
+      const refVideos = input.mediaInputs?.ref_videos ?? [];
+      const refAudios = input.mediaInputs?.ref_audios ?? [];
+      if (refImages.length || refVideos.length || refAudios.length) {
+        seedanceR2VEndpoint = FAL_R2V_ENDPOINTS[this.modelId];
+        if (refImages.length) seedanceExtras.image_urls = refImages;
+        if (refVideos.length) seedanceExtras.video_urls = refVideos;
+        if (refAudios.length) seedanceExtras.audio_urls = refAudios;
+      }
+    }
+
+    const endpoint = seedanceR2VEndpoint ?? this.selectEndpoint(imageUrl);
+    const useR2V = !!seedanceR2VEndpoint;
+
+    // r2v endpoints don't accept a single image_url — fold first_frame into image_urls.
+    if (useR2V && imageUrl) {
+      const existing = (seedanceExtras.image_urls as string[] | undefined) ?? [];
+      seedanceExtras.image_urls = [imageUrl, ...existing].slice(0, 9);
+    }
+
     const falInput = {
       prompt: input.prompt,
-      ...(imageUrl ? { image_url: imageUrl } : {}),
+      ...(imageUrl && !useR2V ? { image_url: imageUrl } : {}),
       ...(input.duration
         ? {
             duration: this.modelId.startsWith("seedance-2")
@@ -64,6 +127,8 @@ export class FalVideoAdapter implements VideoAdapter {
         : {}),
       ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
       ...msExtras,
+      ...klingExtras,
+      ...seedanceExtras,
     };
     logCall(endpoint, "submit", falInput);
     const { request_id } = await fal.queue.submit(endpoint, { input: falInput });

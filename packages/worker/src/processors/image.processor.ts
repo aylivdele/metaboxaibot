@@ -225,19 +225,29 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
             ? (imageResult.width * imageResult.height) / 1_000_000
             : undefined;
 
-        // img2img input surcharge
-        const sourceImageUrl = job.data.sourceImageUrl;
-        const hasInputImage = !!sourceImageUrl;
-        let inputMegapixels: number | undefined;
+        // img2img input surcharge — collect all input image URLs (media-input
+        // slots in `edit` mode) plus the legacy single sourceImageUrl.
+        const editUrls: string[] =
+          (job.data.mediaInputs as Record<string, string[]> | undefined)?.edit ?? [];
+        const legacyUrl = job.data.sourceImageUrl;
+        const inputUrls: string[] = editUrls.length > 0 ? editUrls : legacyUrl ? [legacyUrl] : [];
+        const hasInputImage = inputUrls.length > 0;
+        let inputImagesMegapixels: number[] | undefined;
         if (hasInputImage && model.costUsdPerMPixelInput && !model.costUsdPerMPixelInputFixed) {
-          inputMegapixels = await measureImageMegapixels(sourceImageUrl!).catch(() => undefined);
+          // Per-image ceil is required for accurate billing — measure each.
+          inputImagesMegapixels = (
+            await Promise.all(inputUrls.map((u) => measureImageMegapixels(u).catch(() => 0)))
+          ).filter((mp) => mp > 0);
+        } else if (hasInputImage && model.costUsdPerMPixelInputFixed) {
+          // Fixed-fee models: size doesn't matter, only the count.
+          inputImagesMegapixels = inputUrls.map(() => 1);
         }
 
         await deductTokens(
           BigInt(userIdStr),
           calculateCost(model, 0, 0, megapixels, undefined, modelSettings, undefined, undefined, {
             hasInputImage,
-            inputMegapixels,
+            inputImagesMegapixels,
           }),
           modelId,
         );
