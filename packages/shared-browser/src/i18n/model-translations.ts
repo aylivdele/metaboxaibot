@@ -413,7 +413,7 @@ export const SETTING_TRANSLATIONS_EN: Record<string, SettingTranslation> = {
   verbosity: {
     label: "Response detail",
     description:
-      "low — brief answers, medium — balanced, high — detailed (for explanations and analysis).",
+      "Concise — brief answers, Standard — balanced, Detailed — detailed (for explanations and analysis).",
     options: { low: "Concise", medium: "Standard", high: "Detailed" },
   },
   extended_thinking: {

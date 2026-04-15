@@ -119,7 +119,7 @@ const REASONING_EFFORT: ModelSettingDef = {
 const REASONING_EFFORT_GPT5: ModelSettingDef = {
   key: "reasoning_effort",
   label: "Глубина рассуждений",
-  description: "medium — сбалансировано, xhigh — максимальная точность для сложных задач.",
+  description: "Средняя — сбалансировано, Макс. — максимальная точность для сложных задач.",
   type: "select",
   options: [
     { value: "medium", label: "Средняя" },
@@ -146,7 +146,7 @@ const VERBOSITY_SETTING: ModelSettingDef = {
   key: "verbosity",
   label: "Подробность ответа",
   description:
-    "low — краткие ответы, medium — сбалансировано, high — развёрнуто (для объяснений и аналитики).",
+    "Краткий — краткие ответы, Стандартный — сбалансировано, Подробный — развёрнуто (для объяснений и аналитики).",
   type: "select",
   options: [
     { value: "low", label: "Краткий" },

@@ -715,7 +715,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       {
         key: "quality",
         label: "Качество",
-        description: "low — быстро, medium — баланс, high — максимум. Влияет на цену",
+        description: "Low — быстро, Medium — баланс, High — максимум. Влияет на цену",
         type: "select",
         options: [
           { value: "low", label: "Low" },
