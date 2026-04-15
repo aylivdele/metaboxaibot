@@ -26,7 +26,8 @@ export class GptImageAdapter implements ImageAdapter {
 
   async generate(input: ImageInput): Promise<ImageResult> {
     const ms = input.modelSettings ?? {};
-    const imageUrl = input.mediaInputs?.edit?.[0] ?? input.imageUrl;
+    const editUrls = input.mediaInputs?.edit ?? (input.imageUrl ? [input.imageUrl] : []);
+    const imageUrl = editUrls[0];
     const quality = (ms.quality as string | undefined) ?? "medium";
     const size = (ms.size as string | undefined) ?? "1024x1024";
     const outputFormat = (ms.output_format as string | undefined) ?? "png";
@@ -54,18 +55,23 @@ export class GptImageAdapter implements ImageAdapter {
     let b64: string | null | undefined;
 
     try {
-      if (imageUrl) {
-        // Image-to-image via Images Edit API
-        const imgResp = await fetch(imageUrl);
-        if (!imgResp.ok) throw new Error(`Failed to fetch source image: ${imgResp.status}`);
-        const buffer = Buffer.from(await imgResp.arrayBuffer());
-        const imageFile = await toFile(buffer, "image.png", { type: "image/png" });
+      if (editUrls.length > 0) {
+        // Image-to-image via Images Edit API — supports up to 4 reference images.
+        const refUrls = editUrls.slice(0, 4);
+        const imageFiles = await Promise.all(
+          refUrls.map(async (url, idx) => {
+            const imgResp = await fetch(url);
+            if (!imgResp.ok) throw new Error(`Failed to fetch source image: ${imgResp.status}`);
+            const buffer = Buffer.from(await imgResp.arrayBuffer());
+            return toFile(buffer, `image-${idx}.png`, { type: "image/png" });
+          }),
+        );
 
         const response = await (
           this.client.images.edit as (p: unknown) => Promise<{ data: Array<{ b64_json?: string }> }>
         )({
           ...baseParams,
-          image: imageFile,
+          image: imageFiles.length === 1 ? imageFiles[0] : imageFiles,
           ...(background && background !== "auto" && { background }),
           ...(moderation && moderation !== "auto" && { moderation }),
         });

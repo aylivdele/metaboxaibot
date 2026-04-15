@@ -703,7 +703,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_EDIT],
+    mediaInputs: [MI_EDIT_4],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
