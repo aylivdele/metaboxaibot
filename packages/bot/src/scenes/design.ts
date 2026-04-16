@@ -507,8 +507,11 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
 
   // Deduplicate album messages — only the first photo-with-caption (or the first
   // one overall, after a short buffering window) is processed.
+  // Exception: when a slot is active, every photo from the album is processed
+  // individually so that all images land in the slot.
+  const activeSlotForDedup = getActiveSlot(ctx.user.id);
   const mediaGroupId = ctx.message?.media_group_id;
-  if (mediaGroupId) {
+  if (mediaGroupId && !activeSlotForDedup) {
     const key = `${ctx.user.id}__${mediaGroupId}`;
     const hasCaption = !!ctx.message?.caption?.trim();
     const existing = designMediaGroupBuffer.get(key);

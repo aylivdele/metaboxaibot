@@ -12,6 +12,12 @@ const MI_EDIT_4: MediaInputSlot = {
   labelKey: "edit",
   maxImages: 4,
 };
+const MI_EDIT_8: MediaInputSlot = {
+  slotKey: "edit",
+  mode: "edit",
+  labelKey: "edit",
+  maxImages: 8,
+};
 const MI_EDIT_10: MediaInputSlot = {
   slotKey: "edit",
   mode: "edit",
@@ -340,7 +346,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_EDIT_4],
+    mediaInputs: [MI_EDIT_8],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,

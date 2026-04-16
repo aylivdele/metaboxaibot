@@ -714,8 +714,11 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
   if (!ctx.user || (!isPhoto && !isImageDoc)) return;
 
   // Only the captioned photo from an album triggers generation; siblings are ignored.
+  // Exception: when a slot is active, every photo from the album is processed
+  // individually so that all images land in the slot.
+  const activeSlotForDedup = getActiveSlot(ctx.user.id);
   const mediaGroupId = ctx.message?.media_group_id;
-  if (mediaGroupId) {
+  if (mediaGroupId && !activeSlotForDedup) {
     const key = `${ctx.user.id}__${mediaGroupId}`;
     const hasCaption = !!ctx.message?.caption?.trim();
     const existing = videoMediaGroupBuffer.get(key);
