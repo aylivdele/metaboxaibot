@@ -12,6 +12,7 @@ import { HeyGenAvatarPicker } from "./HeyGenAvatarPicker.js";
 import { HiggsFieldMotionPicker } from "./HiggsFieldMotionPicker.js";
 import type { MotionEntry } from "./HiggsFieldMotionPicker.js";
 import { HiggsFieldSoulPicker } from "./HiggsFieldSoulPicker.js";
+import { SoulStylePicker } from "./SoulStylePicker.js";
 
 function isPresent(v: unknown): boolean {
   if (v === null || v === undefined || v === false || v === "" || v === 0) return false;
@@ -182,6 +183,9 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
             soulId={String(values["custom_reference_id"] ?? "")}
             onChange={(changes) => Object.entries(changes).forEach(([k, v]) => onChange(k, v))}
           />
+        )}
+        {def.type === "soul-style-picker" && (
+          <SoulStylePicker styleId={String(values["style_id"] ?? "")} onChange={onChange} />
         )}
       </div>
     );

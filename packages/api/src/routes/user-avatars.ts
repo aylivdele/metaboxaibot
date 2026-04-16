@@ -55,7 +55,7 @@ export const userAvatarsRoutes: FastifyPluginAsync = async (fastify) => {
       const telegramChatId = Number(userId);
 
       if (provider === "higgsfield_soul") {
-        await userStateService.setState(userId, "HIGGSFIELD_SOUL_PHOTO", "video");
+        await userStateService.setState(userId, "HIGGSFIELD_SOUL_PHOTO", "design");
 
         // Get user language for i18n
         const user = await db.user.findUnique({

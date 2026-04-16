@@ -1,5 +1,6 @@
 import { config } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
+import { logger } from "../../logger.js";
 
 const HIGGSFIELD_API = "https://platform.higgsfield.ai";
 
@@ -63,6 +64,7 @@ export class HiggsFieldSoulAdapter {
     }
 
     const data = (await res.json()) as CreateResponse;
+    logger.info({ data }, "Higgsfield Soul create response");
     if (!data.id) {
       throw new Error(`Higgsfield Soul: no ID in response: ${JSON.stringify(data)}`);
     }
@@ -83,6 +85,7 @@ export class HiggsFieldSoulAdapter {
     }
 
     const data = (await res.json()) as SoulIdStatusResponse;
+    logger.info({ data, externalId }, "Higgsfield Soul poll response");
 
     if (data.status === "completed") {
       return { status: "ready", previewUrl: data.preview_url };

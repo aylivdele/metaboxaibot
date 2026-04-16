@@ -84,7 +84,8 @@ export interface ModelSettingDef {
     | "color"
     | "avatar-picker"
     | "motion-picker"
-    | "soul-picker";
+    | "soul-picker"
+    | "soul-style-picker";
   options?: ModelSettingOption[];
   min?: number;
   max?: number;
@@ -135,6 +136,13 @@ export interface HiggsFieldMotion {
   description?: string;
   preview_url?: string | null;
   category?: string;
+}
+
+export interface SoulStyle {
+  id: string;
+  name: string;
+  description?: string | null;
+  preview_url: string;
 }
 
 export interface DIDLanguage {

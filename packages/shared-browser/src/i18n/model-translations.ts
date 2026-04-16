@@ -300,6 +300,11 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
     descriptionOverride:
       "Flagship version with maximum quality — most realistic lighting, detail and cinematic quality.",
   },
+  "higgsfield-soul": {
+    name: "🧬 Higgsfield Soul",
+    description:
+      "Image generation with your character (Soul ID). Create a character from 20+ photos — and generate any scene with their appearance. Supports styles, reference images and batch mode.",
+  },
   veo: {
     name: "📽️ Veo 3",
     description:
@@ -498,6 +503,27 @@ export const SETTING_TRANSLATIONS_EN: Record<string, SettingTranslation> = {
   resolution: {
     label: "Resolution",
     description: "Quality / detail level of the output.",
+  },
+  custom_reference_id: {
+    label: "Character (Soul ID)",
+    description: "Select a created character. Required for generation.",
+  },
+  custom_reference_strength: {
+    label: "Character strength",
+    description:
+      "How strongly the character's appearance affects the result (0 — weak, 1 — maximum).",
+  },
+  batch_size: {
+    label: "Number of images",
+    description: "How many variants to generate per request (1 or 4).",
+  },
+  style_id: {
+    label: "Style (Soul Style)",
+    description: "Choose a style for generation — defines mood, colors and aesthetics.",
+  },
+  style_strength: {
+    label: "Style strength",
+    description: "How strongly the style affects the result (0 — weak, 1 — maximum).",
   },
   generate_audio: {
     label: "Generate audio",

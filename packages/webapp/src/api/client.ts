@@ -11,6 +11,7 @@ import type {
   HeyGenVoice,
   HeyGenAvatar,
   HiggsFieldMotion,
+  SoulStyle,
   DIDVoice,
   UserAvatar,
   ElevenLabsVoice,
@@ -261,6 +262,10 @@ export const api = {
 
   higgsfieldMotions: {
     list: () => request<HiggsFieldMotion[]>("/higgsfield-motions"),
+  },
+
+  soulStyles: {
+    list: () => request<SoulStyle[]>("/soul-styles"),
   },
 
   didVoices: {

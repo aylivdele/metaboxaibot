@@ -5,6 +5,7 @@ import { FalAdapter } from "./fal.adapter.js";
 import { ReplicateAdapter } from "./replicate.adapter.js";
 import { RecraftAdapter } from "./recraft.adapter.js";
 import { GptImageAdapter } from "./gpt-image.adapter.js";
+import { HiggsFieldSoulImageAdapter } from "./higgsfield.soul.adapter.js";
 
 export function createImageAdapter(modelId: string): ImageAdapter {
   const model = AI_MODELS[modelId];
@@ -25,6 +26,8 @@ export function createImageAdapter(modelId: string): ImageAdapter {
     case "google":
       // Imagen 4 — use Replicate mirror until direct API is available
       return new ReplicateAdapter(modelId);
+    case "higgsfield":
+      return new HiggsFieldSoulImageAdapter();
     default:
       throw new Error(`No image adapter for provider: ${model.provider} (model: ${modelId})`);
   }

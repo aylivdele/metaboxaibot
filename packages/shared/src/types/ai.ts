@@ -43,7 +43,8 @@ export type ModelSettingType =
   | "color"
   | "avatar-picker"
   | "motion-picker"
-  | "soul-picker";
+  | "soul-picker"
+  | "soul-style-picker";
 
 export interface ModelSettingOption {
   value: string | number | boolean;

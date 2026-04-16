@@ -1299,7 +1299,7 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
       )
       .catch(() => void 0);
     // Restore FSM
-    await userStateService.setState(userId, "VIDEO_ACTIVE", "video");
+    await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
     return;
   }
 
@@ -1309,7 +1309,7 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
     await checkBalance(userId, costTokens);
   } catch {
     await ctx.editMessageText(ctx.t.errors.insufficientTokens).catch(() => void 0);
-    await userStateService.setState(userId, "VIDEO_ACTIVE", "video");
+    await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
     return;
   }
 
@@ -1338,20 +1338,20 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
 
   await ctx.editMessageText(ctx.t.video.soulCreating).catch(() => void 0);
 
-  // Restore FSM to VIDEO_ACTIVE
-  await userStateService.setState(userId, "VIDEO_ACTIVE", "video");
+  // Restore FSM to DESIGN_ACTIVE
+  await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
 }
 
 /**
  * Callback: user cancels Soul character creation.
- * Clears buffer, restores FSM to VIDEO_ACTIVE.
+ * Clears buffer, restores FSM to DESIGN_ACTIVE.
  */
 export async function handleSoulCreateCancel(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   await ctx.answerCallbackQuery();
 
   clearSoulBuffer(ctx.user.id);
-  await userStateService.setState(ctx.user.id, "VIDEO_ACTIVE", "video");
+  await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE", "design");
   await ctx.editMessageText(ctx.t.video.soulCancelled).catch(() => void 0);
 }
 
