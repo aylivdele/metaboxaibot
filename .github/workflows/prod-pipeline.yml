@@ -49,6 +49,7 @@ jobs:
       bot: ${{ steps.filter.outputs.bot }}
       worker: ${{ steps.filter.outputs.worker }}
       webapp: ${{ steps.filter.outputs.webapp }}
+      web: ${{ steps.filter.outputs.web }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,6 +65,7 @@ jobs:
             echo "bot=true"    >> "$GITHUB_OUTPUT"
             echo "worker=true" >> "$GITHUB_OUTPUT"
             echo "webapp=true" >> "$GITHUB_OUTPUT"
+            echo "web=true"    >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -75,6 +77,7 @@ jobs:
             echo "bot=true"    >> "$GITHUB_OUTPUT"
             echo "worker=true" >> "$GITHUB_OUTPUT"
             echo "webapp=true" >> "$GITHUB_OUTPUT"
+            echo "web=true"    >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -88,6 +91,7 @@ jobs:
           echo "bot=$(match    '^(packages/bot|packages/api|packages/shared|packages/shared-browser|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.bot)')"    >> "$GITHUB_OUTPUT"
           echo "worker=$(match '^(packages/worker|packages/api|packages/shared|packages/shared-browser|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.worker)')" >> "$GITHUB_OUTPUT"
           echo "webapp=$(match '^(packages/webapp|packages/shared|packages/shared-browser|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.webapp)')"     >> "$GITHUB_OUTPUT"
+          echo "web=$(match    '^(packages/web|packages/shared|packages/shared-browser|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.web)')"           >> "$GITHUB_OUTPUT"
 
   build-api:
     name: Build API
@@ -209,10 +213,45 @@ jobs:
           target: /var/www/metabox
           strip_components: 3
 
+  build-web:
+    name: Build & deploy web app
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || github.event.inputs.force_all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @metabox/shared-browser build
+      - name: Build web app
+        run: pnpm --filter @metabox/web build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+      - name: Clear web dir on VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: mkdir -p /var/www/metabox-web && rm -rf /var/www/metabox-web/*
+      - name: Upload web dist to VPS
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "packages/web/dist/*"
+          target: /var/www/metabox-web
+          strip_components: 3
+
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
-    needs: [changes, build-api, build-bot, build-worker, build-webapp]
+    needs: [changes, build-api, build-bot, build-worker, build-webapp, build-web]
     permissions:
       contents: write
     if: |
@@ -260,6 +299,9 @@ jobs:
 
             echo "Pruning old images..."
             docker image prune -af
+
+            # Ensure nginx configs are symlinked
+            sudo ln -sf /opt/metaboxaibot/infra/nginx/nginx.web-prod.conf /etc/nginx/sites-enabled/metabox-web 2>/dev/null || true
 
             sudo nginx -t && sudo systemctl reload nginx
 
