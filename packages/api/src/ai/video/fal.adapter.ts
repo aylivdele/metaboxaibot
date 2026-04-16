@@ -95,11 +95,19 @@ export class FalVideoAdapter implements VideoAdapter {
       if (input.prompt) motionInput.prompt = input.prompt;
 
       // Elements: only supported when character_orientation="video", max 1.
+      // KlingV3ImageElementInput uses frontal_image_url + reference_image_urls (same as i2v).
       if (orientation === "video") {
         const elemUrls = input.mediaInputs?.ref_element_1 ?? [];
         if (elemUrls.length > 0) {
-          const frontal = elemUrls[0];
-          motionInput.elements = [{ image_url: frontal }];
+          const [frontal, ...refs] = elemUrls;
+          if (frontal) {
+            motionInput.elements = [
+              {
+                frontal_image_url: frontal,
+                reference_image_urls: refs.length > 0 ? refs.slice(0, 3) : [frontal],
+              },
+            ];
+          }
         }
       }
 

@@ -404,25 +404,28 @@ export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
   const kb = new InlineKeyboard().text(ctx.t.mediaInput.cancel, `mi_cancel:video`);
   const isWan = modelId === "wan";
   const isKlingMotion = modelId === "kling-motion" || modelId === "kling-motion-pro";
-  const hint = isKlingMotion
-    ? ctx.t.mediaInput.motionVideoHint
-    : slot.mode === "reference_element"
-      ? ctx.t.mediaInput.refElementHint
-      : slot.mode === "reference_image"
-        ? ctx.t.mediaInput.referenceImagesHint
-        : slot.mode === "reference_video"
-          ? ctx.t.mediaInput.referenceVideosHint
-          : slot.mode === "reference_audio"
-            ? ctx.t.mediaInput.referenceAudiosHint
-            : slot.mode === "driving_audio"
-              ? ctx.t.mediaInput.drivingAudioHint
-              : slot.mode === "first_clip"
-                ? ctx.t.mediaInput.firstClipHint
-                : isWan && slot.mode === "first_frame"
-                  ? ctx.t.mediaInput.firstFrameWanHint
-                  : isWan && slot.mode === "last_frame"
-                    ? ctx.t.mediaInput.lastFrameWanHint
-                    : null;
+  const hint =
+    isKlingMotion && slot.mode === "reference_element"
+      ? ctx.t.mediaInput.motionElementHint
+      : isKlingMotion
+        ? ctx.t.mediaInput.motionVideoHint
+        : slot.mode === "reference_element"
+          ? ctx.t.mediaInput.refElementHint
+          : slot.mode === "reference_image"
+            ? ctx.t.mediaInput.referenceImagesHint
+            : slot.mode === "reference_video"
+              ? ctx.t.mediaInput.referenceVideosHint
+              : slot.mode === "reference_audio"
+                ? ctx.t.mediaInput.referenceAudiosHint
+                : slot.mode === "driving_audio"
+                  ? ctx.t.mediaInput.drivingAudioHint
+                  : slot.mode === "first_clip"
+                    ? ctx.t.mediaInput.firstClipHint
+                    : isWan && slot.mode === "first_frame"
+                      ? ctx.t.mediaInput.firstFrameWanHint
+                      : isWan && slot.mode === "last_frame"
+                        ? ctx.t.mediaInput.lastFrameWanHint
+                        : null;
   if (hint) await ctx.reply(hint);
   await ctx.reply(msg, { reply_markup: kb });
 }
