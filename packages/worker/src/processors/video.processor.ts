@@ -234,9 +234,19 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
         // Providers that bill per whole second — round up so we never under-charge.
         const CEIL_DURATION_MODELS = new Set(["heygen"]);
         const rawDuration = actualDuration ?? duration ?? 5;
-        const effectiveDuration = CEIL_DURATION_MODELS.has(modelId)
+        let effectiveDuration = CEIL_DURATION_MODELS.has(modelId)
           ? Math.ceil(rawDuration)
           : rawDuration;
+
+        // Wan 2.7 reference-to-video (first_clip): billable = min(inputDur, 5) + outputDur.
+        if (modelId === "wan") {
+          const firstClipUrl = (mediaInputs as Record<string, string[]> | undefined)
+            ?.first_clip?.[0];
+          if (firstClipUrl) {
+            const inputSeconds = await fetchClipDurationSec(firstClipUrl).catch(() => 5);
+            effectiveDuration += Math.min(inputSeconds, 5);
+          }
+        }
         const videoTokens = model.costUsdPerMVideoToken
           ? computeVideoTokens(
               model,
@@ -364,6 +374,15 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     throw err;
   }
+}
+
+/** Downloads a clip and returns its duration in seconds (0 on failure). */
+async function fetchClipDurationSec(url: string): Promise<number> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetch clip: HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const info = parseMp4Info(buf);
+  return info.duration ?? 0;
 }
 
 async function resolveTelegramVideoSource(

@@ -10,9 +10,17 @@ import { fetchWithLog, logCall } from "../../utils/fetch.js";
 import { resolveImageMimeType } from "../../utils/mime-detect.js";
 
 const API_MODELS: Record<string, string> = {
-  veo: "veo-3.0-generate-001",
-  "veo-fast": "veo-3.0-fast-generate-001",
+  veo: "veo-3.1-generate-preview",
+  "veo-fast": "veo-3.1-fast-generate-preview",
 };
+
+async function fetchImagePayload(url: string): Promise<{ imageBytes: string; mimeType: string }> {
+  const imgResp = await fetchWithLog(url);
+  if (!imgResp.ok) throw new Error(`Veo: failed to fetch image: ${imgResp.status}`);
+  const buf = Buffer.from(await imgResp.arrayBuffer());
+  const mimeType = resolveImageMimeType(buf, imgResp.headers.get("content-type"));
+  return { imageBytes: buf.toString("base64"), mimeType };
+}
 
 /**
  * Google Veo 3 adapter — @google/genai SDK (generateVideos + getVideosOperation).
@@ -34,8 +42,14 @@ export class VeoAdapter implements VideoAdapter {
   }
 
   validateRequest(input: VideoInput): VideoValidationError | null {
-    const refUrl = input.mediaInputs?.reference?.[0] ?? input.imageUrl;
-    if (refUrl && input.duration !== undefined && input.duration !== 8) {
+    const firstFrame = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+    const lastFrame = input.mediaInputs?.last_frame?.[0];
+    const refs = input.mediaInputs?.reference ?? [];
+    if (
+      (firstFrame || lastFrame || refs.length > 0) &&
+      input.duration !== undefined &&
+      input.duration !== 8
+    ) {
       return { key: "veoImageRequires8s" };
     }
     return null;
@@ -43,7 +57,11 @@ export class VeoAdapter implements VideoAdapter {
 
   async submit(input: VideoInput): Promise<string> {
     const ms = input.modelSettings ?? {};
-    const referenceUrl = input.mediaInputs?.reference?.[0] ?? input.imageUrl;
+    const firstFrameUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+    const lastFrameUrl = input.mediaInputs?.last_frame?.[0];
+    const referenceUrls = (input.mediaInputs?.reference ?? []).slice(0, 3);
+
+    const isVideoUrl = (u: string) => /\.(mp4|webm|mov|avi)(\?|$)/i.test(u);
 
     const params: GenerateVideosParameters = {
       model: this.apiModel,
@@ -57,20 +75,24 @@ export class VeoAdapter implements VideoAdapter {
       },
     };
 
-    if (referenceUrl) {
-      const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(referenceUrl);
-      if (isVideo) {
-        params.video = { uri: referenceUrl };
+    if (firstFrameUrl) {
+      if (isVideoUrl(firstFrameUrl)) {
+        params.video = { uri: firstFrameUrl };
       } else {
-        const imgResp = await fetchWithLog(referenceUrl);
-        if (!imgResp.ok) throw new Error(`Veo: failed to fetch reference image: ${imgResp.status}`);
-        const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
-        const mimeType = resolveImageMimeType(imgBuffer, imgResp.headers.get("content-type"));
-        params.image = {
-          imageBytes: imgBuffer.toString("base64"),
-          mimeType,
-        };
+        params.image = await fetchImagePayload(firstFrameUrl);
       }
+    }
+
+    if (referenceUrls.length > 0) {
+      const referenceImages = await Promise.all(
+        referenceUrls.filter((u) => !isVideoUrl(u)).map(fetchImagePayload),
+      );
+      if (referenceImages.length > 0) {
+        (params.config as Record<string, unknown>).referenceImages = referenceImages;
+      }
+    } else if (lastFrameUrl && !isVideoUrl(lastFrameUrl)) {
+      // lastFrame is ignored by Veo when referenceImages are present.
+      (params.config as Record<string, unknown>).lastFrame = await fetchImagePayload(lastFrameUrl);
     }
 
     logCall(this.apiModel, "generateVideos", {
@@ -80,7 +102,9 @@ export class VeoAdapter implements VideoAdapter {
       personGeneration: ms.person_generation,
       resolution: ms.resolution,
       negativePrompt: ms.negative_prompt,
-      hasImage: !!referenceUrl,
+      hasFirstFrame: !!firstFrameUrl,
+      hasLastFrame: !!lastFrameUrl,
+      refCount: referenceUrls.length,
     });
 
     const operation = await this.ai.models.generateVideos(params);

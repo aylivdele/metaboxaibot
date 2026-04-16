@@ -305,6 +305,12 @@ export interface Translations {
     referenceImagesHint: string;
     referenceVideosHint: string;
     referenceAudiosHint: string;
+    drivingAudio: string;
+    firstClip: string;
+    firstFrameWanHint: string;
+    lastFrameWanHint: string;
+    drivingAudioHint: string;
+    firstClipHint: string;
     uploadPrompt: string;
     uploadPromptMulti: string;
     uploadPromptElement: string;

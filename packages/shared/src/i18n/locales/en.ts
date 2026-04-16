@@ -393,6 +393,16 @@ export default {
       "Reference videos for generation:\n• Up to 3 videos\n• Combined duration 2–15 seconds\n• Total size under 50 MB\n• Each video between ~480p and ~720p\n\nReference them in the prompt as @Video1, @Video2, etc.\n\nSend videos one at a time.",
     referenceAudiosHint:
       "Reference audios for generation:\n• Up to 3 files\n• Combined duration ≤ 15 seconds\n• Max 15 MB each (MP3, WAV)\n• When audio is provided, at least one reference image or video is required\n\nReference them in the prompt as @Audio1, @Audio2, etc.\n\nSend audio files one at a time.",
+    drivingAudio: "🎵 Driving audio",
+    firstClip: "🎬 First video clip",
+    firstFrameWanHint:
+      "Wan 2.7 supports the following input combinations:\n• First frame\n• First frame + driving audio\n• First frame + last frame\n• First frame + last frame + driving audio\n• First video clip\n• First video clip + last frame\n\nImage limits: JPEG/PNG/BMP/WEBP, up to 20 MB, 240–8000 px per side, aspect ratio 1:8–8:1.",
+    lastFrameWanHint:
+      "Last frame for Wan 2.7 — sets the final frame of the generated video.\nSupported combinations:\n• First frame + last frame\n• First frame + last frame + driving audio\n• First video clip + last frame\n\nLimits: JPEG/PNG/BMP/WEBP, up to 20 MB, 240–8000 px per side, aspect ratio 1:8–8:1.",
+    drivingAudioHint:
+      "Driving audio for Wan 2.7 — audio that drives lip-sync and motion timing.\nSupported combinations:\n• First frame + driving audio\n• First frame + last frame + driving audio\n\nLimits: WAV or MP3, duration 2–30 s, up to 15 MB. If audio is shorter than the video, the remainder is silent; if longer, it is truncated to the video duration.",
+    firstClipHint:
+      "First video clip for Wan 2.7 — initial video the model will continue.\nSupported combinations:\n• First video clip\n• First video clip + last frame\n\nLimits: MP4 or MOV, 2–10 s, 240–4096 px per side, aspect ratio 1:8–8:1, up to 100 MB. Total output duration is controlled by the duration parameter.",
     uploadPrompt: 'Send a photo for "{slot}".',
     uploadPromptMulti: 'Send up to {max} photos for "{slot}".',
     uploadPromptElement:

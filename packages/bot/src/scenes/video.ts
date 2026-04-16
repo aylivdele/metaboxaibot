@@ -388,6 +388,7 @@ export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
             .replace("{max}", String(maxImages))
         : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
   const kb = new InlineKeyboard().text(ctx.t.mediaInput.cancel, `mi_cancel:video`);
+  const isWan = modelId === "wan";
   const hint =
     slot.mode === "reference_element"
       ? ctx.t.mediaInput.refElementHint
@@ -397,7 +398,15 @@ export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
           ? ctx.t.mediaInput.referenceVideosHint
           : slot.mode === "reference_audio"
             ? ctx.t.mediaInput.referenceAudiosHint
-            : null;
+            : slot.mode === "driving_audio"
+              ? ctx.t.mediaInput.drivingAudioHint
+              : slot.mode === "first_clip"
+                ? ctx.t.mediaInput.firstClipHint
+                : isWan && slot.mode === "first_frame"
+                  ? ctx.t.mediaInput.firstFrameWanHint
+                  : isWan && slot.mode === "last_frame"
+                    ? ctx.t.mediaInput.lastFrameWanHint
+                    : null;
   if (hint) await ctx.reply(hint);
   await ctx.reply(msg, { reply_markup: kb });
 }
@@ -850,6 +859,13 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
       await sendVideoMediaInputStatus(ctx);
       return;
     }
+    if (slot?.mode === "first_clip") {
+      await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
+      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, fileUrl);
+      clearActiveSlot(ctx.user.id);
+      await sendVideoMediaInputStatus(ctx);
+      return;
+    }
     if (slot?.mode === "reference_video") {
       const current = await userStateService.getMediaInputs(ctx.user.id);
       const existing = current[activeSlot.slotKey] ?? [];
@@ -1002,6 +1018,15 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
   const activeSlot = getActiveSlot(userId);
   if (activeSlot && activeSlot.section === "video") {
     const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+    if (slot?.mode === "driving_audio") {
+      const file = await ctx.api.getFile(audioMsg.file_id);
+      const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+      await userStateService.clearMediaInputSlot(userId, activeSlot.slotKey);
+      await userStateService.addMediaInput(userId, activeSlot.slotKey, tgUrl);
+      clearActiveSlot(userId);
+      await sendVideoMediaInputStatus(ctx);
+      return;
+    }
     if (slot?.mode === "reference_audio") {
       const file = await ctx.api.getFile(audioMsg.file_id);
       const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;

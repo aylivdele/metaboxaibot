@@ -3,12 +3,56 @@ import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config, UserFacingError } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
 
-/** USD cost per image by quality × size. */
-const COST_TABLE: Record<string, Record<string, number>> = {
-  low: { "1024x1024": 0.009, "1024x1536": 0.013, "1536x1024": 0.013 },
-  medium: { "1024x1024": 0.034, "1024x1536": 0.05, "1536x1024": 0.05 },
-  high: { "1024x1024": 0.133, "1024x1536": 0.2, "1536x1024": 0.2 },
+/** Per-million-token USD rates for gpt-image-1.5. */
+const RATE_TEXT_INPUT = 5 / 1_000_000;
+const RATE_TEXT_INPUT_CACHED = 1.25 / 1_000_000;
+const RATE_IMAGE_INPUT = 8 / 1_000_000;
+const RATE_IMAGE_INPUT_CACHED = 2 / 1_000_000;
+const RATE_IMAGE_OUTPUT = 32 / 1_000_000;
+
+/** Fallback image-output token counts per quality × size (used when `usage` absent). */
+const OUTPUT_TOKENS_FALLBACK: Record<string, Record<string, number>> = {
+  low: { "1024x1024": 272, "1024x1536": 408, "1536x1024": 400 },
+  medium: { "1024x1024": 1056, "1024x1536": 1584, "1536x1024": 1568 },
+  high: { "1024x1024": 4160, "1024x1536": 6240, "1536x1024": 6208 },
 };
+
+interface GptImageUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  input_tokens_details?: {
+    text_tokens?: number;
+    image_tokens?: number;
+    cached_tokens?: number;
+    cached_text_tokens?: number;
+    cached_image_tokens?: number;
+  };
+}
+
+function computeCostFromUsage(
+  usage: GptImageUsage | undefined,
+  outputImageTokensEstimate: number,
+): number | null {
+  if (!usage) return null;
+  const details = usage.input_tokens_details ?? {};
+  const imageIn = details.image_tokens ?? 0;
+  const textIn = details.text_tokens ?? Math.max(0, (usage.input_tokens ?? 0) - imageIn);
+  const cachedImage = details.cached_image_tokens ?? 0;
+  const cachedText = details.cached_text_tokens ?? details.cached_tokens ?? 0;
+  const billedTextIn = Math.max(0, textIn - cachedText);
+  const billedImageIn = Math.max(0, imageIn - cachedImage);
+  // OpenAI's `output_tokens` for image endpoints counts image-output tokens
+  // (billed at $32/M). Text-output reasoning tokens aren't separately reported
+  // for images.generate/edit — treat the whole output_tokens bucket as image output.
+  const imageOut = usage.output_tokens ?? outputImageTokensEstimate;
+  return (
+    billedTextIn * RATE_TEXT_INPUT +
+    cachedText * RATE_TEXT_INPUT_CACHED +
+    billedImageIn * RATE_IMAGE_INPUT +
+    cachedImage * RATE_IMAGE_INPUT_CACHED +
+    imageOut * RATE_IMAGE_OUTPUT
+  );
+}
 
 /**
  * GPT Image adapter — uses OpenAI Images API.
@@ -53,6 +97,7 @@ export class GptImageAdapter implements ImageAdapter {
     };
 
     let b64: string | null | undefined;
+    let usage: GptImageUsage | undefined;
 
     try {
       if (editUrls.length > 0) {
@@ -68,7 +113,9 @@ export class GptImageAdapter implements ImageAdapter {
         );
 
         const response = await (
-          this.client.images.edit as (p: unknown) => Promise<{ data: Array<{ b64_json?: string }> }>
+          this.client.images.edit as (
+            p: unknown,
+          ) => Promise<{ data: Array<{ b64_json?: string }>; usage?: GptImageUsage }>
         )({
           ...baseParams,
           image: imageFiles.length === 1 ? imageFiles[0] : imageFiles,
@@ -76,18 +123,20 @@ export class GptImageAdapter implements ImageAdapter {
           ...(moderation && moderation !== "auto" && { moderation }),
         });
         b64 = response.data[0]?.b64_json;
+        usage = response.usage;
       } else {
         // Text-to-image via Images Generate API
         const response = await (
           this.client.images.generate as (
             p: unknown,
-          ) => Promise<{ data: Array<{ b64_json?: string }> }>
+          ) => Promise<{ data: Array<{ b64_json?: string }>; usage?: GptImageUsage }>
         )({
           ...baseParams,
           ...(background && background !== "auto" && { background }),
           ...(moderation && moderation !== "auto" && { moderation }),
         });
         b64 = response.data[0]?.b64_json;
+        usage = response.usage;
       }
     } catch (err) {
       if (
@@ -109,7 +158,12 @@ export class GptImageAdapter implements ImageAdapter {
     if (!b64) throw new Error("gpt-image: no image data in response");
 
     const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
-    const providerUsdCost = COST_TABLE[quality]?.[size] ?? COST_TABLE.medium["1024x1024"];
+    const outputTokensEstimate =
+      OUTPUT_TOKENS_FALLBACK[quality]?.[size] ?? OUTPUT_TOKENS_FALLBACK.medium["1024x1024"];
+    const costFromUsage = computeCostFromUsage(usage, outputTokensEstimate);
+    // Fallback: estimate using only image-output tokens + a small prompt allowance.
+    const providerUsdCost =
+      costFromUsage ?? outputTokensEstimate * RATE_IMAGE_OUTPUT + 200 * RATE_TEXT_INPUT;
 
     return {
       url: `data:image/${ext};base64,${b64}`,

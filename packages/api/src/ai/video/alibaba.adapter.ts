@@ -5,8 +5,32 @@ import { fetchWithLog } from "../../utils/fetch.js";
 const DASHSCOPE_BASE = "https://dashscope-intl.aliyuncs.com/api/v1";
 const SUBMIT_PATH = "/services/aigc/video-generation/video-synthesis";
 
-const T2V_MODEL = "wan2.6-t2v";
-const I2V_MODEL = "wan2.6-i2v";
+const T2V_MODEL = "wan2.7-t2v";
+const I2V_MODEL = "wan2.7-i2v";
+
+interface WanMediaAsset {
+  type: "first_frame" | "last_frame" | "driving_audio" | "first_clip";
+  url: string;
+}
+
+/**
+ * Valid media-type combinations accepted by wan2.7-i2v. Any other combination
+ * must be rejected before submit to avoid a 4xx from DashScope.
+ */
+const VALID_WAN_COMBINATIONS: ReadonlyArray<ReadonlySet<WanMediaAsset["type"]>> = [
+  new Set(["first_frame"]),
+  new Set(["first_frame", "driving_audio"]),
+  new Set(["first_frame", "last_frame"]),
+  new Set(["first_frame", "last_frame", "driving_audio"]),
+  new Set(["first_clip"]),
+  new Set(["first_clip", "last_frame"]),
+];
+
+function isValidWanCombination(types: WanMediaAsset["type"][]): boolean {
+  const set = new Set(types);
+  if (set.size !== types.length) return false; // duplicates not allowed
+  return VALID_WAN_COMBINATIONS.some((v) => v.size === set.size && [...set].every((t) => v.has(t)));
+}
 
 /**
  * Size strings for text-to-video (T2V) — resolution tier × aspect ratio → "W*H".
@@ -63,21 +87,37 @@ export class AlibabaVideoAdapter implements VideoAdapter {
 
   async submit(input: VideoInput): Promise<string> {
     const ms = input.modelSettings ?? {};
-    const imageUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
-    const isI2V = !!imageUrl;
-    const dashscopeModel = isI2V ? I2V_MODEL : T2V_MODEL;
+    const mi = input.mediaInputs ?? {};
 
+    const media: WanMediaAsset[] = [];
+    const firstFrame = mi.first_frame?.[0] ?? input.imageUrl;
+    if (firstFrame) media.push({ type: "first_frame", url: firstFrame });
+    const lastFrame = mi.last_frame?.[0];
+    if (lastFrame) media.push({ type: "last_frame", url: lastFrame });
+    const drivingAudio = mi.driving_audio?.[0];
+    if (drivingAudio) media.push({ type: "driving_audio", url: drivingAudio });
+    const firstClip = mi.first_clip?.[0];
+    if (firstClip) media.push({ type: "first_clip", url: firstClip });
+
+    const isI2V = media.length > 0;
+    if (isI2V && !isValidWanCombination(media.map((m) => m.type))) {
+      throw new Error(
+        `Wan 2.7: invalid media combination [${media.map((m) => m.type).join(", ")}]`,
+      );
+    }
+
+    const dashscopeModel = isI2V ? I2V_MODEL : T2V_MODEL;
     const resolution = (ms.resolution as string | undefined) ?? "720P";
     const duration = (ms.duration as number | undefined) ?? input.duration ?? 5;
 
     const apiInput: Record<string, unknown> = { prompt: input.prompt };
-    if (isI2V) apiInput.img_url = imageUrl;
+    if (isI2V) apiInput.media = media;
     if (ms.negative_prompt) apiInput.negative_prompt = ms.negative_prompt;
 
     const parameters: Record<string, unknown> = { duration };
 
     if (isI2V) {
-      // I2V uses a resolution tier keyword; aspect ratio comes from the input image
+      // wan2.7-i2v uses a resolution tier keyword; output aspect ratio is driven by input media.
       parameters.resolution = resolution;
     } else {
       // T2V uses an exact pixel dimension string (resolution × aspect ratio)

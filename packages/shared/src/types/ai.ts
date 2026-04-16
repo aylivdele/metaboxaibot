@@ -89,7 +89,9 @@ export type MediaInputMode =
   | "reference_element"
   | "reference_image"
   | "reference_video"
-  | "reference_audio";
+  | "reference_audio"
+  | "driving_audio"
+  | "first_clip";
 
 export interface MediaInputSlot {
   /** Unique key for this slot within the model, used as storage key. */

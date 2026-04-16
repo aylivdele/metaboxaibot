@@ -16,6 +16,13 @@ const MI_REFERENCE: MediaInputSlot = {
   mode: "reference",
   labelKey: "reference",
 };
+/** Veo accepts up to 3 reference images; last_frame is ignored when references are present. */
+const MI_REFERENCE_VEO: MediaInputSlot = {
+  slotKey: "reference",
+  mode: "reference",
+  labelKey: "reference",
+  maxImages: 3,
+};
 
 /** Kling element slots: each accepts up to 4 images (1 frontal + 3 refs) OR 1 video. */
 const MI_REF_ELEMENTS: MediaInputSlot[] = [1, 2, 3, 4, 5].map((i) => ({
@@ -26,6 +33,19 @@ const MI_REF_ELEMENTS: MediaInputSlot[] = [1, 2, 3, 4, 5].map((i) => ({
 }));
 
 const KLING_MEDIA_INPUTS: MediaInputSlot[] = [MI_FIRST_FRAME, MI_LAST_FRAME, ...MI_REF_ELEMENTS];
+
+/** Wan 2.7 driving audio slot (lip-sync / motion timing). */
+const MI_DRIVING_AUDIO: MediaInputSlot = {
+  slotKey: "driving_audio",
+  mode: "driving_audio",
+  labelKey: "drivingAudio",
+};
+/** Wan 2.7 first-clip slot — video that model continues. */
+const MI_FIRST_CLIP: MediaInputSlot = {
+  slotKey: "first_clip",
+  mode: "first_clip",
+  labelKey: "firstClip",
+};
 
 /** Seedance 2 reference-to-video slots. */
 const MI_REF_IMAGES: MediaInputSlot = {
@@ -468,20 +488,20 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
 
   veo: {
     id: "veo",
-    name: "📽️ Veo 3",
+    name: "📽️ Veo 3.1",
     description:
-      "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Standard — максимальное качество, выше детализация чем Fast. Отправьте фото вместе с текстом — видео начнется с вашего фото.",
+      "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Standard — максимальное качество, выше детализация чем Fast. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
     section: "video",
     provider: "google",
     familyId: "veo",
     variantLabel: "Standard",
-    // $0.40/s (Veo 3 Standard, Gemini API)
+    // $0.40/s (Veo 3.1 Standard, Gemini API)
     costUsdPerRequest: 0,
     costUsdPerSecond: 0.4,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_REFERENCE],
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -494,7 +514,8 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       {
         key: "duration",
         label: "Длительность",
-        description: "Продолжительность видеоклипа в секундах.",
+        description:
+          "Продолжительность видеоклипа в секундах. При использовании референсных изображений или разрешений 1080p/4K доступен только вариант 8 с.",
         type: "select",
         options: [
           { value: 4, label: "4 с", unavailableIf: { key: "resolution", neq: "720p" } },
@@ -548,9 +569,9 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
 
   "veo-fast": {
     id: "veo-fast",
-    name: "📽️ Veo 3 Fast",
+    name: "📽️ Veo 3.1 Fast",
     description:
-      "Быстрая и более доступная версия Veo 3 от Google. Со звуком и голосами, но чуть ниже детализация чем Standard. Поддерживает 4K. Отправьте фото вместе с текстом — видео начнется с вашего фото.",
+      "Быстрая и более доступная версия Veo 3.1 от Google. Со звуком и голосами, но чуть ниже детализация чем Standard. Поддерживает 4K. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
     section: "video",
     provider: "google",
     familyId: "veo",
@@ -569,7 +590,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_REFERENCE],
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -583,7 +604,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         key: "duration",
         label: "Длительность",
         description:
-          "Продолжительность видеоклипа в секундах. Если используется референсное изображение, то доступнен только вариант 8с.",
+          "Продолжительность видеоклипа в секундах. При использовании референсных изображений или разрешений 1080p/4K доступен только вариант 8 с.",
         type: "select",
         options: [
           { value: 4, label: "4 с", unavailableIf: { key: "resolution", neq: "720p" } },
@@ -628,7 +649,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "sora",
     name: "🌌 Sora 2",
     description:
-      "Самое реалистичное видео от OpenAI. Объекты двигаются как в реальности, со звуком и правильной физикой. Отправьте фото вместе с текстом — оно станет первым кадром видео.",
+      "Устаревшая модель генерации видео от OpenAI. Объекты двигаются как в реальности, со звуком и правильной физикой. Отправьте фото вместе с текстом — оно станет первым кадром видео.",
     section: "video",
     provider: "openai",
     // $0.10/s (via Replicate openai/sora)
@@ -1156,9 +1177,9 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
 
   wan: {
     id: "wan",
-    name: "🏯 Wan 2.6 (Alibaba)",
+    name: "🏯 Wan 2.7 (Alibaba)",
     description:
-      "Видеомодель Alibaba с высоким качеством движения и поддержкой 1080p. Отправьте фото вместе с текстом — модель перейдёт в режим image-to-video, где соотношение сторон берётся из фото.",
+      "Видеомодель Alibaba с высоким качеством движения и поддержкой 1080p. Поддерживает три режима: image-to-video (первый кадр, опционально последний кадр и driving audio) и video continuation (начальный клип, опционально последний кадр). Без медиа — text-to-video с соотношением из настроек.",
     section: "video",
     provider: "alibaba",
     // Per-second billing: 720P=$0.10/s, 1080P=$0.15/s (international endpoint)
@@ -1174,7 +1195,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_FIRST_FRAME],
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_DRIVING_AUDIO, MI_FIRST_CLIP],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
