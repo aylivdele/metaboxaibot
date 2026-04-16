@@ -48,6 +48,8 @@ export interface SubmitImageParams {
 
 export interface SubmitImageResult {
   dbJobId: string;
+  /** Output record ID (for refine / download buttons). Set for sync models. */
+  outputId?: string;
   /** Populated immediately for sync models (dall-e). */
   imageUrl?: string;
   /** Original filename with extension (e.g. "recraft-v4.svg"). Set for sync models. */
@@ -60,15 +62,32 @@ export interface SubmitImageResult {
 }
 
 export const generationService = {
-  /** Fetch a generation job by ID (for refine button — returns s3Key and modelId). */
-  async getJobById(
+  /**
+   * Fetch a generation output by ID (for refine / download buttons).
+   * Also supports legacy jobId lookup (old buttons sent before migration).
+   */
+  async getOutputById(
     id: string,
   ): Promise<{ s3Key: string | null; modelId: string; section: string } | null> {
-    const job = await db.generationJob.findUnique({
+    // Try as output ID first
+    let output = await db.generationJobOutput.findUnique({
       where: { id },
-      select: { s3Key: true, modelId: true, section: true },
+      include: { job: { select: { modelId: true, section: true } } },
     });
-    return job;
+    if (output) {
+      return { s3Key: output.s3Key, modelId: output.job.modelId, section: output.job.section };
+    }
+
+    // Fallback: treat as jobId (for old buttons sent before migration)
+    output = await db.generationJobOutput.findFirst({
+      where: { jobId: id, index: 0 },
+      include: { job: { select: { modelId: true, section: true } } },
+    });
+    if (output) {
+      return { s3Key: output.s3Key, modelId: output.job.modelId, section: output.job.section };
+    }
+
+    return null;
   },
 
   async submitImage(params: SubmitImageParams): Promise<SubmitImageResult> {
@@ -160,15 +179,18 @@ export const generationService = {
           }
         }
 
+        const output = await db.generationJobOutput.create({
+          data: {
+            jobId: job.id,
+            index: 0,
+            outputUrl: finalUrl,
+            s3Key: s3KeySync,
+            thumbnailS3Key: thumbnailS3KeySync,
+          },
+        });
         await db.generationJob.update({
           where: { id: job.id },
-          data: {
-            status: "done",
-            outputUrl: finalUrl,
-            s3Key: s3KeySync ?? undefined,
-            thumbnailS3Key: thumbnailS3KeySync ?? undefined,
-            completedAt: new Date(),
-          },
+          data: { status: "done", completedAt: new Date() },
         });
 
         const outputMegapixels = parseMegapixels(modelSettings);
@@ -215,15 +237,16 @@ export const generationService = {
                   () => null,
                 )
               : null;
-            await db.generationJob.update({
-              where: { id: job.id },
-              data: { s3Key: s3KeySync, thumbnailS3Key: thumbnailS3KeySync ?? undefined },
+            await db.generationJobOutput.updateMany({
+              where: { jobId: job.id, index: 0 },
+              data: { s3Key: s3KeySync, thumbnailS3Key: thumbnailS3KeySync },
             });
           }
         }
 
         return {
           dbJobId: job.id,
+          outputId: output.id,
           imageUrl: finalUrl,
           filename: result.filename,
           s3Key: s3KeySync ?? undefined,

@@ -69,18 +69,24 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
   try {
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
-      select: { outputUrl: true, s3Key: true, providerJobId: true },
+      select: {
+        providerJobId: true,
+        status: true,
+        outputs: { orderBy: { index: "asc" as const }, take: 1 },
+      },
     });
 
     let outputUrl: string;
     let s3Key: string | null;
+    let outputId: string;
     let videoBuffer: Buffer | null = null;
     let videoResult: Awaited<ReturnType<typeof adapter.poll>> | null = null;
 
-    if (existingJob?.outputUrl) {
+    if (existingJob?.outputs?.length) {
       logger.info({ dbJobId }, "Generation already done, skipping to send");
-      outputUrl = existingJob.outputUrl;
-      s3Key = existingJob.s3Key ?? null;
+      outputUrl = existingJob.outputs[0].outputUrl ?? "";
+      s3Key = existingJob.outputs[0].s3Key ?? null;
+      outputId = existingJob.outputs[0].id;
     } else if (stage === "generate") {
       // ── Stage 1: submit ────────────────────────────────────────────────
       await db.generationJob.update({
@@ -224,9 +230,13 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
       outputUrl = videoResult.url;
 
+      const output = await db.generationJobOutput.create({
+        data: { jobId: dbJobId, index: 0, outputUrl, s3Key, thumbnailS3Key },
+      });
+      outputId = output.id;
       await db.generationJob.update({
         where: { id: dbJobId },
-        data: { status: "done", outputUrl, s3Key, thumbnailS3Key, completedAt: new Date() },
+        data: { status: "done", completedAt: new Date() },
       });
 
       const model = AI_MODELS[modelId];
@@ -279,7 +289,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     // ── Stage 3: send to user ────────────────────────────────────────────
     const origRow: InlineKeyboardButton[] | null = sendOriginalLabel
-      ? [{ text: sendOriginalLabel, callback_data: `orig_${dbJobId}` }]
+      ? [{ text: sendOriginalLabel, callback_data: `orig_${outputId}` }]
       : null;
     const downloadRow: InlineKeyboardButton[] | null =
       s3Key && config.api.publicUrl

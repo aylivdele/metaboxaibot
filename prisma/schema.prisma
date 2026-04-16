@@ -183,9 +183,6 @@ model GenerationJob {
 
   prompt    String
   inputData Json?  // доп. параметры (размер, стиль и т.д.)
-  outputUrl      String?
-  s3Key          String? // path within S3 bucket — null if upload skipped
-  thumbnailS3Key String? // S3 key for resized WebP preview (400px wide) — images only
   providerJobId  String? // external provider task ID — persisted after submit for poll resume on restart
   error          String?
 
@@ -193,9 +190,27 @@ model GenerationJob {
   updatedAt   DateTime  @updatedAt
   completedAt DateTime?
 
+  outputs GenerationJobOutput[]
+
   @@index([userId])
   @@index([status])
   @@map("generation_jobs")
+}
+
+model GenerationJobOutput {
+  id             String  @id @default(cuid())
+  jobId          String
+  index          Int     @default(0) // 0-based order within batch
+  outputUrl      String?
+  s3Key          String?
+  thumbnailS3Key String?
+
+  createdAt DateTime @default(now())
+
+  job GenerationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("generation_job_outputs")
 }
 
 // ─────────────────────────────────────────────

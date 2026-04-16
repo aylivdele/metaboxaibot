@@ -101,9 +101,12 @@ export const audioGenerationService = {
           modelSettings: resolvedModelSettings,
         });
 
+        await db.generationJobOutput.create({
+          data: { jobId: job.id, index: 0, outputUrl: result.url ?? null },
+        });
         await db.generationJob.update({
           where: { id: job.id },
-          data: { status: "done", outputUrl: result.url ?? null, completedAt: new Date() },
+          data: { status: "done", completedAt: new Date() },
         });
 
         await deductTokens(
@@ -131,7 +134,10 @@ export const audioGenerationService = {
         uploadFn
           .then((s3Key) => {
             if (s3Key) {
-              return db.generationJob.update({ where: { id: job.id }, data: { s3Key } });
+              return db.generationJobOutput.updateMany({
+                where: { jobId: job.id, index: 0 },
+                data: { s3Key },
+              });
             }
           })
           .catch(() => void 0);

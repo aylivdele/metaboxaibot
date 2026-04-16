@@ -48,6 +48,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /gallery?section=image|audio|video&page=1&limit=20
    * Returns the current user's completed generation jobs, newest first.
+   * Each output within a batch is returned as a separate gallery item.
    */
   fastify.get<{
     Querystring: { section?: string; page?: string; limit?: string };
@@ -64,7 +65,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       ...(section ? { section } : {}),
     };
 
-    const [rawItems, total] = await Promise.all([
+    const [rawJobs, total] = await Promise.all([
       db.generationJob.findMany({
         where,
         orderBy: { completedAt: "desc" },
@@ -75,35 +76,47 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           section: true,
           modelId: true,
           prompt: true,
-          s3Key: true,
-          thumbnailS3Key: true,
-          outputUrl: true,
           completedAt: true,
+          outputs: {
+            orderBy: { index: "asc" },
+            select: {
+              id: true,
+              s3Key: true,
+              thumbnailS3Key: true,
+              outputUrl: true,
+            },
+          },
         },
       }),
       db.generationJob.count({ where }),
     ]);
 
-    // Resolve stable URLs for each item via signed download tokens.
-    // thumbnailUrl: thumbnail WebP when available, else null.
-    // previewUrl: full-res file — S3 token when available, else provider URL.
-    //   Videos skip this resolution to keep list payloads light; callers fetch
-    //   the URL on-demand via GET /gallery/:id/preview-url when the user opens
-    //   the player.
-    const items = rawItems.map((item) => {
-      const base = config.api.publicUrl;
-      const previewUrl =
-        item.section !== "design"
-          ? null
-          : item.s3Key && base
-            ? `${base}/download/${generateDownloadToken(item.s3Key, userId)}`
-            : item.outputUrl;
-      const thumbnailUrl =
-        item.thumbnailS3Key && base
-          ? `${base}/download/${generateDownloadToken(item.thumbnailS3Key, userId)}`
-          : null;
-      return { ...item, previewUrl, thumbnailUrl };
-    });
+    const base = config.api.publicUrl;
+    const items = rawJobs.flatMap((job) =>
+      job.outputs.map((output) => {
+        const previewUrl =
+          job.section !== "design"
+            ? null
+            : output.s3Key && base
+              ? `${base}/download/${generateDownloadToken(output.s3Key, userId)}`
+              : output.outputUrl;
+        const thumbnailUrl =
+          output.thumbnailS3Key && base
+            ? `${base}/download/${generateDownloadToken(output.thumbnailS3Key, userId)}`
+            : null;
+        return {
+          id: output.id,
+          section: job.section,
+          modelId: job.modelId,
+          prompt: job.prompt,
+          s3Key: output.s3Key,
+          outputUrl: output.outputUrl,
+          previewUrl,
+          thumbnailUrl,
+          completedAt: job.completedAt,
+        };
+      }),
+    );
 
     return { items, total, page: parseInt(page, 10), limit: take };
   });
@@ -111,43 +124,38 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * POST /gallery/:id/download
    * Sends the file to the user's Telegram chat.
+   * :id is a GenerationJobOutput ID.
    */
   fastify.post<{ Params: { id: string } }>("/gallery/:id/download", async (request, reply) => {
     const userId = (request as AuthRequest).userId;
     const { id } = request.params;
 
-    const job = await db.generationJob.findUnique({
+    const output = await db.generationJobOutput.findUnique({
       where: { id },
-      select: {
-        id: true,
-        userId: true,
-        section: true,
-        modelId: true,
-        prompt: true,
-        s3Key: true,
-        outputUrl: true,
+      include: {
+        job: { select: { userId: true, section: true, modelId: true, prompt: true } },
       },
     });
 
-    if (!job) return reply.code(404).send({ error: "Not found" });
-    if (job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+    if (!output) return reply.code(404).send({ error: "Not found" });
+    if (output.job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
 
     // Resolve file URL: prefer S3, fall back to provider URL
     let fileUrl: string | null = null;
 
-    if (job.s3Key) {
-      fileUrl = await getFileUrl(job.s3Key);
+    if (output.s3Key) {
+      fileUrl = await getFileUrl(output.s3Key);
     }
 
-    if (!fileUrl && job.outputUrl) {
-      fileUrl = job.outputUrl;
+    if (!fileUrl && output.outputUrl) {
+      fileUrl = output.outputUrl;
     }
 
     if (!fileUrl) {
       return reply.code(422).send({ error: "File not available" });
     }
 
-    const caption = `${job.modelId}: ${job.prompt.slice(0, 200)}`;
+    const caption = `${output.job.modelId}: ${output.job.prompt.slice(0, 200)}`;
 
     const user = await db.user.findUnique({
       where: { id: userId },
@@ -156,13 +164,13 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     const t = getT((user?.language ?? "ru") as Parameters<typeof getT>[0]);
 
     const downloadMarkup =
-      job.s3Key && config.api.publicUrl
+      output.s3Key && config.api.publicUrl
         ? {
             inline_keyboard: [
               [
                 {
                   text: t.common.downloadFile,
-                  url: `${config.api.publicUrl}/download/${generateDownloadToken(job.s3Key, userId)}`,
+                  url: `${config.api.publicUrl}/download/${generateDownloadToken(output.s3Key, userId)}`,
                 },
               ],
             ],
@@ -170,7 +178,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         : undefined;
 
     try {
-      await sendFileToUser(userId, job.section, fileUrl, caption, downloadMarkup);
+      await sendFileToUser(userId, output.job.section, fileUrl, caption, downloadMarkup);
     } catch (err) {
       // If Telegram rejected the file (e.g. too large), send a download link instead
       const isTooLarge =
@@ -199,28 +207,26 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * GET /gallery/:id/preview-url
-   * Returns a playable URL for the gallery item on demand. Used primarily by
-   * the webapp video player modal — list responses no longer include
-   * previewUrl for videos to keep payloads small. Falls back to the raw
-   * provider outputUrl when no S3 key is available.
+   * Returns a playable URL for the gallery item on demand.
+   * :id is a GenerationJobOutput ID.
    */
   fastify.get<{ Params: { id: string } }>("/gallery/:id/preview-url", async (request, reply) => {
     const userId = (request as AuthRequest).userId;
     const { id } = request.params;
 
-    const job = await db.generationJob.findUnique({
+    const output = await db.generationJobOutput.findUnique({
       where: { id },
-      select: { id: true, userId: true, s3Key: true, outputUrl: true },
+      include: { job: { select: { userId: true } } },
     });
 
-    if (!job) return reply.code(404).send({ error: "Not found" });
-    if (job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+    if (!output) return reply.code(404).send({ error: "Not found" });
+    if (output.job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
 
     const base = config.api.publicUrl;
     const url =
-      job.s3Key && base
-        ? `${base}/download/${generateDownloadToken(job.s3Key, userId)}`
-        : job.outputUrl;
+      output.s3Key && base
+        ? `${base}/download/${generateDownloadToken(output.s3Key, userId)}`
+        : output.outputUrl;
 
     if (!url) return reply.code(422).send({ error: "File not available" });
     return { url };
@@ -228,28 +234,31 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * DELETE /gallery/:id
-   * Removes a gallery item (completed generation job) along with its S3
-   * artifacts (main file + thumbnail, if any). The DB row is deleted only
-   * after S3 cleanup is attempted — failures in S3 are logged via the
-   * boolean return but do not block the DB delete (the user's intent is to
-   * remove the item from their gallery).
+   * Removes a gallery output along with its S3 artifacts.
+   * If the parent job has no remaining outputs, the job is also deleted.
    */
   fastify.delete<{ Params: { id: string } }>("/gallery/:id", async (request, reply) => {
     const userId = (request as AuthRequest).userId;
     const { id } = request.params;
 
-    const job = await db.generationJob.findUnique({
+    const output = await db.generationJobOutput.findUnique({
       where: { id },
-      select: { id: true, userId: true, s3Key: true, thumbnailS3Key: true },
+      include: { job: { select: { userId: true } } },
     });
 
-    if (!job) return reply.code(404).send({ error: "Not found" });
-    if (job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+    if (!output) return reply.code(404).send({ error: "Not found" });
+    if (output.job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
 
-    if (job.s3Key) await deleteFile(job.s3Key);
-    if (job.thumbnailS3Key) await deleteFile(job.thumbnailS3Key);
+    if (output.s3Key) await deleteFile(output.s3Key);
+    if (output.thumbnailS3Key) await deleteFile(output.thumbnailS3Key);
 
-    await db.generationJob.delete({ where: { id } });
+    await db.generationJobOutput.delete({ where: { id } });
+
+    // Clean up orphaned job
+    const remaining = await db.generationJobOutput.count({ where: { jobId: output.jobId } });
+    if (remaining === 0) {
+      await db.generationJob.delete({ where: { id: output.jobId } });
+    }
 
     return { success: true };
   });

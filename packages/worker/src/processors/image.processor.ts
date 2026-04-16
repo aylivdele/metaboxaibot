@@ -34,6 +34,51 @@ const INITIAL_POLL_INTERVAL_MS = 5000;
 
 const telegram = new Api(config.bot.token);
 
+/** Upload an image to S3 and generate a thumbnail. Returns { s3Key, thumbnailS3Key }. */
+async function uploadImageToS3(
+  url: string,
+  userIdStr: string,
+  keySuffix: string,
+  contentTypeHint?: string,
+  filenameHint?: string,
+): Promise<{ s3Key: string | null; thumbnailS3Key: string | null; buffer: Buffer | null }> {
+  const isSvg = filenameHint?.endsWith(".svg") ?? false;
+  const resolvedContentType = isSvg
+    ? "image/svg+xml"
+    : (contentTypeHint ?? sectionMeta("image").contentType);
+  const resolvedExt = isSvg
+    ? "svg"
+    : (resolvedContentType.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg");
+
+  let imageBuffer: Buffer | null = null;
+  try {
+    const res = await fetch(url);
+    if (res.ok) imageBuffer = Buffer.from(await res.arrayBuffer());
+  } catch (e) {
+    logger.error({ reason: e }, "Could not fetch image buffer");
+  }
+
+  const key = buildS3Key("image", userIdStr, keySuffix, resolvedExt);
+  const s3Key = imageBuffer
+    ? await uploadBuffer(key, imageBuffer, resolvedContentType).catch((reason) => {
+        logger.error({ reason }, "Could not upload image buffer");
+        return null;
+      })
+    : null;
+
+  let thumbnailS3Key: string | null = null;
+  if (imageBuffer && s3Key) {
+    const thumbBuf = await generateThumbnail(imageBuffer, resolvedContentType);
+    if (thumbBuf) {
+      thumbnailS3Key = await uploadBuffer(buildThumbnailKey(s3Key), thumbBuf, "image/webp").catch(
+        () => null,
+      );
+    }
+  }
+
+  return { s3Key, thumbnailS3Key, buffer: imageBuffer };
+}
+
 export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
   const {
     dbJobId,
@@ -63,18 +108,20 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
   try {
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
-      select: { outputUrl: true, s3Key: true, providerJobId: true },
+      select: {
+        providerJobId: true,
+        status: true,
+        outputs: { orderBy: { index: "asc" as const } },
+      },
     });
 
-    let outputUrl: string;
-    let s3Key: string | null;
-    let imageResults: ImageResult[] = [];
+    // Output records created during finalization — used for buttons in Stage 3
+    let outputRecords: Array<{ id: string; outputUrl: string | null; s3Key: string | null }> = [];
 
-    if (existingJob?.outputUrl) {
+    if (existingJob?.outputs?.length) {
       // Stage 3 already done — skip submit + poll (crash-recovery fast path)
       logger.info({ dbJobId }, "Generation already done, skipping to send");
-      outputUrl = existingJob.outputUrl;
-      s3Key = existingJob.s3Key ?? null;
+      outputRecords = existingJob.outputs;
     } else if (stage === "generate") {
       // ── Stage 1: submit ────────────────────────────────────────────────
       await db.generationJob.update({
@@ -176,53 +223,39 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       }
 
       // Normalize to array
-      imageResults = Array.isArray(pollResult) ? pollResult : [pollResult];
+      const imageResults: ImageResult[] = Array.isArray(pollResult) ? pollResult : [pollResult];
 
-      // Process first image → main generationJob record
-      const firstResult = imageResults[0];
-      const isSvg = firstResult.filename?.endsWith(".svg") ?? false;
-      const resolvedContentType = isSvg
-        ? "image/svg+xml"
-        : (firstResult.contentType ?? sectionMeta("image").contentType);
-      const resolvedExt = isSvg
-        ? "svg"
-        : (resolvedContentType.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg");
+      // Upload all images to S3 and create output records
+      for (let i = 0; i < imageResults.length; i++) {
+        const ir = imageResults[i];
+        const keySuffix = imageResults.length > 1 ? `${dbJobId}_${i + 1}` : dbJobId;
+        const { s3Key, thumbnailS3Key } = await uploadImageToS3(
+          ir.url,
+          userIdStr,
+          keySuffix,
+          ir.contentType,
+          ir.filename,
+        );
 
-      let imageBuffer: Buffer | null = null;
-      try {
-        const res = await fetch(firstResult.url);
-        if (res.ok) imageBuffer = Buffer.from(await res.arrayBuffer());
-      } catch (e) {
-        logger.error({ reason: e }, "Could not fetch image buffer");
+        const output = await db.generationJobOutput.create({
+          data: {
+            jobId: dbJobId,
+            index: i,
+            outputUrl: ir.url,
+            s3Key,
+            thumbnailS3Key,
+          },
+        });
+        outputRecords.push({ id: output.id, outputUrl: ir.url, s3Key });
       }
-
-      const mainKey = buildS3Key("image", userIdStr, dbJobId, resolvedExt);
-      s3Key = imageBuffer
-        ? await uploadBuffer(mainKey, imageBuffer, resolvedContentType).catch((reason) => {
-            logger.error({ reason }, "Could not upload image buffer");
-            return null;
-          })
-        : null;
-
-      let thumbnailS3Key: string | null = null;
-      if (imageBuffer && s3Key) {
-        const thumbBuf = await generateThumbnail(imageBuffer, resolvedContentType);
-        if (thumbBuf) {
-          thumbnailS3Key = await uploadBuffer(
-            buildThumbnailKey(s3Key),
-            thumbBuf,
-            "image/webp",
-          ).catch(() => null);
-        }
-      }
-
-      outputUrl = firstResult.url;
 
       await db.generationJob.update({
         where: { id: dbJobId },
-        data: { status: "done", outputUrl, s3Key, thumbnailS3Key, completedAt: new Date() },
+        data: { status: "done", completedAt: new Date() },
       });
 
+      // Billing — use first image for megapixel calculation
+      const firstResult = imageResults[0];
       const model = AI_MODELS[modelId];
       if (model) {
         const megapixels =
@@ -230,8 +263,6 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
             ? (firstResult.width * firstResult.height) / 1_000_000
             : undefined;
 
-        // img2img input surcharge — collect all input image URLs (media-input
-        // slots in `edit` mode) plus the legacy single sourceImageUrl.
         const editUrls: string[] =
           (job.data.mediaInputs as Record<string, string[]> | undefined)?.edit ?? [];
         const legacyUrl = job.data.sourceImageUrl;
@@ -239,12 +270,10 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         const hasInputImage = inputUrls.length > 0;
         let inputImagesMegapixels: number[] | undefined;
         if (hasInputImage && model.costUsdPerMPixelInput && !model.costUsdPerMPixelInputFixed) {
-          // Per-image ceil is required for accurate billing — measure each.
           inputImagesMegapixels = (
             await Promise.all(inputUrls.map((u) => measureImageMegapixels(u).catch(() => 0)))
           ).filter((mp) => mp > 0);
         } else if (hasInputImage && model.costUsdPerMPixelInputFixed) {
-          // Fixed-fee models: size doesn't matter, only the count.
           inputImagesMegapixels = inputUrls.map(() => 1);
         }
 
@@ -263,59 +292,20 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     let slicedPrompt = prompt.slice(0, 200);
     slicedPrompt = slicedPrompt.concat(slicedPrompt.length < 200 ? "" : "...");
 
-    // Batch: multiple images → send as media group
-    if (imageResults.length > 1) {
-      // Upload extra images to S3 (first one is already uploaded above)
-      const extraS3Keys: (string | null)[] = [];
-      for (let i = 1; i < imageResults.length; i++) {
-        const ir = imageResults[i];
-        const ext =
-          ir.contentType?.split("/")[1]?.replace("jpeg", "jpg") ??
-          ir.filename?.split(".").pop() ??
-          "png";
-        const ct = ir.contentType ?? sectionMeta("image").contentType;
-        let buf: Buffer | null = null;
-        try {
-          const res = await fetch(ir.url);
-          if (res.ok) buf = Buffer.from(await res.arrayBuffer());
-        } catch (e) {
-          logger.error({ reason: e, index: i }, "Could not fetch batch image buffer");
-        }
-        const key = buildS3Key("image", userIdStr, `${dbJobId}_${i + 1}`, ext);
-        const uploaded = buf
-          ? await uploadBuffer(key, buf, ct).catch((reason) => {
-              logger.error({ reason, index: i }, "Could not upload batch image buffer");
-              return null;
-            })
-          : null;
-        extraS3Keys.push(uploaded);
-
-        // Generate thumbnails for extra images
-        if (buf && uploaded) {
-          const thumbBuf = await generateThumbnail(buf, ct);
-          if (thumbBuf) {
-            await uploadBuffer(buildThumbnailKey(uploaded), thumbBuf, "image/webp").catch(
-              () => null,
-            );
-          }
-        }
-      }
-
-      // Build media group: all images as InputMediaPhoto
-      const allS3Keys = [s3Key, ...extraS3Keys];
+    // Batch: multiple outputs → send as media group
+    if (outputRecords.length > 1) {
       const mediaGroup: Array<{
         type: "photo";
         media: string | InstanceType<typeof InputFile>;
         caption?: string;
       }> = [];
 
-      for (let i = 0; i < imageResults.length; i++) {
-        const ir = imageResults[i];
-        const key = allS3Keys[i];
+      for (let i = 0; i < outputRecords.length; i++) {
+        const rec = outputRecords[i];
         const { source } = await resolveTelegramSource(
-          key,
-          ir.url,
-          ir.filename ?? `image-${i + 1}.png`,
+          rec.s3Key,
+          rec.outputUrl ?? "",
+          `image-${i + 1}.png`,
         );
         mediaGroup.push({
           type: "photo",
@@ -326,21 +316,18 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
       await telegram.sendMediaGroup(telegramChatId, mediaGroup);
 
-      // Send refine + download buttons as a separate message (media groups don't support inline keyboards)
-      const refineRow = dbJobId
-        ? [{ text: t.design.refine, callback_data: `design_ref_${dbJobId}` }]
-        : null;
-      const downloadRow: InlineKeyboardButton[] | null =
-        s3Key && config.api.publicUrl
-          ? [
-              {
-                text: t.common.downloadFile,
-                url: `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userIdStr)}`,
-              },
-            ]
-          : null;
-      const rows = [refineRow, downloadRow].filter(Boolean) as InlineKeyboardButton[][];
-      if (rows.length) {
+      // Send per-output refine + download buttons (media groups don't support inline keyboards)
+      for (const rec of outputRecords) {
+        const rows: InlineKeyboardButton[][] = [];
+        rows.push([{ text: t.design.refine, callback_data: `design_ref_${rec.id}` }]);
+        if (rec.s3Key && config.api.publicUrl) {
+          rows.push([
+            {
+              text: t.common.downloadFile,
+              url: `${config.api.publicUrl}/download/${generateDownloadToken(rec.s3Key, userIdStr)}`,
+            },
+          ]);
+        }
         await telegram.sendMessage(telegramChatId, "⬆️", {
           reply_markup: { inline_keyboard: rows },
         });
@@ -350,13 +337,13 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         await db.message.create({
           data: { dialogId, role: "user", content: prompt, tokensUsed: 0 },
         });
-        for (const ir of imageResults) {
+        for (const rec of outputRecords) {
           await db.message.create({
             data: {
               dialogId,
               role: "assistant",
               content: "",
-              mediaUrl: ir.url,
+              mediaUrl: rec.outputUrl ?? "",
               mediaType: "image",
               tokensUsed: 0,
             },
@@ -364,11 +351,16 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         }
       }
 
-      logger.info({ dbJobId, batchSize: imageResults.length }, "Image batch job completed");
+      logger.info({ dbJobId, batchSize: outputRecords.length }, "Image batch job completed");
       return;
     }
 
-    // Single image path (original logic)
+    // Single output path
+    const rec = outputRecords[0];
+    const outputUrl = rec?.outputUrl ?? "";
+    const s3Key = rec?.s3Key ?? null;
+    const outputId = rec?.id ?? dbJobId;
+
     const retryExt = s3Key?.split(".").pop() ?? "png";
     const finalImageResult = {
       url: outputUrl,
@@ -397,9 +389,9 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       }
     }
 
-    const refineRow = dbJobId
-      ? [{ text: t.design.refine, callback_data: `design_ref_${dbJobId}` }]
-      : null;
+    const refineRow: InlineKeyboardButton[] | null = [
+      { text: t.design.refine, callback_data: `design_ref_${outputId}` },
+    ];
     const downloadRow: InlineKeyboardButton[] | null =
       s3Key && config.api.publicUrl
         ? [
