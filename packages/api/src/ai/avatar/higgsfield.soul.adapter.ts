@@ -10,11 +10,17 @@ interface CreateResponse {
   status: string;
 }
 
+interface ReferenceMedia {
+  id: string;
+  media_url: string;
+}
+
 interface SoulIdStatusResponse {
   id: string;
   name: string;
   status: "not_ready" | "queued" | "in_progress" | "completed" | "failed";
-  preview_url?: string;
+  thumbnail_url?: string | null;
+  reference_media?: ReferenceMedia[];
 }
 
 /**
@@ -88,7 +94,8 @@ export class HiggsFieldSoulAdapter {
     logger.info({ data, externalId }, "Higgsfield Soul poll response");
 
     if (data.status === "completed") {
-      return { status: "ready", previewUrl: data.preview_url };
+      const previewUrl = data.thumbnail_url || data.reference_media?.[0]?.media_url;
+      return { status: "ready", previewUrl };
     }
     if (data.status === "failed") {
       return { status: "failed" };

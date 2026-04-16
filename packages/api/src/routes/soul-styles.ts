@@ -28,10 +28,9 @@ export const soulStylesRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(503).send({ error: "Higgsfield API key not configured" });
     }
 
-    const res = await fetch("https://cloud.higgsfield.ai/v1/text2image/soul-styles", {
+    const res = await fetch("https://platform.higgsfield.ai/v1/text2image/soul-styles", {
       headers: {
-        "hf-api-key": apiKey,
-        "hf-secret": apiSecret,
+        Authorization: `Key ${apiKey}:${apiSecret}`,
         Accept: "application/json",
       },
     });
