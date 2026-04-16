@@ -3,7 +3,7 @@ import { config } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { logger } from "../../logger.js";
 
-const HIGGSFIELD_API = "https://cloud.higgsfield.ai";
+const HIGGSFIELD_API = "https://platform.higgsfield.ai";
 
 /** Response from POST /higgsfield-ai/soul/character */
 interface SubmitResponse {
