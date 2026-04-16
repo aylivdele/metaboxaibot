@@ -29,6 +29,12 @@ const FAL_R2V_ENDPOINTS: Record<string, string> = {
   "seedance-2-fast": "bytedance/seedance-2.0/fast/reference-to-video",
 };
 
+/** Kling Motion Control endpoints — dedicated, no T2V/I2V split. */
+const FAL_MOTION_ENDPOINTS: Record<string, string> = {
+  "kling-motion": "fal-ai/kling-video/v3/standard/motion-control",
+  "kling-motion-pro": "fal-ai/kling-video/v3/pro/motion-control",
+};
+
 /** Separator used to pack endpoint+requestId into a single opaque string. */
 const SEP = "||";
 
@@ -45,6 +51,9 @@ export class FalVideoAdapter implements VideoAdapter {
   }
 
   private selectEndpoint(input: VideoInput): string {
+    if (FAL_MOTION_ENDPOINTS[this.modelId]) {
+      return FAL_MOTION_ENDPOINTS[this.modelId];
+    }
     if (!FAL_I2V_ENDPOINTS[this.modelId]) {
       return FAL_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`;
     }
@@ -69,6 +78,36 @@ export class FalVideoAdapter implements VideoAdapter {
     if (ms.resolution) msExtras.resolution = ms.resolution;
     if (ms.motion_strength !== undefined) msExtras.motion_strength = ms.motion_strength;
     if (ms.seed != null) msExtras.seed = ms.seed;
+
+    // ── Kling Motion Control ─────────────────────────────────────────────────
+    if (FAL_MOTION_ENDPOINTS[this.modelId]) {
+      const motionImageUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+      const motionVideoUrl = input.mediaInputs?.motion_video?.[0];
+      const orientation = (ms.character_orientation as string) ?? "video";
+      const keepSound = ms.keep_original_sound !== undefined ? ms.keep_original_sound : true;
+
+      const motionInput: Record<string, unknown> = {
+        image_url: motionImageUrl,
+        video_url: motionVideoUrl,
+        character_orientation: orientation,
+        keep_original_sound: keepSound,
+      };
+      if (input.prompt) motionInput.prompt = input.prompt;
+
+      // Elements: only supported when character_orientation="video", max 1.
+      if (orientation === "video") {
+        const elemUrls = input.mediaInputs?.ref_element_1 ?? [];
+        if (elemUrls.length > 0) {
+          const frontal = elemUrls[0];
+          motionInput.elements = [{ image_url: frontal }];
+        }
+      }
+
+      const endpoint = FAL_MOTION_ENDPOINTS[this.modelId];
+      logCall(endpoint, "submit", motionInput);
+      const { request_id } = await fal.queue.submit(endpoint, { input: motionInput });
+      return `${endpoint}${SEP}${request_id}`;
+    }
 
     const klingExtras: Record<string, unknown> = {};
     if (this.modelId === "kling" || this.modelId === "kling-pro") {

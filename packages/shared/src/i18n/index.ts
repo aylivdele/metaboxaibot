@@ -311,6 +311,11 @@ export interface Translations {
     lastFrameWanHint: string;
     drivingAudioHint: string;
     firstClipHint: string;
+    motionImage: string;
+    motionVideo: string;
+    motionElement: string;
+    motionVideoHint: string;
+    uploadPromptVideo: string;
     uploadPrompt: string;
     uploadPromptMulti: string;
     uploadPromptElement: string;

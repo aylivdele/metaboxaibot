@@ -379,18 +379,23 @@ export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
 
   const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
   const maxImages = slot.maxImages ?? 1;
+  const isVideoSlot = slot.mode === "motion_video" || slot.mode === "first_clip";
   const msg =
     slot.mode === "reference_element"
       ? ctx.t.mediaInput.uploadPromptElement.replace("{slot}", String(label))
-      : maxImages > 1
-        ? ctx.t.mediaInput.uploadPromptMulti
-            .replace("{slot}", String(label))
-            .replace("{max}", String(maxImages))
-        : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
+      : isVideoSlot
+        ? ctx.t.mediaInput.uploadPromptVideo.replace("{slot}", String(label))
+        : maxImages > 1
+          ? ctx.t.mediaInput.uploadPromptMulti
+              .replace("{slot}", String(label))
+              .replace("{max}", String(maxImages))
+          : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
   const kb = new InlineKeyboard().text(ctx.t.mediaInput.cancel, `mi_cancel:video`);
   const isWan = modelId === "wan";
-  const hint =
-    slot.mode === "reference_element"
+  const isKlingMotion = modelId === "kling-motion" || modelId === "kling-motion-pro";
+  const hint = isKlingMotion
+    ? ctx.t.mediaInput.motionVideoHint
+    : slot.mode === "reference_element"
       ? ctx.t.mediaInput.refElementHint
       : slot.mode === "reference_image"
         ? ctx.t.mediaInput.referenceImagesHint
@@ -882,7 +887,7 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
       await sendVideoMediaInputStatus(ctx);
       return;
     }
-    if (slot?.mode === "first_clip") {
+    if (slot?.mode === "first_clip" || slot?.mode === "motion_video") {
       await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
       await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, fileUrl);
       clearActiveSlot(ctx.user.id);

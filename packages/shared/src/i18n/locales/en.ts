@@ -403,6 +403,12 @@ export default {
       "Driving audio for Wan 2.7 — audio that drives lip-sync and motion timing.\nSupported combinations:\n• First frame + driving audio\n• First frame + last frame + driving audio\n\nLimits: WAV or MP3, duration 2–30 s, up to 15 MB. If audio is shorter than the video, the remainder is silent; if longer, it is truncated to the video duration.",
     firstClipHint:
       "First video clip for Wan 2.7 — initial video the model will continue.\nSupported combinations:\n• First video clip\n• First video clip + last frame\n\nLimits: MP4 or MOV, 2–10 s, 240–4096 px per side, aspect ratio 1:8–8:1, up to 100 MB. Total output duration is controlled by the duration parameter.",
+    motionImage: "Character Image",
+    motionVideo: "Reference Video",
+    motionElement: "Face Element",
+    motionVideoHint:
+      "Kling Motion — transfer movements from a reference video to any character image.\n\n📸 Character Image (required): character should have clear body proportions, no occlusion, and occupy more than 5% of the image area.\n\n🎬 Reference Video (required): video with movements to transfer. Should contain a realistic-style character with entire body or upper body visible, including head, without obstruction.\n• Orientation 'video' — max 30 s\n• Orientation 'image' — max 10 s\n\n👤 Face Element (optional): upload a face photo to enhance identity preservation. Reference as @Element1 in prompt. Only works with orientation 'video'.\n\n⚙️ Character orientation is configured in Management.",
+    uploadPromptVideo: 'Send a video for "{slot}".',
     uploadPrompt: 'Send a photo for "{slot}".',
     uploadPromptMulti: 'Send up to {max} photos for "{slot}".',
     uploadPromptElement:

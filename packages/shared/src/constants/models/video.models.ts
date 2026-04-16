@@ -34,6 +34,56 @@ const MI_REF_ELEMENTS: MediaInputSlot[] = [1, 2, 3, 4, 5].map((i) => ({
 
 const KLING_MEDIA_INPUTS: MediaInputSlot[] = [MI_FIRST_FRAME, MI_LAST_FRAME, ...MI_REF_ELEMENTS];
 
+/** Kling Motion: required reference image (image_url). */
+const MI_MOTION_IMAGE: MediaInputSlot = {
+  slotKey: "first_frame",
+  mode: "first_frame",
+  labelKey: "motionImage",
+  required: true,
+};
+/** Kling Motion: required reference video (video_url). */
+const MI_MOTION_VIDEO: MediaInputSlot = {
+  slotKey: "motion_video",
+  mode: "motion_video",
+  labelKey: "motionVideo",
+  required: true,
+};
+/** Kling Motion: optional facial element (only 1, only with character_orientation="video"). */
+const MI_MOTION_ELEMENT: MediaInputSlot = {
+  slotKey: "ref_element_1",
+  mode: "reference_element",
+  labelKey: "motionElement",
+  maxImages: 1,
+};
+
+const KLING_MOTION_MEDIA_INPUTS: MediaInputSlot[] = [
+  MI_MOTION_IMAGE,
+  MI_MOTION_VIDEO,
+  MI_MOTION_ELEMENT,
+];
+
+const KLING_MOTION_SETTINGS: ModelSettingDef[] = [
+  {
+    key: "character_orientation",
+    label: "Ориентация персонажа",
+    description:
+      "Определяет, чью ориентацию повторит персонаж в результате. «По видео» — ориентация как в референсном видео (лучше для сложных движений, макс. 30 с). «По изображению» — ориентация как на исходном фото (лучше для камерных движений, макс. 10 с).",
+    type: "select",
+    options: [
+      { value: "video", label: "По видео" },
+      { value: "image", label: "По изображению" },
+    ],
+    default: "video",
+  },
+  {
+    key: "keep_original_sound",
+    label: "Сохранить звук из видео",
+    description: "Перенести оригинальный звук из референсного видео в результат.",
+    type: "toggle",
+    default: true,
+  },
+];
+
 /** Wan 2.7 driving audio slot (lip-sync / motion timing). */
 const MI_DRIVING_AUDIO: MediaInputSlot = {
   slotKey: "driving_audio",
@@ -1246,6 +1296,52 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         advanced: true,
       },
     ],
+  },
+
+  "kling-motion": {
+    id: "kling-motion",
+    name: "🎥 Kling Motion",
+    description:
+      "Переносит движения из референсного видео на любого персонажа с изображения. Standard-версия — быстрее и дешевле Pro. Идеален для портретов и простых анимаций.",
+    section: "video",
+    provider: "fal",
+    familyId: "kling-motion",
+    variantLabel: "Standard",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.126,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    mediaInputs: KLING_MOTION_MEDIA_INPUTS,
+    settings: [...KLING_MOTION_SETTINGS],
+  },
+
+  "kling-motion-pro": {
+    id: "kling-motion-pro",
+    name: "🎥 Kling Motion Pro",
+    description:
+      "Переносит движения из референсного видео на любого персонажа с изображения. Pro-версия — повышенная точность переноса и детализация.",
+    section: "video",
+    provider: "fal",
+    familyId: "kling-motion",
+    variantLabel: "Pro",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.168,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    mediaInputs: KLING_MOTION_MEDIA_INPUTS,
+    settings: [...KLING_MOTION_SETTINGS],
   },
 
   // "d-id": {

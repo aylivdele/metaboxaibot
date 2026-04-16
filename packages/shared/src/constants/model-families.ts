@@ -158,6 +158,19 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     ],
   },
 
+  "kling-motion": {
+    id: "kling-motion",
+    name: "🎥 Kling Motion",
+    section: "video",
+    description:
+      "Переносит движения из референсного видео на любого персонажа с изображения. Идеален для портретов и простых анимаций.",
+    defaultModelId: "kling-motion",
+    members: [
+      { modelId: "kling-motion", variantLabel: "Standard" },
+      { modelId: "kling-motion-pro", variantLabel: "Pro" },
+    ],
+  },
+
   minimax: {
     id: "minimax",
     name: "🎞️ Hailuo 2.3",
