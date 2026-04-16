@@ -71,6 +71,8 @@ export class HiggsFieldAdapter implements VideoAdapter {
 
     const enhancePrompt = (input.modelSettings?.enhance_prompt as boolean | undefined) ?? true;
     const seed = (input.modelSettings?.seed as number | null | undefined) ?? undefined;
+    const customRefId = input.modelSettings?.custom_reference_id as string | undefined;
+    const customRefStrength = input.modelSettings?.custom_reference_strength as number | undefined;
 
     const imageUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
 
@@ -81,6 +83,8 @@ export class HiggsFieldAdapter implements VideoAdapter {
       ...(seed != null ? { seed } : {}),
       ...(imageUrl ? { input_images: [{ type: "image_url", image_url: imageUrl }] } : {}),
       ...(motions?.length ? { motions } : {}),
+      ...(customRefId ? { custom_reference_id: customRefId } : {}),
+      ...(customRefStrength != null ? { custom_reference_strength: customRefStrength } : {}),
     };
 
     const res = await fetchWithLog(`${HIGGSFIELD_API}/v1/image2video/dop`, {

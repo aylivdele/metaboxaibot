@@ -310,6 +310,12 @@ const translations = {
       "Return to the chat and send a photo with your face — the bot will create a personal avatar based on it.",
     "uploads.avatarCreating": "Creating...",
     "uploads.emptyAvatars": 'No avatars yet. Click "Create avatar" to start.',
+    "uploads.mySouls": "My Characters",
+    "uploads.createSoul": "➕ Create Character",
+    "uploads.createSoulHint":
+      "Return to the chat and send 20+ photos — the bot will create a character based on them.",
+    "uploads.noSouls": "No characters yet.",
+    "uploads.soulCreating": "Creating...",
 
     // Auth errors
     "auth.tokenExpired": "Link expired. Press the «Profile» button in the bot menu again.",
@@ -619,6 +625,12 @@ const translations = {
       "Вернитесь в чат и отправьте фото с лицом — бот создаст персональный аватар на его основе.",
     "uploads.avatarCreating": "Создаётся...",
     "uploads.emptyAvatars": "Аватаров пока нет. Нажмите «Создать аватар».",
+    "uploads.mySouls": "Мои персонажи",
+    "uploads.createSoul": "➕ Создать персонажа",
+    "uploads.createSoulHint":
+      "Вернитесь в чат и отправьте 20+ фото — бот создаст персонажа на их основе.",
+    "uploads.noSouls": "Персонажей пока нет.",
+    "uploads.soulCreating": "Создаётся...",
 
     // Auth errors
     "auth.tokenExpired":

@@ -16,6 +16,10 @@ export interface AvatarJobData {
   telegramChatId: number;
   /** Poll attempt counter (incremented on each retry) */
   pollAttempt?: number;
+  /** S3 keys of multiple images (for Soul character creation) */
+  s3Keys?: string[];
+  /** Display name for the character */
+  characterName?: string;
 }
 
 export function getAvatarQueue(): Queue<AvatarJobData> {

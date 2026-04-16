@@ -137,6 +137,14 @@ export interface Translations {
     heygenNeedsVoice: string;
     heygenNeedsAvatar: string;
     veoImageRequires8s: string;
+    soulCreatePrompt: string;
+    soulPhotoCount: string;
+    soulCreateButton: string;
+    soulCreating: string;
+    soulReady: string;
+    soulFailed: string;
+    soulCancelled: string;
+    soulMinPhotos: string;
     imageIgnoredUnsupported: string;
     hintVideoDefault: string;
     avatarCreationCancelled: string;

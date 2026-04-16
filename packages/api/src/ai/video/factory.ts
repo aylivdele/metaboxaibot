@@ -14,6 +14,7 @@ import { MinimaxVideoAdapter } from "./minimax.adapter.js";
 const FAL_MODELS = new Set([
   "kling",
   "kling-pro",
+  "kling-motion",
   "pika",
   "seedance",
   "seedance-2",

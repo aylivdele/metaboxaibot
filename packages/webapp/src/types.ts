@@ -83,7 +83,8 @@ export interface ModelSettingDef {
     | "openai-voice-picker"
     | "color"
     | "avatar-picker"
-    | "motion-picker";
+    | "motion-picker"
+    | "soul-picker";
   options?: ModelSettingOption[];
   min?: number;
   max?: number;

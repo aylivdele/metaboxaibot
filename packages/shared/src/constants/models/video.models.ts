@@ -399,6 +399,24 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     settings: [
       mkAspectRatio(["16:9", "9:16", "1:1"]),
       {
+        key: "custom_reference_id",
+        label: "Персонаж (Soul ID)",
+        description: "Выберите созданного персонажа для генерации с его внешностью.",
+        type: "soul-picker",
+        default: null,
+      },
+      {
+        key: "custom_reference_strength",
+        label: "Сила персонажа",
+        description: "Насколько сильно внешность персонажа влияет на результат (0–1).",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.5,
+        advanced: true,
+      },
+      {
         key: "motions",
         label: "Пресеты движений",
         description:
@@ -451,6 +469,24 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     supportedDurations: [5],
     settings: [
       mkAspectRatio(["16:9", "9:16", "1:1"]),
+      {
+        key: "custom_reference_id",
+        label: "Персонаж (Soul ID)",
+        description: "Выберите созданного персонажа для генерации с его внешностью.",
+        type: "soul-picker",
+        default: null,
+      },
+      {
+        key: "custom_reference_strength",
+        label: "Сила персонажа",
+        description: "Насколько сильно внешность персонажа влияет на результат (0–1).",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.5,
+        advanced: true,
+      },
       {
         key: "motions",
         label: "Пресеты движений",
@@ -506,6 +542,24 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     supportedDurations: [5],
     settings: [
       mkAspectRatio(["16:9", "9:16", "1:1"]),
+      {
+        key: "custom_reference_id",
+        label: "Персонаж (Soul ID)",
+        description: "Выберите созданного персонажа для генерации с его внешностью.",
+        type: "soul-picker",
+        default: null,
+      },
+      {
+        key: "custom_reference_strength",
+        label: "Сила персонажа",
+        description: "Насколько сильно внешность персонажа влияет на результат (0–1).",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.5,
+        advanced: true,
+      },
       {
         key: "motions",
         label: "Пресеты движений",

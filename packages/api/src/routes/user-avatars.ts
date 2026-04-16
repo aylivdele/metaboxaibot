@@ -3,7 +3,9 @@ import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { userAvatarService } from "../services/user-avatar.service.js";
 import { userStateService } from "../services/user-state.service.js";
 import { getFileUrl } from "../services/s3.service.js";
-import { config } from "@metabox/shared";
+import { config, getT } from "@metabox/shared";
+import type { Language } from "@metabox/shared";
+import { db } from "../db.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
@@ -46,16 +48,40 @@ export const userAvatarsRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (!provider) return reply.status(400).send({ error: "provider is required" });
 
-      // Only HeyGen is supported currently
-      if (provider !== "heygen") {
+      if (provider !== "heygen" && provider !== "higgsfield_soul") {
         return reply.status(400).send({ error: `Unsupported provider: ${provider}` });
       }
 
-      // Set bot FSM state so the next photo from the user triggers avatar creation
+      const telegramChatId = Number(userId);
+
+      if (provider === "higgsfield_soul") {
+        await userStateService.setState(userId, "HIGGSFIELD_SOUL_PHOTO", "video");
+
+        // Get user language for i18n
+        const user = await db.user.findUnique({
+          where: { id: userId },
+          select: { language: true },
+        });
+        const t = getT((user?.language ?? "en") as Language);
+
+        await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: telegramChatId,
+            text: t.video.soulCreatePrompt,
+            reply_markup: {
+              inline_keyboard: [[{ text: "❌", callback_data: "soul_create_cancel" }]],
+            },
+          }),
+        });
+
+        return { ok: true };
+      }
+
+      // HeyGen: set FSM state so the next photo triggers avatar creation
       await userStateService.setState(userId, "HEYGEN_AVATAR_PHOTO", "video");
 
-      // Send Telegram message asking for a photo
-      const telegramChatId = Number(userId);
       await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -161,6 +161,17 @@ export default {
       "❌ HeyGen requires an avatar selected in ⚙ Management or a photo sent for animation.",
     veoImageRequires8s:
       "❌ When using an input image, Veo only supports 8-second duration. Change the duration in ⚙ Management.",
+    soulCreatePrompt:
+      "📸 Send 20+ photos to create a character.\n\n✅ Recommendations:\n• 20+ photos in one cohesive style, no faces\n• High-quality, clear images\n• Different angles and poses\n\n❌ Avoid:\n• Faces, blurry or low-quality images\n• Mixed styles in one set\n\nSend photos one at a time or as a group.",
+    soulPhotoCount: "📸 Uploaded {n} of {max} max.",
+    soulCreateButton: "✅ Create character ({n} photos)",
+    soulCreating:
+      "⏳ Character is being created. This may take several minutes — you'll be notified when it's ready.",
+    soulReady:
+      "✅ Your character is ready! Select it in Higgsfield settings under ⚙ Management to use in generation.",
+    soulFailed: "❌ Failed to create character. Please try again.",
+    soulCancelled: "❌ Character creation cancelled.",
+    soulMinPhotos: "⚠️ At least {min} photos are required to create a character. Uploaded: {n}.",
     imageIgnoredUnsupported:
       "⚠️ This model does not support image input — your photo will be ignored.",
     hintVideoDefault:

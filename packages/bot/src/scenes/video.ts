@@ -8,11 +8,13 @@ import {
   calculateCost,
   checkBalance,
   deductTokens,
+  usdToTokens,
 } from "@metabox/api/services";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { HeyGenAvatarAdapter } from "@metabox/api/ai/avatar/heygen";
 import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
+import { getAvatarQueue } from "@metabox/api/queues";
 import {
   MODELS_BY_SECTION,
   FAMILIES_BY_SECTION,
@@ -35,6 +37,15 @@ import {
   buildMediaInputStatusMenu,
   resolveMediaInputUrls,
 } from "../utils/media-input-state.js";
+import {
+  SOUL_MAX_PHOTOS,
+  SOUL_MIN_PHOTOS,
+  initSoulBuffer,
+  getSoulBuffer,
+  addSoulPhoto,
+  clearSoulBuffer,
+  debounceSoulReply,
+} from "../utils/soul-photo-buffer.js";
 
 // ── Avatar voice choice store (TTL 10 min) ──────────────────────────────────
 
@@ -1197,6 +1208,148 @@ export async function handleVideoAvatarVoiceCallback(ctx: BotContext): Promise<v
       await ctx.reply(ctx.t.video.generationFailed);
     }
   }
+}
+
+// ── HIGGSFIELD_SOUL_PHOTO state: collect photos for Soul character creation ──
+
+/** Cost of Soul character creation in USD */
+const SOUL_COST_USD = 2.5;
+
+/**
+ * Receives a photo (compressed or document) while in HIGGSFIELD_SOUL_PHOTO state.
+ * Uploads to S3, adds to in-memory buffer, replies with count + Create/Cancel buttons.
+ * Uses debounceSoulReply to send only one reply per media group (album).
+ */
+export async function handleSoulPhotoCapture(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+
+  let fileId: string | undefined;
+  if (ctx.message?.photo) {
+    fileId = ctx.message.photo.at(-1)?.file_id;
+  } else if (ctx.message?.document?.mime_type?.startsWith("image/")) {
+    fileId = ctx.message.document.file_id;
+  }
+  if (!fileId) return;
+
+  const userId = ctx.user.id;
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  // Lazily init the buffer on first photo (route only sets FSM state)
+  if (!getSoulBuffer(userId)) {
+    initSoulBuffer(userId, chatId);
+  }
+  const buf = getSoulBuffer(userId);
+  if (!buf) return;
+
+  const file = await ctx.api.getFile(fileId);
+  const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+
+  // Upload to S3
+  const s3Key = `soul_photos/${userId.toString()}/${Date.now()}_${file.file_id}.jpg`;
+  const uploaded = await s3Service.uploadFromUrl(s3Key, tgUrl, "image/jpeg").catch(() => null);
+  if (!uploaded) {
+    logger.warn({ userId, fileId }, "Soul photo S3 upload failed, skipping");
+    return;
+  }
+
+  const count = addSoulPhoto(userId, uploaded);
+
+  // Debounce reply for media groups (albums) — only send one message per group
+  debounceSoulReply(userId, ctx.message?.media_group_id, async () => {
+    // Re-read count after debounce (more photos may have arrived)
+    const currentBuf = getSoulBuffer(userId);
+    const n = currentBuf?.s3Keys.length ?? count;
+
+    const text = ctx.t.video.soulPhotoCount
+      .replace("{n}", String(n))
+      .replace("{max}", String(SOUL_MAX_PHOTOS));
+
+    const kb = new InlineKeyboard();
+    if (n >= SOUL_MIN_PHOTOS) {
+      kb.text(ctx.t.video.soulCreateButton.replace("{n}", String(n)), "soul_create_submit").row();
+    }
+    kb.text("❌ " + ctx.t.video.soulCancelled.replace("❌ ", ""), "soul_create_cancel");
+
+    await ctx.reply(text, { reply_markup: kb });
+  });
+}
+
+/**
+ * Callback: user taps "Create character" after uploading photos.
+ * Validates min photos, checks balance, deducts $2.50, creates UserAvatar + queue job.
+ */
+export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.answerCallbackQuery();
+
+  const userId = ctx.user.id;
+  const buf = clearSoulBuffer(userId);
+
+  if (!buf || buf.s3Keys.length < SOUL_MIN_PHOTOS) {
+    const n = buf?.s3Keys.length ?? 0;
+    await ctx
+      .editMessageText(
+        ctx.t.video.soulMinPhotos
+          .replace("{min}", String(SOUL_MIN_PHOTOS))
+          .replace("{n}", String(n)),
+      )
+      .catch(() => void 0);
+    // Restore FSM
+    await userStateService.setState(userId, "VIDEO_ACTIVE", "video");
+    return;
+  }
+
+  // Check balance ($2.50)
+  const costTokens = usdToTokens(SOUL_COST_USD);
+  try {
+    await checkBalance(userId, costTokens);
+  } catch {
+    await ctx.editMessageText(ctx.t.errors.insufficientTokens).catch(() => void 0);
+    await userStateService.setState(userId, "VIDEO_ACTIVE", "video");
+    return;
+  }
+
+  // Deduct tokens
+  await deductTokens(userId, costTokens, "higgsfield_soul");
+
+  // Create UserAvatar record
+  const avatar = await userAvatarService.create(userId, {
+    provider: "higgsfield_soul",
+    name: ctx.t.video.myAvatarDefaultName,
+    externalId: undefined,
+    status: "creating",
+    previewUrl: undefined,
+  });
+
+  // Enqueue avatar creation job
+  await getAvatarQueue().add("create", {
+    userAvatarId: avatar.id,
+    userId: userId.toString(),
+    provider: "higgsfield_soul",
+    action: "create",
+    telegramChatId: buf.telegramChatId,
+    s3Keys: buf.s3Keys,
+    characterName: ctx.t.video.myAvatarDefaultName,
+  });
+
+  await ctx.editMessageText(ctx.t.video.soulCreating).catch(() => void 0);
+
+  // Restore FSM to VIDEO_ACTIVE
+  await userStateService.setState(userId, "VIDEO_ACTIVE", "video");
+}
+
+/**
+ * Callback: user cancels Soul character creation.
+ * Clears buffer, restores FSM to VIDEO_ACTIVE.
+ */
+export async function handleSoulCreateCancel(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.answerCallbackQuery();
+
+  clearSoulBuffer(ctx.user.id);
+  await userStateService.setState(ctx.user.id, "VIDEO_ACTIVE", "video");
+  await ctx.editMessageText(ctx.t.video.soulCancelled).catch(() => void 0);
 }
 
 /**

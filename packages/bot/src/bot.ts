@@ -43,6 +43,9 @@ import {
   handleVideoAvatars,
   handleAvatarPhotoCapture,
   handleHeygenAvatarCancel,
+  handleSoulPhotoCapture,
+  handleSoulCreateSubmit,
+  handleSoulCreateCancel,
   handleVideoMediaInput,
   handleVideoMediaInputCancel,
   handleVideoMediaInputDone,
@@ -180,6 +183,10 @@ export function createBot(token: string): Bot<BotContext> {
   // ── HeyGen avatar creation cancel ────────────────────────────────────────
   bot.callbackQuery("heygen_avatar_cancel", handleHeygenAvatarCancel);
 
+  // ── Higgsfield Soul character creation ──────────────────────────────────
+  bot.callbackQuery("soul_create_submit", handleSoulCreateSubmit);
+  bot.callbackQuery("soul_create_cancel", handleSoulCreateCancel);
+
   // ── Merge conflict resolution callbacks ────────────────────────────────────
   bot.callbackQuery(/^merge:(site|bot):/, handleMergeChoice);
   bot.callbackQuery("merge:cancel", handleMergeCancel);
@@ -310,6 +317,12 @@ export function createBot(token: string): Bot<BotContext> {
       if (ctx.message?.document?.mime_type?.startsWith("image/"))
         return handleAvatarPhotoCapture(ctx);
       return; // ignore non-image messages while waiting for avatar photo
+    }
+    if (state?.state === "HIGGSFIELD_SOUL_PHOTO") {
+      if (ctx.message?.photo) return handleSoulPhotoCapture(ctx);
+      if (ctx.message?.document?.mime_type?.startsWith("image/"))
+        return handleSoulPhotoCapture(ctx);
+      return; // ignore non-image messages while waiting for soul photos
     }
     if (state?.state === "AUDIO_ACTIVE") {
       if (state.audioModelId === "voice-clone") {

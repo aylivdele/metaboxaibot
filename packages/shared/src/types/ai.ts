@@ -42,7 +42,8 @@ export type ModelSettingType =
   | "openai-voice-picker"
   | "color"
   | "avatar-picker"
-  | "motion-picker";
+  | "motion-picker"
+  | "soul-picker";
 
 export interface ModelSettingOption {
   value: string | number | boolean;

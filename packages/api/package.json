@@ -60,6 +60,10 @@
       "types": "./src/ai/avatar/heygen.avatar.adapter.ts",
       "default": "./dist/ai/avatar/heygen.avatar.adapter.js"
     },
+    "./ai/avatar/higgsfield-soul": {
+      "types": "./src/ai/avatar/higgsfield.soul.adapter.ts",
+      "default": "./dist/ai/avatar/higgsfield.soul.adapter.js"
+    },
     "./utils/fal-error": {
       "types": "./src/utils/fal-error.ts",
       "default": "./dist/utils/fal-error.js"
