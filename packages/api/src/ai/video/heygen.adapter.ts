@@ -78,10 +78,14 @@ export class HeyGenAdapter implements VideoAdapter {
       contentType = "audio/mpeg";
     }
 
+    const ext = contentType.includes("wav") ? "wav" : contentType.includes("ogg") ? "ogg" : "mp3";
+    const formData = new FormData();
+    formData.append("file", new Blob([audioBuffer], { type: contentType }), `audio.${ext}`);
+
     const uploadRes = await fetchWithLog(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",
-      headers: { "X-Api-Key": this.apiKey, "Content-Type": contentType },
-      body: audioBuffer,
+      headers: { "X-Api-Key": this.apiKey },
+      body: formData,
     });
     if (!uploadRes.ok) {
       const text = await uploadRes.text();
@@ -110,10 +114,18 @@ export class HeyGenAdapter implements VideoAdapter {
     // (S3 presigned URLs and Telegram file URLs often return application/octet-stream).
     const contentType = resolveImageMimeType(imgBuffer, imgRes.headers.get("content-type"));
 
+    const imgExt = contentType.includes("png")
+      ? "png"
+      : contentType.includes("webp")
+        ? "webp"
+        : "jpg";
+    const imgFormData = new FormData();
+    imgFormData.append("file", new Blob([imgBuffer], { type: contentType }), `image.${imgExt}`);
+
     const uploadRes = await fetchWithLog(`${HEYGEN_UPLOAD}/v1/asset`, {
       method: "POST",
-      headers: { "X-Api-Key": this.apiKey, "Content-Type": contentType },
-      body: imgBuffer,
+      headers: { "X-Api-Key": this.apiKey },
+      body: imgFormData,
     });
     if (!uploadRes.ok) {
       const text = await uploadRes.text();
