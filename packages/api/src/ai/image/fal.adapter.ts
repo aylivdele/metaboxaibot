@@ -63,8 +63,9 @@ export class FalAdapter implements ImageAdapter {
     fal.config({ credentials: apiKey });
   }
 
-  private selectEndpoint(imageUrl: string | undefined): string {
-    if (imageUrl && EDIT_ENDPOINTS[this.modelId]) {
+  private selectEndpoint(input: ImageInput): string {
+    const hasEditMedia = !!(input.mediaInputs?.edit?.length || input.imageUrl);
+    if (hasEditMedia && EDIT_ENDPOINTS[this.modelId]) {
       return EDIT_ENDPOINTS[this.modelId];
     }
     return T2I_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`;
@@ -73,7 +74,7 @@ export class FalAdapter implements ImageAdapter {
   async submit(input: ImageInput): Promise<string> {
     const editUrls = input.mediaInputs?.edit ?? (input.imageUrl ? [input.imageUrl] : []);
     const imageUrl = editUrls[0];
-    const endpoint = this.selectEndpoint(imageUrl);
+    const endpoint = this.selectEndpoint(input);
     const ms = input.modelSettings ?? {};
     const msExtras: Record<string, unknown> = {};
     if (ms.num_inference_steps !== undefined) msExtras.num_inference_steps = ms.num_inference_steps;

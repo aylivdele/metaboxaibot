@@ -44,11 +44,19 @@ export class FalVideoAdapter implements VideoAdapter {
     fal.config({ credentials: apiKey });
   }
 
-  private selectEndpoint(imageUrl: string | undefined): string {
-    if (imageUrl && FAL_I2V_ENDPOINTS[this.modelId]) {
-      return FAL_I2V_ENDPOINTS[this.modelId];
+  private selectEndpoint(input: VideoInput): string {
+    if (!FAL_I2V_ENDPOINTS[this.modelId]) {
+      return FAL_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`;
     }
-    return FAL_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`;
+    const mi = input.mediaInputs ?? {};
+    const hasMedia =
+      !!mi.first_frame?.length ||
+      !!mi.last_frame?.length ||
+      !!input.imageUrl ||
+      Object.keys(mi).some((k) => k.startsWith("ref_element_") && mi[k]?.length);
+    return hasMedia
+      ? FAL_I2V_ENDPOINTS[this.modelId]
+      : (FAL_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`);
   }
 
   async submit(input: VideoInput): Promise<string> {
@@ -106,7 +114,7 @@ export class FalVideoAdapter implements VideoAdapter {
       }
     }
 
-    const endpoint = seedanceR2VEndpoint ?? this.selectEndpoint(imageUrl);
+    const endpoint = seedanceR2VEndpoint ?? this.selectEndpoint(input);
     const useR2V = !!seedanceR2VEndpoint;
 
     // r2v endpoints don't accept a single image_url — fold first_frame into image_urls.

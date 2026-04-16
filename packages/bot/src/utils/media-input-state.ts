@@ -38,10 +38,26 @@ export function buildMediaInputStatusMenu(
   const kb = new InlineKeyboard();
 
   let allRequiredFilled = true;
+  let nextElementShown = false;
 
   for (const slot of slots) {
     const label = t.mediaInput[slot.labelKey as keyof typeof t.mediaInput] ?? slot.labelKey;
     const isFilled = !!filledInputs[slot.slotKey]?.length;
+
+    // Progressive reveal for element slots: show filled + one next empty slot.
+    if (slot.mode === "reference_element") {
+      if (isFilled) {
+        kb.text(`✅ ${label}`, `mi:${section}:${slot.slotKey}`)
+          .text(t.mediaInput.remove, `mi_remove:${section}:${slot.slotKey}`)
+          .row();
+      } else if (!nextElementShown) {
+        nextElementShown = true;
+        const suffix = slot.required ? ` ${t.mediaInput.required}` : ` ${t.mediaInput.optional}`;
+        kb.text(`${label}${suffix}`, `mi:${section}:${slot.slotKey}`).row();
+        if (slot.required) allRequiredFilled = false;
+      }
+      continue;
+    }
 
     if (isFilled) {
       kb.text(`✅ ${label}`, `mi:${section}:${slot.slotKey}`)

@@ -363,7 +363,7 @@ export async function handleDesignMediaInputDone(ctx: BotContext): Promise<void>
   if (!ctx.user) return;
   await ctx.answerCallbackQuery();
   clearActiveSlot(ctx.user.id);
-  await sendDesignMediaInputStatus(ctx);
+  await sendDesignMediaInputStatus(ctx, { edit: true });
 }
 
 /** Callback for mi_remove:design:{slotKey} — clear a filled slot. */

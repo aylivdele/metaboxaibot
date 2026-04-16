@@ -2280,6 +2280,9 @@ textarea::placeholder {
 
 /* ── Management onboarding banner ────────────────────────────────────────── */
 .manage-onboarding-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   background: #d32f2f;
   color: #fff;
   font-size: 13px;
@@ -2287,6 +2290,23 @@ textarea::placeholder {
   padding: 10px 14px;
   border-radius: 8px;
   margin: 8px 12px 0;
+}
+.manage-onboarding-banner span {
+  flex: 1;
+}
+.manage-onboarding-banner__close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.8;
+}
+.manage-onboarding-banner__close:hover {
+  opacity: 1;
 }
 
 /* ── Management tabs ─────────────────────────────────────────────────────── */

@@ -16,6 +16,7 @@ export function ManagementPage({
   finishedOnboarding: boolean;
 }) {
   const { t } = useI18n();
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [tab, setTab] = useState<ManageTab>(
     initialSection === "design"
       ? "design"
@@ -36,8 +37,17 @@ export function ManagementPage({
 
   return (
     <div className="manage-root">
-      {!finishedOnboarding && (
-        <div className="manage-onboarding-banner">{t("manage.onboardingBanner")}</div>
+      {!finishedOnboarding && !bannerDismissed && (
+        <div className="manage-onboarding-banner">
+          <span>{t("manage.onboardingBanner")}</span>
+          <button
+            className="manage-onboarding-banner__close"
+            onClick={() => setBannerDismissed(true)}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
       )}
       <div className="manage-tabs">
         {(["gpt", "design", "video", "audio", "uploads"] as ManageTab[]).map((s) => (

@@ -434,7 +434,7 @@ export async function handleVideoMediaInputDone(ctx: BotContext): Promise<void> 
   if (!ctx.user) return;
   await ctx.answerCallbackQuery();
   clearActiveSlot(ctx.user.id);
-  await sendVideoMediaInputStatus(ctx);
+  await sendVideoMediaInputStatus(ctx, { edit: true });
 }
 
 /** Callback for mi_remove:video:{slotKey} — clear a filled slot. */
@@ -443,7 +443,30 @@ export async function handleVideoMediaInputRemove(ctx: BotContext): Promise<void
   const data = ctx.callbackQuery?.data ?? "";
   const slotKey = data.replace("mi_remove:video:", "");
   await ctx.answerCallbackQuery();
-  await userStateService.clearMediaInputSlot(ctx.user.id, slotKey);
+
+  // For element slots: shift subsequent elements down after removal.
+  const elemMatch = slotKey.match(/^ref_element_(\d+)$/);
+  if (elemMatch) {
+    const removed = parseInt(elemMatch[1], 10);
+    const current = await userStateService.getMediaInputs(ctx.user.id);
+    // Clear the removed slot and shift higher-numbered elements down.
+    for (let i = removed; i <= 5; i++) {
+      const nextKey = `ref_element_${i + 1}`;
+      const curKey = `ref_element_${i}`;
+      const nextVal = current[nextKey];
+      if (nextVal?.length) {
+        await userStateService.clearMediaInputSlot(ctx.user.id, curKey);
+        for (const url of nextVal) {
+          await userStateService.addMediaInput(ctx.user.id, curKey, url);
+        }
+      } else {
+        await userStateService.clearMediaInputSlot(ctx.user.id, curKey);
+        break;
+      }
+    }
+  } else {
+    await userStateService.clearMediaInputSlot(ctx.user.id, slotKey);
+  }
   await sendVideoMediaInputStatus(ctx, { edit: true });
 }
 
