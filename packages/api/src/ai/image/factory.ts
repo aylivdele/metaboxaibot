@@ -1,5 +1,6 @@
 import { AI_MODELS } from "@metabox/shared";
 import type { ImageAdapter } from "./base.adapter.js";
+export type { ImageResult } from "./base.adapter.js";
 import { DalleAdapter } from "./dalle.adapter.js";
 import { FalAdapter } from "./fal.adapter.js";
 import { ReplicateAdapter } from "./replicate.adapter.js";

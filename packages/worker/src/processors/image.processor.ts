@@ -8,6 +8,7 @@ import type { ImageJobData } from "@metabox/api/queues";
 import { getImageQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createImageAdapter } from "@metabox/api/ai/image";
+import type { ImageResult } from "@metabox/api/ai/image";
 import { deductTokens, calculateCost, translatePromptIfNeeded } from "@metabox/api/services";
 import {
   buildS3Key,
@@ -67,7 +68,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
     let outputUrl: string;
     let s3Key: string | null;
-    let imageResult: Awaited<ReturnType<NonNullable<typeof adapter.poll>>> | null = null;
+    let imageResults: ImageResult[] = [];
 
     if (existingJob?.outputUrl) {
       // Stage 3 already done — skip submit + poll (crash-recovery fast path)
@@ -135,9 +136,9 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       if (!providerJobId) throw new Error(`Image poll stage without providerJobId: ${dbJobId}`);
       if (!adapter.poll) throw new Error(`Adapter ${modelId} has no poll()`);
 
-      imageResult = await adapter.poll(providerJobId);
+      const pollResult = await adapter.poll(providerJobId);
 
-      if (!imageResult) {
+      if (!pollResult) {
         // Not done yet — schedule the next poll with tiered interval.
         const elapsed = Date.now() - (job.data.pollStartedAt ?? Date.now());
         const interval = getIntervalForElapsed(elapsed);
@@ -174,18 +175,22 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         return;
       }
 
-      // imageResult present → fall through to finalize.
-      const isSvg = imageResult.filename?.endsWith(".svg") ?? false;
+      // Normalize to array
+      imageResults = Array.isArray(pollResult) ? pollResult : [pollResult];
+
+      // Process first image → main generationJob record
+      const firstResult = imageResults[0];
+      const isSvg = firstResult.filename?.endsWith(".svg") ?? false;
       const resolvedContentType = isSvg
         ? "image/svg+xml"
-        : (imageResult.contentType ?? sectionMeta("image").contentType);
+        : (firstResult.contentType ?? sectionMeta("image").contentType);
       const resolvedExt = isSvg
         ? "svg"
         : (resolvedContentType.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg");
 
       let imageBuffer: Buffer | null = null;
       try {
-        const res = await fetch(imageResult.url);
+        const res = await fetch(firstResult.url);
         if (res.ok) imageBuffer = Buffer.from(await res.arrayBuffer());
       } catch (e) {
         logger.error({ reason: e }, "Could not fetch image buffer");
@@ -211,7 +216,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         }
       }
 
-      outputUrl = imageResult.url;
+      outputUrl = firstResult.url;
 
       await db.generationJob.update({
         where: { id: dbJobId },
@@ -221,8 +226,8 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       const model = AI_MODELS[modelId];
       if (model) {
         const megapixels =
-          model.costUsdPerMPixel && imageResult.width && imageResult.height
-            ? (imageResult.width * imageResult.height) / 1_000_000
+          model.costUsdPerMPixel && firstResult.width && firstResult.height
+            ? (firstResult.width * firstResult.height) / 1_000_000
             : undefined;
 
         // img2img input surcharge — collect all input image URLs (media-input
@@ -255,6 +260,115 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     }
 
     // ── Stage 3: send to user ────────────────────────────────────────────
+    let slicedPrompt = prompt.slice(0, 200);
+    slicedPrompt = slicedPrompt.concat(slicedPrompt.length < 200 ? "" : "...");
+
+    // Batch: multiple images → send as media group
+    if (imageResults.length > 1) {
+      // Upload extra images to S3 (first one is already uploaded above)
+      const extraS3Keys: (string | null)[] = [];
+      for (let i = 1; i < imageResults.length; i++) {
+        const ir = imageResults[i];
+        const ext =
+          ir.contentType?.split("/")[1]?.replace("jpeg", "jpg") ??
+          ir.filename?.split(".").pop() ??
+          "png";
+        const ct = ir.contentType ?? sectionMeta("image").contentType;
+        let buf: Buffer | null = null;
+        try {
+          const res = await fetch(ir.url);
+          if (res.ok) buf = Buffer.from(await res.arrayBuffer());
+        } catch (e) {
+          logger.error({ reason: e, index: i }, "Could not fetch batch image buffer");
+        }
+        const key = buildS3Key("image", userIdStr, `${dbJobId}_${i + 1}`, ext);
+        const uploaded = buf
+          ? await uploadBuffer(key, buf, ct).catch((reason) => {
+              logger.error({ reason, index: i }, "Could not upload batch image buffer");
+              return null;
+            })
+          : null;
+        extraS3Keys.push(uploaded);
+
+        // Generate thumbnails for extra images
+        if (buf && uploaded) {
+          const thumbBuf = await generateThumbnail(buf, ct);
+          if (thumbBuf) {
+            await uploadBuffer(buildThumbnailKey(uploaded), thumbBuf, "image/webp").catch(
+              () => null,
+            );
+          }
+        }
+      }
+
+      // Build media group: all images as InputMediaPhoto
+      const allS3Keys = [s3Key, ...extraS3Keys];
+      const mediaGroup: Array<{
+        type: "photo";
+        media: string | InstanceType<typeof InputFile>;
+        caption?: string;
+      }> = [];
+
+      for (let i = 0; i < imageResults.length; i++) {
+        const ir = imageResults[i];
+        const key = allS3Keys[i];
+        const { source } = await resolveTelegramSource(
+          key,
+          ir.url,
+          ir.filename ?? `image-${i + 1}.png`,
+        );
+        mediaGroup.push({
+          type: "photo",
+          media: source,
+          ...(i === 0 ? { caption: `✅ ${modelId}: ${slicedPrompt}` } : {}),
+        });
+      }
+
+      await telegram.sendMediaGroup(telegramChatId, mediaGroup);
+
+      // Send refine + download buttons as a separate message (media groups don't support inline keyboards)
+      const refineRow = dbJobId
+        ? [{ text: t.design.refine, callback_data: `design_ref_${dbJobId}` }]
+        : null;
+      const downloadRow: InlineKeyboardButton[] | null =
+        s3Key && config.api.publicUrl
+          ? [
+              {
+                text: t.common.downloadFile,
+                url: `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userIdStr)}`,
+              },
+            ]
+          : null;
+      const rows = [refineRow, downloadRow].filter(Boolean) as InlineKeyboardButton[][];
+      if (rows.length) {
+        await telegram.sendMessage(telegramChatId, "⬆️", {
+          reply_markup: { inline_keyboard: rows },
+        });
+      }
+
+      if (dialogId) {
+        await db.message.create({
+          data: { dialogId, role: "user", content: prompt, tokensUsed: 0 },
+        });
+        for (const ir of imageResults) {
+          await db.message.create({
+            data: {
+              dialogId,
+              role: "assistant",
+              content: "",
+              mediaUrl: ir.url,
+              mediaType: "image",
+              tokensUsed: 0,
+            },
+          });
+        }
+      }
+
+      logger.info({ dbJobId, batchSize: imageResults.length }, "Image batch job completed");
+      return;
+    }
+
+    // Single image path (original logic)
     const retryExt = s3Key?.split(".").pop() ?? "png";
     const finalImageResult = {
       url: outputUrl,
@@ -310,9 +424,6 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     const isSvg = finalImageResult.filename?.endsWith("svg") ?? false;
     const useDocument = isSvg || byteSize > PHOTO_MAX_BYTES;
     const tooLargeForTelegram = byteSize > DOCUMENT_MAX_BYTES;
-
-    let slicedPrompt = prompt.slice(0, 200);
-    slicedPrompt = slicedPrompt.concat(slicedPrompt.length < 200 ? "" : "...");
 
     if (tooLargeForTelegram) {
       await telegram.sendMessage(

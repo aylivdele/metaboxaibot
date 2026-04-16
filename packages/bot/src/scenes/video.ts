@@ -1314,7 +1314,7 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
   }
 
   // Deduct tokens
-  await deductTokens(userId, costTokens, "higgsfield_soul");
+  await deductTokens(userId, costTokens, "higgsfield_soul", undefined, "soul_creation");
 
   // Create UserAvatar record
   const avatar = await userAvatarService.create(userId, {

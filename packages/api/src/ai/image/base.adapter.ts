@@ -48,6 +48,6 @@ export interface ImageAdapter {
   generate?(input: ImageInput): Promise<ImageResult>;
   /** Submit async job. Returns provider-side job / prediction ID. */
   submit?(input: ImageInput): Promise<string>;
-  /** Poll async result. Returns null if still processing. */
-  poll?(providerJobId: string): Promise<ImageResult | null>;
+  /** Poll async result. Returns null if still processing. May return an array for batch generation. */
+  poll?(providerJobId: string): Promise<ImageResult[] | ImageResult | null>;
 }

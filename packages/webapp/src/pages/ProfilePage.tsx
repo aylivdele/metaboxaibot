@@ -32,6 +32,7 @@ const REASON_KEYS: Record<string, string> = {
   referral_bonus: "profile.reason.referral_bonus",
   admin: "profile.reason.admin",
   autotranslate: "profile.reason.autotranslate",
+  soul_creation: "profile.reason.soul_creation",
 };
 
 export function ProfilePage({ initialSection }: { initialSection?: ProfileTab }) {

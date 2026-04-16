@@ -107,7 +107,7 @@ export class HiggsFieldSoulImageAdapter implements ImageAdapter {
     return statusUrl;
   }
 
-  async poll(statusUrl: string): Promise<ImageResult | null> {
+  async poll(statusUrl: string): Promise<ImageResult[] | ImageResult | null> {
     const res = await fetchWithLog(statusUrl, {
       headers: this.headers(),
     });
@@ -125,7 +125,18 @@ export class HiggsFieldSoulImageAdapter implements ImageAdapter {
     }
     if (data.status !== "completed") return null;
 
-    // Try multiple response shapes to find the image URL
+    // Batch: return all images when multiple are present
+    if (data.images && data.images.length > 1) {
+      return data.images.map((img, i) => ({
+        url: img.url,
+        filename: `higgsfield-soul-${i + 1}.png`,
+        contentType: "image/png" as const,
+        width: img.width,
+        height: img.height,
+      }));
+    }
+
+    // Single image: try multiple response shapes
     const url = data.images?.[0]?.url ?? data.image?.url ?? data.results?.url;
 
     if (!url) {
