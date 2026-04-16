@@ -14,16 +14,14 @@ import { parseHeyGenErrorBody, parseHeyGenPollFailure } from "../../utils/heygen
 import { resolveImageMimeType, resolveAudioMimeType } from "../../utils/mime-detect.js";
 
 const HEYGEN_API = "https://api.heygen.com";
-const HEYGEN_UPLOAD = "https://upload.heygen.com";
 
 interface HeyGenVideoDetail {
-  code?: string;
   data?: {
+    id: string;
     status: string;
     video_url?: string | null;
     failure_message?: string | null;
     failure_code?: string | null;
-    error?: string;
   };
 }
 
@@ -31,19 +29,22 @@ interface HeyGenVideoDetail {
 const SUPPORTED_ASPECT_RATIOS = new Set(["16:9", "9:16"]);
 
 /**
- * HeyGen talking-avatar adapter using POST /v3/videos (flat body).
+ * HeyGen talking-avatar adapter using v3 API.
+ *
+ * Endpoints:
+ *  - POST /v3/videos   — create video (discriminated union: type "avatar" | "image")
+ *  - GET  /v3/videos/:id — poll status
+ *  - POST /v3/assets    — upload image/audio assets
  *
  * Avatar source priority:
- *  1. modelSettings.image_asset_id    → pre-uploaded photo asset (image_asset_id)
- *  2. modelSettings.avatar_photo_url  → upload image now → image_asset_id
- *  3. modelSettings.avatar_id         → official avatar look_id (from /v3/avatars/looks)
- *  4. default avatarId from config    → avatar_id
+ *  1. modelSettings.image_asset_id    → pre-uploaded photo asset → type "image"
+ *  2. modelSettings.avatar_photo_url  → upload image now → type "image"
+ *  3. modelSettings.avatar_id         → official avatar look_id → type "avatar"
+ *  4. default avatarId from config    → type "avatar"
  *
  * Voice source priority:
  *  1. modelSettings.voice_url / voice_s3key → audio_asset_id (lip-sync)
  *  2. modelSettings.voice_id + prompt        → script + voice_id (TTS)
- *
- * Asset uploads remain on v1. Video status polling uses GET /v3/videos/:id.
  */
 export class HeyGenAdapter implements VideoAdapter {
   readonly modelId = "heygen";
@@ -82,7 +83,7 @@ export class HeyGenAdapter implements VideoAdapter {
     const formData = new FormData();
     formData.append("file", new Blob([audioBuffer], { type: contentType }), `audio.${ext}`);
 
-    const uploadRes = await fetchWithLog(`${HEYGEN_UPLOAD}/v1/asset`, {
+    const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
       method: "POST",
       headers: { "X-Api-Key": this.apiKey },
       body: formData,
@@ -91,8 +92,8 @@ export class HeyGenAdapter implements VideoAdapter {
       const text = await uploadRes.text();
       throw new Error(`HeyGen audio asset upload failed: ${uploadRes.status} ${text}`);
     }
-    const uploadData = (await uploadRes.json()) as { data?: { id?: string } };
-    const assetId = uploadData.data?.id;
+    const uploadData = (await uploadRes.json()) as { data?: { asset_id?: string } };
+    const assetId = uploadData.data?.asset_id;
     if (!assetId)
       throw new Error(
         `HeyGen: no asset id in audio upload response: ${JSON.stringify(uploadData)}`,
@@ -122,7 +123,7 @@ export class HeyGenAdapter implements VideoAdapter {
     const imgFormData = new FormData();
     imgFormData.append("file", new Blob([imgBuffer], { type: contentType }), `image.${imgExt}`);
 
-    const uploadRes = await fetchWithLog(`${HEYGEN_UPLOAD}/v1/asset`, {
+    const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
       method: "POST",
       headers: { "X-Api-Key": this.apiKey },
       body: imgFormData,
@@ -131,8 +132,8 @@ export class HeyGenAdapter implements VideoAdapter {
       const text = await uploadRes.text();
       throw new Error(`HeyGen asset upload failed: ${uploadRes.status} ${text}`);
     }
-    const uploadData = (await uploadRes.json()) as { data?: { id?: string } };
-    const assetId = uploadData.data?.id;
+    const uploadData = (await uploadRes.json()) as { data?: { asset_id?: string } };
+    const assetId = uploadData.data?.asset_id;
     if (!assetId)
       throw new Error(`HeyGen: no asset id in upload response: ${JSON.stringify(uploadData)}`);
     return assetId;
@@ -198,35 +199,39 @@ export class HeyGenAdapter implements VideoAdapter {
     );
     const avatarId = (input.modelSettings?.avatar_id as string | undefined) || this.defaultAvatarId;
 
-    // ── Build flat POST /v3/videos body ──────────────────────────────────────
+    // ── Build POST /v3/videos body (discriminated union) ────────────────────
     const body: Record<string, unknown> = {
       aspect_ratio: aspectRatio,
       resolution,
       background: { type: "color", value: bgColor },
     };
 
-    // Avatar: one-shot upload > pre-uploaded asset >  official look_id
+    // Avatar source → determines type: "avatar" vs type: "image"
     if (input.imageUrl) {
       const uploadedId = await this.uploadImageAsset(undefined, input.imageUrl);
-      body.image_asset_id = uploadedId;
+      body.type = "image";
+      body.image = { type: "asset_id", asset_id: uploadedId };
       logger.info({ imageAssetId: uploadedId }, "HeyGen: using uploaded image asset");
     } else if (avatarPhotoUrl) {
       const avatarPhotoS3Key = input.modelSettings?.avatar_photo_s3key as string | undefined;
       const uploadedId = await this.uploadImageAsset(avatarPhotoS3Key, avatarPhotoUrl);
-      body.image_asset_id = uploadedId;
+      body.type = "image";
+      body.image = { type: "asset_id", asset_id: uploadedId };
       logger.info({ imageAssetId: uploadedId }, "HeyGen: using uploaded image asset");
     } else if (imageAssetIdFromSettings) {
-      body.image_asset_id = imageAssetIdFromSettings;
+      body.type = "image";
+      body.image = { type: "asset_id", asset_id: imageAssetIdFromSettings };
       logger.info(
         { imageAssetId: imageAssetIdFromSettings },
         "HeyGen: using pre-uploaded image asset",
       );
     } else {
+      body.type = "avatar";
       body.avatar_id = avatarId;
     }
 
-    // Photo-avatar-only fields
-    if (body.image_asset_id) {
+    // Photo-avatar / image fields
+    if (body.type === "image" || body.type === "avatar") {
       const expressiveness = input.modelSettings?.expressiveness as string | undefined;
       const motionPrompt = input.modelSettings?.motion_prompt as string | undefined;
       if (expressiveness) body.expressiveness = expressiveness;
@@ -252,7 +257,7 @@ export class HeyGenAdapter implements VideoAdapter {
       }
     }
 
-    const res = await fetchWithLog(`${HEYGEN_API}/v2/videos`, {
+    const res = await fetchWithLog(`${HEYGEN_API}/v3/videos`, {
       method: "POST",
       headers: this.jsonHeaders,
       body: JSON.stringify(body),
@@ -268,18 +273,18 @@ export class HeyGenAdapter implements VideoAdapter {
       }
       const structured = parseHeyGenErrorBody(json);
       if (structured) throw structured;
-      throw new Error(`HeyGen /v2/videos submit failed: ${res.status} ${text}`);
+      throw new Error(`HeyGen /v3/videos submit failed: ${res.status} ${text}`);
     }
 
-    const data = (await res.json()) as { data?: { video_id?: string }; video_id?: string };
-    const videoId = data.data?.video_id ?? data.video_id;
+    const data = (await res.json()) as { data?: { video_id?: string } };
+    const videoId = data.data?.video_id;
     if (!videoId) throw new Error(`HeyGen: no video_id in response: ${JSON.stringify(data)}`);
     return videoId;
   }
 
   async poll(videoId: string): Promise<VideoResult | null> {
-    const res = await fetchWithLog(`${HEYGEN_API}/v2/videos/${videoId}`, {
-      headers: this.jsonHeaders,
+    const res = await fetchWithLog(`${HEYGEN_API}/v3/videos/${videoId}`, {
+      headers: { "X-Api-Key": this.apiKey },
     });
     const text = await res.text();
 
@@ -294,7 +299,7 @@ export class HeyGenAdapter implements VideoAdapter {
 
     if (!data) throw new Error("HeyGen: empty status response");
     if (data.status === "failed") {
-      throw parseHeyGenPollFailure(data.failure_code, data.failure_message ?? data.error);
+      throw parseHeyGenPollFailure(data.failure_code, data.failure_message);
     }
     if (data.status !== "completed") return null;
 

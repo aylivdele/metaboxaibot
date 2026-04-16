@@ -146,20 +146,28 @@ export function getHeyGenUserMessage(
 
 /**
  * Parse a HeyGen JSON error body (from failed HTTP response).
- * Shape: { code: number, message: string } or { error: { code, message } }
+ *
+ * v1/v2 shape: { code: number, message: string }
+ * v3 shape:    { error: { code: string, message: string } }
  */
 export function parseHeyGenErrorBody(body: unknown): HeyGenApiError | null {
   if (!body || typeof body !== "object") return null;
   const b = body as Record<string, unknown>;
 
-  // Top-level { code, message }
+  // Legacy v1/v2: top-level { code: number, message: string }
   if (typeof b.code === "number" && typeof b.message === "string") {
     return new HeyGenApiError(b.code, String(b.code), b.message);
   }
 
-  // Nested { error: { code, message } }
+  // v3: { error: { code: string, message: string } }
   if (b.error && typeof b.error === "object") {
     const e = b.error as Record<string, unknown>;
+    if (typeof e.code === "string" && typeof e.message === "string") {
+      // Map string enum name to numeric code if known, else -1
+      const numericCode = ENUM_TO_CODE[e.code] ?? -1;
+      return new HeyGenApiError(numericCode, e.code, e.message);
+    }
+    // Legacy nested { error: { code: number, message } }
     if (typeof e.code === "number" && typeof e.message === "string") {
       return new HeyGenApiError(e.code, String(e.code), e.message);
     }

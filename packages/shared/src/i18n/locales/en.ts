@@ -178,7 +178,7 @@ export default {
       "✉️ Send a text prompt to generate a video.\n🖼 To add images (first/last frame, reference etc.) — use the slot buttons below.",
     videoPhotoSaved: "📸 Photo saved for use in next generation.",
     videoDriverSaved: "🎬 Driver video saved for use in next generation.",
-    videoVoiceSaved: "🎙 Voice sample saved. Now send the text for the avatar to speak.",
+    videoVoiceSaved: "🎙 Voice sample saved. Choose how to use it:",
     avatarPhotoSaved:
       "📸 Avatar photo saved and selected. Send the text for the avatar to speak.\nYou can change the photo in Management → HeyGen → Avatar.",
     myVoiceDefaultName: "My voice",

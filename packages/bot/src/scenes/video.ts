@@ -1148,8 +1148,8 @@ export async function handleVideoAvatarVoiceCallback(ctx: BotContext): Promise<v
   const chatId = ctx.chat?.id;
   if (!chatId) return;
 
-  // Remove choice buttons
-  await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => void 0);
+  // Remove choice message
+  await ctx.deleteMessage().catch(() => void 0);
 
   const userId = ctx.user.id;
   const state = await userStateService.get(userId);
