@@ -1,0 +1,31 @@
+{
+  "app": {
+    "name": "AI Box",
+    "loading": "Loading…"
+  },
+  "nav": {
+    "chat": "Chat",
+    "history": "History",
+    "plans": "Plans",
+    "tokens": "Tokens",
+    "profile": "Profile",
+    "logout": "Log out"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "error": "Something went wrong",
+    "retry": "Retry"
+  },
+  "telegramLink": {
+    "title": "Connect the Telegram bot",
+    "openBot": "Open Telegram bot",
+    "waiting": "Waiting for connection…"
+  }
+}

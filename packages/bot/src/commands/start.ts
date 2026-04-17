@@ -11,6 +11,8 @@ import {
   verifyLinkToken,
   getPendingTokenGrants,
   markOrderGrantedOnMetabox,
+  consumeLinkTelegramState,
+  markLinkTelegramLinked,
 } from "@metabox/api/services";
 import { logger } from "../logger.js";
 
@@ -173,6 +175,51 @@ export async function handleStart(ctx: BotContext): Promise<void> {
     if (state) {
       return;
     }
+  } else if (param?.startsWith("linkweb_") && ctx.user) {
+    // ── ai.metabox.global → Bot: привязка web-аккаунта ───────────────────────
+    // Юзер залогинен на ai.metabox.global, нажал «Привязать Telegram»,
+    // фронт получил state, сгенерил deep-link вида /start linkweb_<state>.
+    // Здесь мы: (1) читаем state из Redis → metaboxUserId, (2) проставляем
+    // его на AI Box юзера (по telegramId), (3) помечаем linkState как «linked»,
+    // чтобы фронт увидел успех при очередном poll.
+    const state = param.slice("linkweb_".length);
+    try {
+      const metaboxUserId = await consumeLinkTelegramState(state);
+      if (!metaboxUserId) {
+        await ctx.reply(
+          "⚠️ Ссылка недействительна или истекла. Вернитесь на сайт и нажмите «Привязать Telegram» ещё раз.",
+        );
+      } else {
+        // Проверяем конфликт: если на AI Box юзере уже прописан ДРУГОЙ metaboxUserId
+        if (ctx.user.metaboxUserId && ctx.user.metaboxUserId !== metaboxUserId) {
+          await ctx.reply(
+            `⚠️ Этот Telegram уже привязан к другому аккаунту на Metabox.\n\nЕсли это ошибка — напишите в поддержку: @${config.supportTg}`,
+          );
+        } else {
+          await db.user.update({
+            where: { id: ctx.user.id },
+            data: { metaboxUserId },
+          });
+          await markLinkTelegramLinked(
+            state,
+            ctx.user.id.toString(),
+            ctx.from?.username ?? null,
+          );
+          await ctx.reply(
+            "✅ Аккаунт привязан. Возвращайтесь на ai.metabox.global — нейросети уже доступны.",
+          );
+          // Синхронизируем токены/подписки из metabox
+          void syncMetaboxGrants(ctx.user.id).catch((err) => {
+            logger.error({ err }, "[start linkweb] grant sync failed");
+          });
+        }
+      }
+    } catch (err) {
+      logger.error({ err, state }, "[start linkweb] failed");
+      await ctx.reply("❌ Не удалось привязать аккаунт. Попробуйте ещё раз.");
+    }
+    const state2 = await userStateService.get(ctx.user.id);
+    if (state2) return;
   } else if (param?.startsWith("ref_") && ctx.user && ctx.user.referredById) {
     // ── Referral deep link ─────────────────────────────────────────────────────
     // User already has a referrer — notify with mentor name

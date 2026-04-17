@@ -130,6 +130,23 @@ export const config = {
     ssoSecret: opt("METABOX_SSO_SECRET"),
   },
 
+  /**
+   * Web-версия AI Box (packages/web → ai.metabox.global).
+   * JWT_SECRET — секрет для подписи web access-токенов (HMAC-SHA256).
+   * Cookie параметры — домен и безопасность refresh-cookie.
+   */
+  web: {
+    jwtSecret: opt("WEB_JWT_SECRET"),
+    accessTtlSeconds: optInt("WEB_ACCESS_TTL_SEC", 15 * 60), // 15 минут
+    refreshTtlSeconds: optInt("WEB_REFRESH_TTL_SEC", 30 * 24 * 60 * 60), // 30 дней
+    /** Домен refresh-cookie (например, ".metabox.global" чтобы работало на поддоменах). */
+    cookieDomain: opt("WEB_COOKIE_DOMAIN"),
+    /** Secure cookie (true на https; в dev можно false). По умолчанию — true если NODE_ENV=production. */
+    cookieSecure: optDefault("WEB_COOKIE_SECURE", "") as "" | "true" | "false",
+    /** Базовый URL веб-фронта (для ссылок в email-ах восстановления пароля). */
+    frontUrl: opt("WEB_FRONT_URL"),
+  },
+
   /** Support Telegram username (without @) */
   supportTg: optDefault("SUPPORT_TG_USERNAME", "metaboxsupport"),
 
