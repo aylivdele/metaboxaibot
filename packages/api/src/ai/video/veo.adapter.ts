@@ -8,6 +8,7 @@ import type {
 import { config } from "@metabox/shared";
 import { fetchWithLog, logCall } from "../../utils/fetch.js";
 import { resolveImageMimeType } from "../../utils/mime-detect.js";
+import { logger } from "../../logger.js";
 
 const API_MODELS: Record<string, string> = {
   veo: "veo-3.1-generate-preview",
@@ -131,7 +132,10 @@ export class VeoAdapter implements VideoAdapter {
     if (!operation.done) return null;
 
     const uri = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (!uri) throw new Error("Veo: no video URI in completed operation");
+    if (!uri) {
+      logger.error({ operation }, "Empty operation response");
+      throw new Error("Veo: no video URI in completed operation");
+    }
     return { url: uri, filename: "veo.mp4" };
   }
 }
