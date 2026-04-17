@@ -81,11 +81,7 @@ export default function Login() {
           />
 
           <label className="inline-flex items-center gap-2 text-sm text-text-secondary cursor-pointer select-none">
-            <input
-              type="checkbox"
-              className="w-4 h-4 accent-accent"
-              {...register("rememberMe")}
-            />
+            <input type="checkbox" className="w-4 h-4 accent-accent" {...register("rememberMe")} />
             Запомнить меня
           </label>
 

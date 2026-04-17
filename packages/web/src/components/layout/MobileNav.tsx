@@ -30,9 +30,7 @@ export function MobileNav() {
               <>
                 <t.icon size={22} />
                 <span className="text-[11px] font-medium">{t.label}</span>
-                {isActive && (
-                  <span className="absolute top-1 w-5 h-[2px] bg-accent rounded" />
-                )}
+                {isActive && <span className="absolute top-1 w-5 h-[2px] bg-accent rounded" />}
               </>
             )}
           </NavLink>

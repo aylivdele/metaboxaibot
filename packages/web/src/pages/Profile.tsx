@@ -206,8 +206,8 @@ function IntegrationsSection() {
     <div className="card p-5 md:p-6 space-y-4">
       <h2 className="font-semibold">Telegram-бот</h2>
       <p className="text-sm text-text-secondary">
-        Привязка Telegram открывает доступ к нейросетям, истории диалогов и галерее
-        генераций. Баланс и подписка синхронизируются с ботом.
+        Привязка Telegram открывает доступ к нейросетям, истории диалогов и галерее генераций.
+        Баланс и подписка синхронизируются с ботом.
       </p>
 
       <div className="flex items-center gap-3 p-4 rounded bg-bg-elevated">

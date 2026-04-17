@@ -54,9 +54,7 @@ export default function ResetPassword() {
       <div className="min-h-screen flex items-center justify-center p-4 bg-bg">
         <div className="card w-full max-w-[400px] p-8 text-center anim-page-in">
           <div className="text-danger font-semibold mb-2">Некорректная ссылка</div>
-          <p className="text-text-secondary text-sm mb-6">
-            Токен восстановления отсутствует.
-          </p>
+          <p className="text-text-secondary text-sm mb-6">Токен восстановления отсутствует.</p>
           <Link to="/forgot-password" className="btn-primary inline-flex">
             Запросить новый
           </Link>

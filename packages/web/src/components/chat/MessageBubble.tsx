@@ -30,18 +30,11 @@ export function MessageBubble({ message, modelName }: Props) {
   };
 
   return (
-    <div
-      className={clsx(
-        "flex w-full mb-4 group",
-        isUser ? "justify-end" : "justify-start",
-      )}
-    >
+    <div className={clsx("flex w-full mb-4 group", isUser ? "justify-end" : "justify-start")}>
       <div
         className={clsx(
           "relative max-w-[85%] md:max-w-[75%] px-4 py-3 rounded",
-          isUser
-            ? "bg-[color:var(--accent-lighter)] text-text"
-            : "bg-bg-card border border-border",
+          isUser ? "bg-[color:var(--accent-lighter)] text-text" : "bg-bg-card border border-border",
         )}
       >
         {!isUser && modelName && (
@@ -64,11 +57,7 @@ export function MessageBubble({ message, modelName }: Props) {
           <span className="inline-block w-1.5 h-3.5 bg-accent rounded-sm ml-0.5 align-middle animate-pulse" />
         )}
 
-        {message.error && (
-          <div className="mt-2 text-xs text-danger">
-            {message.error}
-          </div>
-        )}
+        {message.error && <div className="mt-2 text-xs text-danger">{message.error}</div>}
 
         {!message.pending && message.content && (
           <button

@@ -31,13 +31,13 @@ export function getCatalog() {
 }
 
 export function createSubscriptionOrder(planId: string, period: "M1" | "M3" | "M6" | "M12") {
-  return apiClient<
-    { orderId: string; paymentUrl: string },
-    { planId: string; period: string }
-  >("/web/billing/subscription-invoice", {
-    method: "POST",
-    body: { planId, period },
-  });
+  return apiClient<{ orderId: string; paymentUrl: string }, { planId: string; period: string }>(
+    "/web/billing/subscription-invoice",
+    {
+      method: "POST",
+      body: { planId, period },
+    },
+  );
 }
 
 export function createTokensOrder(productId: string) {

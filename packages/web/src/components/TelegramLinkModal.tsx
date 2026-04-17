@@ -147,8 +147,8 @@ export function TelegramLinkModal({ open, onClose, context }: Props) {
           <h3 className="text-lg font-bold mb-2">Подключите Telegram-бот</h3>
           <p className="text-sm text-text-secondary leading-relaxed mb-4">{contextText}</p>
           <p className="text-xs text-text-hint leading-relaxed">
-            Нажмите кнопку ниже, откройте бота и нажмите «Start». После подключения доступ
-            откроется автоматически.
+            Нажмите кнопку ниже, откройте бота и нажмите «Start». После подключения доступ откроется
+            автоматически.
           </p>
         </div>
 

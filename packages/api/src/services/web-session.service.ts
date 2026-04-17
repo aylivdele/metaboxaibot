@@ -98,9 +98,7 @@ export function verifyAccessToken(token: string): AccessTokenClaims {
   if (parts.length !== 3) throw new Error("Invalid JWT format");
   const [header, body, sig] = parts;
 
-  const expected = createHmac("sha256", getJwtSecret())
-    .update(`${header}.${body}`)
-    .digest();
+  const expected = createHmac("sha256", getJwtSecret()).update(`${header}.${body}`).digest();
   const given = b64urlParse(sig);
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) {
     throw new Error("Invalid JWT signature");
@@ -115,9 +113,11 @@ export function verifyAccessToken(token: string): AccessTokenClaims {
 
 // ── Refresh session (Redis) ─────────────────────────────────────────────────
 
-export async function createRefreshSession(session: Omit<WebSession, "createdAt" | "expiresAt" | "csrfToken"> & {
-  rememberMe: boolean;
-}): Promise<{ refreshToken: string; csrfToken: string; session: WebSession }> {
+export async function createRefreshSession(
+  session: Omit<WebSession, "createdAt" | "expiresAt" | "csrfToken"> & {
+    rememberMe: boolean;
+  },
+): Promise<{ refreshToken: string; csrfToken: string; session: WebSession }> {
   const redis = getRedis();
   const refreshToken = generateRefreshToken();
   const csrfToken = generateCsrfToken();
@@ -156,10 +156,7 @@ export async function touchRefreshSession(
   const redis = getRedis();
   // Поворачиваем CSRF на каждый рефреш — защита от кражи
   session.csrfToken = generateCsrfToken();
-  const ttlSec = Math.max(
-    Math.floor((session.expiresAt - Date.now()) / 1000),
-    60,
-  );
+  const ttlSec = Math.max(Math.floor((session.expiresAt - Date.now()) / 1000), 60);
   await redis.set(REFRESH_KEY_PREFIX + refreshToken, JSON.stringify(session), "EX", ttlSec);
   return { csrfToken: session.csrfToken };
 }
@@ -171,10 +168,7 @@ export async function revokeRefreshSession(refreshToken: string): Promise<void> 
 
 /** Session ID для JWT — усечённый hash refresh-токена (не раскрывает сам токен). */
 export function sessionIdFromRefresh(refreshToken: string): string {
-  return createHmac("sha256", getJwtSecret())
-    .update(refreshToken)
-    .digest("hex")
-    .slice(0, 16);
+  return createHmac("sha256", getJwtSecret()).update(refreshToken).digest("hex").slice(0, 16);
 }
 
 // ── Password reset (Redis) ──────────────────────────────────────────────────

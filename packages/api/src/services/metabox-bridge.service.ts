@@ -420,9 +420,7 @@ export async function webChangePassword(params: {
 }
 
 /** Профиль юзера из meta-box (для /auth/web-me). */
-export async function webGetProfile(params: {
-  metaboxUserId: string;
-}): Promise<{
+export async function webGetProfile(params: { metaboxUserId: string }): Promise<{
   metaboxUserId: string;
   email: string;
   firstName: string | null;

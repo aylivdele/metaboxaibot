@@ -75,9 +75,7 @@ export const webTelegramLinkedPreHandler: preHandlerHookHandler = async (request
   const user = await extractWebUserFromRequest(request);
   if (!user) return reply.code(401).send({ error: "Unauthorized" });
   if (user.aibUserId === null) {
-    return reply
-      .code(403)
-      .send({ error: "Telegram is not linked", code: "TELEGRAM_NOT_LINKED" });
+    return reply.code(403).send({ error: "Telegram is not linked", code: "TELEGRAM_NOT_LINKED" });
   }
   request.webUser = user;
 };

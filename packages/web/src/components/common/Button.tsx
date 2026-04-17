@@ -46,11 +46,7 @@ export function Button({
 
   return (
     <button className={cls} disabled={disabled || loading} {...rest}>
-      {loading ? (
-        <Loader2 size={18} className="animate-spin" />
-      ) : (
-        leftIcon
-      )}
+      {loading ? <Loader2 size={18} className="animate-spin" /> : leftIcon}
       <span>{children}</span>
       {!loading && rightIcon}
     </button>

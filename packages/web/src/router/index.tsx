@@ -44,21 +44,15 @@ export const router = createBrowserRouter([
   // Гостевые роуты
   {
     path: "/login",
-    element: (
-      <GuestOnlyRoute>{withSuspense(<LoginPage />)}</GuestOnlyRoute>
-    ),
+    element: <GuestOnlyRoute>{withSuspense(<LoginPage />)}</GuestOnlyRoute>,
   },
   {
     path: "/signup",
-    element: (
-      <GuestOnlyRoute>{withSuspense(<SignupPage />)}</GuestOnlyRoute>
-    ),
+    element: <GuestOnlyRoute>{withSuspense(<SignupPage />)}</GuestOnlyRoute>,
   },
   {
     path: "/forgot-password",
-    element: (
-      <GuestOnlyRoute>{withSuspense(<ForgotPasswordPage />)}</GuestOnlyRoute>
-    ),
+    element: <GuestOnlyRoute>{withSuspense(<ForgotPasswordPage />)}</GuestOnlyRoute>,
   },
   {
     path: "/reset-password",
@@ -88,21 +82,15 @@ export const router = createBrowserRouter([
   // Оплата
   {
     path: "/payment/success",
-    element: (
-      <ProtectedRoute>{withSuspense(<PaymentSuccessPage />)}</ProtectedRoute>
-    ),
+    element: <ProtectedRoute>{withSuspense(<PaymentSuccessPage />)}</ProtectedRoute>,
   },
   {
     path: "/payment/pending",
-    element: (
-      <ProtectedRoute>{withSuspense(<PaymentPendingPage />)}</ProtectedRoute>
-    ),
+    element: <ProtectedRoute>{withSuspense(<PaymentPendingPage />)}</ProtectedRoute>,
   },
   {
     path: "/payment/failed",
-    element: (
-      <ProtectedRoute>{withSuspense(<PaymentFailedPage />)}</ProtectedRoute>
-    ),
+    element: <ProtectedRoute>{withSuspense(<PaymentFailedPage />)}</ProtectedRoute>,
   },
 
   { path: "*", element: withSuspense(<NotFoundPage />) },

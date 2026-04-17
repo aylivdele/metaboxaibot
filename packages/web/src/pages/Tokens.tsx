@@ -34,8 +34,7 @@ export default function Tokens() {
       window.location.href = paymentUrl;
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.code !== "TELEGRAM_NOT_LINKED")
-          pushToast({ type: "error", message: err.message });
+        if (err.code !== "TELEGRAM_NOT_LINKED") pushToast({ type: "error", message: err.message });
       } else {
         pushToast({ type: "error", message: "Ошибка оплаты" });
       }
@@ -49,12 +48,8 @@ export default function Tokens() {
         <h1 className="text-2xl font-bold mb-3">Токены</h1>
         <div className="card p-5 text-center">
           <Sparkles size={32} className="text-accent mx-auto mb-3" />
-          <p className="text-text-secondary mb-4">
-            Чтобы докупать токены, привяжите Telegram-бот.
-          </p>
-          <Button onClick={() => openTelegramLinkModal("купить токены")}>
-            Привязать Telegram
-          </Button>
+          <p className="text-text-secondary mb-4">Чтобы докупать токены, привяжите Telegram-бот.</p>
+          <Button onClick={() => openTelegramLinkModal("купить токены")}>Привязать Telegram</Button>
         </div>
       </div>
     );
@@ -98,9 +93,7 @@ export default function Tokens() {
                 {p.tokens.toLocaleString("ru-RU")}
                 <span className="text-sm text-text-secondary font-normal"> токенов</span>
               </div>
-              <div className="text-lg text-text mt-1">
-                {Math.round(Number(p.priceRub))} ₽
-              </div>
+              <div className="text-lg text-text mt-1">{Math.round(Number(p.priceRub))} ₽</div>
               <Button
                 fullWidth
                 className="mt-4"

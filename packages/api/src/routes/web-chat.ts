@@ -37,9 +37,7 @@ function serializeModelCompact(m: AIModel) {
     provider: m.provider,
     familyId: m.familyId ?? null,
     familyName: m.familyId ? (MODEL_FAMILIES[m.familyId]?.name ?? null) : null,
-    familyDefaultModelId: m.familyId
-      ? (MODEL_FAMILIES[m.familyId]?.defaultModelId ?? null)
-      : null,
+    familyDefaultModelId: m.familyId ? (MODEL_FAMILIES[m.familyId]?.defaultModelId ?? null) : null,
     versionLabel: m.versionLabel ?? null,
     variantLabel: m.variantLabel ?? null,
     supportsImages: m.supportsImages,
@@ -196,14 +194,16 @@ export const webChatRoutes: FastifyPluginAsync = async (fastify) => {
 
       const messages = await dialogService.getMessages(id);
       const resolved = await Promise.all(
-        (messages as Array<{
-          id: string;
-          role: string;
-          content: string;
-          mediaUrl: string | null;
-          mediaType: string | null;
-          createdAt: Date;
-        }>).map(async (m) => {
+        (
+          messages as Array<{
+            id: string;
+            role: string;
+            content: string;
+            mediaUrl: string | null;
+            mediaType: string | null;
+            createdAt: Date;
+          }>
+        ).map(async (m) => {
           let mediaUrl = m.mediaUrl ?? null;
           if (mediaUrl && !mediaUrl.startsWith("http")) {
             mediaUrl = (await getFileUrl(mediaUrl)) ?? mediaUrl;
@@ -298,10 +298,7 @@ export const webChatRoutes: FastifyPluginAsync = async (fastify) => {
         } else if (err instanceof DocumentExtractFailedError) {
           code = "DOCUMENT_EXTRACT_FAILED";
           message = err.message;
-        } else if (
-          err instanceof Error &&
-          /insufficient|balance/i.test(err.message)
-        ) {
+        } else if (err instanceof Error && /insufficient|balance/i.test(err.message)) {
           code = "INSUFFICIENT_BALANCE";
           message = "Недостаточно токенов";
         }

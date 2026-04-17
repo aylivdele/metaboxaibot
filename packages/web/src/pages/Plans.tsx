@@ -39,9 +39,7 @@ export default function Plans() {
   }, [isTelegramLinked, pushToast]);
 
   const availablePeriods: Period[] =
-    plans && plans.length > 0
-      ? (Object.keys(plans[0].periods) as Period[])
-      : ["M1"];
+    plans && plans.length > 0 ? (Object.keys(plans[0].periods) as Period[]) : ["M1"];
 
   const onBuy = async (plan: PlanDto) => {
     if (!plan.periods[period]) return;
@@ -53,8 +51,7 @@ export default function Plans() {
         : paymentUrl;
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.code !== "TELEGRAM_NOT_LINKED")
-          pushToast({ type: "error", message: err.message });
+        if (err.code !== "TELEGRAM_NOT_LINKED") pushToast({ type: "error", message: err.message });
       } else {
         pushToast({ type: "error", message: "Ошибка оплаты" });
       }
@@ -108,9 +105,7 @@ export default function Plans() {
           ))}
         </div>
       ) : !plans || plans.length === 0 ? (
-        <div className="card p-8 text-center text-text-secondary">
-          Тарифы временно недоступны
-        </div>
+        <div className="card p-8 text-center text-text-secondary">Тарифы временно недоступны</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {plans.map((plan, idx) => {
@@ -120,10 +115,7 @@ export default function Plans() {
             return (
               <div
                 key={plan.id}
-                className={clsx(
-                  "card p-6 flex flex-col",
-                  highlighted && "!border-accent",
-                )}
+                className={clsx("card p-6 flex flex-col", highlighted && "!border-accent")}
                 style={highlighted ? { boxShadow: "var(--shadow-accent)" } : undefined}
               >
                 {highlighted && (
@@ -141,9 +133,7 @@ export default function Plans() {
                     </span>
                   )}
                 </div>
-                <div className="text-sm text-text-secondary mt-1">
-                  {periodLabels[period]}
-                </div>
+                <div className="text-sm text-text-secondary mt-1">{periodLabels[period]}</div>
 
                 <div className="h-px bg-border my-5" />
 

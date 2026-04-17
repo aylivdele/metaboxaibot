@@ -83,8 +83,7 @@ export const webBillingRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { aibUserId, metaboxUserId } = request.webUser!;
       const { planId, period } = request.body ?? {};
-      if (!planId || !period)
-        return reply.code(400).send({ error: "planId и period обязательны" });
+      if (!planId || !period) return reply.code(400).send({ error: "planId и period обязательны" });
       if (!["M1", "M3", "M6", "M12"].includes(period))
         return reply.code(400).send({ error: "Некорректный period" });
 
@@ -101,9 +100,7 @@ export const webBillingRoutes: FastifyPluginAsync = async (fastify) => {
         });
       } catch (err) {
         if (err instanceof MetaboxApiError) {
-          return reply
-            .code(err.status >= 500 ? 502 : err.status)
-            .send({ error: err.message });
+          return reply.code(err.status >= 500 ? 502 : err.status).send({ error: err.message });
         }
         logger.error({ err }, "web/billing/subscription-invoice failed");
         return reply.code(502).send({ error: "Не удалось создать заказ" });
@@ -132,9 +129,7 @@ export const webBillingRoutes: FastifyPluginAsync = async (fastify) => {
         });
       } catch (err) {
         if (err instanceof MetaboxApiError) {
-          return reply
-            .code(err.status >= 500 ? 502 : err.status)
-            .send({ error: err.message });
+          return reply.code(err.status >= 500 ? 502 : err.status).send({ error: err.message });
         }
         logger.error({ err }, "web/billing/tokens-invoice failed");
         return reply.code(502).send({ error: "Не удалось создать заказ" });

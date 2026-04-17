@@ -69,7 +69,9 @@ export default function Chat() {
         setModels(ms);
         setDialogs(ds);
         if (ms.length > 0) {
-          setPickedModelId((prev) => prev ?? ms.find((m) => m.id === DEFAULT_MODEL_ID)?.id ?? ms[0].id);
+          setPickedModelId(
+            (prev) => prev ?? ms.find((m) => m.id === DEFAULT_MODEL_ID)?.id ?? ms[0].id,
+          );
         }
       } catch (err) {
         if (!(err instanceof ApiError) || err.code !== "TELEGRAM_NOT_LINKED") {
@@ -83,13 +85,7 @@ export default function Chat() {
     return () => {
       cancelled = true;
     };
-  }, [
-    isTelegramLinked,
-    pushToast,
-    setDialogs,
-    setLoadingDialogs,
-    setModels,
-  ]);
+  }, [isTelegramLinked, pushToast, setDialogs, setLoadingDialogs, setModels]);
 
   // ── Подгрузка сообщений при смене диалога ──────────────────────────────
   const loadMessagesFor = useCallback(
@@ -294,9 +290,7 @@ export default function Chat() {
             sending={isSending}
             disabled={loadingMessages}
             placeholder={
-              isTelegramLinked
-                ? "Напишите сообщение…"
-                : "Привяжите Telegram, чтобы начать общение"
+              isTelegramLinked ? "Напишите сообщение…" : "Привяжите Telegram, чтобы начать общение"
             }
           />
         </div>
@@ -323,9 +317,7 @@ export default function Chat() {
               </div>
             )}
             {!loadingDialogs && dialogs.length === 0 && (
-              <div className="p-4 text-center text-xs text-text-hint">
-                Пока нет чатов
-              </div>
+              <div className="p-4 text-center text-xs text-text-hint">Пока нет чатов</div>
             )}
             {!loadingDialogs &&
               dialogs.map((d) => (
@@ -440,9 +432,7 @@ function DialogListItem({
       onClick={onPick}
     >
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium truncate">
-          {dialog.title || "Без названия"}
-        </div>
+        <div className="text-sm font-medium truncate">{dialog.title || "Без названия"}</div>
         <div className="text-[11px] text-text-hint mt-0.5 truncate">
           {dialog.modelId} · {new Date(dialog.updatedAt).toLocaleDateString("ru-RU")}
         </div>
@@ -461,13 +451,7 @@ function DialogListItem({
   );
 }
 
-function EmptyState({
-  modelName,
-  onNewChat,
-}: {
-  modelName?: string;
-  onNewChat: () => void;
-}) {
+function EmptyState({ modelName, onNewChat }: { modelName?: string; onNewChat: () => void }) {
   const examples = [
     "Напиши план поста про новый продукт",
     "Объясни квантовую запутанность простыми словами",

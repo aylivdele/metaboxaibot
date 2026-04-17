@@ -96,9 +96,8 @@ async function buildWebUserResponse(args: {
 }) {
   const aib = await findAibUser(args.metaboxUserId);
 
-  const telegramId = aib ? aib.id.toString() : args.telegramOnSite?.telegramId ?? null;
-  const telegramUsername =
-    aib?.username ?? args.telegramOnSite?.telegramUsername ?? null;
+  const telegramId = aib ? aib.id.toString() : (args.telegramOnSite?.telegramId ?? null);
+  const telegramUsername = aib?.username ?? args.telegramOnSite?.telegramUsername ?? null;
 
   return {
     id: aib?.id.toString() ?? null,
@@ -118,15 +117,18 @@ async function buildWebUserResponse(args: {
 }
 
 /** Единый helper: создать refresh-сессию, выдать access token, поставить cookie. */
-async function issueSession(reply: any, params: {
-  metaboxUserId: string;
-  aibUserId: string | null;
-  email: string;
-  firstName: string | null;
-  rememberMe: boolean;
-  userAgent?: string;
-  ip?: string;
-}) {
+async function issueSession(
+  reply: any,
+  params: {
+    metaboxUserId: string;
+    aibUserId: string | null;
+    email: string;
+    firstName: string | null;
+    rememberMe: boolean;
+    userAgent?: string;
+    ip?: string;
+  },
+) {
   const { refreshToken, csrfToken, session } = await createRefreshSession({
     metaboxUserId: params.metaboxUserId,
     aibUserId: params.aibUserId,
@@ -163,8 +165,7 @@ export const webAuthRoutes: FastifyPluginAsync = async (fastify) => {
     const emailNorm = email.toLowerCase().trim();
     const firstNameNorm = firstName.trim();
 
-    if (!isValidEmail(emailNorm))
-      return reply.code(400).send({ error: "Некорректный email" });
+    if (!isValidEmail(emailNorm)) return reply.code(400).send({ error: "Некорректный email" });
     if (!isStrongPassword(password))
       return reply.code(400).send({ error: "Пароль должен быть не короче 8 символов" });
     if (firstNameNorm.length < 1 || firstNameNorm.length > 100)
@@ -180,8 +181,7 @@ export const webAuthRoutes: FastifyPluginAsync = async (fastify) => {
       });
     } catch (err) {
       if (err instanceof MetaboxApiError) {
-        if (err.status === 409)
-          return reply.code(409).send({ error: "Email уже зарегистрирован" });
+        if (err.status === 409) return reply.code(409).send({ error: "Email уже зарегистрирован" });
         if (err.status === 400) return reply.code(400).send({ error: err.message });
       }
       logger.error({ err }, "web-signup: metabox register failed");
@@ -223,8 +223,7 @@ export const webAuthRoutes: FastifyPluginAsync = async (fastify) => {
       validated = await webValidateCredentials({ email: emailNorm, password });
     } catch (err) {
       if (err instanceof MetaboxApiError) {
-        if (err.status === 401)
-          return reply.code(401).send({ error: "Неверный email или пароль" });
+        if (err.status === 401) return reply.code(401).send({ error: "Неверный email или пароль" });
         if (err.status === 403)
           return reply.code(403).send({ error: err.message || "Вход запрещён" });
       }

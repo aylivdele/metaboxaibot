@@ -200,11 +200,7 @@ export async function handleStart(ctx: BotContext): Promise<void> {
             where: { id: ctx.user.id },
             data: { metaboxUserId },
           });
-          await markLinkTelegramLinked(
-            state,
-            ctx.user.id.toString(),
-            ctx.from?.username ?? null,
-          );
+          await markLinkTelegramLinked(state, ctx.user.id.toString(), ctx.from?.username ?? null);
           await ctx.reply(
             "✅ Аккаунт привязан. Возвращайтесь на ai.metabox.global — нейросети уже доступны.",
           );

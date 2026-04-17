@@ -60,7 +60,4 @@ export { userAvatarService } from "./user-avatar.service.js";
 export { translatePromptIfNeeded } from "./prompt-translate.service.js";
 
 // ── Web (ai.metabox.global) ─────────────────────────────────────────────
-export {
-  consumeLinkTelegramState,
-  markLinkTelegramLinked,
-} from "./web-session.service.js";
+export { consumeLinkTelegramState, markLinkTelegramLinked } from "./web-session.service.js";

@@ -46,9 +46,7 @@ export function ModelSelector({ models, currentModelId, onPick, disabled }: Prop
           disabled && "opacity-50 cursor-not-allowed",
         )}
       >
-        <span className="truncate max-w-[200px]">
-          {current ? current.name : "Выберите модель"}
-        </span>
+        <span className="truncate max-w-[200px]">{current ? current.name : "Выберите модель"}</span>
         <ChevronDown size={14} className={clsx("transition-transform", open && "rotate-180")} />
       </button>
 

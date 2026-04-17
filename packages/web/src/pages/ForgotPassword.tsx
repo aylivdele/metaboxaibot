@@ -43,8 +43,8 @@ export default function ForgotPassword() {
           <h1 className="text-xl font-bold mt-4 mb-2">Проверьте почту</h1>
           <p className="text-text-secondary text-sm mb-6">
             Если аккаунт с адресом{" "}
-            <span className="text-text font-semibold">{getValues("email")}</span> существует,
-            мы отправили ссылку для сброса пароля. Ссылка действительна 1 час.
+            <span className="text-text font-semibold">{getValues("email")}</span> существует, мы
+            отправили ссылку для сброса пароля. Ссылка действительна 1 час.
           </p>
           <Link to="/login" className="text-accent hover:underline text-sm">
             ← Вернуться ко входу

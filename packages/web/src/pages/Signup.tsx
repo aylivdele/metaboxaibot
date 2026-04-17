@@ -147,9 +147,7 @@ export default function Signup() {
               </a>
             </span>
           </label>
-          {errors.agree && (
-            <div className="text-xs text-danger -mt-3">{errors.agree.message}</div>
-          )}
+          {errors.agree && <div className="text-xs text-danger -mt-3">{errors.agree.message}</div>}
 
           {serverError && (
             <div
