@@ -72,7 +72,7 @@ export class VeoAdapter implements VideoAdapter {
         ...(input.duration ? { durationSeconds: input.duration } : {}),
         ...(ms.person_generation ? { personGeneration: String(ms.person_generation) } : {}),
         ...(ms.resolution ? { resolution: String(ms.resolution) } : {}),
-        ...(ms.negative_prompt ? { negativePrompt: String(ms.negative_prompt) } : {}),
+        // ...(ms.negative_prompt ? { negativePrompt: String(ms.negative_prompt) } : {}),
       },
     };
 
@@ -89,7 +89,12 @@ export class VeoAdapter implements VideoAdapter {
         referenceUrls.filter((u) => !isVideoUrl(u)).map(fetchImagePayload),
       );
       if (referenceImages.length > 0) {
-        (params.config as Record<string, unknown>).referenceImages = referenceImages;
+        (params.config as Record<string, unknown>).referenceImages = referenceImages.map(
+          (image) => ({
+            image,
+            referenceType: "asset",
+          }),
+        );
       }
     } else if (lastFrameUrl && !isVideoUrl(lastFrameUrl)) {
       // lastFrame is ignored by Veo when referenceImages are present.

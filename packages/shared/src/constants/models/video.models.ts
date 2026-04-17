@@ -611,15 +611,15 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         ],
         default: "allow_adult",
       },
-      {
-        key: "negative_prompt",
-        label: "Негативный промпт",
-        description:
-          "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
-        type: "text",
-        default: "",
-        advanced: true,
-      },
+      // {
+      //   key: "negative_prompt",
+      //   label: "Негативный промпт",
+      //   description:
+      //     "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
+      //   type: "text",
+      //   default: "",
+      //   advanced: true,
+      // },
     ],
   },
 
@@ -689,15 +689,15 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         ],
         default: "720p",
       },
-      {
-        key: "negative_prompt",
-        label: "Негативный промпт",
-        description:
-          "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
-        type: "text",
-        default: "",
-        advanced: true,
-      },
+      // {
+      //   key: "negative_prompt",
+      //   label: "Негативный промпт",
+      //   description:
+      //     "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
+      //   type: "text",
+      //   default: "",
+      //   advanced: true,
+      // },
     ],
   },
 
