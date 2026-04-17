@@ -58,9 +58,9 @@ function buildUrl(path: string, query?: ApiOptions<unknown>["query"]): string {
 }
 
 async function parseError(res: Response): Promise<ApiError> {
-  let body: any = null;
+  let body: { code?: string; error?: string; message?: string } | null = null;
   try {
-    body = await res.json();
+    body = (await res.json()) as { code?: string; error?: string; message?: string };
   } catch {
     /* ignore */
   }

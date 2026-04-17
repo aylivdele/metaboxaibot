@@ -83,8 +83,13 @@ export default function Chat() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTelegramLinked]);
+  }, [
+    isTelegramLinked,
+    pushToast,
+    setDialogs,
+    setLoadingDialogs,
+    setModels,
+  ]);
 
   // ── Подгрузка сообщений при смене диалога ──────────────────────────────
   const loadMessagesFor = useCallback(
@@ -110,8 +115,7 @@ export default function Chat() {
     } else if (!urlId && currentDialogId) {
       setCurrentDialog(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]);
+  }, [params.id, currentDialogId, loadMessagesFor, setCurrentDialog]);
 
   // ── Автоскролл ──────────────────────────────────────────────────────────
   useEffect(() => {

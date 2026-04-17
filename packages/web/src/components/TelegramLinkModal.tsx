@@ -92,8 +92,7 @@ export function TelegramLinkModal({ open, onClose, context }: Props) {
       .finally(() => setLoading(false));
 
     return () => stopPolling();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, startPolling, stopPolling]);
 
   // Close on Escape
   useEffect(() => {
