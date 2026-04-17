@@ -26,12 +26,16 @@ async function sendAudio(
   result: { buffer?: Buffer; url?: string; ext: string; contentType: string },
   caption: string,
 ): Promise<void> {
-  if (result.buffer) {
-    await telegram.sendAudio(chatId, new InputFile(result.buffer, `audio.${result.ext}`), {
+  let buf = result.buffer;
+  if (!buf && result.url) {
+    const res = await fetch(result.url);
+    if (!res.ok) throw new Error(`Failed to fetch audio from provider: ${res.status}`);
+    buf = Buffer.from(await res.arrayBuffer());
+  }
+  if (buf) {
+    await telegram.sendAudio(chatId, new InputFile(buf, `audio.${result.ext}`), {
       caption,
     });
-  } else if (result.url) {
-    await telegram.sendAudio(chatId, result.url, { caption });
   } else {
     throw new Error("Audio result has neither buffer nor URL");
   }

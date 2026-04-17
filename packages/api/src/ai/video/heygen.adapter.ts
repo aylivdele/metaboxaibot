@@ -79,9 +79,21 @@ export class HeyGenAdapter implements VideoAdapter {
       contentType = "audio/mpeg";
     }
 
+    if (!audioBuffer.byteLength) {
+      throw new Error("HeyGen: audio buffer is empty after fetch/transcode");
+    }
+
     const ext = contentType.includes("wav") ? "wav" : contentType.includes("ogg") ? "ogg" : "mp3";
     const formData = new FormData();
-    formData.append("file", new Blob([audioBuffer], { type: contentType }), `audio.${ext}`);
+    // Use Uint8Array to avoid Node.js Buffer/Blob serialization edge cases
+    formData.append(
+      "file",
+      new Blob(
+        [new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.byteLength)],
+        { type: contentType },
+      ),
+      `audio.${ext}`,
+    );
 
     const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
       method: "POST",
@@ -120,8 +132,16 @@ export class HeyGenAdapter implements VideoAdapter {
       : contentType.includes("webp")
         ? "webp"
         : "jpg";
+    if (!imgBuffer.byteLength) {
+      throw new Error("HeyGen: image buffer is empty after fetch");
+    }
+
     const imgFormData = new FormData();
-    imgFormData.append("file", new Blob([imgBuffer], { type: contentType }), `image.${imgExt}`);
+    imgFormData.append(
+      "file",
+      new Blob([new Uint8Array(imgBuffer)], { type: contentType }),
+      `image.${imgExt}`,
+    );
 
     const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
       method: "POST",

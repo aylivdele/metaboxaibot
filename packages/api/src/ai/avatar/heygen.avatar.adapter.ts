@@ -26,8 +26,19 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
       : resolvedContentType.includes("webp")
         ? "webp"
         : "jpg";
+    if (!imageBuffer.byteLength) {
+      throw new Error("HeyGen: image buffer is empty");
+    }
+
     const formData = new FormData();
-    formData.append("file", new Blob([imageBuffer], { type: resolvedContentType }), `image.${ext}`);
+    formData.append(
+      "file",
+      new Blob(
+        [new Uint8Array(imageBuffer.buffer, imageBuffer.byteOffset, imageBuffer.byteLength)],
+        { type: resolvedContentType },
+      ),
+      `image.${ext}`,
+    );
 
     const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
       method: "POST",

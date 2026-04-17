@@ -294,19 +294,10 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     const rows = [downloadRow, origRow].filter(Boolean) as InlineKeyboardButton[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
-    const tgVideoSource = await resolveTelegramVideoSource(s3Key, outputUrl, videoBuffer);
+    const videoBuf = await resolveTelegramVideoBuffer(s3Key, outputUrl, videoBuffer);
 
-    let videoByteSize = videoBuffer?.byteLength;
-    if (!videoByteSize && typeof tgVideoSource === "string") {
-      const head = await fetch(tgVideoSource, { method: "HEAD" }).catch(() => null);
-      if (head?.ok) {
-        videoByteSize = parseInt(head.headers.get("content-length") ?? "NaN", 10);
-      }
-    }
-
-    const isUrl = typeof tgVideoSource === "string";
-    const VIDEO_MAX_BYTES = isUrl ? 20 * 1024 * 1024 : 50 * 1024 * 1024;
-    const tooLargeForTelegram = (videoByteSize || Number.MAX_SAFE_INTEGER) > VIDEO_MAX_BYTES;
+    const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+    const tooLargeForTelegram = videoBuf.byteLength > VIDEO_MAX_BYTES;
     let slicedPrompt = prompt.slice(0, 200);
     slicedPrompt = slicedPrompt.concat(slicedPrompt.length < 200 ? "" : "...");
     const model = AI_MODELS[modelId];
@@ -318,7 +309,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
         { reply_markup: { inline_keyboard: [downloadRow] } },
       );
     } else {
-      await telegram.sendVideo(telegramChatId, tgVideoSource, {
+      await telegram.sendVideo(telegramChatId, new InputFile(videoBuf, "video.mp4"), {
         caption: `✅ ${model.name ?? modelId}: ${slicedPrompt}`,
         reply_markup: replyMarkup,
       });
@@ -402,17 +393,16 @@ async function fetchClipDurationSec(url: string): Promise<number> {
   return info.duration ?? 0;
 }
 
-async function resolveTelegramVideoSource(
+async function resolveTelegramVideoBuffer(
   s3Key: string | null,
   providerUrl: string,
   cachedBuffer: Buffer | null,
-): Promise<string | InstanceType<typeof InputFile>> {
-  if (s3Key) {
-    const s3Url = await getFileUrl(s3Key).catch(() => null);
-    if (s3Url) return s3Url;
-  }
-  if (cachedBuffer) return new InputFile(cachedBuffer, "video.mp4");
-  const res = await fetch(providerUrl);
-  if (!res.ok) throw new Error(`Failed to fetch video from provider: ${res.status}`);
-  return new InputFile(Buffer.from(await res.arrayBuffer()), "video.mp4");
+): Promise<Buffer> {
+  // Always resolve to a buffer — passing URLs directly to Telegram
+  // fails intermittently when Telegram servers can't reach the provider.
+  if (cachedBuffer) return cachedBuffer;
+  const url = s3Key ? ((await getFileUrl(s3Key).catch(() => null)) ?? providerUrl) : providerUrl;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch video for Telegram: ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
 }
