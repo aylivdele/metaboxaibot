@@ -415,6 +415,7 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
         const label =
           ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
         await ctx.reply(ctx.t.mediaInput.slotRequired.replace("{slot}", String(label)));
+        await sendDesignMediaInputStatus(ctx);
         return;
       }
     }

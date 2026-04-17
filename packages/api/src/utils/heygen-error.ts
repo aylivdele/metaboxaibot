@@ -73,6 +73,17 @@ export function isHeyGenUserFacingError(err: unknown): err is HeyGenApiError {
   return err instanceof HeyGenApiError && USER_FACING_CODES.has(err.code);
 }
 
+/**
+ * Provider-side errors that are NOT the user's fault but should still
+ * notify the tech channel (e.g. our HeyGen account ran out of credits).
+ * The user sees "model temporarily unavailable".
+ */
+const PROVIDER_UNAVAILABLE_ENUMS = new Set(["MOVIO_PAYMENT_INSUFFICIENT_CREDIT"]);
+
+export function isHeyGenProviderUnavailable(err: unknown): err is HeyGenApiError {
+  return err instanceof HeyGenApiError && PROVIDER_UNAVAILABLE_ENUMS.has(err.enumName);
+}
+
 export function getHeyGenUserMessage(
   err: HeyGenApiError,
   t: { errors: Record<string, string> },
@@ -229,4 +240,5 @@ const ENUM_TO_CODE: Record<string, number> = {
   AVATAR_USAGE_NOT_PERMITTED: 400685,
   USER_BLOCKED: 400631,
   TIER_NOT_SUPPORT: 400599,
+  MOVIO_PAYMENT_INSUFFICIENT_CREDIT: 900001,
 };

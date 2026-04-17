@@ -519,6 +519,7 @@ export async function executeVideoPrompt(ctx: BotContext, prompt: string): Promi
         const label =
           ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
         await ctx.reply(ctx.t.mediaInput.slotRequired.replace("{slot}", String(label)));
+        await sendVideoMediaInputStatus(ctx);
         return;
       }
     }

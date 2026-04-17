@@ -6,6 +6,12 @@ const MI_FIRST_FRAME: MediaInputSlot = {
   mode: "first_frame",
   labelKey: "firstFrame",
 };
+const MI_FIRST_FRAME_REQUIRED: MediaInputSlot = {
+  slotKey: "first_frame",
+  mode: "first_frame",
+  labelKey: "firstFrame",
+  required: true,
+};
 const MI_LAST_FRAME: MediaInputSlot = {
   slotKey: "last_frame",
   mode: "last_frame",
@@ -388,7 +394,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_FIRST_FRAME],
+    mediaInputs: [MI_FIRST_FRAME_REQUIRED],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -441,7 +447,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_FIRST_FRAME],
+    mediaInputs: [MI_FIRST_FRAME_REQUIRED],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -496,7 +502,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_FIRST_FRAME],
+    mediaInputs: [MI_FIRST_FRAME_REQUIRED],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
