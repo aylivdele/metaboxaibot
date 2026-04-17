@@ -152,6 +152,30 @@ async function issueSession(
 }
 
 export const webAuthRoutes: FastifyPluginAsync = async (fastify) => {
+  // Fail-fast проверка конфигурации при регистрации плагина.
+  // Если секретов нет — web-auth не запускается, но остальной API работает (бот, TG-миниапп).
+  if (!config.web.jwtSecret) {
+    logger.warn(
+      "[web-auth] WEB_JWT_SECRET не задан — /auth/web-* будут возвращать 503. " +
+        "Сгенерируйте: openssl rand -hex 32 и положите в .env",
+    );
+  }
+  if (!config.metabox.apiUrl || !config.metabox.internalKey) {
+    logger.warn(
+      "[web-auth] METABOX_API_URL/INTERNAL_KEY не заданы — login/signup/reset работать не будут.",
+    );
+  }
+
+  // Middleware: если базовая конфигурация неполная — возвращаем 503 вместо 500.
+  fastify.addHook("preHandler", async (request, reply) => {
+    if (!request.url.startsWith("/auth/web-")) return;
+    if (!config.web.jwtSecret) {
+      return reply.code(503).send({
+        error: "Web auth не настроен на сервере (WEB_JWT_SECRET отсутствует).",
+        code: "WEB_AUTH_NOT_CONFIGURED",
+      });
+    }
+  });
   // ── POST /auth/web-signup ────────────────────────────────────────────────
   fastify.post<{
     Body: {
@@ -161,96 +185,108 @@ export const webAuthRoutes: FastifyPluginAsync = async (fastify) => {
       referralCode?: string;
     };
   }>("/auth/web-signup", { schema: { hide: true } as any }, async (request, reply) => {
-    const { email = "", password = "", firstName = "", referralCode } = request.body ?? {};
-    const emailNorm = email.toLowerCase().trim();
-    const firstNameNorm = firstName.trim();
-
-    if (!isValidEmail(emailNorm)) return reply.code(400).send({ error: "Некорректный email" });
-    if (!isStrongPassword(password))
-      return reply.code(400).send({ error: "Пароль должен быть не короче 8 символов" });
-    if (firstNameNorm.length < 1 || firstNameNorm.length > 100)
-      return reply.code(400).send({ error: "Укажите имя" });
-
-    let registered;
     try {
-      registered = await webRegister({
-        email: emailNorm,
-        password,
-        firstName: firstNameNorm,
-        referralCode,
-      });
-    } catch (err) {
-      if (err instanceof MetaboxApiError) {
-        if (err.status === 409) return reply.code(409).send({ error: "Email уже зарегистрирован" });
-        if (err.status === 400) return reply.code(400).send({ error: err.message });
+      const { email = "", password = "", firstName = "", referralCode } = request.body ?? {};
+      const emailNorm = email.toLowerCase().trim();
+      const firstNameNorm = firstName.trim();
+
+      if (!isValidEmail(emailNorm)) return reply.code(400).send({ error: "Некорректный email" });
+      if (!isStrongPassword(password))
+        return reply.code(400).send({ error: "Пароль должен быть не короче 8 символов" });
+      if (firstNameNorm.length < 1 || firstNameNorm.length > 100)
+        return reply.code(400).send({ error: "Укажите имя" });
+
+      let registered;
+      try {
+        registered = await webRegister({
+          email: emailNorm,
+          password,
+          firstName: firstNameNorm,
+          referralCode,
+        });
+      } catch (err) {
+        if (err instanceof MetaboxApiError) {
+          if (err.status === 409)
+            return reply.code(409).send({ error: "Email уже зарегистрирован" });
+          if (err.status === 400) return reply.code(400).send({ error: err.message });
+        }
+        logger.error({ err }, "web-signup: metabox register failed");
+        return reply.code(502).send({ error: "Не удалось создать аккаунт" });
       }
-      logger.error({ err }, "web-signup: metabox register failed");
-      return reply.code(502).send({ error: "Не удалось создать аккаунт" });
+
+      const { accessToken, accessTokenExpiresAt, csrfToken } = await issueSession(reply, {
+        metaboxUserId: registered.metaboxUserId,
+        aibUserId: null, // регистрация на вебе не создаёт AI Box User
+        email: registered.email,
+        firstName: registered.firstName,
+        rememberMe: true,
+        userAgent: request.headers["user-agent"],
+        ip: request.ip,
+      });
+
+      const user = await buildWebUserResponse({
+        metaboxUserId: registered.metaboxUserId,
+        email: registered.email,
+        firstName: registered.firstName,
+        lastName: registered.lastName,
+      });
+
+      return reply.send({ user, accessToken, accessTokenExpiresAt, csrfToken });
+    } catch (err) {
+      logger.error({ err, path: "/auth/web-signup" }, "web-signup: uncaught error");
+      return reply.code(500).send({ error: "Внутренняя ошибка. Попробуйте позже." });
     }
-
-    const { accessToken, accessTokenExpiresAt, csrfToken } = await issueSession(reply, {
-      metaboxUserId: registered.metaboxUserId,
-      aibUserId: null, // регистрация на вебе не создаёт AI Box User
-      email: registered.email,
-      firstName: registered.firstName,
-      rememberMe: true,
-      userAgent: request.headers["user-agent"],
-      ip: request.ip,
-    });
-
-    const user = await buildWebUserResponse({
-      metaboxUserId: registered.metaboxUserId,
-      email: registered.email,
-      firstName: registered.firstName,
-      lastName: registered.lastName,
-    });
-
-    return reply.send({ user, accessToken, accessTokenExpiresAt, csrfToken });
   });
 
   // ── POST /auth/web-login ─────────────────────────────────────────────────
   fastify.post<{
     Body: { email?: string; password?: string; rememberMe?: boolean };
   }>("/auth/web-login", { schema: { hide: true } as any }, async (request, reply) => {
-    const { email = "", password = "", rememberMe = true } = request.body ?? {};
-    const emailNorm = email.toLowerCase().trim();
-
-    if (!isValidEmail(emailNorm) || !password)
-      return reply.code(400).send({ error: "Email и пароль обязательны" });
-
-    let validated;
     try {
-      validated = await webValidateCredentials({ email: emailNorm, password });
-    } catch (err) {
-      if (err instanceof MetaboxApiError) {
-        if (err.status === 401) return reply.code(401).send({ error: "Неверный email или пароль" });
-        if (err.status === 403)
-          return reply.code(403).send({ error: err.message || "Вход запрещён" });
+      const { email = "", password = "", rememberMe = true } = request.body ?? {};
+      const emailNorm = email.toLowerCase().trim();
+
+      if (!isValidEmail(emailNorm) || !password)
+        return reply.code(400).send({ error: "Email и пароль обязательны" });
+
+      let validated;
+      try {
+        validated = await webValidateCredentials({ email: emailNorm, password });
+      } catch (err) {
+        if (err instanceof MetaboxApiError) {
+          if (err.status === 401)
+            return reply.code(401).send({ error: "Неверный email или пароль" });
+          if (err.status === 403)
+            return reply.code(403).send({ error: err.message || "Вход запрещён" });
+        }
+        logger.error({ err }, "web-login: metabox validate failed");
+        return reply.code(502).send({ error: "Временная ошибка. Попробуйте позже." });
       }
-      logger.error({ err }, "web-login: metabox validate failed");
-      return reply.code(502).send({ error: "Временная ошибка. Попробуйте позже." });
+
+      const aib = await findAibUser(validated.metaboxUserId);
+
+      const { accessToken, accessTokenExpiresAt, csrfToken } = await issueSession(reply, {
+        metaboxUserId: validated.metaboxUserId,
+        aibUserId: aib?.id.toString() ?? null,
+        email: validated.email,
+        firstName: validated.firstName,
+        rememberMe,
+        userAgent: request.headers["user-agent"],
+        ip: request.ip,
+      });
+
+      const user = await buildWebUserResponse({
+        metaboxUserId: validated.metaboxUserId,
+        email: validated.email,
+        firstName: validated.firstName,
+        lastName: validated.lastName,
+      });
+
+      return reply.send({ user, accessToken, accessTokenExpiresAt, csrfToken });
+    } catch (err) {
+      logger.error({ err, path: "/auth/web-login" }, "web-login: uncaught error");
+      return reply.code(500).send({ error: "Внутренняя ошибка. Попробуйте позже." });
     }
-
-    const aib = await findAibUser(validated.metaboxUserId);
-
-    const { accessToken, accessTokenExpiresAt, csrfToken } = await issueSession(reply, {
-      metaboxUserId: validated.metaboxUserId,
-      aibUserId: aib?.id.toString() ?? null,
-      email: validated.email,
-      firstName: validated.firstName,
-      rememberMe,
-      userAgent: request.headers["user-agent"],
-      ip: request.ip,
-    });
-
-    const user = await buildWebUserResponse({
-      metaboxUserId: validated.metaboxUserId,
-      email: validated.email,
-      firstName: validated.firstName,
-      lastName: validated.lastName,
-    });
-
-    return reply.send({ user, accessToken, accessTokenExpiresAt, csrfToken });
   });
 
   // ── POST /auth/web-refresh ───────────────────────────────────────────────
