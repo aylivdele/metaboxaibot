@@ -9,6 +9,7 @@ import { VeoAdapter } from "./veo.adapter.js";
 import { HiggsFieldAdapter } from "./higgsfield.adapter.js";
 import { AlibabaVideoAdapter } from "./alibaba.adapter.js";
 import { MinimaxVideoAdapter } from "./minimax.adapter.js";
+import { KieVideoAdapter } from "./kie.adapter.js";
 
 /** FAL.ai-backed video models */
 const FAL_MODELS = new Set([
@@ -50,6 +51,8 @@ export function createVideoAdapter(modelId: string): VideoAdapter {
     case "higgsfield":
     case "higgsfield-preview":
       return new HiggsFieldAdapter(modelId);
+    case "grok-imagine":
+      return new KieVideoAdapter(modelId);
     default:
       throw new Error(`Unknown video model: ${modelId}`);
   }

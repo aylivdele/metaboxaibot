@@ -6,8 +6,8 @@ interface UserBucket {
   lastRefill: number;
 }
 
-const CAPACITY = 10; // max burst
-const REFILL_RATE = 1; // tokens per second
+const CAPACITY = 55; // max burst
+const REFILL_RATE = 2; // tokens per second
 const REFILL_INTERVAL_MS = 1000;
 
 const buckets = new Map<string, UserBucket>();

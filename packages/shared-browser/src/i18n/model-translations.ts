@@ -375,6 +375,16 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
     description:
       "Alibaba video model with high movement quality and 1080p support. Send a photo with text for image-to-video mode.",
   },
+  "grok-imagine": {
+    name: "🔮 Grok Imagine",
+    description:
+      "xAI (Grok) video model. Text-to-video and image-to-video with 6–30 second clips. Supports up to 7 input images — reference them in the prompt via @image1, @image2, etc.",
+  },
+  "grok-imagine-image": {
+    name: "🔮 Grok Imagine",
+    description:
+      "xAI (Grok) image generation. Text-to-image and image-to-image. Quality mode — higher precision and detail, Speed mode — faster generation with more variants.",
+  },
 };
 
 export const SETTING_TRANSLATIONS_EN: Record<string, SettingTranslation> = {
@@ -611,6 +621,17 @@ export const SETTING_TRANSLATIONS_EN: Record<string, SettingTranslation> = {
     description:
       "Minimal — slight instruction-following boost, High — deep prompt analysis. Disabled = no extra thinking. Affects price.",
     options: { "": "Disabled" },
+  },
+  mode: {
+    label: "Generation mode",
+    description: "Fun — more creative and playful interpretation, Normal — balanced approach.",
+    options: { fun: "Fun", normal: "Normal" },
+  },
+  enable_pro: {
+    label: "Mode",
+    description:
+      "Speed — fast generation (6 variants), Quality — higher precision and detail (4 variants). Affects price.",
+    options: { false: "Speed", true: "Quality" },
   },
   // ── Design-specific ───────────────────────────────────────────────────────────
   style_type: {

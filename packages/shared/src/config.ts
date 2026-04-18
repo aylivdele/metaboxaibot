@@ -158,6 +158,7 @@ export const config = {
     apipass: opt("APIPASS_API_KEY"),
     recraft: opt("RECRAFT_API_KEY"),
     minimax: opt("MINIMAX_API_KEY"),
+    kie: opt("KIE_API_KEY"),
   },
 } as const;
 

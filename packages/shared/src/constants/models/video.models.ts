@@ -123,6 +123,14 @@ const MI_REF_AUDIOS: MediaInputSlot = {
   maxImages: 3,
 };
 
+/** Grok Imagine i2v: up to 7 reference images, referenced via @image1..@image7 in prompt. */
+const MI_GROK_IMAGINE_REFS: MediaInputSlot = {
+  slotKey: "ref_images",
+  mode: "reference_image",
+  labelKey: "referenceImages",
+  maxImages: 7,
+};
+
 const KLING_SETTINGS: ModelSettingDef[] = [
   mkAspectRatio(["16:9", "9:16", "1:1"]),
   {
@@ -1348,6 +1356,63 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     mediaInputs: KLING_MOTION_MEDIA_INPUTS,
     settings: [...KLING_MOTION_SETTINGS],
+  },
+
+  "grok-imagine": {
+    id: "grok-imagine",
+    name: "🔮 Grok Imagine",
+    description:
+      "Видеомодель от xAI (Grok). Text-to-video и image-to-video с длительностью 6–30 секунд. Поддержка до 7 входных изображений — ссылайтесь на них в промпте через @image1, @image2 и т.д.",
+    section: "video",
+    provider: "kie",
+    // Resolution-based: 480p $0.008/s, 720p $0.015/s
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.008,
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "480p": { costUsdPerSecond: 0.008 },
+        "720p": { costUsdPerSecond: 0.015 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_GROK_IMAGINE_REFS],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["2:3", "3:2", "1:1", "16:9", "9:16"],
+    durationRange: { min: 6, max: 30 },
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1", "2:3", "3:2"]),
+      mkDurationSlider(6, 30),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "480p — быстрее и дешевле, 720p — более чёткое видео. Влияет на цену.",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        default: "480p",
+      },
+      {
+        key: "mode",
+        label: "Режим генерации",
+        description:
+          "Fun — более креативная и игривая интерпретация, Normal — сбалансированный подход.",
+        type: "select",
+        options: [
+          { value: "fun", label: "Fun" },
+          { value: "normal", label: "Normal" },
+        ],
+        default: "normal",
+      },
+    ],
   },
 
   // "d-id": {

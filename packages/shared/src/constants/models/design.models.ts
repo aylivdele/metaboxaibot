@@ -1759,6 +1759,46 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     ],
   },
 
+  "grok-imagine-image": {
+    id: "grok-imagine-image",
+    name: "🔮 Grok Imagine",
+    description:
+      "Генерация изображений от xAI (Grok). Text-to-image и image-to-image. Режим Quality — повышенная точность и детализация, Speed — быстрая генерация с большим количеством вариантов.",
+    section: "design",
+    provider: "kie",
+    // Speed: $0.02 per 6 images, Quality: $0.025 per 4 images
+    costUsdPerRequest: 0.02,
+    costVariants: {
+      settingKey: "enable_pro",
+      map: { false: 0.02, true: 0.025 },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_EDIT],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["1:1", "2:3", "3:2", "16:9", "9:16"],
+    settings: [
+      mkAspectRatio(["1:1", "2:3", "3:2", "16:9", "9:16"]),
+      {
+        key: "enable_pro",
+        label: "Режим",
+        description:
+          "Speed — быстрая генерация (6 вариантов), Quality — повышенное качество и точность (4 варианта). Влияет на цену.",
+        type: "select",
+        options: [
+          { value: false, label: "Speed" },
+          { value: true, label: "Quality" },
+        ],
+        default: false,
+      },
+    ],
+  },
+
   "seedream-4.5": {
     id: "seedream-4.5",
     name: "🛍️ Seedream 4.5",
