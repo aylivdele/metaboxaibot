@@ -1661,11 +1661,13 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     section: "design",
     provider: "higgsfield",
     costUsdPerRequest: 0.09,
-    costVariants: {
-      settingKey: "resolution",
-      map: {
-        "720p": { costUsdPerRequest: 0.09 },
-        "1080p": { costUsdPerRequest: 0.19 },
+    costMatrix: {
+      dims: ["resolution", "batch_size"],
+      table: {
+        "720p__1": 0.09,
+        "720p__4": 0.13,
+        "1080p__1": 0.19,
+        "1080p__4": 0.31,
       },
     },
     inputCostUsdPerMToken: 0,
