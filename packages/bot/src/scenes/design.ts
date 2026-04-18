@@ -88,9 +88,10 @@ async function sendSyncImageResult(
   result: SubmitImageResult,
   caption: string,
 ): Promise<void> {
-  const { imageUrl, filename = "image.png", s3Key, dbJobId } = result;
+  const { imageUrl, filename = "image.png", s3Key, dbJobId, outputId } = result;
   if (!imageUrl) return;
 
+  const buttonId = outputId ?? dbJobId;
   const userId = ctx.user!.id;
 
   const { source, byteSize } = await resolveSyncSource(s3Key, imageUrl, filename);
@@ -104,8 +105,8 @@ async function sendSyncImageResult(
 
   // Build keyboard
   const kb = new InlineKeyboard();
-  if (dbJobId) {
-    kb.text(ctx.t.design.refine, `design_ref_${dbJobId}`).row();
+  if (buttonId) {
+    kb.text(ctx.t.design.refine, `design_ref_${buttonId}`).row();
   }
   if (s3Key && config.api.publicUrl) {
     kb.url(
@@ -113,7 +114,7 @@ async function sendSyncImageResult(
       `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userId.toString())}`,
     );
   } else {
-    kb.text(ctx.t.common.sendOriginal, `orig_${dbJobId}`);
+    kb.text(ctx.t.common.sendOriginal, `orig_${buttonId}`);
   }
 
   if (tooLarge) {

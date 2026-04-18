@@ -69,23 +69,28 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
   try {
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
-      select: { outputUrl: true, s3Key: true, providerJobId: true },
+      select: {
+        providerJobId: true,
+        status: true,
+        outputs: { orderBy: { index: "asc" as const }, take: 1 },
+      },
     });
 
     let audioResult: { buffer?: Buffer; url?: string; ext: string; contentType: string } | null =
       null;
     let s3Key: string | null = null;
+    const existingOutput = existingJob?.outputs?.[0];
 
-    if (existingJob?.outputUrl || existingJob?.s3Key) {
+    if (existingOutput) {
       logger.info({ dbJobId }, "Generation already done, skipping to send");
-      const ext = existingJob.s3Key?.split(".").pop() ?? "mp3";
-      const resolvedUrl = existingJob.s3Key
-        ? ((await getFileUrl(existingJob.s3Key).catch(() => null)) ??
-          existingJob.outputUrl ??
+      const ext = existingOutput.s3Key?.split(".").pop() ?? "mp3";
+      const resolvedUrl = existingOutput.s3Key
+        ? ((await getFileUrl(existingOutput.s3Key).catch(() => null)) ??
+          existingOutput.outputUrl ??
           undefined)
-        : (existingJob.outputUrl ?? undefined);
+        : (existingOutput.outputUrl ?? undefined);
       audioResult = { url: resolvedUrl, ext, contentType: `audio/${ext}` };
-      s3Key = existingJob.s3Key ?? null;
+      s3Key = existingOutput.s3Key ?? null;
     } else if (stage === "generate") {
       // ── Stage 1: submit (or sync-generate) ────────────────────────────
       await db.generationJob.update({
@@ -207,7 +212,7 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
     }
 
     // ── Stage 3: upload + deduct (when not already persisted) ───────────
-    if (!(existingJob?.outputUrl || existingJob?.s3Key)) {
+    if (!existingOutput) {
       const audioKey = buildS3Key("audio", userIdStr, dbJobId, audioResult.ext ?? "mp3");
       s3Key = await (
         audioResult.buffer
@@ -217,14 +222,12 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
             : Promise.resolve(null)
       ).catch(() => null);
 
+      await db.generationJobOutput.create({
+        data: { jobId: dbJobId, index: 0, outputUrl: audioResult.url ?? null, s3Key },
+      });
       await db.generationJob.update({
         where: { id: dbJobId },
-        data: {
-          status: "done",
-          outputUrl: audioResult.url ?? null,
-          s3Key,
-          completedAt: new Date(),
-        },
+        data: { status: "done", completedAt: new Date() },
       });
 
       const model = AI_MODELS[modelId];

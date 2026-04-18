@@ -4,13 +4,13 @@
  * Allows the user to load a generated image into a media input slot
  * of the active model, or choose a different model/section.
  *
- * Callback data formats (jobId = GenerationJob cuid, ~25 chars):
- *   design_ref_{jobId}          — entry point
- *   ref_use:{jobId}             — use in active model
- *   ref_choose:{jobId}          — show section chooser
- *   ref_sec:{d|v}:{jobId}       — show models for section
- *   ref_mdl:{modelId}:{jobId}   — activate model
- *   ref_slt:{slotKey}:{jobId}   — pick slot (when model has multiple)
+ * Callback data formats (outputId = GenerationJobOutput cuid, ~25 chars):
+ *   design_ref_{outputId}          — entry point
+ *   ref_use:{outputId}             — use in active model
+ *   ref_choose:{outputId}          — show section chooser
+ *   ref_sec:{d|v}:{outputId}       — show models for section
+ *   ref_mdl:{modelId}:{outputId}   — activate model
+ *   ref_slt:{slotKey}:{outputId}   — pick slot (when model has multiple)
  */
 import type { BotContext } from "../types/context.js";
 import { generationService, userStateService } from "@metabox/api/services";
@@ -97,7 +97,7 @@ export async function handleRefineEntry(ctx: BotContext): Promise<void> {
   await ctx.answerCallbackQuery();
 
   // Fetch job to verify it exists and has s3Key
-  const job = await generationService.getJobById(jobId);
+  const job = await generationService.getOutputById(jobId);
   if (!job?.s3Key) return;
 
   const state = await userStateService.get(ctx.user.id);
@@ -151,7 +151,7 @@ export async function handleRefineUseActive(ctx: BotContext): Promise<void> {
   const jobId = (ctx.callbackQuery?.data ?? "").replace("ref_use:", "");
   await ctx.answerCallbackQuery();
 
-  const job = await generationService.getJobById(jobId);
+  const job = await generationService.getOutputById(jobId);
   if (!job?.s3Key) return;
 
   const state = await userStateService.get(ctx.user.id);
@@ -218,7 +218,7 @@ export async function handleRefineModel(ctx: BotContext): Promise<void> {
   const jobId = data.slice(sepIdx + 1);
   await ctx.answerCallbackQuery();
 
-  const job = await generationService.getJobById(jobId);
+  const job = await generationService.getOutputById(jobId);
   if (!job?.s3Key) return;
 
   const model = AI_MODELS[modelId];
@@ -282,7 +282,7 @@ export async function handleRefineSlot(ctx: BotContext): Promise<void> {
   const jobId = data.slice(sepIdx + 1);
   await ctx.answerCallbackQuery();
 
-  const job = await generationService.getJobById(jobId);
+  const job = await generationService.getOutputById(jobId);
   if (!job?.s3Key) return;
 
   const state = await userStateService.get(ctx.user.id);
