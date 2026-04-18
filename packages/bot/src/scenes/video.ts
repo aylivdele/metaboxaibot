@@ -231,15 +231,17 @@ export async function activateVideoModel(
     const kb = new InlineKeyboard();
 
     if (!options.suppressKeyboard) {
-      // Add media input slot buttons
+      // Add media input slot buttons (with progressive element reveal)
       if (model.mediaInputs?.length) {
-        for (const slot of model.mediaInputs) {
-          const label =
-            ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
-          const suffix = slot.required
-            ? ` ${ctx.t.mediaInput.required}`
-            : ` ${ctx.t.mediaInput.optional}`;
-          kb.text(`${label}${suffix}`, `mi:video:${slot.slotKey}`).row();
+        const { kb: slotsKb } = buildMediaInputStatusMenu(
+          model.mediaInputs,
+          {}, // activation clears media inputs — all slots empty
+          "video",
+          ctx.t,
+          { promptOptional: model.promptOptional },
+        );
+        for (const row of slotsKb.inline_keyboard) {
+          kb.row(...row);
         }
       }
 

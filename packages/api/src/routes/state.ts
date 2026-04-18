@@ -300,7 +300,14 @@ async function sendModelActivatedNotification(
   const inlineKeyboard: { text: string; callback_data?: string; web_app?: { url: string } }[][] =
     [];
   if ((section === "video" || section === "design") && model.mediaInputs?.length) {
+    // Progressive reveal: show all non-element slots + only the first element slot.
+    // Activation clears media inputs, so all slots start empty.
+    let firstElementShown = false;
     for (const slot of model.mediaInputs) {
+      if (slot.mode === "reference_element") {
+        if (firstElementShown) continue;
+        firstElementShown = true;
+      }
       const label = (t.mediaInput as Record<string, string>)[slot.labelKey] ?? slot.labelKey;
       const suffix = slot.required ? ` ${t.mediaInput.required}` : ` ${t.mediaInput.optional}`;
       inlineKeyboard.push([
