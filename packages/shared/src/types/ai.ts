@@ -194,6 +194,11 @@ export interface AIModel {
    * Set for Gemini / DeepSeek / Qwen / Grok / Perplexity and similar text-only chat models.
    */
   documentTextExtractFallback?: boolean;
+  /**
+   * When true, the model can be submitted without a text prompt.
+   * The bot shows a "Start generation" button once all required media slots are filled.
+   */
+  promptOptional?: boolean;
   isAsync: boolean; // требует очереди (для image/video/audio)
   contextStrategy: ContextStrategy;
   contextMaxMessages: number; // актуально для db_history: сколько сообщений отправлять

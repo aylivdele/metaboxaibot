@@ -351,7 +351,9 @@ export async function sendVideoMediaInputStatus(
   if (!model?.mediaInputs?.length) return;
 
   const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
-  const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "video", ctx.t);
+  const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "video", ctx.t, {
+    promptOptional: model.promptOptional,
+  });
   const webappUrl = config.bot.webappUrl;
   if (webappUrl) {
     kb.webApp(ctx.t.video.management, `${webappUrl}?page=management&section=video`);
@@ -441,7 +443,15 @@ export async function handleVideoMediaInputCancel(ctx: BotContext): Promise<void
   const model = AI_MODELS[modelId];
   if (model?.mediaInputs?.length) {
     const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
-    const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "video", ctx.t);
+    const { text, kb } = buildMediaInputStatusMenu(
+      model.mediaInputs,
+      filledInputs,
+      "video",
+      ctx.t,
+      {
+        promptOptional: model.promptOptional,
+      },
+    );
     await ctx.editMessageText(text || ctx.t.mediaInput.uploadCancelled, { reply_markup: kb });
   } else {
     await ctx.editMessageText(ctx.t.mediaInput.uploadCancelled).catch(() => void 0);
@@ -454,6 +464,14 @@ export async function handleVideoMediaInputDone(ctx: BotContext): Promise<void> 
   await ctx.answerCallbackQuery();
   clearActiveSlot(ctx.user.id);
   await sendVideoMediaInputStatus(ctx, { edit: true });
+}
+
+/** Callback for mi_generate:video — start generation without a text prompt (promptOptional models). */
+export async function handleVideoGenerateNoPrompt(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
+  await executeVideoPrompt(ctx, "");
 }
 
 /** Callback for mi_remove:video:{slotKey} — clear a filled slot. */

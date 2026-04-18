@@ -435,6 +435,9 @@ export default {
     required: "(required)",
     doneUploading: "Done ✓",
     readyForPrompt: "✅ Ready! Send a text prompt to start generation.",
+    readyForPromptOptional:
+      "✅ Ready! Send a text prompt or tap the button below to generate without a prompt.",
+    startGeneration: "🚀 Start generation",
     cancel: "Cancel",
     uploadCancelled: "Upload cancelled.",
     refineUseActive: "Use this image in the active model?\nActive model: {model}",

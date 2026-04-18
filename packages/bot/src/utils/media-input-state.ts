@@ -28,12 +28,14 @@ export function clearActiveSlot(userId: bigint): void {
  * Filled slots: "✅ {label}" with remove callback.
  * Empty slots: "🖼 {label} (optional/required)" with upload callback.
  * If all required slots are filled (or none are required), appends readyForPrompt text.
+ * When `promptOptional` is true and all required slots are filled, adds a "Start generation" button.
  */
 export function buildMediaInputStatusMenu(
   slots: MediaInputSlot[],
   filledInputs: Record<string, string[]>,
   section: string,
   t: Translations,
+  options?: { promptOptional?: boolean },
 ): { text: string; kb: InlineKeyboard } {
   const kb = new InlineKeyboard();
 
@@ -70,7 +72,17 @@ export function buildMediaInputStatusMenu(
     }
   }
 
-  const text = allRequiredFilled ? t.mediaInput.readyForPrompt : "";
+  const promptOptional = options?.promptOptional ?? false;
+
+  if (allRequiredFilled && promptOptional) {
+    kb.text(t.mediaInput.startGeneration, `mi_generate:${section}`).row();
+  }
+
+  const text = allRequiredFilled
+    ? promptOptional
+      ? t.mediaInput.readyForPromptOptional
+      : t.mediaInput.readyForPrompt
+    : "";
   return { text, kb };
 }
 

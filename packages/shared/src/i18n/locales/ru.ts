@@ -428,6 +428,9 @@ export default {
     required: "(обязательно)",
     doneUploading: "Готово ✓",
     readyForPrompt: "✅ Готово! Отправьте текстовый промпт для начала генерации.",
+    readyForPromptOptional:
+      "✅ Готово! Отправьте текстовый промпт или нажмите кнопку ниже для генерации без промпта.",
+    startGeneration: "🚀 Начать генерацию",
     cancel: "Отмена",
     uploadCancelled: "Загрузка отменена.",
     refineUseActive: "Использовать изображение в активной модели?\nАктивная модель: {model}",

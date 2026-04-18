@@ -172,16 +172,6 @@ export function modelCostLabel(
       );
       perSecond = m.tokenCostVariants.map[vKey] ?? perSecond;
     }
-    const hasDuration =
-      m.settings.some((s) => s.key === "duration") ||
-      (m.supportedDurations && m.supportedDurations.length > 0);
-    if (hasDuration) {
-      const duration = Number(
-        values["duration"] ?? m.settings.find((s) => s.key === "duration")?.default ?? 5,
-      );
-      const cost = perSecond * duration + resolveAddons(m, values);
-      return `~${cost.toFixed(2)} ✦${t("manage.price.perReq")}`;
-    }
     return `${perSecond.toFixed(2)} ✦${t("manage.price.perSec")}`;
   }
   if (m.tokenCostPerRequest > 0) {

@@ -337,6 +337,8 @@ export interface Translations {
     required: string;
     doneUploading: string;
     readyForPrompt: string;
+    readyForPromptOptional: string;
+    startGeneration: string;
     cancel: string;
     uploadCancelled: string;
     refineUseActive: string;

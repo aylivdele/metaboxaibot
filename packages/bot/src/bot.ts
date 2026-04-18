@@ -50,6 +50,7 @@ import {
   handleVideoMediaInputCancel,
   handleVideoMediaInputDone,
   handleVideoMediaInputRemove,
+  handleVideoGenerateNoPrompt,
 } from "./scenes/video.js";
 import {
   handleRefineEntry,
@@ -174,6 +175,7 @@ export function createBot(token: string): Bot<BotContext> {
   bot.callbackQuery(/^mi_cancel:video$/, handleVideoMediaInputCancel);
   bot.callbackQuery(/^mi_cancel:design$/, handleDesignMediaInputCancel);
   bot.callbackQuery(/^mi_done:/, handleVideoMediaInputDone); // section-agnostic: just clears active slot
+  bot.callbackQuery(/^mi_generate:video$/, handleVideoGenerateNoPrompt);
   bot.callbackQuery(/^mi_remove:video:/, handleVideoMediaInputRemove);
   bot.callbackQuery(/^mi_remove:design:/, handleDesignMediaInputRemove);
 
