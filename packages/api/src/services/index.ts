@@ -58,3 +58,6 @@ export { getRate, calcStars, updateRate, STAR_PRICE_USD } from "./exchange-rate.
 export { userUploadsService } from "./user-uploads.service.js";
 export { userAvatarService } from "./user-avatar.service.js";
 export { translatePromptIfNeeded } from "./prompt-translate.service.js";
+
+// ── Web (ai.metabox.global) ─────────────────────────────────────────────
+export { consumeLinkTelegramState, markLinkTelegramLinked } from "./web-session.service.js";

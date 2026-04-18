@@ -350,6 +350,89 @@ export async function getSubscriptionStatus(telegramId: bigint): Promise<{
   return get(`/internal/subscription-status?telegramId=${telegramId.toString()}`);
 }
 
+// ── Web (ai.metabox.global) методы ──────────────────────────────────────────
+/**
+ * Все endpoints ниже — новые "мосты" на стороне meta-box под
+ * ai.metabox.global. Существующие (register-from-bot, login-and-link,
+ * validate-credentials, record-sale и др.) — не затронуты.
+ */
+
+export interface WebValidateResult {
+  metaboxUserId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  name: string | null;
+  /** true если на стороне meta-box у юзера есть telegramId (может быть привязан через сайт ранее). */
+  hasTelegramOnSite: boolean;
+}
+
+/** Валидация email + пароля для входа на ai.metabox.global. */
+export async function webValidateCredentials(params: {
+  email: string;
+  password: string;
+}): Promise<WebValidateResult> {
+  return post<WebValidateResult>("/web-validate-credentials", params);
+}
+
+export interface WebRegisterResult {
+  metaboxUserId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  referralCode: string;
+}
+
+/** Регистрация нового юзера с ai.metabox.global. Создаёт MetaBox User. */
+export async function webRegister(params: {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName?: string;
+  referralCode?: string;
+}): Promise<WebRegisterResult> {
+  return post<WebRegisterResult>("/web-register", params);
+}
+
+/** Запрос на восстановление пароля — meta-box создаёт PasswordResetToken и шлёт email. */
+export async function webRequestPasswordReset(params: {
+  email: string;
+  resetUrlBase: string; // например, https://stage.ai.metabox.global/reset-password?token=
+}): Promise<{ ok: true }> {
+  return post<{ ok: true }>("/web-password-reset-request", params);
+}
+
+/** Подтверждение сброса пароля по токену. */
+export async function webConfirmPasswordReset(params: {
+  token: string;
+  newPassword: string;
+}): Promise<{ ok: true }> {
+  return post<{ ok: true }>("/web-password-reset-confirm", params);
+}
+
+/** Смена пароля авторизованным юзером (знает старый). */
+export async function webChangePassword(params: {
+  metaboxUserId: string;
+  oldPassword: string;
+  newPassword: string;
+}): Promise<{ ok: true }> {
+  return post<{ ok: true }>("/web-change-password", params);
+}
+
+/** Профиль юзера из meta-box (для /auth/web-me). */
+export async function webGetProfile(params: { metaboxUserId: string }): Promise<{
+  metaboxUserId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  name: string | null;
+  telegramId: string | null;
+  telegramUsername: string | null;
+  referralCode: string | null;
+}> {
+  return post("/web-get-profile", params);
+}
+
 /** Get partner balance and referral count from Metabox. */
 export async function getPartnerBalance(telegramId: bigint): Promise<{
   balance: number;

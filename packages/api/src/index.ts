@@ -3,6 +3,7 @@ import { initSentry } from "./sentry.js";
 initSentry();
 
 import Fastify from "fastify";
+import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
@@ -15,6 +16,9 @@ import { fileURLToPath } from "node:url";
 import { logger } from "./logger.js";
 import { registry } from "./metrics.js";
 import { authRoutes } from "./routes/auth.js";
+import { webAuthRoutes } from "./routes/web-auth.js";
+import { webChatRoutes } from "./routes/web-chat.js";
+import { webBillingRoutes } from "./routes/web-billing.js";
 import { profileRoutes } from "./routes/profile.js";
 import { dialogsRoutes } from "./routes/dialogs.js";
 import { stateRoutes } from "./routes/state.js";
@@ -49,8 +53,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const server = Fastify({ logger: false });
 
+await server.register(cookie, {
+  // Секрет для подписи cookie не используем — refresh-токен сам random opaque,
+  // а подпись JWT отдельная. @fastify/cookie нужен только чтобы читать/ставить cookie.
+});
 await server.register(cors, {
   origin: true, // restrict in prod via env
+  credentials: true, // нужно для httpOnly cookie refresh-токена
 });
 await server.register(helmet);
 
@@ -107,6 +116,9 @@ server.get("/metrics", { schema: { hide: true } }, async (_request, reply) => {
 });
 
 await server.register(authRoutes);
+await server.register(webAuthRoutes);
+await server.register(webChatRoutes);
+await server.register(webBillingRoutes);
 await server.register(profileRoutes);
 await server.register(dialogsRoutes);
 await server.register(stateRoutes);
