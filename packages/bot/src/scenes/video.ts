@@ -39,6 +39,7 @@ import {
   debounceSlotReply,
   buildTgSlotValue,
   TG_DOWNLOAD_LIMIT_BYTES,
+  sendSlotPreview,
 } from "../utils/media-input-state.js";
 import {
   SOUL_MAX_PHOTOS,
@@ -385,6 +386,14 @@ export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
   const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
   if (!slot) return;
 
+  // Filled slot → preview content instead of entering upload mode.
+  const filled = await userStateService.getMediaInputs(ctx.user.id);
+  const existing = filled[slotKey] ?? [];
+  if (existing.length) {
+    await sendSlotPreview(ctx, slot, existing);
+    return;
+  }
+
   // Remove inline keyboard from the old menu message, keep the text for history
   await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
 
@@ -442,22 +451,11 @@ export async function handleVideoMediaInputCancel(ctx: BotContext): Promise<void
   if (!ctx.user) return;
   await ctx.answerCallbackQuery();
   clearActiveSlot(ctx.user.id);
-  // Replace the waiting message text and show current status menu
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.videoModelId ?? "kling";
   const model = AI_MODELS[modelId];
   if (model?.mediaInputs?.length) {
-    const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
-    const { text, kb } = buildMediaInputStatusMenu(
-      model.mediaInputs,
-      filledInputs,
-      "video",
-      ctx.t,
-      {
-        promptOptional: model.promptOptional,
-      },
-    );
-    await ctx.editMessageText(text || ctx.t.mediaInput.uploadCancelled, { reply_markup: kb });
+    await sendVideoMediaInputStatus(ctx, { edit: true });
   } else {
     await ctx.editMessageText(ctx.t.mediaInput.uploadCancelled).catch(() => void 0);
   }

@@ -1,6 +1,7 @@
 import type { Section, MediaInputSlot, Translations } from "@metabox/shared";
 import { config, UserFacingError } from "@metabox/shared";
-import { InlineKeyboard } from "grammy";
+import { InlineKeyboard, InputFile } from "grammy";
+import type { Context } from "grammy";
 import { getFileUrl } from "@metabox/api/services";
 
 /** Telegram Bot API hard limit for downloading files (cloud Bot API). */
@@ -197,4 +198,148 @@ export async function resolveMediaInputUrls(
     resolved[key] = await Promise.all(values.map(resolveSlotValue));
   }
   return resolved;
+}
+
+/** Maps slot.mode to the default Telegram send method for legacy values without explicit kind. */
+function inferKindFromSlotMode(mode: MediaInputSlot["mode"]): TgFileKind {
+  if (mode === "reference_audio" || mode === "driving_audio") return "audio";
+  if (mode === "reference_video" || mode === "motion_video" || mode === "first_clip")
+    return "video";
+  return "photo";
+}
+
+interface ResolvedSlotItem {
+  kind: TgFileKind;
+  source: string | InputFile;
+}
+
+async function resolveSlotItem(v: string, slot: MediaInputSlot): Promise<ResolvedSlotItem | null> {
+  if (v.startsWith("tg:")) {
+    const rest = v.slice(3);
+    const idx = rest.indexOf(":");
+    const parsedKind = (idx === -1 ? rest : rest.slice(0, idx)) as TgFileKind;
+    const fileId = idx === -1 ? "" : rest.slice(idx + 1);
+    if (!fileId) return null;
+    return { kind: parsedKind, source: fileId };
+  }
+  const kind = inferKindFromSlotMode(slot.mode);
+  const url = v.startsWith("http") ? v : ((await getFileUrl(v)) ?? null);
+  if (!url) return null;
+  return { kind, source: new InputFile({ url }) };
+}
+
+/** Telegram media-group bucket: photo+video can mix, audio/document own buckets, voice never groups. */
+type GroupBucket = "photo_video" | "audio" | "document" | "single";
+function bucketFor(kind: TgFileKind): GroupBucket {
+  if (kind === "photo" || kind === "video") return "photo_video";
+  if (kind === "audio") return "audio";
+  if (kind === "doc") return "document";
+  return "single"; // voice
+}
+
+async function sendSingle(ctx: Context, chatId: number, item: ResolvedSlotItem): Promise<void> {
+  const { kind, source } = item;
+  if (kind === "photo") await ctx.api.sendPhoto(chatId, source);
+  else if (kind === "video") await ctx.api.sendVideo(chatId, source);
+  else if (kind === "audio") await ctx.api.sendAudio(chatId, source);
+  else if (kind === "voice") await ctx.api.sendVoice(chatId, source);
+  else await ctx.api.sendDocument(chatId, source);
+}
+
+async function sendBucket(
+  ctx: Context,
+  chatId: number,
+  bucket: GroupBucket,
+  items: ResolvedSlotItem[],
+): Promise<void> {
+  if (items.length === 1 || bucket === "single") {
+    for (const item of items) {
+      try {
+        await sendSingle(ctx, chatId, item);
+      } catch {
+        // skip unresendable item
+      }
+    }
+    return;
+  }
+  // Telegram media groups accept 2-10 items; chunk if needed.
+  for (let i = 0; i < items.length; i += 10) {
+    const chunk = items.slice(i, i + 10);
+    if (chunk.length === 1) {
+      try {
+        await sendSingle(ctx, chatId, chunk[0]);
+      } catch {
+        /* skip */
+      }
+      continue;
+    }
+    try {
+      if (bucket === "photo_video") {
+        await ctx.api.sendMediaGroup(
+          chatId,
+          chunk.map((it) =>
+            it.kind === "video"
+              ? { type: "video", media: it.source }
+              : { type: "photo", media: it.source },
+          ),
+        );
+      } else if (bucket === "audio") {
+        await ctx.api.sendMediaGroup(
+          chatId,
+          chunk.map((it) => ({ type: "audio", media: it.source })),
+        );
+      } else {
+        await ctx.api.sendMediaGroup(
+          chatId,
+          chunk.map((it) => ({ type: "document", media: it.source })),
+        );
+      }
+    } catch {
+      // Fallback: send individually if media group failed (e.g. mixed legacy URLs).
+      for (const item of chunk) {
+        try {
+          await sendSingle(ctx, chatId, item);
+        } catch {
+          /* skip */
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Sends slot contents back to the chat as a preview when the user taps a filled slot.
+ * For `tg:{kind}:{fileId}` values uses file_id directly (no download). For legacy
+ * URL/s3Key values, resolves to a URL and sends by InputFile.
+ * Multiple compatible items (photos/videos, audio, documents) are batched into
+ * a Telegram media group; voice messages are always sent individually.
+ */
+export async function sendSlotPreview(
+  ctx: Context,
+  slot: MediaInputSlot,
+  values: string[],
+): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  // Resolve all items, then group consecutive compatible items into buckets.
+  const resolved: ResolvedSlotItem[] = [];
+  for (const v of values) {
+    const item = await resolveSlotItem(v, slot);
+    if (item) resolved.push(item);
+  }
+  if (!resolved.length) return;
+
+  let currentBucket = bucketFor(resolved[0].kind);
+  let currentChunk: ResolvedSlotItem[] = [];
+  for (const item of resolved) {
+    const b = bucketFor(item.kind);
+    if (b !== currentBucket) {
+      await sendBucket(ctx, chatId, currentBucket, currentChunk);
+      currentChunk = [];
+      currentBucket = b;
+    }
+    currentChunk.push(item);
+  }
+  if (currentChunk.length) await sendBucket(ctx, chatId, currentBucket, currentChunk);
 }

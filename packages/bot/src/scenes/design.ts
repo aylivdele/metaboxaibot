@@ -33,6 +33,7 @@ import {
   debounceSlotReply,
   buildTgSlotValue,
   TG_DOWNLOAD_LIMIT_BYTES,
+  sendSlotPreview,
 } from "../utils/media-input-state.js";
 
 // ── Random design pending messages (Russian) ────────────────────────────────
@@ -318,6 +319,14 @@ export async function handleDesignMediaInput(ctx: BotContext): Promise<void> {
   const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
   if (!slot) return;
 
+  // Filled slot → preview content instead of entering upload mode.
+  const filled = await userStateService.getMediaInputs(ctx.user.id);
+  const existing = filled[slotKey] ?? [];
+  if (existing.length) {
+    await sendSlotPreview(ctx, slot, existing);
+    return;
+  }
+
   // Remove inline keyboard from the old menu message, keep the text for history
   await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
 
@@ -345,19 +354,11 @@ export async function handleDesignMediaInputCancel(ctx: BotContext): Promise<voi
   if (!ctx.user) return;
   await ctx.answerCallbackQuery();
   clearActiveSlot(ctx.user.id);
-  // Replace the waiting message text and show current status menu
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
   const model = AI_MODELS[modelId];
   if (model?.mediaInputs?.length) {
-    const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
-    const { text, kb } = buildMediaInputStatusMenu(
-      model.mediaInputs,
-      filledInputs,
-      "design",
-      ctx.t,
-    );
-    await ctx.editMessageText(text || ctx.t.mediaInput.uploadCancelled, { reply_markup: kb });
+    await sendDesignMediaInputStatus(ctx, { edit: true });
   } else {
     await ctx.editMessageText(ctx.t.mediaInput.uploadCancelled).catch(() => void 0);
   }
