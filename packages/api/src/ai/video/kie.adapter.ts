@@ -134,7 +134,7 @@ export class KieVideoAdapter implements VideoAdapter {
       inputPayload.duration = (ms.duration as number | undefined) ?? input.duration ?? 6;
       inputPayload.resolution = (ms.resolution as string | undefined) ?? "480p";
       inputPayload.mode = (ms.mode as string | undefined) ?? "normal";
-      inputPayload.nsfw_checker = false;
+      inputPayload.nsfw_checker = ms.nsfw_checker !== undefined ? ms.nsfw_checker : false;
 
       if (isI2V) {
         const uploadedUrls = await Promise.all(

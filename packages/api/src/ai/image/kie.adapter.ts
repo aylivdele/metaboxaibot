@@ -24,6 +24,14 @@ interface KieTaskResponse {
   };
 }
 
+const T2I_ENDPOINTS = {
+  "grok-imagine-image": "grok-imagine/text-to-image",
+};
+
+const I2I_ENDPOINTS = {
+  "grok-imagine-image": "grok-imagine/image-to-image",
+};
+
 /**
  * KIE adapter for Grok Imagine image generation.
  *
@@ -61,7 +69,7 @@ export class KieImageAdapter implements ImageAdapter {
 
     const inputPayload: Record<string, unknown> = {
       prompt: input.prompt,
-      nsfw_checker: false,
+      nsfw_checker: ms.nsfw_checker !== undefined ? ms.nsfw_checker : false,
     };
 
     // aspect_ratio
@@ -81,7 +89,7 @@ export class KieImageAdapter implements ImageAdapter {
     }
 
     const body = {
-      model: "grok-imagine/text-to-image",
+      model: isI2I ? I2I_ENDPOINTS[this.modelId] : T2I_ENDPOINTS[this.modelId],
       input: inputPayload,
     };
 
