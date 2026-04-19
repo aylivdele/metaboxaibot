@@ -208,7 +208,13 @@ function computeMediaBaseUsd(model: AIModel, rates: ResolvedRates, opts: MediaOp
   if (model.costMatrix && modelSettings) {
     const key = model.costMatrix.dims.map((dim) => String(modelSettings[dim] ?? "")).join("__");
     const matrixCost = model.costMatrix.table[key];
-    if (matrixCost !== undefined) return matrixCost;
+    if (matrixCost !== undefined) {
+      // When the model also has costUsdPerSecond, the matrix value is a per-second rate.
+      if (model.costUsdPerSecond !== undefined && durationSeconds !== undefined) {
+        return rates.baseRequest + durationSeconds * matrixCost;
+      }
+      return matrixCost;
+    }
   }
 
   // 2. Per-megapixel

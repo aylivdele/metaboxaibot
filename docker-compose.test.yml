@@ -32,7 +32,7 @@ services:
       retries: 5
 
   bot:
-    image: ${GHCR_IMAGE_PREFIX}/metabox-bot:${IMAGE_TAG:-test}
+    image: ${GHCR_IMAGE_PREFIX:-ghcr.io/aylivdele}/metabox-bot:${IMAGE_TAG:-test}
     container_name: metabox_test_bot
     restart: always
     env_file: .env
@@ -49,7 +49,7 @@ services:
         condition: service_healthy
 
   api:
-    image: ${GHCR_IMAGE_PREFIX}/metabox-api:${IMAGE_TAG:-test}
+    image: ${GHCR_IMAGE_PREFIX:-ghcr.io/aylivdele}/metabox-api:${IMAGE_TAG:-test}
     container_name: metabox_test_api
     restart: always
     env_file: .env
@@ -69,7 +69,7 @@ services:
         condition: service_healthy
 
   worker:
-    image: ${GHCR_IMAGE_PREFIX}/metabox-worker:${IMAGE_TAG:-test}
+    image: ${GHCR_IMAGE_PREFIX:-ghcr.io/aylivdele}/metabox-worker:${IMAGE_TAG:-test}
     container_name: metabox_test_worker
     restart: always
     env_file: .env

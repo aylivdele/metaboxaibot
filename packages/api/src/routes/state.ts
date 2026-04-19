@@ -100,6 +100,12 @@ function buildActivationCostLine(
     const min = Math.min(...costs);
     const max = Math.max(...costs);
     if (min < max) {
+      // When matrix values are per-second rates (model also has costUsdPerSecond)
+      if (isPerSecond) {
+        return t.common.costRangePerSecond
+          .replace("{min}", min.toFixed(2))
+          .replace("{max}", max.toFixed(2));
+      }
       return t.common.costRangePerRequest
         .replace("{min}", min.toFixed(2))
         .replace("{max}", max.toFixed(2));

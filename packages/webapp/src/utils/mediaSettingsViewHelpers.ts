@@ -164,7 +164,10 @@ export function modelCostLabel(
   }
   if (m.tokenCostPerSecond > 0) {
     let perSecond = m.tokenCostPerSecond;
-    if (m.tokenCostVariants) {
+    if (m.costMatrix) {
+      const key = m.costMatrix.dims.map((dim) => String(values[dim] ?? "")).join("__");
+      perSecond = m.costMatrix.table[key] ?? perSecond;
+    } else if (m.tokenCostVariants) {
       const vKey = String(
         values[m.tokenCostVariants.settingKey] ??
           m.settings.find((s) => s.key === m.tokenCostVariants!.settingKey)?.default ??

@@ -295,14 +295,23 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     description:
       "Новейшая видеомодель ByteDance — значительно выше качество и реалистичность движений по сравнению с 1.5. Встроенный звук, до 15 секунд, широкий выбор соотношений сторон.",
     section: "video",
-    provider: "fal",
+    provider: "kie",
     familyId: "seedance",
     variantLabel: "2.0 Standard",
-    // Per-video-token billing: $14/M tokens.
-    // tokens = (w × h × 24 × duration) / 1024; 720p 5s ≈ $0.30
+    // Per-second billing, varies by resolution × generate_audio
     costUsdPerRequest: 0,
-    costUsdPerMVideoToken: 14.0,
-    videoFps: 24,
+    costUsdPerSecond: 0.125,
+    costMatrix: {
+      dims: ["resolution", "generate_audio"],
+      table: {
+        "480p__true": 0.0575,
+        "480p__false": 0.095,
+        "720p__true": 0.125,
+        "720p__false": 0.205,
+        "1080p__true": 0.31,
+        "1080p__false": 0.51,
+      },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -320,11 +329,13 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       {
         key: "resolution",
         label: "Разрешение видео",
-        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
+        description:
+          "480p — быстрее генерируется, 720p — более чёткое видео, 1080p — максимальная детализация. Влияет на цену.",
         type: "select",
         options: [
           { value: "480p", label: "480p" },
           { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
         ],
         default: "720p",
       },
@@ -332,7 +343,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         key: "generate_audio",
         label: "Генерировать аудио",
         description:
-          "Включить автоматическую генерацию звукового сопровождения к видео. Стоимость одинакова с аудио и без.",
+          "Включить автоматическую генерацию звукового сопровождения к видео. Влияет на цену.",
         type: "toggle",
         default: true,
       },
@@ -343,16 +354,23 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "seedance-2-fast",
     name: "💃 Seedance 2.0 Fast (ByteDance)",
     description:
-      "Ускоренная версия Seedance 2.0 — быстрее и ~20% дешевле стандарта при схожем качестве. Встроенная генерация звука, до 15 секунд.",
+      "Ускоренная версия Seedance 2.0 — быстрее и дешевле стандарта при схожем качестве. Встроенная генерация звука, до 15 секунд.",
     section: "video",
-    provider: "fal",
+    provider: "kie",
     familyId: "seedance",
     variantLabel: "2.0 Fast",
-    // Per-video-token billing: $11.2/M tokens (fast).
-    // tokens = (w × h × 24 × duration) / 1024; 720p 5s ≈ $0.24
+    // Per-second billing, varies by resolution × generate_audio
     costUsdPerRequest: 0,
-    costUsdPerMVideoToken: 11.2,
-    videoFps: 24,
+    costUsdPerSecond: 0.1,
+    costMatrix: {
+      dims: ["resolution", "generate_audio"],
+      table: {
+        "480p__true": 0.045,
+        "480p__false": 0.0775,
+        "720p__true": 0.1,
+        "720p__false": 0.165,
+      },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -370,7 +388,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       {
         key: "resolution",
         label: "Разрешение видео",
-        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
+        description: "480p — быстрее генерируется, 720p — более чёткое видео. Влияет на цену.",
         type: "select",
         options: [
           { value: "480p", label: "480p" },
@@ -382,7 +400,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         key: "generate_audio",
         label: "Генерировать аудио",
         description:
-          "Включить автоматическую генерацию звукового сопровождения к видео. Стоимость одинакова с аудио и без.",
+          "Включить автоматическую генерацию звукового сопровождения к видео. Влияет на цену.",
         type: "toggle",
         default: true,
       },
