@@ -145,6 +145,7 @@ export interface Translations {
     soulReady: string;
     soulFailed: string;
     soulCancelled: string;
+    soulCancelButton: string;
     soulMinPhotos: string;
     imageIgnoredUnsupported: string;
     hintVideoDefault: string;
@@ -181,6 +182,7 @@ export interface Translations {
     generationStillRunning: string;
     generationTimedOut24h: string;
     modelTemporarilyUnavailable: string;
+    soulProviderUnavailable: string;
     // HeyGen
     heygenBlockedWords: string;
     heygenNsfw: string;

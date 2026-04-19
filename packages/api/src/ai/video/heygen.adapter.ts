@@ -9,7 +9,7 @@ import { config } from "@metabox/shared";
 import { getFileUrl } from "../../services/s3.service.js";
 import { logger } from "../../logger.js";
 import { fetchWithLog } from "../../utils/fetch.js";
-import { transcodeOggToMp3 } from "../../utils/audio-transcode.js";
+import { transcodeToMp3 } from "../../utils/audio-transcode.js";
 import { parseHeyGenErrorBody, parseHeyGenPollFailure } from "../../utils/heygen-error.js";
 import { resolveImageMimeType, resolveAudioMimeType } from "../../utils/mime-detect.js";
 
@@ -80,12 +80,15 @@ export class HeyGenAdapter implements VideoAdapter {
     // Detect actual audio type from magic bytes — HTTP Content-Type may be unreliable.
     let contentType = resolveAudioMimeType(audioBuffer, audioRes.headers.get("content-type"));
 
-    // HeyGen does not support OGG/Opus — transcode to MP3 first
-    if (contentType.includes("ogg") || contentType.includes("opus")) {
-      audioBuffer = await transcodeOggToMp3(audioBuffer);
+    // HeyGen accepts only MP3 and WAV. Transcode anything else (OGG, M4A, AAC, FLAC, ...).
+    const isHeyGenSupported =
+      contentType === "audio/mpeg" || contentType === "audio/mp3" || contentType === "audio/wav";
+    if (!isHeyGenSupported) {
+      logger.info({ from: contentType }, "HeyGen: transcoding audio to MP3");
+      audioBuffer = await transcodeToMp3(audioBuffer);
       contentType = "audio/mpeg";
       if (!audioBuffer.byteLength) {
-        throw new Error("HeyGen: audio buffer empty after OGG→MP3 transcode");
+        throw new Error("HeyGen: audio buffer empty after transcode to MP3");
       }
     }
 

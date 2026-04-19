@@ -1,4 +1,4 @@
-import { config } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { logger } from "../../logger.js";
 
@@ -66,6 +66,11 @@ export class HiggsFieldSoulAdapter {
 
     if (!res.ok) {
       const text = await res.text();
+      if (res.status === 402 || res.status === 403 || /not enough credits/i.test(text)) {
+        throw new UserFacingError(`Higgsfield Soul out of credits: ${res.status} ${text}`, {
+          key: "soulProviderUnavailable",
+        });
+      }
       throw new Error(`Higgsfield Soul create failed: ${res.status} ${text}`);
     }
 

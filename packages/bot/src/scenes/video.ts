@@ -1334,7 +1334,7 @@ export async function handleSoulPhotoCapture(ctx: BotContext): Promise<void> {
     if (n >= SOUL_MIN_PHOTOS) {
       kb.text(ctx.t.video.soulCreateButton.replace("{n}", String(n)), "soul_create_submit").row();
     }
-    kb.text("❌ " + ctx.t.video.soulCancelled.replace("❌ ", ""), "soul_create_cancel");
+    kb.text(ctx.t.video.soulCancelButton, "soul_create_cancel");
 
     await ctx.reply(text, { reply_markup: kb });
   });

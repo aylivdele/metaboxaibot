@@ -173,6 +173,7 @@ export default {
       "✅ Your character is ready! Select it in Higgsfield settings under ⚙ Management to use in generation.",
     soulFailed: "❌ Failed to create character. Please try again.",
     soulCancelled: "❌ Character creation cancelled.",
+    soulCancelButton: "❌ Cancel creation",
     soulMinPhotos: "⚠️ At least {min} photos are required to create a character. Uploaded: {n}.",
     imageIgnoredUnsupported:
       "⚠️ This model does not support image input — your photo will be ignored.",
@@ -237,6 +238,7 @@ export default {
       "❌ {modelName}: generation did not finish within 24 hours and was cancelled. Please try again.",
     modelTemporarilyUnavailable:
       "❌ {modelName} is temporarily unavailable due to provider limits. Please try later or choose another model.",
+    soulProviderUnavailable: "❌ Character creation is temporarily unavailable. Please try later.",
     // HeyGen
     heygenBlockedWords:
       "❌ Your request contains prohibited words or content. Please edit your text and try again.",

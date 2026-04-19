@@ -16,6 +16,7 @@ import {
   isRateLimitDeferredError,
   isRateLimitLongWindowError,
 } from "../utils/submit-with-throttle.js";
+import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
 
 const telegram = new Api(config.bot.token);
 
@@ -87,7 +88,10 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
           .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
           .then((u) => u?.language ?? "en")) as Language;
         const t = getT(userLang);
-        await telegram.sendMessage(telegramChatId, t.video.soulFailed).catch(() => void 0);
+        const userMsg = resolveUserFacingMessage(err, t);
+        await telegram
+          .sendMessage(telegramChatId, userMsg ?? t.video.soulFailed)
+          .catch(() => void 0);
       }
       return;
     }
