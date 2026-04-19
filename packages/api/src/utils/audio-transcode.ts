@@ -47,7 +47,11 @@ export async function transcodeOggToMp3(input: Buffer): Promise<Buffer> {
       })
       .on("error", (err: Error) => {
         logger.error(
-          { err: err.message, stderr: stderrLines.slice(-20).join("\n"), inputBytes: input.byteLength },
+          {
+            err: err.message,
+            stderr: stderrLines.slice(-20).join("\n"),
+            inputBytes: input.byteLength,
+          },
           "ffmpeg transcode failed",
         );
         fail(err);

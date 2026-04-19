@@ -17,9 +17,11 @@ async function tgGetFilePath(fileId: string): Promise<string> {
   const res = await fetch(
     `https://api.telegram.org/bot${config.bot.token}/getFile?file_id=${encodeURIComponent(fileId)}`,
   );
-  const data = (await res.json().catch(() => null)) as
-    | { ok: boolean; result?: { file_path?: string }; description?: string }
-    | null;
+  const data = (await res.json().catch(() => null)) as {
+    ok: boolean;
+    result?: { file_path?: string };
+    description?: string;
+  } | null;
   if (!res.ok || !data?.ok || !data.result?.file_path) {
     throw new Error(`Telegram getFile failed: ${data?.description ?? `HTTP ${res.status}`}`);
   }
