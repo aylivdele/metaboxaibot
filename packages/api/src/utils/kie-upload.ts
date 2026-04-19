@@ -1,6 +1,6 @@
 import { fetchWithLog } from "./fetch.js";
 
-const KIE_BASE = "https://api.kie.ai";
+const KIE_FILE_BASE = "https://kieai.redpandaai.co";
 
 interface KieFileUploadResponse {
   success: boolean;
@@ -25,7 +25,7 @@ interface KieFileUploadResponse {
  * generation endpoints (which cannot reach private/expiring URLs).
  */
 export async function uploadFileUrl(apiKey: string, fileUrl: string): Promise<string> {
-  const resp = await fetchWithLog(`${KIE_BASE}/api/file-url-upload`, {
+  const resp = await fetchWithLog(`${KIE_FILE_BASE}/api/file-url-upload`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
