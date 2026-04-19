@@ -316,19 +316,30 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
       await telegram.sendMediaGroup(telegramChatId, mediaGroup);
 
-      // Send per-output refine + download buttons (media groups don't support inline keyboards)
-      for (const rec of outputRecords) {
-        const rows: InlineKeyboardButton[][] = [];
-        rows.push([{ text: t.design.refine, callback_data: `design_ref_${rec.id}` }]);
-        if (rec.s3Key && config.api.publicUrl) {
-          rows.push([
-            {
-              text: t.common.downloadFile,
+      // Send a single message with refine + download buttons for all outputs.
+      // Up to 3 pairs per row: "{N}. 🔄" "{N}. ⬇️"
+      {
+        const buttons: InlineKeyboardButton[] = [];
+        for (let i = 0; i < outputRecords.length; i++) {
+          const rec = outputRecords[i];
+          const n = i + 1;
+          buttons.push({ text: `${n}. 🔄`, callback_data: `design_ref_${rec.id}` });
+          if (rec.s3Key && config.api.publicUrl) {
+            buttons.push({
+              text: `${n}. ⬇️`,
               url: `${config.api.publicUrl}/download/${generateDownloadToken(rec.s3Key, userIdStr)}`,
-            },
-          ]);
+            });
+          }
         }
-        await telegram.sendMessage(telegramChatId, "⬆️", {
+        // Layout: <3 pairs → 1 per row, even → 2 per row, odd → 3 per row
+        const rows: InlineKeyboardButton[][] = [];
+        const totalPairs = outputRecords.length;
+        const pairsPerRow = totalPairs <= 3 ? 1 : totalPairs % 2 === 0 ? 2 : 3;
+        const chunkSize = 2 * pairsPerRow;
+        for (let i = 0; i < buttons.length; i += chunkSize) {
+          rows.push(buttons.slice(i, i + chunkSize));
+        }
+        await telegram.sendMessage(telegramChatId, t.design.batchActions, {
           reply_markup: { inline_keyboard: rows },
         });
       }

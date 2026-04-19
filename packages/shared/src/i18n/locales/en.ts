@@ -85,6 +85,8 @@ export default {
     withReference: "(with reference)",
     refSelected: "✅ Selected as reference",
     refine: "🔄 Refine",
+    batchActions:
+      "You can refine an image or download the original uncompressed file (we recommend opening the link in a browser if you're using the mobile version of Telegram).\n\n🔄 - Refine\n⬇️ - Download",
     chooseModel: "🎨 Choose model",
   },
   audio: {
