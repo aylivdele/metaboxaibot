@@ -105,6 +105,35 @@ export function buildMediaInputStatusMenu(
 }
 
 /**
+ * Debounce reply when receiving a media group into a slot.
+ * Each photo in the group saves immediately, but the status reply is delayed.
+ * Only the last callback (after no more photos arrive within 500ms) fires.
+ * For non-group messages, the callback executes immediately.
+ */
+const slotReplyTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+export function debounceSlotReply(
+  userId: bigint,
+  mediaGroupId: string | undefined,
+  callback: () => Promise<void>,
+): void {
+  if (!mediaGroupId) {
+    void callback();
+    return;
+  }
+  const key = `${userId}__${mediaGroupId}`;
+  const existing = slotReplyTimers.get(key);
+  if (existing) clearTimeout(existing);
+  slotReplyTimers.set(
+    key,
+    setTimeout(() => {
+      slotReplyTimers.delete(key);
+      void callback();
+    }, 500),
+  );
+}
+
+/**
  * Resolves media input values: s3Keys (no `http` prefix) are converted to
  * presigned URLs via `getFileUrl`; existing URLs are passed through unchanged.
  * Called right before generation so presigned URLs are fresh.

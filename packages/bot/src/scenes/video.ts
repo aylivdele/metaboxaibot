@@ -36,6 +36,7 @@ import {
   clearActiveSlot,
   buildMediaInputStatusMenu,
   resolveMediaInputUrls,
+  debounceSlotReply,
 } from "../utils/media-input-state.js";
 import {
   SOUL_MAX_PHOTOS,
@@ -780,38 +781,37 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       // Replace if max reached (single-image slot)
       await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
     }
-    await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, tgUrl);
-    const updatedCount = Math.min(existing.length + 1, activeSlot.maxImages);
+    const userId = ctx.user.id;
+    await userStateService.addMediaInput(userId, activeSlot.slotKey, tgUrl);
 
     const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
     const label = slot
       ? (ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey)
       : activeSlot.slotKey;
 
-    if (activeSlot.maxImages === 1) {
-      clearActiveSlot(ctx.user.id);
-      await sendVideoMediaInputStatus(ctx);
-    } else {
-      const msg = ctx.t.mediaInput.imageSaved
-        .replace("{slot}", String(label))
-        .replace("{n}", String(updatedCount))
-        .replace("{max}", String(activeSlot.maxImages));
-      if (updatedCount >= activeSlot.maxImages) {
-        clearActiveSlot(ctx.user.id);
+    debounceSlotReply(userId, mediaGroupId, async () => {
+      const freshInputs = await userStateService.getMediaInputs(userId);
+      const freshCount = freshInputs[activeSlot.slotKey]?.length ?? 0;
+
+      if (activeSlot.maxImages === 1 || freshCount >= activeSlot.maxImages) {
+        clearActiveSlot(userId);
         await sendVideoMediaInputStatus(ctx);
       } else {
+        const msg = ctx.t.mediaInput.imageSaved
+          .replace("{slot}", String(label))
+          .replace("{n}", String(freshCount))
+          .replace("{max}", String(activeSlot.maxImages));
         const kb = new InlineKeyboard().text(
           ctx.t.mediaInput.doneUploading,
           `mi_done:${activeSlot.slotKey}`,
         );
         await ctx.reply(msg, { reply_markup: kb });
       }
-    }
 
-    // If caption is also provided, use it as prompt and generate immediately
-    if (caption) {
-      await executeVideoPrompt(ctx, caption);
-    }
+      if (caption) {
+        await executeVideoPrompt(ctx, caption);
+      }
+    });
     return;
   }
 

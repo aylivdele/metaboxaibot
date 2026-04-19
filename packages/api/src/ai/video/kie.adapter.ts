@@ -1,5 +1,5 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
-import { config } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { uploadFileUrl } from "../../utils/kie-upload.js";
 
@@ -180,6 +180,13 @@ export class KieVideoAdapter implements VideoAdapter {
     const task = data.data;
 
     if (task.state === "fail") {
+      const failMsg = task.failMsg ?? "unknown error";
+      const isSensitive = /sensitive/i.test(failMsg);
+      if (isSensitive)
+        throw new UserFacingError(
+          `KIE ${this.modelId} generation failed: ${task.failCode ?? ""} ${failMsg}`,
+          { key: "contentPolicyViolation" },
+        );
       throw new Error(
         `KIE ${this.modelId} generation failed: ${task.failCode ?? ""} ${task.failMsg ?? "unknown error"}`,
       );
