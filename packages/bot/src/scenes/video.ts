@@ -37,6 +37,8 @@ import {
   buildMediaInputStatusMenu,
   resolveMediaInputUrls,
   debounceSlotReply,
+  buildTgSlotValue,
+  TG_DOWNLOAD_LIMIT_BYTES,
 } from "../utils/media-input-state.js";
 import {
   SOUL_MAX_PHOTOS,
@@ -765,12 +767,34 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.videoModelId ?? "kling";
-  const fileId = isPhoto ? ctx.message!.photo!.at(-1)!.file_id : ctx.message!.document!.file_id;
-  const file = await ctx.api.getFile(fileId);
-  const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+
+  // Resolve file_id + size from message — without calling getFile.
+  // file_id is durable (no TTL) and stored in slots as `tg:{kind}:{id}`.
+  const photoSize = isPhoto ? ctx.message!.photo!.at(-1)! : null;
+  const docFile = isImageDoc ? ctx.message!.document! : null;
+  const fileId = (photoSize?.file_id ?? docFile!.file_id) as string;
+  const fileSize = photoSize?.file_size ?? docFile?.file_size ?? 0;
+  const tgKind: "photo" | "doc" = photoSize ? "photo" : "doc";
+
+  // Bot API can't download files >20 MB at all → reject early.
+  if (fileSize > TG_DOWNLOAD_LIMIT_BYTES) {
+    await ctx.reply(ctx.t.errors.fileTooLargeForBotApi);
+    return;
+  }
 
   const model = AI_MODELS[modelId];
   const caption = ctx.message.caption?.trim();
+  const tgSlotValue = buildTgSlotValue(tgKind, fileId);
+
+  // Lazily resolve the live download URL only for paths that need bytes now
+  // (caption+photo, HeyGen avatar legacy, no-caption-no-slot legacy below).
+  let cachedTgUrl: string | null = null;
+  const getLiveTgUrl = async (): Promise<string> => {
+    if (cachedTgUrl) return cachedTgUrl;
+    const file = await ctx.api.getFile(fileId);
+    cachedTgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+    return cachedTgUrl;
+  };
 
   // ── Slot-based upload (new path) ──────────────────────────────────────────
   const activeSlot = getActiveSlot(ctx.user.id);
@@ -782,7 +806,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
     }
     const userId = ctx.user.id;
-    await userStateService.addMediaInput(userId, activeSlot.slotKey, tgUrl);
+    await userStateService.addMediaInput(userId, activeSlot.slotKey, tgSlotValue);
 
     const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
     const label = slot
@@ -824,10 +848,13 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     if (current[targetSlot.slotKey]?.length) {
       await userStateService.clearMediaInputSlot(ctx.user.id, targetSlot.slotKey);
     }
-    await userStateService.addMediaInput(ctx.user.id, targetSlot.slotKey, tgUrl);
+    await userStateService.addMediaInput(ctx.user.id, targetSlot.slotKey, tgSlotValue);
     await sendVideoMediaInputStatus(ctx);
     return;
   }
+
+  // Below paths (caption+photo, HeyGen, no-caption legacy) need the live URL.
+  const tgUrl = await getLiveTgUrl();
 
   // ── Photo with caption → generate immediately ─────────────────────────────
   if (caption) {
@@ -911,8 +938,14 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
   const modelId = state?.videoModelId;
   if (!modelId) return;
   const model = AI_MODELS[modelId];
-  const file = await ctx.api.getFile(ctx.message.video.file_id);
-  const fileUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+
+  const videoMsg = ctx.message.video;
+  const fileSize = videoMsg.file_size ?? 0;
+  if (fileSize > TG_DOWNLOAD_LIMIT_BYTES) {
+    await ctx.reply(ctx.t.errors.fileTooLargeForBotApi);
+    return;
+  }
+  const tgSlotValue = buildTgSlotValue("video", videoMsg.file_id);
 
   // Active reference_element slot: videos are exclusive (replace any images).
   const activeSlot = getActiveSlot(ctx.user.id);
@@ -920,14 +953,14 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
     const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
     if (slot?.mode === "reference_element") {
       await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
-      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, fileUrl);
+      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, tgSlotValue);
       clearActiveSlot(ctx.user.id);
       await sendVideoMediaInputStatus(ctx);
       return;
     }
     if (slot?.mode === "first_clip" || slot?.mode === "motion_video") {
       await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
-      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, fileUrl);
+      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, tgSlotValue);
       clearActiveSlot(ctx.user.id);
       await sendVideoMediaInputStatus(ctx);
       return;
@@ -938,7 +971,7 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
       if (existing.length >= activeSlot.maxImages) {
         await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
       }
-      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, fileUrl);
+      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, tgSlotValue);
       const updatedCount = Math.min(existing.length + 1, activeSlot.maxImages);
       if (updatedCount >= activeSlot.maxImages) {
         clearActiveSlot(ctx.user.id);
@@ -961,6 +994,8 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
   }
 
   if (!model?.supportsVideo) return;
+  const file = await ctx.api.getFile(videoMsg.file_id);
+  const fileUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
   await userStateService.setVideoRefDriverUrl(ctx.user.id, fileUrl);
   await ctx.reply(ctx.t.video.videoDriverSaved);
 }
@@ -1084,24 +1119,27 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
   const activeSlot = getActiveSlot(userId);
   if (activeSlot && activeSlot.section === "video") {
     const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
-    if (slot?.mode === "driving_audio") {
-      const file = await ctx.api.getFile(audioMsg.file_id);
-      const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
-      await userStateService.clearMediaInputSlot(userId, activeSlot.slotKey);
-      await userStateService.addMediaInput(userId, activeSlot.slotKey, tgUrl);
-      clearActiveSlot(userId);
-      await sendVideoMediaInputStatus(ctx);
-      return;
-    }
-    if (slot?.mode === "reference_audio") {
-      const file = await ctx.api.getFile(audioMsg.file_id);
-      const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+    if (slot?.mode === "driving_audio" || slot?.mode === "reference_audio") {
+      const audioSize = audioMsg.file_size ?? 0;
+      if (audioSize > TG_DOWNLOAD_LIMIT_BYTES) {
+        await ctx.reply(ctx.t.errors.fileTooLargeForBotApi);
+        return;
+      }
+      const tgKind = ctx.message?.voice ? "voice" : "audio";
+      const tgSlotValue = buildTgSlotValue(tgKind, audioMsg.file_id);
+      if (slot.mode === "driving_audio") {
+        await userStateService.clearMediaInputSlot(userId, activeSlot.slotKey);
+        await userStateService.addMediaInput(userId, activeSlot.slotKey, tgSlotValue);
+        clearActiveSlot(userId);
+        await sendVideoMediaInputStatus(ctx);
+        return;
+      }
       const current = await userStateService.getMediaInputs(userId);
       const existing = current[activeSlot.slotKey] ?? [];
       if (existing.length >= activeSlot.maxImages) {
         await userStateService.clearMediaInputSlot(userId, activeSlot.slotKey);
       }
-      await userStateService.addMediaInput(userId, activeSlot.slotKey, tgUrl);
+      await userStateService.addMediaInput(userId, activeSlot.slotKey, tgSlotValue);
       const updatedCount = Math.min(existing.length + 1, activeSlot.maxImages);
       if (updatedCount >= activeSlot.maxImages) {
         clearActiveSlot(userId);

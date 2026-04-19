@@ -208,6 +208,10 @@ export default {
     userBlocked: "❌ Your account has been blocked. Contact support.",
     fileTooLargeForTelegram:
       "The file is too large to send via Telegram. If you are on mobile, we recommend opening the download link in a browser.",
+    fileTooLargeForBotApi:
+      "❌ File is too large. The maximum upload size via the bot is 20 MB. Please compress the file and try again.",
+    mediaSlotExpired:
+      "❌ The uploaded file is no longer available. Please upload it again and try once more.",
     contentPolicyViolation:
       "❌ Your request was rejected due to a content policy violation. Please modify your prompt and try again.",
     recraftImg2imgSvgUnsupported:

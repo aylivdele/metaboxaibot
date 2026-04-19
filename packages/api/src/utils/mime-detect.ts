@@ -56,6 +56,11 @@ export function detectAudioMimeType(buf: ArrayBuffer | Buffer): string | null {
   if (b[0] === 0x66 && b[1] === 0x4c && b[2] === 0x61 && b[3] === 0x43) return "audio/flac";
   // AAC ADTS
   if (b[0] === 0xff && (b[1] & 0xf0) === 0xf0) return "audio/aac";
+  // ISO BMFF (MP4/M4A): "....ftyp" at bytes 0-7 (size + 'ftyp')
+  if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
+    // brand at bytes 8-11: M4A , mp42, isom, etc → all audio-capable mp4
+    return "audio/mp4";
+  }
   return null;
 }
 

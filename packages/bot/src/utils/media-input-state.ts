@@ -1,6 +1,30 @@
 import type { Section, MediaInputSlot, Translations } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { getFileUrl } from "@metabox/api/services";
+
+/** Telegram Bot API hard limit for downloading files (cloud Bot API). */
+export const TG_DOWNLOAD_LIMIT_BYTES = 20 * 1024 * 1024;
+
+export type TgFileKind = "photo" | "doc" | "video" | "audio" | "voice";
+
+/** Slot value format for Telegram-uploaded media: resolved lazily at submit. */
+export function buildTgSlotValue(kind: TgFileKind, fileId: string): string {
+  return `tg:${kind}:${fileId}`;
+}
+
+async function tgGetFilePath(fileId: string): Promise<string> {
+  const res = await fetch(
+    `https://api.telegram.org/bot${config.bot.token}/getFile?file_id=${encodeURIComponent(fileId)}`,
+  );
+  const data = (await res.json().catch(() => null)) as
+    | { ok: boolean; result?: { file_path?: string }; description?: string }
+    | null;
+  if (!res.ok || !data?.ok || !data.result?.file_path) {
+    throw new Error(`Telegram getFile failed: ${data?.description ?? `HTTP ${res.status}`}`);
+  }
+  return data.result.file_path;
+}
 
 export interface ActiveUploadSlot {
   slotKey: string;
@@ -134,22 +158,41 @@ export function debounceSlotReply(
 }
 
 /**
- * Resolves media input values: s3Keys (no `http` prefix) are converted to
- * presigned URLs via `getFileUrl`; existing URLs are passed through unchanged.
- * Called right before generation so presigned URLs are fresh.
+ * Resolves a single slot value to a fresh URL.
+ *  - `tg:{kind}:{fileId}` → call Telegram getFile, build a fresh download URL
+ *  - `http*`              → pass through
+ *  - anything else        → treated as an S3 key, resolved via `getFileUrl`
+ *
+ * Throws `UserFacingError("mediaSlotExpired")` if a Telegram file_id can no
+ * longer be downloaded (e.g. bot token rotated). This surfaces as a clear
+ * message to the user instead of an opaque generation failure.
+ */
+async function resolveSlotValue(v: string): Promise<string> {
+  if (v.startsWith("tg:")) {
+    const idx = v.indexOf(":", 3);
+    const fileId = idx === -1 ? v.slice(3) : v.slice(idx + 1);
+    try {
+      const filePath = await tgGetFilePath(fileId);
+      return `https://api.telegram.org/file/bot${config.bot.token}/${filePath}`;
+    } catch {
+      throw new UserFacingError("Media slot expired", { key: "mediaSlotExpired" });
+    }
+  }
+  if (v.startsWith("http")) return v;
+  const url = await getFileUrl(v);
+  return url ?? v;
+}
+
+/**
+ * Resolves media input values right before generation so URLs are fresh.
+ * See `resolveSlotValue` for per-value semantics.
  */
 export async function resolveMediaInputUrls(
   inputs: Record<string, string[]>,
 ): Promise<Record<string, string[]>> {
   const resolved: Record<string, string[]> = {};
   for (const [key, values] of Object.entries(inputs)) {
-    resolved[key] = await Promise.all(
-      values.map(async (v) => {
-        if (v.startsWith("http")) return v;
-        const url = await getFileUrl(v);
-        return url ?? v; // fallback to raw value if resolution fails
-      }),
-    );
+    resolved[key] = await Promise.all(values.map(resolveSlotValue));
   }
   return resolved;
 }

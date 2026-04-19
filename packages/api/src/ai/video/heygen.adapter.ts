@@ -70,6 +70,13 @@ export class HeyGenAdapter implements VideoAdapter {
     if (!audioRes.ok)
       throw new Error(`Failed to fetch audio for HeyGen upload: ${audioRes.status}`);
     let audioBuffer = Buffer.from(await audioRes.arrayBuffer()) as Buffer;
+    if (!audioBuffer.byteLength) {
+      logger.error(
+        { audioUrl, status: audioRes.status, headers: Object.fromEntries(audioRes.headers) },
+        "HeyGen: fetched audio body is empty",
+      );
+      throw new Error("HeyGen: fetched audio body is empty");
+    }
     // Detect actual audio type from magic bytes — HTTP Content-Type may be unreliable.
     let contentType = resolveAudioMimeType(audioBuffer, audioRes.headers.get("content-type"));
 
@@ -77,10 +84,9 @@ export class HeyGenAdapter implements VideoAdapter {
     if (contentType.includes("ogg") || contentType.includes("opus")) {
       audioBuffer = await transcodeOggToMp3(audioBuffer);
       contentType = "audio/mpeg";
-    }
-
-    if (!audioBuffer.byteLength) {
-      throw new Error("HeyGen: audio buffer is empty after fetch/transcode");
+      if (!audioBuffer.byteLength) {
+        throw new Error("HeyGen: audio buffer empty after OGG→MP3 transcode");
+      }
     }
 
     const ext = contentType.includes("wav") ? "wav" : contentType.includes("ogg") ? "ogg" : "mp3";

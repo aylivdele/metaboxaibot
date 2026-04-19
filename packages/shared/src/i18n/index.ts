@@ -165,6 +165,8 @@ export interface Translations {
     userBlocked: string;
     sendOriginalFailed: string;
     fileTooLargeForTelegram: string;
+    fileTooLargeForBotApi: string;
+    mediaSlotExpired: string;
     contentPolicyViolation: string;
     recraftImg2imgSvgUnsupported: string;
     recraftImg2imgFileTooLarge: string;

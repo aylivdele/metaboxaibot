@@ -124,6 +124,9 @@ export async function uploadFromUrl(
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Failed to fetch file for S3 upload: ${response.status}`);
     const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.byteLength) {
+      throw new Error(`Fetched body is empty for S3 upload: ${url}`);
+    }
     await client.send(
       new PutObjectCommand({
         Bucket: config.s3.bucket!,

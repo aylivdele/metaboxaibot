@@ -31,6 +31,8 @@ import {
   buildMediaInputStatusMenu,
   resolveMediaInputUrls,
   debounceSlotReply,
+  buildTgSlotValue,
+  TG_DOWNLOAD_LIMIT_BYTES,
 } from "../utils/media-input-state.js";
 
 // ── Random design pending messages (Russian) ────────────────────────────────
@@ -550,12 +552,32 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   const modelId = state?.designModelId ?? "dall-e-3";
   const model = AI_MODELS[modelId];
 
-  // Resolve file_id: highest-res photo or image document
-  const fileId = isPhoto ? ctx.message!.photo!.at(-1)!.file_id : ctx.message!.document!.file_id;
-  const file = await ctx.api.getFile(fileId);
-  const fileUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+  // Resolve file_id + size from message — without calling getFile.
+  // file_id is durable (no TTL) and stored in slots as `tg:{kind}:{id}`.
+  const photoSize = isPhoto ? ctx.message!.photo!.at(-1)! : null;
+  const docFile = isImageDoc ? ctx.message!.document! : null;
+  const fileId = (photoSize?.file_id ?? docFile!.file_id) as string;
+  const fileSize = photoSize?.file_size ?? docFile?.file_size ?? 0;
+  const tgKind: "photo" | "doc" = photoSize ? "photo" : "doc";
+
+  // Bot API can't download files >20 MB at all → reject early.
+  if (fileSize > TG_DOWNLOAD_LIMIT_BYTES) {
+    await ctx.reply(ctx.t.errors.fileTooLargeForBotApi);
+    return;
+  }
 
   const caption = ctx.message.caption?.trim();
+  const tgSlotValue = buildTgSlotValue(tgKind, fileId);
+
+  // Lazily resolve the live download URL only when a path actually needs the
+  // bytes during this request (caption+photo legacy flow below).
+  let cachedTgUrl: string | null = null;
+  const getLiveTgUrl = async (): Promise<string> => {
+    if (cachedTgUrl) return cachedTgUrl;
+    const file = await ctx.api.getFile(fileId);
+    cachedTgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+    return cachedTgUrl;
+  };
 
   // ── Slot-based upload (new path) ──────────────────────────────────────────
   const activeSlot = getActiveSlot(ctx.user.id);
@@ -566,7 +588,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
       await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
     }
     const userId = ctx.user.id;
-    await userStateService.addMediaInput(userId, activeSlot.slotKey, fileUrl);
+    await userStateService.addMediaInput(userId, activeSlot.slotKey, tgSlotValue);
 
     const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
     const label = slot
@@ -607,10 +629,13 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     if (current[targetSlot.slotKey]?.length) {
       await userStateService.clearMediaInputSlot(ctx.user.id, targetSlot.slotKey);
     }
-    await userStateService.addMediaInput(ctx.user.id, targetSlot.slotKey, fileUrl);
+    await userStateService.addMediaInput(ctx.user.id, targetSlot.slotKey, tgSlotValue);
     await sendDesignMediaInputStatus(ctx);
     return;
   }
+
+  // Below paths (legacy dialog reference + caption+photo) need the live URL.
+  const fileUrl = await getLiveTgUrl();
 
   // ── Legacy path: dialog-based reference ───────────────────────────────────
   // Auto-create dialog if none exists
