@@ -103,24 +103,37 @@ const MI_FIRST_CLIP: MediaInputSlot = {
   labelKey: "firstClip",
 };
 
-/** Seedance 2 reference-to-video slots. */
+/** Seedance 2 first/last frame slots — exclusive with reference slots. */
+const MI_SEEDANCE_FIRST_FRAME: MediaInputSlot = {
+  ...MI_FIRST_FRAME,
+  exclusiveGroup: "frames",
+};
+const MI_SEEDANCE_LAST_FRAME: MediaInputSlot = {
+  ...MI_LAST_FRAME,
+  exclusiveGroup: "frames",
+};
+
+/** Seedance 2 reference-to-video slots — exclusive with frame slots. */
 const MI_REF_IMAGES: MediaInputSlot = {
   slotKey: "ref_images",
   mode: "reference_image",
   labelKey: "referenceImages",
   maxImages: 9,
+  exclusiveGroup: "refs",
 };
 const MI_REF_VIDEOS: MediaInputSlot = {
   slotKey: "ref_videos",
   mode: "reference_video",
   labelKey: "referenceVideos",
   maxImages: 3,
+  exclusiveGroup: "refs",
 };
 const MI_REF_AUDIOS: MediaInputSlot = {
   slotKey: "ref_audios",
   mode: "reference_audio",
   labelKey: "referenceAudios",
   maxImages: 3,
+  exclusiveGroup: "refs",
 };
 
 /** Grok Imagine i2v: up to 7 reference images, referenced via @image1..@image7 in prompt. */
@@ -320,7 +333,13 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REF_IMAGES, MI_REF_VIDEOS, MI_REF_AUDIOS],
+    mediaInputs: [
+      MI_SEEDANCE_FIRST_FRAME,
+      MI_SEEDANCE_LAST_FRAME,
+      MI_REF_IMAGES,
+      MI_REF_VIDEOS,
+      MI_REF_AUDIOS,
+    ],
     supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
     durationRange: { min: 4, max: 15 },
     settings: [
@@ -379,7 +398,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    mediaInputs: [MI_FIRST_FRAME, MI_REF_IMAGES, MI_REF_VIDEOS, MI_REF_AUDIOS],
+    mediaInputs: [MI_SEEDANCE_FIRST_FRAME, MI_REF_IMAGES, MI_REF_VIDEOS, MI_REF_AUDIOS],
     supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
     durationRange: { min: 4, max: 15 },
     settings: [

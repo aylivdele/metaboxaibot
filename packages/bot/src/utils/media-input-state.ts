@@ -42,9 +42,27 @@ export function buildMediaInputStatusMenu(
   let allRequiredFilled = true;
   let nextElementShown = false;
 
+  // Determine which exclusive groups have filled slots.
+  const filledGroups = new Set<string>();
+  for (const slot of slots) {
+    if (slot.exclusiveGroup && filledInputs[slot.slotKey]?.length) {
+      filledGroups.add(slot.exclusiveGroup);
+    }
+  }
+
   for (const slot of slots) {
     const label = t.mediaInput[slot.labelKey as keyof typeof t.mediaInput] ?? slot.labelKey;
     const isFilled = !!filledInputs[slot.slotKey]?.length;
+
+    // Hide slots from other exclusive groups when one group is active.
+    if (
+      slot.exclusiveGroup &&
+      !isFilled &&
+      filledGroups.size > 0 &&
+      !filledGroups.has(slot.exclusiveGroup)
+    ) {
+      continue;
+    }
 
     // Progressive reveal for element slots: show filled + one next empty slot.
     if (slot.mode === "reference_element") {

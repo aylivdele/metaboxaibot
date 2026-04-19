@@ -107,6 +107,12 @@ export interface MediaInputSlot {
   maxImages?: number;
   /** When true the slot must be filled before generation can start. */
   required?: boolean;
+  /**
+   * Mutually exclusive group tag. Slots in different groups cannot be used
+   * together — once any slot in a group is filled, slots from other groups
+   * are hidden until the filled slot is cleared.
+   */
+  exclusiveGroup?: string;
 }
 
 // ── Model family types ───────────────────────────────────────────────────────
