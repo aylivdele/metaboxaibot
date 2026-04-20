@@ -363,6 +363,7 @@ export default {
     tokens: "токенов",
     sendOriginal: "📎 Отправить оригинал",
     downloadFile: "⬇️ Скачать",
+    generationCostLine: "💰 Списано: {cost} ✦ · 💳 Баланс: {total} ✦ (подп. {sub} + {regular})",
     tariffs: "💳 Тарифы",
     costPerRequest: "💰 {cost} ✦ за запрос",
     costRangePerRequest: "💰 {min} – {max} ✦ за запрос",

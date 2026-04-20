@@ -24,6 +24,7 @@ export {
   computeVideoTokens,
   usdToTokens,
 } from "./token.service.js";
+export type { DeductResult } from "./token.service.js";
 export { s3Service, getFileUrl, uploadBuffer } from "./s3.service.js";
 export {
   verifyLinkToken,

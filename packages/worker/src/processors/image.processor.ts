@@ -22,7 +22,8 @@ import {
 import { generateDownloadToken } from "@metabox/api/utils/download-token";
 import { InputFile } from "grammy";
 import { logger } from "../logger.js";
-import { config, AI_MODELS, getT } from "@metabox/shared";
+import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
+import type { DeductResult } from "@metabox/api/services";
 import { notifyTechError } from "../utils/notify-error.js";
 import {
   submitWithThrottle,
@@ -117,6 +118,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
     // Output records created during finalization — used for buttons in Stage 3
     let outputRecords: Array<{ id: string; outputUrl: string | null; s3Key: string | null }> = [];
+    let deductResult: DeductResult | undefined;
 
     if (existingJob?.outputs?.length) {
       // Stage 3 already done — skip submit + poll (crash-recovery fast path)
@@ -277,7 +279,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
           inputImagesMegapixels = inputUrls.map(() => 1);
         }
 
-        await deductTokens(
+        deductResult = await deductTokens(
           BigInt(userIdStr),
           calculateCost(model, 0, 0, megapixels, undefined, modelSettings, undefined, undefined, {
             hasInputImage,
@@ -289,8 +291,14 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     }
 
     // ── Stage 3: send to user ────────────────────────────────────────────
-    let slicedPrompt = prompt.slice(0, 200);
-    slicedPrompt = slicedPrompt.concat(slicedPrompt.length < 200 ? "" : "...");
+    const modelForCaption = AI_MODELS[modelId];
+    const displayName = modelForCaption?.name ?? modelId;
+    const buildCaption = (): string =>
+      buildResultCaption(t, displayName, prompt, {
+        cost: deductResult?.deducted,
+        subscriptionBalance: deductResult?.subscriptionTokenBalance,
+        tokenBalance: deductResult?.tokenBalance,
+      });
 
     // Batch: multiple outputs → send as media group
     if (outputRecords.length > 1) {
@@ -300,6 +308,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         caption?: string;
       }> = [];
 
+      const batchCaption = buildCaption();
       for (let i = 0; i < outputRecords.length; i++) {
         const rec = outputRecords[i];
         const { source } = await resolveTelegramSource(
@@ -310,7 +319,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         mediaGroup.push({
           type: "photo",
           media: source,
-          ...(i === 0 ? { caption: `✅ ${modelId}: ${slicedPrompt}` } : {}),
+          ...(i === 0 ? { caption: batchCaption } : {}),
         });
       }
 
@@ -428,20 +437,21 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     const useDocument = isSvg || byteSize > PHOTO_MAX_BYTES;
     const tooLargeForTelegram = byteSize > DOCUMENT_MAX_BYTES;
 
+    const singleCaption = buildCaption();
     if (tooLargeForTelegram) {
       await telegram.sendMessage(
         telegramChatId,
-        `✅ ${modelId}: ${slicedPrompt}\n\n${t.errors.fileTooLargeForTelegram}`,
+        `${singleCaption}\n\n${t.errors.fileTooLargeForTelegram}`,
         { reply_markup: replyMarkup },
       );
     } else if (useDocument) {
       await telegram.sendDocument(telegramChatId, tgImageSource, {
-        caption: `✅ ${modelId}: ${slicedPrompt}`,
+        caption: singleCaption,
         reply_markup: replyMarkup,
       });
     } else {
       await telegram.sendPhoto(telegramChatId, tgImageSource, {
-        caption: `✅ ${modelId}: ${slicedPrompt}`,
+        caption: singleCaption,
         reply_markup: replyMarkup,
       });
     }

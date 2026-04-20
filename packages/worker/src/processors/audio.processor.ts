@@ -5,6 +5,7 @@ import { getAudioQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createAudioAdapter } from "@metabox/api/ai/audio";
 import { deductTokens, calculateCost, translatePromptIfNeeded } from "@metabox/api/services";
+import type { DeductResult } from "@metabox/api/services";
 import { buildS3Key, uploadBuffer, uploadFromUrl, getFileUrl } from "@metabox/api/services/s3";
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT } from "@metabox/shared";

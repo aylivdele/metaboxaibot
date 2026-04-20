@@ -14,6 +14,7 @@ import {
   computeVideoTokens,
   translatePromptIfNeeded,
 } from "@metabox/api/services";
+import type { DeductResult } from "@metabox/api/services";
 import {
   buildS3Key,
   buildThumbnailKey,
@@ -27,7 +28,7 @@ import { InputFile } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
 import { parseMp4Info } from "@metabox/api/utils/mp4-duration";
 import { logger } from "../logger.js";
-import { config, AI_MODELS, getT } from "@metabox/shared";
+import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
 import {
   submitWithThrottle,
@@ -82,6 +83,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     let outputId: string;
     let videoBuffer: Buffer | null = null;
     let videoResult: Awaited<ReturnType<typeof adapter.poll>> | null = null;
+    let deductResult: DeductResult | undefined;
 
     if (existingJob?.outputs?.length) {
       logger.info({ dbJobId }, "Generation already done, skipping to send");
@@ -270,7 +272,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
           : undefined;
         const refVideos = (mediaInputs as Record<string, string[]> | undefined)?.ref_videos ?? [];
         const hasVideoInputs = refVideos.length > 0;
-        await deductTokens(
+        deductResult = await deductTokens(
           BigInt(userIdStr),
           calculateCost(
             model,
@@ -308,19 +310,22 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
     const tooLargeForTelegram = videoBuf.byteLength > VIDEO_MAX_BYTES;
-    let slicedPrompt = prompt.slice(0, 200);
-    slicedPrompt = slicedPrompt.concat(slicedPrompt.length < 200 ? "" : "...");
     const model = AI_MODELS[modelId];
+    const caption = buildResultCaption(t, model?.name ?? modelId, prompt, {
+      cost: deductResult?.deducted,
+      subscriptionBalance: deductResult?.subscriptionTokenBalance,
+      tokenBalance: deductResult?.tokenBalance,
+    });
 
     if (tooLargeForTelegram && downloadRow) {
       await telegram.sendMessage(
         telegramChatId,
-        `✅ ${model.name ?? modelId}: ${slicedPrompt}\n\n${t.errors.fileTooLargeForTelegram}`,
+        `${caption}\n\n${t.errors.fileTooLargeForTelegram}`,
         { reply_markup: { inline_keyboard: [downloadRow] } },
       );
     } else {
       await telegram.sendVideo(telegramChatId, new InputFile(videoBuf, "video.mp4"), {
-        caption: `✅ ${model.name ?? modelId}: ${slicedPrompt}`,
+        caption,
         reply_markup: replyMarkup,
       });
     }

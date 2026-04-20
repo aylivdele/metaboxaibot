@@ -371,6 +371,7 @@ export default {
     tokens: "tokens",
     sendOriginal: "📎 Send as file",
     downloadFile: "⬇️ Download",
+    generationCostLine: "💰 Spent: {cost} ✦ · 💳 Balance: {total} ✦ (sub {sub} + {regular})",
     tariffs: "💳 Plans",
     costPerRequest: "💰 {cost} ✦ per request",
     costRangePerRequest: "💰 {min} – {max} ✦ per request",

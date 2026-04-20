@@ -280,6 +280,7 @@ export interface Translations {
     tokens: string;
     sendOriginal: string;
     downloadFile: string;
+    generationCostLine: string;
     tariffs: string;
     costPerRequest: string;
     costRangePerRequest: string;
@@ -401,6 +402,46 @@ export async function preloadLocales(languages: Language[]): Promise<void> {
  */
 export function getT(lang: Language): Translations {
   return cache.get(lang) ?? (cache.get("en") as Translations);
+}
+
+/**
+ * Builds the standard caption shown with a generation result:
+ *   ✅ {modelName}: {prompt}{suffix}
+ *   💰 Spent: {cost} ✦ · 💳 Balance: {total} ✦ (sub {sub} + {regular})
+ *
+ * `cost`/`sub`/`regular` may be undefined when deduction context is unavailable
+ * (e.g. crash recovery) — the cost line is then omitted.
+ */
+export function buildResultCaption(
+  t: Translations,
+  displayName: string,
+  prompt: string,
+  opts?: {
+    cost?: number;
+    subscriptionBalance?: number;
+    tokenBalance?: number;
+    suffix?: string;
+    maxPromptLen?: number;
+  },
+): string {
+  const maxLen = opts?.maxPromptLen ?? 200;
+  let sliced = prompt.slice(0, maxLen);
+  if (prompt.length > maxLen) sliced += "...";
+  const suffix = opts?.suffix ? ` ${opts.suffix}` : "";
+  let caption = `✅ ${displayName}: ${sliced}${suffix}`;
+  const cost = opts?.cost;
+  const sub = opts?.subscriptionBalance;
+  const reg = opts?.tokenBalance;
+  if (cost !== undefined && sub !== undefined && reg !== undefined) {
+    const total = sub + reg;
+    const line = t.common.generationCostLine
+      .replace("{cost}", String(Math.round(cost)))
+      .replace("{total}", String(Math.round(total)))
+      .replace("{sub}", String(Math.round(sub)))
+      .replace("{regular}", String(Math.round(reg)));
+    caption += `\n${line}`;
+  }
+  return caption;
 }
 
 /**

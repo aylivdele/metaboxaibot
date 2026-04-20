@@ -2,9 +2,18 @@ import { db } from "../db.js";
 import { config } from "@metabox/shared";
 import type { AIModel } from "@metabox/shared";
 
+export interface DeductResult {
+  /** Tokens actually deducted (same as input `amount`). */
+  deducted: number;
+  /** Subscription token balance AFTER deduction. */
+  subscriptionTokenBalance: number;
+  /** Regular (purchased) token balance AFTER deduction. */
+  tokenBalance: number;
+}
+
 /**
  * Deduct tokens for AI usage. Subscription tokens are spent first, then regular tokens.
- * Atomically updates balances and records the transaction.
+ * Atomically updates balances and records the transaction. Returns post-deduction balances.
  */
 export async function deductTokens(
   userId: bigint,
@@ -12,7 +21,7 @@ export async function deductTokens(
   modelId: string,
   dialogId?: string,
   reason?: string,
-): Promise<void> {
+): Promise<DeductResult> {
   const user = await db.user.findUniqueOrThrow({
     where: { id: userId },
     select: {
@@ -31,7 +40,7 @@ export async function deductTokens(
   const newCount = user.generationCount + 1;
   const shouldFinishOnboarding = !user.finishedOnboarding && newCount >= 10;
 
-  await db.$transaction([
+  const [updatedUser] = await db.$transaction([
     db.user.update({
       where: { id: userId },
       data: {
@@ -40,6 +49,7 @@ export async function deductTokens(
         generationCount: { increment: 1 },
         ...(shouldFinishOnboarding ? { finishedOnboarding: true } : {}),
       },
+      select: { subscriptionTokenBalance: true, tokenBalance: true },
     }),
     db.tokenTransaction.create({
       data: {
@@ -52,6 +62,12 @@ export async function deductTokens(
       },
     }),
   ]);
+
+  return {
+    deducted: amount,
+    subscriptionTokenBalance: Number(updatedUser.subscriptionTokenBalance),
+    tokenBalance: Number(updatedUser.tokenBalance),
+  };
 }
 
 /**
