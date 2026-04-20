@@ -59,6 +59,12 @@ export interface SubmitImageResult {
   isPending: boolean;
   /** Message.id of the saved assistant result (for "Refine" button). Only set for sync models when dialogId provided. */
   assistantMessageId?: string;
+  /** Tokens deducted for this generation (sync path only). */
+  deductedTokens?: number;
+  /** Subscription token balance AFTER deduction (sync path only). */
+  subscriptionTokenBalance?: number;
+  /** Regular token balance AFTER deduction (sync path only). */
+  tokenBalance?: number;
 }
 
 export const generationService = {
@@ -194,7 +200,7 @@ export const generationService = {
         });
 
         const outputMegapixels = parseMegapixels(modelSettings);
-        await deductTokens(
+        const deduct = await deductTokens(
           userId,
           calculateCost(model, 0, 0, outputMegapixels, undefined, modelSettings),
           modelId,
@@ -252,6 +258,9 @@ export const generationService = {
           s3Key: s3KeySync ?? undefined,
           isPending: false,
           assistantMessageId,
+          deductedTokens: deduct.deducted,
+          subscriptionTokenBalance: deduct.subscriptionTokenBalance,
+          tokenBalance: deduct.tokenBalance,
         };
       } catch (err) {
         await db.generationJob.update({

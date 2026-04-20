@@ -22,6 +22,7 @@ import {
   UserFacingError,
   resolveUserFacingError,
   resolveModelDisplay,
+  buildResultCaption,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -540,7 +541,12 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
 
     if (!result.isPending && result.imageUrl) {
-      const caption = `${model?.name ?? modelId}: ${prompt.slice(0, 200)}${sourceImageUrl || hasMediaInputs ? ` ${ctx.t.design.withReference}` : ""}`;
+      const caption = buildResultCaption(ctx.t, model?.name ?? modelId, prompt, {
+        cost: result.deductedTokens,
+        subscriptionBalance: result.subscriptionTokenBalance,
+        tokenBalance: result.tokenBalance,
+        suffix: sourceImageUrl || hasMediaInputs ? ctx.t.design.withReference : undefined,
+      });
       await sendSyncImageResult(ctx, modelId, result, caption);
     } else {
       // Async — worker will notify when done
@@ -774,7 +780,12 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
 
       if (!result.isPending && result.imageUrl) {
-        const captionText = `🎨 ${caption.slice(0, 200)} ${ctx.t.design.withReference}`;
+        const captionText = buildResultCaption(ctx.t, model?.name ?? modelId, caption, {
+          cost: result.deductedTokens,
+          subscriptionBalance: result.subscriptionTokenBalance,
+          tokenBalance: result.tokenBalance,
+          suffix: ctx.t.design.withReference,
+        });
         await sendSyncImageResult(ctx, modelId, result, captionText);
       } else {
         await ctx.reply(pickDesignPending(ctx));

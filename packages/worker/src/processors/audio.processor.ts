@@ -8,7 +8,7 @@ import { deductTokens, calculateCost, translatePromptIfNeeded } from "@metabox/a
 import type { DeductResult } from "@metabox/api/services";
 import { buildS3Key, uploadBuffer, uploadFromUrl, getFileUrl } from "@metabox/api/services/s3";
 import { logger } from "../logger.js";
-import { config, AI_MODELS, getT } from "@metabox/shared";
+import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
 import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
 import { getIntervalForElapsed } from "../utils/poll-schedule.js";
@@ -80,6 +80,7 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
     let audioResult: { buffer?: Buffer; url?: string; ext: string; contentType: string } | null =
       null;
     let s3Key: string | null = null;
+    let deductResult: DeductResult | undefined;
     const existingOutput = existingJob?.outputs?.[0];
 
     if (existingOutput) {
@@ -233,7 +234,7 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
 
       const model = AI_MODELS[modelId];
       if (model) {
-        await deductTokens(
+        deductResult = await deductTokens(
           BigInt(userIdStr),
           calculateCost(model, 0, 0, undefined, undefined, modelSettings, undefined, prompt.length),
           modelId,
@@ -241,7 +242,13 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
       }
     }
 
-    await sendAudio(telegramChatId, audioResult, `✅ ${modelId}: ${prompt.slice(0, 200)}`);
+    const audioModel = AI_MODELS[modelId];
+    const audioCaption = buildResultCaption(t, audioModel?.name ?? modelId, prompt, {
+      cost: deductResult?.deducted,
+      subscriptionBalance: deductResult?.subscriptionTokenBalance,
+      tokenBalance: deductResult?.tokenBalance,
+    });
+    await sendAudio(telegramChatId, audioResult, audioCaption);
 
     logger.info({ dbJobId }, "Audio job completed");
   } catch (err) {
