@@ -272,7 +272,8 @@ async function sendModelActivatedNotification(
       }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
       return;
     }
-    const audioText = `${modelName}\n\n${modelDesc}\n\n${audioHint}\n${t.voice.inputHint}\n\n${costLine}`;
+    const voiceInputHint = modelId === "tts-el" ? "" : `\n${t.voice.inputHint}`;
+    const audioText = `${modelName}\n\n${modelDesc}\n\n${audioHint}${voiceInputHint}\n\n${costLine}`;
     const audioReplyMarkup = webappUrl
       ? {
           inline_keyboard: [

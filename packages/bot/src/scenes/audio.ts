@@ -60,10 +60,11 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
         ctx.user.language,
         model,
       );
-      await ctx.reply(
-        `${modelName}\n\n${modelDesc}\n\n${hint}\n${ctx.t.voice.inputHint}\n\n${costLine}`,
-        { reply_markup: kb, parse_mode: modelId === "tts-el" ? "HTML" : undefined },
-      );
+      const voiceInputHint = modelId === "tts-el" ? "" : `\n${ctx.t.voice.inputHint}`;
+      await ctx.reply(`${modelName}\n\n${modelDesc}\n\n${hint}${voiceInputHint}\n\n${costLine}`, {
+        reply_markup: kb,
+        parse_mode: modelId === "tts-el" ? "HTML" : undefined,
+      });
       return;
     }
   }
