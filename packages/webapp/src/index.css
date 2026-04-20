@@ -1016,8 +1016,10 @@ textarea::placeholder {
   margin-top: 2px;
 }
 .plan-card__price {
-  font-size: 13px;
-  color: var(--text-hint);
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
   min-width: 80px;
   text-align: right;
 }
