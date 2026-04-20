@@ -301,7 +301,7 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
       "Flagship version with maximum quality — most realistic lighting, detail and cinematic quality.",
   },
   "higgsfield-soul": {
-    name: "🧬 Higgsfield Soul",
+    name: "🧬 Higgsfield Soul 2.0",
     description:
       "Image generation with your character (Soul ID). Create a character from 20+ photos — and generate any scene with their appearance. Supports styles, reference images and batch mode.",
   },

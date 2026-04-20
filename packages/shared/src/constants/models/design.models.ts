@@ -1655,7 +1655,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
   },
   "higgsfield-soul": {
     id: "higgsfield-soul",
-    name: "🧬 Higgsfield Soul",
+    name: "🧬 Higgsfield Soul 2.0",
     description:
       "Генерация изображений с вашим персонажем (Soul ID). Создайте персонажа из 20+ фотографий — и генерируйте любые сцены с его внешностью. Поддерживает стили, референсные изображения и режим batch.",
     section: "design",
