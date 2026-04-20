@@ -22,6 +22,8 @@ import {
   uploadBuffer,
   getFileUrl,
   generateVideoThumbnail,
+  generateVideoJpegThumbnail,
+  remuxToFaststart,
 } from "@metabox/api/services/s3";
 import { generateDownloadToken } from "@metabox/api/utils/download-token";
 import { InputFile } from "grammy";
@@ -306,7 +308,12 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     const rows = [downloadRow, origRow].filter(Boolean) as InlineKeyboardButton[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
-    const videoBuf = await resolveTelegramVideoBuffer(s3Key, outputUrl, videoBuffer);
+    const rawVideoBuf = await resolveTelegramVideoBuffer(s3Key, outputUrl, videoBuffer);
+
+    // Remux to faststart (moov at front) so Telegram's head-only probe returns
+    // correct width/height/duration for the inline preview. Stream-copy only,
+    // no re-encoding — typical cost ~50-150 ms per clip.
+    const videoBuf = await remuxToFaststart(rawVideoBuf);
 
     const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
     const tooLargeForTelegram = videoBuf.byteLength > VIDEO_MAX_BYTES;
@@ -329,9 +336,18 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
         { reply_markup: { inline_keyboard: [downloadRow] } },
       );
     } else {
+      // Probe the remuxed buffer so the values we pass to Telegram match the
+      // file it will actually receive.
+      const info = parseMp4Info(videoBuf);
+      const jpegThumb = await generateVideoJpegThumbnail(videoBuf);
       await telegram.sendVideo(telegramChatId, new InputFile(videoBuf, "video.mp4"), {
         caption,
         reply_markup: replyMarkup,
+        supports_streaming: true,
+        ...(info.width ? { width: info.width } : {}),
+        ...(info.height ? { height: info.height } : {}),
+        ...(info.duration ? { duration: Math.round(info.duration) } : {}),
+        ...(jpegThumb ? { thumbnail: new InputFile(jpegThumb, "thumb.jpg") } : {}),
       });
     }
 

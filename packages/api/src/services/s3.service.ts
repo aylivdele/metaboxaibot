@@ -341,6 +341,85 @@ export async function generateVideoThumbnail(buf: Buffer): Promise<Buffer | null
 }
 
 /**
+ * Extracts a single frame (~1s in) and returns a JPEG ≤320px wide at quality
+ * tuned to stay under Telegram's 200KB thumbnail limit. JPEG (not WebP) is
+ * required by Telegram's `thumbnail` field on sendVideo/sendDocument.
+ */
+export async function generateVideoJpegThumbnail(buf: Buffer): Promise<Buffer | null> {
+  const tmpFile = join(tmpdir(), `vidthumb-${randomUUID()}.mp4`);
+  try {
+    await writeFile(tmpFile, buf);
+    const rawFrame: Buffer = await new Promise((resolve, reject) => {
+      const output = new PassThrough();
+      const chunks: Buffer[] = [];
+      output.on("data", (c: Buffer) => chunks.push(c));
+      output.on("end", () => resolve(Buffer.concat(chunks)));
+      output.on("error", reject);
+      ffmpeg(tmpFile)
+        .inputOptions(["-ss", "1"])
+        .outputOptions(["-frames:v", "1", "-f", "image2", "-vcodec", "mjpeg"])
+        .on("error", reject)
+        .pipe(output, { end: true });
+    });
+    if (!rawFrame.length) return null;
+
+    let quality = 80;
+    let out = await sharp(rawFrame)
+      .resize({ width: 320, withoutEnlargement: true })
+      .jpeg({ quality })
+      .toBuffer();
+    while (out.byteLength > 200 * 1024 && quality > 40) {
+      quality -= 15;
+      out = await sharp(rawFrame)
+        .resize({ width: 320, withoutEnlargement: true })
+        .jpeg({ quality })
+        .toBuffer();
+    }
+    return out;
+  } catch (err) {
+    logger.warn({ err }, "generateVideoJpegThumbnail failed");
+    return null;
+  } finally {
+    await unlink(tmpFile).catch(() => void 0);
+  }
+}
+
+/**
+ * Remuxes an MP4 with `-movflags +faststart` so the moov atom is at the front.
+ * Stream-copies video/audio (no re-encoding). Returns the original buffer on
+ * any failure — Telegram may still render it, just without a reliable probe.
+ *
+ * Purpose: Telegram's inline preview runs a partial probe that reads only the
+ * head of the file. When moov is at the end (common for several AI video
+ * providers), the probe returns wrong dimensions, which is what breaks the
+ * aspect ratio in chat. Downloading plays fine because the client reads the
+ * whole file.
+ */
+export async function remuxToFaststart(buf: Buffer): Promise<Buffer> {
+  const inFile = join(tmpdir(), `remux-in-${randomUUID()}.mp4`);
+  const outFile = join(tmpdir(), `remux-out-${randomUUID()}.mp4`);
+  try {
+    await writeFile(inFile, buf);
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(inFile)
+        .outputOptions(["-c", "copy", "-movflags", "+faststart"])
+        .on("error", reject)
+        .on("end", () => resolve())
+        .save(outFile);
+    });
+    const { readFile } = await import("fs/promises");
+    const out = await readFile(outFile);
+    return out.byteLength > 0 ? out : buf;
+  } catch (err) {
+    logger.warn({ err }, "remuxToFaststart failed, using original buffer");
+    return buf;
+  } finally {
+    await unlink(inFile).catch(() => void 0);
+    await unlink(outFile).catch(() => void 0);
+  }
+}
+
+/**
  * Delete an object from S3. Returns true on success (or if S3 is not
  * configured — nothing to clean up), false on failure. Missing keys are
  * treated as success since the goal state (object gone) is already met.
