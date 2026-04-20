@@ -184,8 +184,7 @@ export async function activateDesignModel(
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE", "design");
   await userStateService.setModelForSection(ctx.user.id, "design", modelId);
-  // Clear any leftover media inputs from a previous session
-  await userStateService.clearMediaInputs(ctx.user.id);
+  // Media-input slots persist per-model; not cleared on activation.
   clearActiveSlot(ctx.user.id);
 
   const model = AI_MODELS[modelId];
@@ -199,11 +198,16 @@ export async function activateDesignModel(
     if (!options.suppressKeyboard) {
       // Add media input slot buttons (with progressive element reveal)
       if (model.mediaInputs?.length) {
+        const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
         const { kb: slotsKb } = buildMediaInputStatusMenu(
           model.mediaInputs,
-          {}, // activation clears media inputs — all slots empty
+          filledInputs,
           "design",
           ctx.t,
+          {
+            promptOptional: model.promptOptional,
+            promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
+          },
         );
         for (const row of slotsKb.inline_keyboard) {
           kb.row(...row);
@@ -293,7 +297,7 @@ export async function sendDesignMediaInputStatus(
   const model = AI_MODELS[modelId];
   if (!model?.mediaInputs?.length) return;
 
-  const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
+  const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
   const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "design", ctx.t, {
     promptOptional: model.promptOptional,
     promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
@@ -349,7 +353,7 @@ export async function handleDesignMediaInput(ctx: BotContext): Promise<void> {
   const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
   if (!slot) return;
 
-  const filled = await userStateService.getMediaInputs(ctx.user.id);
+  const filled = await userStateService.getMediaInputs(ctx.user.id, modelId);
   const existing = filled[slotKey] ?? [];
   const maxImages = slot.maxImages ?? 1;
 
@@ -405,7 +409,7 @@ export async function handleDesignGenerateNoPrompt(ctx: BotContext): Promise<voi
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
-  const filled = await userStateService.getMediaInputs(ctx.user.id);
+  const filled = await userStateService.getMediaInputs(ctx.user.id, modelId);
   const firstFilled = Object.values(filled).find((v) => v?.length);
 
   if (!firstFilled?.length) {
@@ -440,7 +444,9 @@ export async function handleDesignMediaInputRemove(ctx: BotContext): Promise<voi
   const data = ctx.callbackQuery?.data ?? "";
   const slotKey = data.replace("mi_remove:design:", "");
   await ctx.answerCallbackQuery();
-  await userStateService.clearMediaInputSlot(ctx.user.id, slotKey);
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.designModelId ?? "dall-e-3";
+  await userStateService.clearMediaInputSlot(ctx.user.id, modelId, slotKey);
   await sendDesignMediaInputStatus(ctx, { edit: true });
 }
 
@@ -471,8 +477,8 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
     dialogId = dialog.id;
   }
 
-  // Slot-based media inputs (one-shot — consumed and cleared)
-  const mediaInputs = await userStateService.getMediaInputs(ctx.user.id);
+  // Slot-based media inputs (per-model; cleared for this model after generation start)
+  const mediaInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
   const hasMediaInputs = Object.keys(mediaInputs).length > 0;
   clearActiveSlot(ctx.user.id);
 
@@ -500,8 +506,8 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
     }
   }
 
-  // Clear media inputs (one-shot)
-  if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id);
+  // Clear media inputs for this model (consumed on generation start)
+  if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id, modelId);
 
   // Resolve reference image (one-shot, legacy path)
   const refMessageId = state?.designRefMessageId ?? null;
@@ -656,13 +662,14 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   // ── Slot-based upload (new path) ──────────────────────────────────────────
   const activeSlot = getActiveSlot(ctx.user.id);
   if (activeSlot && activeSlot.section === "design") {
-    const current = await userStateService.getMediaInputs(ctx.user.id);
+    const slotModelId = activeSlot.modelId;
+    const current = await userStateService.getMediaInputs(ctx.user.id, slotModelId);
     const existing = current[activeSlot.slotKey] ?? [];
     if (existing.length >= activeSlot.maxImages) {
-      await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
+      await userStateService.clearMediaInputSlot(ctx.user.id, slotModelId, activeSlot.slotKey);
     }
     const userId = ctx.user.id;
-    await userStateService.addMediaInput(userId, activeSlot.slotKey, tgSlotValue);
+    await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
 
     const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
     const label = slot
@@ -670,7 +677,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
       : activeSlot.slotKey;
 
     debounceSlotReply(userId, mediaGroupId, async () => {
-      const freshInputs = await userStateService.getMediaInputs(userId);
+      const freshInputs = await userStateService.getMediaInputs(userId, slotModelId);
       const freshCount = freshInputs[activeSlot.slotKey]?.length ?? 0;
 
       if (activeSlot.maxImages === 1 || freshCount >= activeSlot.maxImages) {
@@ -697,13 +704,13 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
 
   // ── Auto-slot: no active slot, but model has mediaInputs → save to first slot ─
   if (!caption && model?.mediaInputs?.length) {
-    const current = await userStateService.getMediaInputs(ctx.user.id);
+    const current = await userStateService.getMediaInputs(ctx.user.id, modelId);
     const targetSlot =
       model.mediaInputs.find((s) => !current[s.slotKey]?.length) ?? model.mediaInputs[0];
     if (current[targetSlot.slotKey]?.length) {
-      await userStateService.clearMediaInputSlot(ctx.user.id, targetSlot.slotKey);
+      await userStateService.clearMediaInputSlot(ctx.user.id, modelId, targetSlot.slotKey);
     }
-    await userStateService.addMediaInput(ctx.user.id, targetSlot.slotKey, tgSlotValue);
+    await userStateService.addMediaInput(ctx.user.id, modelId, targetSlot.slotKey, tgSlotValue);
     await sendDesignMediaInputStatus(ctx);
     return;
   }

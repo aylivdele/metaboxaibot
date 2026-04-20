@@ -62,12 +62,13 @@ function buildRefineModelKeyboard(
 /** Save s3Key into a media input slot and send the updated status menu. */
 async function fillSlotAndSendStatus(
   ctx: BotContext,
+  modelId: string,
   slotKey: string,
   s3Key: string,
   section: "design" | "video",
 ): Promise<void> {
   if (!ctx.user) return;
-  await userStateService.addMediaInput(ctx.user.id, slotKey, s3Key);
+  await userStateService.addMediaInput(ctx.user.id, modelId, slotKey, s3Key);
   if (section === "video") {
     await sendVideoMediaInputStatus(ctx);
   } else {
@@ -165,7 +166,7 @@ export async function handleRefineUseActive(ctx: BotContext): Promise<void> {
 
   if (compatibleSlots.length === 1) {
     // Single slot — fill directly
-    await fillSlotAndSendStatus(ctx, compatibleSlots[0].slotKey, job.s3Key, section);
+    await fillSlotAndSendStatus(ctx, activeModelId, compatibleSlots[0].slotKey, job.s3Key, section);
   } else if (compatibleSlots.length > 1) {
     // Multiple slots — ask which one
     await showSlotChoice(ctx, compatibleSlots, jobId);
@@ -254,7 +255,12 @@ export async function handleRefineModel(ctx: BotContext): Promise<void> {
 
   // Fill the slot
   if (compatibleSlots.length === 1) {
-    await userStateService.addMediaInput(ctx.user.id, compatibleSlots[0].slotKey, job.s3Key);
+    await userStateService.addMediaInput(
+      ctx.user.id,
+      modelId,
+      compatibleSlots[0].slotKey,
+      job.s3Key,
+    );
     if (section === "video") {
       await sendVideoMediaInputStatus(ctx);
     } else {
@@ -287,9 +293,12 @@ export async function handleRefineSlot(ctx: BotContext): Promise<void> {
 
   const state = await userStateService.get(ctx.user.id);
   const section = (state?.section ?? "design") as "design" | "video";
+  const modelId =
+    section === "video" ? (state?.videoModelId ?? null) : (state?.designModelId ?? null);
+  if (!modelId) return;
 
   // Remove the slot chooser keyboard
   await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
 
-  await fillSlotAndSendStatus(ctx, slotKey, job.s3Key, section);
+  await fillSlotAndSendStatus(ctx, modelId, slotKey, job.s3Key, section);
 }

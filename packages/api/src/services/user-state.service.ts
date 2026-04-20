@@ -271,46 +271,76 @@ export const userStateService = {
     return { ...modelLevel, ...dialogLevel };
   },
 
-  // ── Media inputs (slot-based, one-shot) ────────────────────────────────────
+  // ── Media inputs (per-model, slot-based) ───────────────────────────────────
+  // Storage shape: { [modelId]: { [slotKey]: string[] } }
+  // Slots persist across model/section switches — only cleared on generation
+  // start (for the active model) or explicit user removal.
 
-  /** Add a URL to a media input slot. Returns the updated map. */
+  /** Full root map. Legacy flat-shape values are ignored (treated as empty). */
+  async getAllMediaInputs(userId: bigint): Promise<Record<string, Record<string, string[]>>> {
+    const state = await db.userState.findUnique({ where: { userId } });
+    const raw = state?.mediaInputs;
+    if (!raw || typeof raw !== "object") return {};
+    const result: Record<string, Record<string, string[]>> = {};
+    for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
+      if (val && typeof val === "object" && !Array.isArray(val)) {
+        result[key] = val as Record<string, string[]>;
+      }
+    }
+    return result;
+  },
+
+  /** Add a URL to a media input slot for the given model. Returns the updated map for that model. */
   async addMediaInput(
     userId: bigint,
+    modelId: string,
     slotKey: string,
     url: string,
   ): Promise<Record<string, string[]>> {
-    const current = await this.getMediaInputs(userId);
-    const arr = current[slotKey] ?? [];
+    const all = await this.getAllMediaInputs(userId);
+    const forModel = all[modelId] ?? {};
+    const arr = forModel[slotKey] ?? [];
     arr.push(url);
-    const updated = { ...current, [slotKey]: arr };
+    const updatedForModel = { ...forModel, [slotKey]: arr };
+    const updated = { ...all, [modelId]: updatedForModel };
     await db.userState.upsert({
       where: { userId },
       create: { userId, state: "IDLE", mediaInputs: updated },
       update: { mediaInputs: updated },
     });
-    return updated;
+    return updatedForModel;
   },
 
-  /** Get all media inputs for user: { [slotKey]: string[] } */
-  async getMediaInputs(userId: bigint): Promise<Record<string, string[]>> {
-    const state = await db.userState.findUnique({ where: { userId } });
-    if (!state?.mediaInputs) return {};
-    return state.mediaInputs as Record<string, string[]>;
+  /** Get media inputs for a specific model: { [slotKey]: string[] } */
+  async getMediaInputs(userId: bigint, modelId: string): Promise<Record<string, string[]>> {
+    const all = await this.getAllMediaInputs(userId);
+    return all[modelId] ?? {};
   },
 
-  /** Clear all media input slots (one-shot after generation). */
-  async clearMediaInputs(userId: bigint): Promise<void> {
-    await db.userState.update({ where: { userId }, data: { mediaInputs: Prisma.DbNull } });
-  },
-
-  /** Clear a specific slot. */
-  async clearMediaInputSlot(userId: bigint, slotKey: string): Promise<void> {
-    const current = await this.getMediaInputs(userId);
-    delete current[slotKey];
-    const hasSlots = Object.keys(current).length > 0;
+  /** Clear all media input slots for a specific model (e.g. after generation start). */
+  async clearMediaInputs(userId: bigint, modelId: string): Promise<void> {
+    const all = await this.getAllMediaInputs(userId);
+    if (!all[modelId]) return;
+    delete all[modelId];
+    const hasAny = Object.keys(all).length > 0;
     await db.userState.update({
       where: { userId },
-      data: { mediaInputs: hasSlots ? current : Prisma.DbNull },
+      data: { mediaInputs: hasAny ? all : Prisma.DbNull },
+    });
+  },
+
+  /** Clear a specific slot for a specific model. */
+  async clearMediaInputSlot(userId: bigint, modelId: string, slotKey: string): Promise<void> {
+    const all = await this.getAllMediaInputs(userId);
+    const forModel = all[modelId];
+    if (!forModel) return;
+    delete forModel[slotKey];
+    if (Object.keys(forModel).length === 0) delete all[modelId];
+    else all[modelId] = forModel;
+    const hasAny = Object.keys(all).length > 0;
+    await db.userState.update({
+      where: { userId },
+      data: { mediaInputs: hasAny ? all : Prisma.DbNull },
     });
   },
 };

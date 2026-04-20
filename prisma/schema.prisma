@@ -87,7 +87,10 @@ model UserState {
   // Произвольные настройки моделей: { [modelId]: { [key]: string | number | boolean | null } }
   modelSettings Json?
 
-  // Медиа-входы для генерации: { [slotKey]: string[] } — массив URL по слотам (one-shot, сбрасывается после использования)
+  // Медиа-входы для генерации: { [modelId]: { [slotKey]: string[] } } — независимы для каждой модели;
+  // сбрасываются только при старте генерации (текущая модель) или ручном удалении.
+  // Также используется для буфера фотографий при создании персонажа Higgsfield Soul под ключом
+  // "soul_creation" (file_id без TTL, resolve → S3 на submit).
   mediaInputs Json?
 
   updatedAt DateTime @updatedAt

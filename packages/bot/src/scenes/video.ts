@@ -44,7 +44,6 @@ import {
 import {
   SOUL_MAX_PHOTOS,
   SOUL_MIN_PHOTOS,
-  initSoulBuffer,
   getSoulBuffer,
   addSoulPhoto,
   clearSoulBuffer,
@@ -217,8 +216,7 @@ export async function activateVideoModel(
   if (!ctx.user) return;
   await userStateService.setState(ctx.user.id, "VIDEO_ACTIVE", "video");
   await userStateService.setModelForSection(ctx.user.id, "video", modelId);
-  // Clear any leftover media inputs from a previous session
-  await userStateService.clearMediaInputs(ctx.user.id);
+  // Media-input slots persist per-model; not cleared on activation.
   clearActiveSlot(ctx.user.id);
 
   const model = AI_MODELS[modelId];
@@ -237,12 +235,16 @@ export async function activateVideoModel(
     if (!options.suppressKeyboard) {
       // Add media input slot buttons (with progressive element reveal)
       if (model.mediaInputs?.length) {
+        const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
         const { kb: slotsKb } = buildMediaInputStatusMenu(
           model.mediaInputs,
-          {}, // activation clears media inputs — all slots empty
+          filledInputs,
           "video",
           ctx.t,
-          { promptOptional: model.promptOptional },
+          {
+            promptOptional: model.promptOptional,
+            promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
+          },
         );
         for (const row of slotsKb.inline_keyboard) {
           kb.row(...row);
@@ -356,7 +358,7 @@ export async function sendVideoMediaInputStatus(
   const model = AI_MODELS[modelId];
   if (!model?.mediaInputs?.length) return;
 
-  const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
+  const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
   const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "video", ctx.t, {
     promptOptional: model.promptOptional,
     promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
@@ -442,7 +444,7 @@ export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
   const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
   if (!slot) return;
 
-  const filled = await userStateService.getMediaInputs(ctx.user.id);
+  const filled = await userStateService.getMediaInputs(ctx.user.id, modelId);
   const existing = filled[slotKey] ?? [];
   const maxImages = slot.maxImages ?? 1;
 
@@ -501,28 +503,31 @@ export async function handleVideoMediaInputRemove(ctx: BotContext): Promise<void
   const slotKey = data.replace("mi_remove:video:", "");
   await ctx.answerCallbackQuery();
 
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.videoModelId ?? "kling";
+
   // For element slots: shift subsequent elements down after removal.
   const elemMatch = slotKey.match(/^ref_element_(\d+)$/);
   if (elemMatch) {
     const removed = parseInt(elemMatch[1], 10);
-    const current = await userStateService.getMediaInputs(ctx.user.id);
+    const current = await userStateService.getMediaInputs(ctx.user.id, modelId);
     // Clear the removed slot and shift higher-numbered elements down.
     for (let i = removed; i <= 5; i++) {
       const nextKey = `ref_element_${i + 1}`;
       const curKey = `ref_element_${i}`;
       const nextVal = current[nextKey];
       if (nextVal?.length) {
-        await userStateService.clearMediaInputSlot(ctx.user.id, curKey);
+        await userStateService.clearMediaInputSlot(ctx.user.id, modelId, curKey);
         for (const url of nextVal) {
-          await userStateService.addMediaInput(ctx.user.id, curKey, url);
+          await userStateService.addMediaInput(ctx.user.id, modelId, curKey, url);
         }
       } else {
-        await userStateService.clearMediaInputSlot(ctx.user.id, curKey);
+        await userStateService.clearMediaInputSlot(ctx.user.id, modelId, curKey);
         break;
       }
     }
   } else {
-    await userStateService.clearMediaInputSlot(ctx.user.id, slotKey);
+    await userStateService.clearMediaInputSlot(ctx.user.id, modelId, slotKey);
   }
   await sendVideoMediaInputStatus(ctx, { edit: true });
 }
@@ -545,8 +550,8 @@ export async function executeVideoPrompt(ctx: BotContext, prompt: string): Promi
   const videoSettings = await userStateService.getVideoSettings(ctx.user.id);
   const modelSettings = videoSettings[modelId];
 
-  // Slot-based media inputs (one-shot — consumed and cleared)
-  const mediaInputs = await userStateService.getMediaInputs(ctx.user.id);
+  // Slot-based media inputs (per-model; cleared for this model after generation start)
+  const mediaInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
   const hasMediaInputs = Object.keys(mediaInputs).length > 0;
   clearActiveSlot(ctx.user.id);
 
@@ -563,8 +568,8 @@ export async function executeVideoPrompt(ctx: BotContext, prompt: string): Promi
     }
   }
 
-  // Clear media inputs (one-shot)
-  if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id);
+  // Clear media inputs for this model (consumed on generation start)
+  if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id, modelId);
 
   // For D-ID/HeyGen: pick up any previously saved reference photo (one-shot, legacy path)
   const imageUrl = (await userStateService.getAndClearVideoRefImageUrl(ctx.user.id)) ?? undefined;
@@ -814,14 +819,15 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
   // ── Slot-based upload (new path) ──────────────────────────────────────────
   const activeSlot = getActiveSlot(ctx.user.id);
   if (activeSlot && activeSlot.section === "video") {
-    const current = await userStateService.getMediaInputs(ctx.user.id);
+    const slotModelId = activeSlot.modelId;
+    const current = await userStateService.getMediaInputs(ctx.user.id, slotModelId);
     const existing = current[activeSlot.slotKey] ?? [];
     if (existing.length >= activeSlot.maxImages) {
       // Replace if max reached (single-image slot)
-      await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
+      await userStateService.clearMediaInputSlot(ctx.user.id, slotModelId, activeSlot.slotKey);
     }
     const userId = ctx.user.id;
-    await userStateService.addMediaInput(userId, activeSlot.slotKey, tgSlotValue);
+    await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
 
     const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
     const label = slot
@@ -829,7 +835,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       : activeSlot.slotKey;
 
     debounceSlotReply(userId, mediaGroupId, async () => {
-      const freshInputs = await userStateService.getMediaInputs(userId);
+      const freshInputs = await userStateService.getMediaInputs(userId, slotModelId);
       const freshCount = freshInputs[activeSlot.slotKey]?.length ?? 0;
 
       if (activeSlot.maxImages === 1 || freshCount >= activeSlot.maxImages) {
@@ -856,14 +862,14 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
 
   // ── Auto-slot: no active slot, but model has mediaInputs → save to first slot ─
   if (!caption && model?.mediaInputs?.length && !AVATAR_MODELS.has(modelId)) {
-    const current = await userStateService.getMediaInputs(ctx.user.id);
+    const current = await userStateService.getMediaInputs(ctx.user.id, modelId);
     // Find first unfilled slot, or first slot if all filled
     const targetSlot =
       model.mediaInputs.find((s) => !current[s.slotKey]?.length) ?? model.mediaInputs[0];
     if (current[targetSlot.slotKey]?.length) {
-      await userStateService.clearMediaInputSlot(ctx.user.id, targetSlot.slotKey);
+      await userStateService.clearMediaInputSlot(ctx.user.id, modelId, targetSlot.slotKey);
     }
-    await userStateService.addMediaInput(ctx.user.id, targetSlot.slotKey, tgSlotValue);
+    await userStateService.addMediaInput(ctx.user.id, modelId, targetSlot.slotKey, tgSlotValue);
     await sendVideoMediaInputStatus(ctx);
     return;
   }
@@ -965,28 +971,44 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
   // Active reference_element slot: videos are exclusive (replace any images).
   const activeSlot = getActiveSlot(ctx.user.id);
   if (activeSlot && activeSlot.section === "video") {
+    const slotModelId = activeSlot.modelId;
     const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
     if (slot?.mode === "reference_element") {
-      await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
-      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, tgSlotValue);
+      await userStateService.clearMediaInputSlot(ctx.user.id, slotModelId, activeSlot.slotKey);
+      await userStateService.addMediaInput(
+        ctx.user.id,
+        slotModelId,
+        activeSlot.slotKey,
+        tgSlotValue,
+      );
       clearActiveSlot(ctx.user.id);
       await sendVideoMediaInputStatus(ctx);
       return;
     }
     if (slot?.mode === "first_clip" || slot?.mode === "motion_video") {
-      await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
-      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, tgSlotValue);
+      await userStateService.clearMediaInputSlot(ctx.user.id, slotModelId, activeSlot.slotKey);
+      await userStateService.addMediaInput(
+        ctx.user.id,
+        slotModelId,
+        activeSlot.slotKey,
+        tgSlotValue,
+      );
       clearActiveSlot(ctx.user.id);
       await sendVideoMediaInputStatus(ctx);
       return;
     }
     if (slot?.mode === "reference_video") {
-      const current = await userStateService.getMediaInputs(ctx.user.id);
+      const current = await userStateService.getMediaInputs(ctx.user.id, slotModelId);
       const existing = current[activeSlot.slotKey] ?? [];
       if (existing.length >= activeSlot.maxImages) {
-        await userStateService.clearMediaInputSlot(ctx.user.id, activeSlot.slotKey);
+        await userStateService.clearMediaInputSlot(ctx.user.id, slotModelId, activeSlot.slotKey);
       }
-      await userStateService.addMediaInput(ctx.user.id, activeSlot.slotKey, tgSlotValue);
+      await userStateService.addMediaInput(
+        ctx.user.id,
+        slotModelId,
+        activeSlot.slotKey,
+        tgSlotValue,
+      );
       const updatedCount = Math.min(existing.length + 1, activeSlot.maxImages);
       if (updatedCount >= activeSlot.maxImages) {
         clearActiveSlot(ctx.user.id);
@@ -1133,6 +1155,7 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
   // Active reference_audio slot: capture audio URL into slot.
   const activeSlot = getActiveSlot(userId);
   if (activeSlot && activeSlot.section === "video") {
+    const slotModelId = activeSlot.modelId;
     const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
     if (slot?.mode === "driving_audio" || slot?.mode === "reference_audio") {
       const audioSize = audioMsg.file_size ?? 0;
@@ -1143,18 +1166,18 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
       const tgKind = ctx.message?.voice ? "voice" : "audio";
       const tgSlotValue = buildTgSlotValue(tgKind, audioMsg.file_id);
       if (slot.mode === "driving_audio") {
-        await userStateService.clearMediaInputSlot(userId, activeSlot.slotKey);
-        await userStateService.addMediaInput(userId, activeSlot.slotKey, tgSlotValue);
+        await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
+        await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
         clearActiveSlot(userId);
         await sendVideoMediaInputStatus(ctx);
         return;
       }
-      const current = await userStateService.getMediaInputs(userId);
+      const current = await userStateService.getMediaInputs(userId, slotModelId);
       const existing = current[activeSlot.slotKey] ?? [];
       if (existing.length >= activeSlot.maxImages) {
-        await userStateService.clearMediaInputSlot(userId, activeSlot.slotKey);
+        await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
       }
-      await userStateService.addMediaInput(userId, activeSlot.slotKey, tgSlotValue);
+      await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
       const updatedCount = Math.min(existing.length + 1, activeSlot.maxImages);
       if (updatedCount >= activeSlot.maxImages) {
         clearActiveSlot(userId);
@@ -1297,49 +1320,34 @@ const SOUL_COST_USD = 2.5;
 
 /**
  * Receives a photo (compressed or document) while in HIGGSFIELD_SOUL_PHOTO state.
- * Uploads to S3, adds to in-memory buffer, replies with count + Create/Cancel buttons.
+ * Stores the Telegram file_id (no TTL) in the persistent Soul buffer so the user
+ * can pause mid-upload without losing progress. S3 upload is deferred until submit.
  * Uses debounceSoulReply to send only one reply per media group (album).
  */
 export async function handleSoulPhotoCapture(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
 
   let fileId: string | undefined;
+  let tgKind: "photo" | "doc" | undefined;
   if (ctx.message?.photo) {
     fileId = ctx.message.photo.at(-1)?.file_id;
+    tgKind = "photo";
   } else if (ctx.message?.document?.mime_type?.startsWith("image/")) {
     fileId = ctx.message.document.file_id;
+    tgKind = "doc";
   }
-  if (!fileId) return;
+  if (!fileId || !tgKind) return;
 
   const userId = ctx.user.id;
-  const chatId = ctx.chat?.id;
-  if (!chatId) return;
 
-  // Lazily init the buffer on first photo (route only sets FSM state)
-  if (!getSoulBuffer(userId)) {
-    initSoulBuffer(userId, chatId);
-  }
-  const buf = getSoulBuffer(userId);
-  if (!buf) return;
-
-  const file = await ctx.api.getFile(fileId);
-  const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
-
-  // Upload to S3
-  const s3Key = `soul_photos/${userId.toString()}/${Date.now()}_${file.file_id}.jpg`;
-  const uploaded = await s3Service.uploadFromUrl(s3Key, tgUrl, "image/jpeg").catch(() => null);
-  if (!uploaded) {
-    logger.warn({ userId, fileId }, "Soul photo S3 upload failed, skipping");
-    return;
-  }
-
-  const count = addSoulPhoto(userId, uploaded);
+  const fileEntry = buildTgSlotValue(tgKind, fileId);
+  const count = await addSoulPhoto(userId, fileEntry);
 
   // Debounce reply for media groups (albums) — only send one message per group
   debounceSoulReply(userId, ctx.message?.media_group_id, async () => {
     // Re-read count after debounce (more photos may have arrived)
-    const currentBuf = getSoulBuffer(userId);
-    const n = currentBuf?.s3Keys.length ?? count;
+    const currentBuf = await getSoulBuffer(userId);
+    const n = currentBuf?.fileIds.length ?? count;
 
     const text = ctx.t.video.soulPhotoCount
       .replace("{n}", String(n))
@@ -1357,17 +1365,18 @@ export async function handleSoulPhotoCapture(ctx: BotContext): Promise<void> {
 
 /**
  * Callback: user taps "Create character" after uploading photos.
- * Validates min photos, checks balance, deducts $2.50, creates UserAvatar + queue job.
+ * Validates min photos, checks balance, deducts $2.50, resolves Telegram file_ids
+ * into S3 keys, creates UserAvatar + queue job.
  */
 export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   await ctx.answerCallbackQuery();
 
   const userId = ctx.user.id;
-  const buf = clearSoulBuffer(userId);
+  const buf = await clearSoulBuffer(userId);
 
-  if (!buf || buf.s3Keys.length < SOUL_MIN_PHOTOS) {
-    const n = buf?.s3Keys.length ?? 0;
+  if (!buf || buf.fileIds.length < SOUL_MIN_PHOTOS) {
+    const n = buf?.fileIds.length ?? 0;
     await ctx
       .editMessageText(
         ctx.t.video.soulMinPhotos
@@ -1390,7 +1399,39 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
     return;
   }
 
-  // Deduct tokens
+  // Show progress message while we download + upload photos
+  await ctx.editMessageText(ctx.t.video.soulCreating).catch(() => void 0);
+
+  // Resolve Telegram file_ids → S3 keys. Deferred from capture time so the user
+  // can take their time uploading without TTL pressure.
+  const s3Keys: string[] = [];
+  for (const entry of buf.fileIds) {
+    const rest = entry.startsWith("tg:") ? entry.slice(3) : entry;
+    const idx = rest.indexOf(":");
+    const fileId = idx === -1 ? rest : rest.slice(idx + 1);
+    if (!fileId) continue;
+    try {
+      const file = await ctx.api.getFile(fileId);
+      const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+      const s3Key = `soul_photos/${userId.toString()}/${Date.now()}_${file.file_id}.jpg`;
+      const uploaded = await s3Service.uploadFromUrl(s3Key, tgUrl, "image/jpeg");
+      if (uploaded) s3Keys.push(uploaded);
+    } catch (err) {
+      logger.warn({ userId, fileId, err }, "Soul photo S3 upload failed, skipping");
+    }
+  }
+
+  if (s3Keys.length < SOUL_MIN_PHOTOS) {
+    await ctx.reply(
+      ctx.t.video.soulMinPhotos
+        .replace("{min}", String(SOUL_MIN_PHOTOS))
+        .replace("{n}", String(s3Keys.length)),
+    );
+    await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
+    return;
+  }
+
+  // Deduct tokens only after we have enough usable photos
   await deductTokens(userId, costTokens, "higgsfield_soul", undefined, "soul_creation");
 
   // Create UserAvatar record
@@ -1408,12 +1449,10 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
     userId: userId.toString(),
     provider: "higgsfield_soul",
     action: "create",
-    telegramChatId: buf.telegramChatId,
-    s3Keys: buf.s3Keys,
+    telegramChatId: ctx.chat?.id ?? Number(userId),
+    s3Keys,
     characterName: ctx.t.video.myAvatarDefaultName,
   });
-
-  await ctx.editMessageText(ctx.t.video.soulCreating).catch(() => void 0);
 
   // Restore FSM to DESIGN_ACTIVE
   await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
@@ -1427,7 +1466,7 @@ export async function handleSoulCreateCancel(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   await ctx.answerCallbackQuery();
 
-  clearSoulBuffer(ctx.user.id);
+  await clearSoulBuffer(ctx.user.id);
   await userStateService.setState(ctx.user.id, "DESIGN_ACTIVE", "design");
   await ctx.editMessageText(ctx.t.video.soulCancelled).catch(() => void 0);
 }
