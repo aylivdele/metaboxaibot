@@ -38,6 +38,18 @@ const SEEDANCE_MODEL_MAP: Record<string, string> = {
   "seedance-2-fast": "bytedance/seedance-2-fast",
 };
 
+/** Kling 3.0 video: std vs pro selected via modelId → `mode` param. */
+const KLING_MODEL_MAP: Record<string, "std" | "pro"> = {
+  kling: "std",
+  "kling-pro": "pro",
+};
+
+/** Kling 3.0 motion-control: std vs pro selected via modelId → `mode` param. */
+const KLING_MOTION_MODEL_MAP: Record<string, "std" | "pro"> = {
+  "kling-motion": "std",
+  "kling-motion-pro": "pro",
+};
+
 /**
  * KIE adapter for Grok Imagine video generation.
  *
@@ -70,13 +82,85 @@ export class KieVideoAdapter implements VideoAdapter {
     const mi = input.mediaInputs ?? {};
 
     const seedanceModel = SEEDANCE_MODEL_MAP[this.modelId];
+    const klingMode = KLING_MODEL_MAP[this.modelId];
+    const klingMotionMode = KLING_MOTION_MODEL_MAP[this.modelId];
     const inputPayload: Record<string, unknown> = {
       prompt: input.prompt,
     };
 
     let model: string;
 
-    if (seedanceModel) {
+    if (klingMotionMode) {
+      // ── Kling 3.0 motion-control ──────────────────────────────────────────
+      model = "kling-3.0/motion-control";
+
+      const imageUrl = mi.first_frame?.[0] ?? input.imageUrl;
+      const videoUrl = mi.motion_video?.[0];
+      if (!imageUrl) throw new Error("Kling MC: reference image is required");
+      if (!videoUrl) throw new Error("Kling MC: reference video is required");
+
+      const [uploadedImage, uploadedVideo] = await Promise.all([
+        uploadFileUrl(this.apiKey, imageUrl),
+        uploadFileUrl(this.apiKey, videoUrl),
+      ]);
+      inputPayload.input_urls = [uploadedImage];
+      inputPayload.video_urls = [uploadedVideo];
+      inputPayload.mode = klingMotionMode;
+
+      const orientation = (ms.character_orientation as string | undefined) ?? "video";
+      inputPayload.character_orientation = orientation;
+
+      const backgroundSource = (ms.background_source as string | undefined) ?? "input_video";
+      inputPayload.background_source = backgroundSource;
+
+      if (!input.prompt) delete inputPayload.prompt;
+    } else if (klingMode) {
+      // ── Kling 3.0 video ───────────────────────────────────────────────────
+      model = "kling-3.0/video";
+
+      const firstFrame = mi.first_frame?.[0] ?? input.imageUrl;
+      const lastFrame = mi.last_frame?.[0];
+      const imageUrls: string[] = [];
+      if (firstFrame) imageUrls.push(await uploadFileUrl(this.apiKey, firstFrame));
+      if (lastFrame) imageUrls.push(await uploadFileUrl(this.apiKey, lastFrame));
+      if (imageUrls.length) inputPayload.image_urls = imageUrls;
+
+      inputPayload.mode = klingMode;
+      inputPayload.aspect_ratio =
+        (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "16:9";
+
+      const durationNum = (ms.duration as number | undefined) ?? input.duration ?? 5;
+      inputPayload.duration = String(durationNum);
+
+      const sound = ms.generate_audio !== undefined ? !!ms.generate_audio : true;
+      inputPayload.sound = sound;
+
+      inputPayload.multi_shots = false;
+
+      // Element references: up to 3 elements, each 2–4 images.
+      // User-uploaded images in ref_element_{1..3} slots become
+      // @element1 / @element2 / @element3 referenceable in the prompt.
+      const klingElements: Array<{
+        name: string;
+        description: string;
+        element_input_urls: string[];
+      }> = [];
+      for (let i = 1; i <= 3; i++) {
+        const urls = mi[`ref_element_${i}`] ?? [];
+        if (urls.length === 0) continue;
+        const uploaded = await Promise.all(
+          urls.slice(0, 4).map((url) => uploadFileUrl(this.apiKey, url)),
+        );
+        // Spec requires min 2 URLs — duplicate first image when only one is uploaded.
+        const elementUrls = uploaded.length >= 2 ? uploaded : [uploaded[0]!, uploaded[0]!];
+        klingElements.push({
+          name: `element${i}`,
+          description: `reference element ${i}`,
+          element_input_urls: elementUrls,
+        });
+      }
+      if (klingElements.length) inputPayload.kling_elements = klingElements;
+    } else if (seedanceModel) {
       // ── Seedance 2.0 / 2.0 Fast ────────────────────────────────────────────
       model = seedanceModel;
 

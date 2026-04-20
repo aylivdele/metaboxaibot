@@ -422,7 +422,7 @@ export default {
     refElement4: "Element 4",
     refElement5: "Element 5",
     refElementHint:
-      "Upload options for this element:\n• 1 image — used as the frontal view\n• 2–4 images — first is the frontal view, the rest (up to 3) are reference views from other angles\n• 1 video — used as the element video (mutually exclusive with images)\n\nReference elements in the prompt as @Element1, @Element2, etc.\n\nSend photos or a video now.",
+      "An element is an object/character you can reference in the prompt.\n• 2–4 photos of the same object from different angles (JPG/PNG, up to 10 MB each)\n• Up to 3 elements per generation\n\nReference them in the prompt as @element1, @element2, @element3 — exactly like that.\n\nSend photos now.",
     referenceImages: "Reference Images",
     referenceVideos: "Reference Videos",
     referenceAudios: "Reference Audios",

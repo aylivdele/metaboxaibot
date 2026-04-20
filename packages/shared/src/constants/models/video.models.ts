@@ -30,8 +30,11 @@ const MI_REFERENCE_VEO: MediaInputSlot = {
   maxImages: 3,
 };
 
-/** Kling element slots: each accepts up to 4 images (1 frontal + 3 refs) OR 1 video. */
-const MI_REF_ELEMENTS: MediaInputSlot[] = [1, 2, 3, 4, 5].map((i) => ({
+/**
+ * Kling 3.0 element slots (KIE): up to 3 elements per task, each 2-4 JPG/PNG
+ * images (max 10 MB). Referenced in prompt via @element1 / @element2 / @element3.
+ */
+const MI_REF_ELEMENTS: MediaInputSlot[] = [1, 2, 3].map((i) => ({
   slotKey: `ref_element_${i}`,
   mode: "reference_element",
   labelKey: `refElement${i}`,
@@ -55,26 +58,14 @@ const MI_MOTION_VIDEO: MediaInputSlot = {
   required: true,
   constraints: { minDurationSec: 3, maxDurationSec: 30 },
 };
-/** Kling Motion: optional facial element (only 1, only with character_orientation="video"). */
-const MI_MOTION_ELEMENT: MediaInputSlot = {
-  slotKey: "ref_element_1",
-  mode: "reference_element",
-  labelKey: "motionElement",
-  maxImages: 1,
-};
-
-const KLING_MOTION_MEDIA_INPUTS: MediaInputSlot[] = [
-  MI_MOTION_IMAGE,
-  MI_MOTION_VIDEO,
-  MI_MOTION_ELEMENT,
-];
+const KLING_MOTION_MEDIA_INPUTS: MediaInputSlot[] = [MI_MOTION_IMAGE, MI_MOTION_VIDEO];
 
 const KLING_MOTION_SETTINGS: ModelSettingDef[] = [
   {
     key: "character_orientation",
     label: "Ориентация персонажа",
     description:
-      "Определяет, чью ориентацию повторит персонаж в результате. «По видео» — ориентация как в референсном видео (лучше для сложных движений, макс. 30 с). «По изображению» — ориентация как на исходном фото (лучше для камерных движений, макс. 10 с).",
+      "Определяет, чью ориентацию повторит персонаж в результате. «По видео» — ориентация как в референсном видео (рекомендуется). «По изображению» — ориентация как на исходном фото.",
     type: "select",
     options: [
       { value: "video", label: "По видео" },
@@ -83,11 +74,16 @@ const KLING_MOTION_SETTINGS: ModelSettingDef[] = [
     default: "video",
   },
   {
-    key: "keep_original_sound",
-    label: "Сохранить звук из видео",
-    description: "Перенести оригинальный звук из референсного видео в результат.",
-    type: "toggle",
-    default: true,
+    key: "background_source",
+    label: "Источник фона",
+    description:
+      "Откуда брать фон для итогового видео. «Из видео» — фон берётся из референсного видео. «Из изображения» — фон берётся с исходного фото.",
+    type: "select",
+    options: [
+      { value: "input_video", label: "Из видео" },
+      { value: "input_image", label: "Из изображения" },
+    ],
+    default: "input_video",
   },
 ];
 
@@ -158,26 +154,6 @@ const KLING_SETTINGS: ModelSettingDef[] = [
     step: 1,
   },
   {
-    key: "cfg_scale",
-    label: "Следование промпту (CFG)",
-    description:
-      "Насколько точно видео передаёт ваше описание: ближе к 1 — строже по тексту, ближе к 0 — больше свободы.",
-    type: "slider",
-    min: 0,
-    max: 1,
-    step: 0.1,
-    default: 0.5,
-    advanced: true,
-  },
-  {
-    key: "negative_prompt",
-    label: "Негативный промпт",
-    description: "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
-    type: "text",
-    default: "",
-    advanced: true,
-  },
-  {
     key: "generate_audio",
     label: "Генерировать аудио",
     description: "Включить автоматическую генерацию звукового сопровождения к видео.",
@@ -194,15 +170,15 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     description:
       "Генерирует видео до 15 секунд со звуком. Лучше всех передаёт движения людей. Стандартная версия — быстрее и дешевле Pro.",
     section: "video",
-    provider: "fal",
+    provider: "kie",
     familyId: "kling",
     variantLabel: "Standard",
-    // $0.126/s with audio (default), $0.084/s without audio
+    // $0.10/s with audio (default), $0.07/s without audio
     costUsdPerRequest: 0,
-    costUsdPerSecond: 0.126,
+    costUsdPerSecond: 0.1,
     costVariants: {
       settingKey: "generate_audio",
-      map: { true: { costUsdPerSecond: 0.126 }, false: { costUsdPerSecond: 0.084 } },
+      map: { true: { costUsdPerSecond: 0.1 }, false: { costUsdPerSecond: 0.07 } },
     },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -224,15 +200,15 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     description:
       "Генерирует видео до 15 секунд со звуком. Лучше всех передаёт движения людей. Pro-версия — повышенная детализация и качество движений.",
     section: "video",
-    provider: "fal",
+    provider: "kie",
     familyId: "kling",
     variantLabel: "Pro",
-    // $0.168/s with audio (default), $0.112/s without audio
+    // $0.135/s with audio (default), $0.09/s without audio
     costUsdPerRequest: 0,
-    costUsdPerSecond: 0.168,
+    costUsdPerSecond: 0.135,
     costVariants: {
       settingKey: "generate_audio",
-      map: { true: { costUsdPerSecond: 0.168 }, false: { costUsdPerSecond: 0.112 } },
+      map: { true: { costUsdPerSecond: 0.135 }, false: { costUsdPerSecond: 0.09 } },
     },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -1355,11 +1331,11 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     description:
       "Переносит движения из референсного видео на любого персонажа с изображения. Standard-версия — быстрее и дешевле Pro. Идеален для портретов и простых анимаций.",
     section: "video",
-    provider: "fal",
+    provider: "kie",
     familyId: "kling-motion",
     variantLabel: "Standard",
     costUsdPerRequest: 0,
-    costUsdPerSecond: 0.126,
+    costUsdPerSecond: 0.1,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1379,11 +1355,11 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     description:
       "Переносит движения из референсного видео на любого персонажа с изображения. Pro-версия — повышенная точность переноса и детализация.",
     section: "video",
-    provider: "fal",
+    provider: "kie",
     familyId: "kling-motion",
     variantLabel: "Pro",
     costUsdPerRequest: 0,
-    costUsdPerSecond: 0.168,
+    costUsdPerSecond: 0.135,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,

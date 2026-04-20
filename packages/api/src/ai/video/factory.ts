@@ -12,7 +12,7 @@ import { MinimaxVideoAdapter } from "./minimax.adapter.js";
 import { KieVideoAdapter } from "./kie.adapter.js";
 
 /** FAL.ai-backed video models */
-const FAL_MODELS = new Set(["kling", "kling-pro", "kling-motion", "pika", "seedance"]);
+const FAL_MODELS = new Set(["pika", "seedance"]);
 
 /** Replicate-backed video models */
 const REPLICATE_MODELS = new Set(["sora"]);
@@ -46,6 +46,10 @@ export function createVideoAdapter(modelId: string): VideoAdapter {
     case "grok-imagine":
     case "seedance-2":
     case "seedance-2-fast":
+    case "kling":
+    case "kling-pro":
+    case "kling-motion":
+    case "kling-motion-pro":
       return new KieVideoAdapter(modelId);
     default:
       throw new Error(`Unknown video model: ${modelId}`);
