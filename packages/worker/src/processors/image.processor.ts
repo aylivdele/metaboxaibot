@@ -122,38 +122,121 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     let outputRecords: Array<{ id: string; outputUrl: string | null; s3Key: string | null }> = [];
     let deductResult: DeductResult | undefined;
 
+    // Finalizes a set of generated image results: uploads to S3, creates
+    // output records, marks the job done and deducts tokens. Shared between
+    // the sync-adapter path (Stage 1) and the async-adapter poll path (Stage 2).
+    const finalizeResults = async (imageResults: ImageResult[]): Promise<void> => {
+      for (let i = 0; i < imageResults.length; i++) {
+        const ir = imageResults[i];
+        const keySuffix = imageResults.length > 1 ? `${dbJobId}_${i + 1}` : dbJobId;
+        let s3Key: string | null;
+        let thumbnailS3Key: string | null;
+
+        if (ir.base64Data) {
+          // gpt-image returns raw base64 — decode and upload directly.
+          const ext = ir.filename?.split(".").pop() ?? "png";
+          const contentType =
+            ir.contentType ??
+            (ext === "webp" ? "image/webp" : ext === "jpg" ? "image/jpeg" : "image/png");
+          const key = buildS3Key("image", userIdStr, keySuffix, ext);
+          const buffer = Buffer.from(ir.base64Data, "base64");
+          s3Key = await uploadBuffer(key, buffer, contentType).catch(() => null);
+          thumbnailS3Key = null;
+          if (s3Key) {
+            const thumbBuf = await generateThumbnail(buffer, contentType);
+            if (thumbBuf) {
+              thumbnailS3Key = await uploadBuffer(
+                buildThumbnailKey(s3Key),
+                thumbBuf,
+                "image/webp",
+              ).catch(() => null);
+            }
+          }
+        } else {
+          const up = await uploadImageToS3(
+            ir.url,
+            userIdStr,
+            keySuffix,
+            ir.contentType,
+            ir.filename,
+          );
+          s3Key = up.s3Key;
+          thumbnailS3Key = up.thumbnailS3Key;
+        }
+
+        const output = await db.generationJobOutput.create({
+          data: { jobId: dbJobId, index: i, outputUrl: ir.url, s3Key, thumbnailS3Key },
+        });
+        outputRecords.push({ id: output.id, outputUrl: ir.url, s3Key });
+      }
+
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { status: "done", completedAt: new Date() },
+      });
+
+      // Billing — use first image for megapixel calculation.
+      const firstResult = imageResults[0];
+      const model = AI_MODELS[modelId];
+      if (!model) return;
+
+      const megapixels =
+        model.costUsdPerMPixel && firstResult.width && firstResult.height
+          ? (firstResult.width * firstResult.height) / 1_000_000
+          : undefined;
+
+      const editUrls: string[] =
+        (job.data.mediaInputs as Record<string, string[]> | undefined)?.edit ?? [];
+      const legacyUrl = job.data.sourceImageUrl;
+      const inputUrls: string[] = editUrls.length > 0 ? editUrls : legacyUrl ? [legacyUrl] : [];
+      const hasInputImage = inputUrls.length > 0;
+      let inputImagesMegapixels: number[] | undefined;
+      if (hasInputImage && model.costUsdPerMPixelInput && !model.costUsdPerMPixelInputFixed) {
+        inputImagesMegapixels = (
+          await Promise.all(inputUrls.map((u) => measureImageMegapixels(u).catch(() => 0)))
+        ).filter((mp) => mp > 0);
+      } else if (hasInputImage && model.costUsdPerMPixelInputFixed) {
+        inputImagesMegapixels = inputUrls.map(() => 1);
+      }
+
+      deductResult = await deductTokens(
+        BigInt(userIdStr),
+        calculateCost(model, 0, 0, megapixels, undefined, modelSettings, undefined, undefined, {
+          hasInputImage,
+          inputImagesMegapixels,
+        }),
+        modelId,
+      );
+    };
+
     if (existingJob?.outputs?.length) {
       // Stage 3 already done — skip submit + poll (crash-recovery fast path)
       logger.info({ dbJobId }, "Generation already done, skipping to send");
       outputRecords = existingJob.outputs;
     } else if (stage === "generate") {
-      // ── Stage 1: submit ────────────────────────────────────────────────
+      // ── Stage 1: submit (or sync-generate) ─────────────────────────────
       await db.generationJob.update({
         where: { id: dbJobId },
         data: { status: "processing" },
       });
 
-      if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
+      const effectivePrompt = await translatePromptIfNeeded(
+        prompt,
+        modelSettings,
+        BigInt(userIdStr),
+        modelId,
+      );
 
-      let providerJobId: string;
-      if (existingJob?.providerJobId) {
-        providerJobId = existingJob.providerJobId;
-        logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
-      } else {
-        const effectivePrompt = await translatePromptIfNeeded(
-          prompt,
-          modelSettings,
-          BigInt(userIdStr),
-          modelId,
-        );
-        providerJobId = await submitWithThrottle({
+      if (!adapter.isAsync && adapter.generate) {
+        // Sync adapter (DALL-E, gpt-image, recraft) — generate inline, then finalize.
+        const genResult = await submitWithThrottle({
           modelId,
           provider: modelMeta?.provider,
           section: "image",
           job,
           queue: getImageQueue(),
           submit: () =>
-            adapter.submit!({
+            adapter.generate!({
               prompt: effectivePrompt,
               negativePrompt,
               imageUrl: job.data.sourceImageUrl,
@@ -162,25 +245,52 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
               modelSettings,
             }),
         });
-        await db.generationJob.update({
-          where: { id: dbJobId },
-          data: { providerJobId },
-        });
-      }
+        const imageResults: ImageResult[] = Array.isArray(genResult) ? genResult : [genResult];
+        await finalizeResults(imageResults);
+      } else {
+        // Async adapter — submit then schedule poll.
+        if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
 
-      // Schedule the first poll job and exit. The current job is now done.
-      await getImageQueue().add(
-        "poll",
-        {
-          ...job.data,
-          stage: "poll",
-          pollStartedAt: Date.now(),
-          lastIntervalMs: INITIAL_POLL_INTERVAL_MS,
-        },
-        { delay: INITIAL_POLL_INTERVAL_MS, attempts: 1, removeOnComplete: true },
-      );
-      logger.info({ dbJobId, providerJobId }, "Image poll scheduled");
-      return;
+        let providerJobId: string;
+        if (existingJob?.providerJobId) {
+          providerJobId = existingJob.providerJobId;
+          logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
+        } else {
+          providerJobId = await submitWithThrottle({
+            modelId,
+            provider: modelMeta?.provider,
+            section: "image",
+            job,
+            queue: getImageQueue(),
+            submit: () =>
+              adapter.submit!({
+                prompt: effectivePrompt,
+                negativePrompt,
+                imageUrl: job.data.sourceImageUrl,
+                mediaInputs: job.data.mediaInputs,
+                aspectRatio,
+                modelSettings,
+              }),
+          });
+          await db.generationJob.update({
+            where: { id: dbJobId },
+            data: { providerJobId },
+          });
+        }
+
+        await getImageQueue().add(
+          "poll",
+          {
+            ...job.data,
+            stage: "poll",
+            pollStartedAt: Date.now(),
+            lastIntervalMs: INITIAL_POLL_INTERVAL_MS,
+          },
+          { delay: INITIAL_POLL_INTERVAL_MS, attempts: 1, removeOnComplete: true },
+        );
+        logger.info({ dbJobId, providerJobId }, "Image poll scheduled");
+        return;
+      }
     } else {
       // ── Stage 2: poll ──────────────────────────────────────────────────
       const providerJobId = existingJob?.providerJobId;
@@ -226,70 +336,8 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         return;
       }
 
-      // Normalize to array
       const imageResults: ImageResult[] = Array.isArray(pollResult) ? pollResult : [pollResult];
-
-      // Upload all images to S3 and create output records
-      for (let i = 0; i < imageResults.length; i++) {
-        const ir = imageResults[i];
-        const keySuffix = imageResults.length > 1 ? `${dbJobId}_${i + 1}` : dbJobId;
-        const { s3Key, thumbnailS3Key } = await uploadImageToS3(
-          ir.url,
-          userIdStr,
-          keySuffix,
-          ir.contentType,
-          ir.filename,
-        );
-
-        const output = await db.generationJobOutput.create({
-          data: {
-            jobId: dbJobId,
-            index: i,
-            outputUrl: ir.url,
-            s3Key,
-            thumbnailS3Key,
-          },
-        });
-        outputRecords.push({ id: output.id, outputUrl: ir.url, s3Key });
-      }
-
-      await db.generationJob.update({
-        where: { id: dbJobId },
-        data: { status: "done", completedAt: new Date() },
-      });
-
-      // Billing — use first image for megapixel calculation
-      const firstResult = imageResults[0];
-      const model = AI_MODELS[modelId];
-      if (model) {
-        const megapixels =
-          model.costUsdPerMPixel && firstResult.width && firstResult.height
-            ? (firstResult.width * firstResult.height) / 1_000_000
-            : undefined;
-
-        const editUrls: string[] =
-          (job.data.mediaInputs as Record<string, string[]> | undefined)?.edit ?? [];
-        const legacyUrl = job.data.sourceImageUrl;
-        const inputUrls: string[] = editUrls.length > 0 ? editUrls : legacyUrl ? [legacyUrl] : [];
-        const hasInputImage = inputUrls.length > 0;
-        let inputImagesMegapixels: number[] | undefined;
-        if (hasInputImage && model.costUsdPerMPixelInput && !model.costUsdPerMPixelInputFixed) {
-          inputImagesMegapixels = (
-            await Promise.all(inputUrls.map((u) => measureImageMegapixels(u).catch(() => 0)))
-          ).filter((mp) => mp > 0);
-        } else if (hasInputImage && model.costUsdPerMPixelInputFixed) {
-          inputImagesMegapixels = inputUrls.map(() => 1);
-        }
-
-        deductResult = await deductTokens(
-          BigInt(userIdStr),
-          calculateCost(model, 0, 0, megapixels, undefined, modelSettings, undefined, undefined, {
-            hasInputImage,
-            inputImagesMegapixels,
-          }),
-          modelId,
-        );
-      }
+      await finalizeResults(imageResults);
     }
 
     // ── Stage 3: send to user ────────────────────────────────────────────

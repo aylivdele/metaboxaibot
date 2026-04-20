@@ -1,11 +1,9 @@
 import { db } from "../db.js";
-import { createAudioAdapter, ElevenLabsAdapter } from "../ai/audio/factory.js";
+import { ElevenLabsAdapter } from "../ai/audio/factory.js";
 import { getAudioQueue } from "../queues/audio.queue.js";
 import { AI_MODELS } from "@metabox/shared";
-import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
-import { buildS3Key, uploadBuffer, uploadFromUrl } from "./s3.service.js";
+import { checkBalance, calculateCost } from "./token.service.js";
 import { userStateService } from "./user-state.service.js";
-import { translatePromptIfNeeded } from "./prompt-translate.service.js";
 
 export interface SubmitAudioParams {
   userId: bigint;
@@ -18,11 +16,6 @@ export interface SubmitAudioParams {
 
 export interface SubmitAudioResult {
   dbJobId: string;
-  /** Populated for sync models (TTS). Use InputFile(audioBuffer) or audioUrl. */
-  audioBuffer?: Buffer;
-  audioUrl?: string;
-  audioExt?: string;
-  isPending: boolean;
 }
 
 export const audioGenerationService = {
@@ -83,82 +76,6 @@ export const audioGenerationService = {
       }
     }
 
-    const adapter = createAudioAdapter(modelId);
-
-    if (!adapter.isAsync && adapter.generate) {
-      // ── Sync generation (TTS, ElevenLabs) ───────────────────────────────
-      try {
-        const effectivePrompt = await translatePromptIfNeeded(
-          prompt,
-          resolvedModelSettings,
-          userId,
-          modelId,
-        );
-        const result = await adapter.generate({
-          prompt: effectivePrompt,
-          voiceId,
-          sourceAudioUrl,
-          modelSettings: resolvedModelSettings,
-        });
-
-        await db.generationJobOutput.create({
-          data: { jobId: job.id, index: 0, outputUrl: result.url ?? null },
-        });
-        await db.generationJob.update({
-          where: { id: job.id },
-          data: { status: "done", completedAt: new Date() },
-        });
-
-        await deductTokens(
-          userId,
-          calculateCost(
-            model,
-            0,
-            0,
-            undefined,
-            undefined,
-            resolvedModelSettings,
-            undefined,
-            prompt.length,
-          ),
-          modelId,
-        );
-
-        // Upload to S3 in background
-        const audioKey = buildS3Key("audio", userId.toString(), job.id, result.ext ?? "mp3");
-        const uploadFn = result.buffer
-          ? uploadBuffer(audioKey, result.buffer, `audio/${result.ext ?? "mpeg"}`)
-          : result.url
-            ? uploadFromUrl(audioKey, result.url, `audio/${result.ext ?? "mpeg"}`)
-            : Promise.resolve(null);
-        uploadFn
-          .then((s3Key) => {
-            if (s3Key) {
-              return db.generationJobOutput.updateMany({
-                where: { jobId: job.id, index: 0 },
-                data: { s3Key },
-              });
-            }
-          })
-          .catch(() => void 0);
-
-        return {
-          dbJobId: job.id,
-          audioBuffer: result.buffer,
-          audioUrl: result.url,
-          audioExt: result.ext,
-          isPending: false,
-        };
-      } catch (err) {
-        await db.generationJob.update({
-          where: { id: job.id },
-          data: { status: "failed", error: String(err) },
-        });
-        throw err;
-      }
-    }
-
-    // ── Async generation — enqueue for worker ─────────────────────────────
     const queue = getAudioQueue();
     await queue.add(
       "generate",
@@ -170,11 +87,11 @@ export const audioGenerationService = {
         voiceId,
         sourceAudioUrl,
         telegramChatId,
-        modelSettings,
+        modelSettings: resolvedModelSettings,
       },
       { attempts: 3, backoff: { type: "exponential", delay: 5000 } },
     );
 
-    return { dbJobId: job.id, isPending: true };
+    return { dbJobId: job.id };
   },
 };
