@@ -35,6 +35,9 @@ import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
 
+/** Telegram multipart upload limit for sendDocument (used by `orig_` callback). */
+const TELEGRAM_DOC_MAX_BYTES = 50 * 1024 * 1024;
+
 const telegram = new Api(config.bot.token);
 
 /** Upload an image to S3 and generate a thumbnail. Returns { s3Key, thumbnailS3Key }. */
@@ -359,10 +362,12 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       }> = [];
 
       const batchCaption = buildCaption();
+      const byteSizes: number[] = [];
       for (let i = 0; i < outputRecords.length; i++) {
         const rec = outputRecords[i];
         const filename = `image-${i + 1}.png`;
         const info = await resolveTelegramSource(rec.s3Key, rec.outputUrl ?? "");
+        byteSizes.push(info.byteSize);
         const { source } = await prepareTelegramPhoto(info, rec.outputUrl ?? "", filename);
         mediaGroup.push({
           type: "photo",
@@ -373,15 +378,17 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
       await telegram.sendMediaGroup(telegramChatId, mediaGroup);
 
-      // Send a single message with refine + download buttons for all outputs.
-      // Up to 3 pairs per row: "{N}. 🔄" "{N}. ⬇️"
+      // Send a single message with refine + (orig|download) buttons for all outputs.
+      // Per output: "{N}. 🔄" paired with "{N}. 📎" (≤50 MB) or "{N}. ⬇️" (>50 MB).
       {
         const buttons: InlineKeyboardButton[] = [];
         for (let i = 0; i < outputRecords.length; i++) {
           const rec = outputRecords[i];
           const n = i + 1;
           buttons.push({ text: `${n}. 🔄`, callback_data: `design_ref_${rec.id}` });
-          if (rec.s3Key && config.api.publicUrl) {
+          if (byteSizes[i] <= TELEGRAM_DOC_MAX_BYTES) {
+            buttons.push({ text: `${n}. 📎`, callback_data: `orig_${rec.id}` });
+          } else if (rec.s3Key && config.api.publicUrl) {
             buttons.push({
               text: `${n}. ⬇️`,
               url: `${config.api.publicUrl}/download/${generateDownloadToken(rec.s3Key, userIdStr)}`,
@@ -457,21 +464,6 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       }
     }
 
-    const refineRow: InlineKeyboardButton[] | null = [
-      { text: t.design.refine, callback_data: `design_ref_${outputId}` },
-    ];
-    const downloadRow: InlineKeyboardButton[] | null =
-      s3Key && config.api.publicUrl
-        ? [
-            {
-              text: t.common.downloadFile,
-              url: `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userIdStr)}`,
-            },
-          ]
-        : null;
-    const rows = [refineRow, downloadRow].filter(Boolean) as InlineKeyboardButton[][];
-    const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
-
     const filename = finalImageResult.filename ?? "image.png";
     const info = await resolveTelegramSource(s3Key, finalImageResult.url);
     const { source: tgImageSource, isSvg } = await prepareTelegramPhoto(
@@ -479,6 +471,23 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       finalImageResult.url,
       filename,
     );
+
+    const refineRow: InlineKeyboardButton[] = [
+      { text: t.design.refine, callback_data: `design_ref_${outputId}` },
+    ];
+    const actionRow: InlineKeyboardButton[] | null =
+      info.byteSize <= TELEGRAM_DOC_MAX_BYTES
+        ? [{ text: t.common.sendOriginal, callback_data: `orig_${outputId}` }]
+        : s3Key && config.api.publicUrl
+          ? [
+              {
+                text: t.common.downloadFile,
+                url: `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userIdStr)}`,
+              },
+            ]
+          : null;
+    const rows = [refineRow, actionRow].filter(Boolean) as InlineKeyboardButton[][];
+    const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
     const singleCaption = buildCaption();
     if (isSvg) {

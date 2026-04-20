@@ -86,7 +86,7 @@ export default {
     refSelected: "✅ Selected as reference",
     refine: "🔄 Refine",
     batchActions:
-      "You can refine an image or download the original uncompressed file (we recommend opening the link in a browser if you're using the mobile version of Telegram).\n\n🔄 - Refine\n⬇️ - Download",
+      "You can refine an image, get the original uncompressed file sent back into the chat, or download it via link (we recommend opening the link in a browser if you're using the mobile version of Telegram).\n\n🔄 - Refine\n📎 - Send as file\n⬇️ - Download",
     chooseModel: "🎨 Choose model",
   },
   audio: {

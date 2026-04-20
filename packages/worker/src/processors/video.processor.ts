@@ -294,21 +294,6 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     }
 
     // ── Stage 3: send to user ────────────────────────────────────────────
-    const origRow: InlineKeyboardButton[] | null = sendOriginalLabel
-      ? [{ text: sendOriginalLabel, callback_data: `orig_${outputId}` }]
-      : null;
-    const downloadRow: InlineKeyboardButton[] | null =
-      s3Key && config.api.publicUrl
-        ? [
-            {
-              text: t.common.downloadFile,
-              url: `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userIdStr)}`,
-            },
-          ]
-        : null;
-    const rows = [downloadRow, origRow].filter(Boolean) as InlineKeyboardButton[][];
-    const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
-
     const rawVideoBuf = await resolveTelegramVideoBuffer(s3Key, outputUrl, videoBuffer);
 
     // Remux to faststart (moov at front) so Telegram's head-only probe returns
@@ -318,6 +303,21 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
     const tooLargeForTelegram = videoBuf.byteLength > VIDEO_MAX_BYTES;
+
+    const actionRow: InlineKeyboardButton[] | null = tooLargeForTelegram
+      ? s3Key && config.api.publicUrl
+        ? [
+            {
+              text: t.common.downloadFile,
+              url: `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userIdStr)}`,
+            },
+          ]
+        : null
+      : sendOriginalLabel
+        ? [{ text: sendOriginalLabel, callback_data: `orig_${outputId}` }]
+        : null;
+    const replyMarkup = actionRow ? { inline_keyboard: [actionRow] } : undefined;
+
     const model = AI_MODELS[modelId];
     const hasAudioDriver =
       !!(modelSettings?.voice_s3key || modelSettings?.voice_url) ||
@@ -330,11 +330,11 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       emptyPromptLabel: hasAudioDriver ? t.common.generationAudioPrompt : undefined,
     });
 
-    if (tooLargeForTelegram && downloadRow) {
+    if (tooLargeForTelegram) {
       await telegram.sendMessage(
         telegramChatId,
         `${caption}\n\n${t.errors.fileTooLargeForTelegram}`,
-        { reply_markup: { inline_keyboard: [downloadRow] } },
+        replyMarkup ? { reply_markup: replyMarkup } : undefined,
       );
     } else {
       // Probe the remuxed buffer so the values we pass to Telegram match the
