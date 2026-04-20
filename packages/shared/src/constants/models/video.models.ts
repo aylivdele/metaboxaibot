@@ -47,12 +47,13 @@ const MI_MOTION_IMAGE: MediaInputSlot = {
   labelKey: "motionImage",
   required: true,
 };
-/** Kling Motion: required reference video (video_url). */
+/** Kling Motion: required reference video (video_url). Provider requires 3–30 s. */
 const MI_MOTION_VIDEO: MediaInputSlot = {
   slotKey: "motion_video",
   mode: "motion_video",
   labelKey: "motionVideo",
   required: true,
+  constraints: { minDurationSec: 3, maxDurationSec: 30 },
 };
 /** Kling Motion: optional facial element (only 1, only with character_orientation="video"). */
 const MI_MOTION_ELEMENT: MediaInputSlot = {

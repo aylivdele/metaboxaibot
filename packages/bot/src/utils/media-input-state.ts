@@ -7,6 +7,92 @@ import { getFileUrl } from "@metabox/api/services";
 /** Telegram Bot API hard limit for downloading files (cloud Bot API). */
 export const TG_DOWNLOAD_LIMIT_BYTES = 20 * 1024 * 1024;
 
+/**
+ * Validate an uploaded media file against a slot's `constraints`.
+ * Returns an error message (from `t.errors.mediaSlot*`) when rejected, or null
+ * when the file is acceptable (or the slot has no constraints).
+ *
+ * Reusable across any handler that receives media into a slot — caller provides
+ * the metadata it already has (duration from `message.video.duration`, size
+ * from `file_size`). Missing fields are skipped, so photo slots can reuse this
+ * for `maxFileSizeBytes` alone.
+ */
+export function validateMediaAgainstSlot(
+  slot: MediaInputSlot,
+  media: {
+    durationSec?: number;
+    fileSizeBytes?: number;
+    widthPx?: number;
+    heightPx?: number;
+  },
+  t: Translations,
+): string | null {
+  const c = slot.constraints;
+  if (!c) return null;
+
+  if (
+    c.maxFileSizeBytes !== undefined &&
+    media.fileSizeBytes !== undefined &&
+    media.fileSizeBytes > c.maxFileSizeBytes
+  ) {
+    const actualMb = (media.fileSizeBytes / (1024 * 1024)).toFixed(1);
+    const maxMb = (c.maxFileSizeBytes / (1024 * 1024)).toFixed(0);
+    return t.errors.mediaSlotFileTooLarge.replace("{actualMb}", actualMb).replace("{maxMb}", maxMb);
+  }
+
+  if (media.durationSec !== undefined) {
+    const d = media.durationSec;
+    const hasMin = c.minDurationSec !== undefined;
+    const hasMax = c.maxDurationSec !== undefined;
+    const belowMin = hasMin && d < (c.minDurationSec as number);
+    const aboveMax = hasMax && d > (c.maxDurationSec as number);
+    if (belowMin || aboveMax) {
+      const actual = String(Math.round(d));
+      if (hasMin && hasMax) {
+        return t.errors.mediaSlotDurationOutOfRange
+          .replace("{actual}", actual)
+          .replace("{min}", String(c.minDurationSec))
+          .replace("{max}", String(c.maxDurationSec));
+      }
+      if (belowMin) {
+        return t.errors.mediaSlotDurationTooShort
+          .replace("{actual}", actual)
+          .replace("{min}", String(c.minDurationSec));
+      }
+      return t.errors.mediaSlotDurationTooLong
+        .replace("{actual}", actual)
+        .replace("{max}", String(c.maxDurationSec));
+    }
+  }
+
+  if (media.widthPx !== undefined && media.heightPx !== undefined) {
+    const w = media.widthPx;
+    const h = media.heightPx;
+    const tooSmall =
+      (c.minWidth !== undefined && w < c.minWidth) ||
+      (c.minHeight !== undefined && h < c.minHeight);
+    const tooLarge =
+      (c.maxWidth !== undefined && w > c.maxWidth) ||
+      (c.maxHeight !== undefined && h > c.maxHeight);
+    if (tooSmall) {
+      return t.errors.mediaSlotImageTooSmall
+        .replace("{actualW}", String(w))
+        .replace("{actualH}", String(h))
+        .replace("{minW}", String(c.minWidth ?? 0))
+        .replace("{minH}", String(c.minHeight ?? 0));
+    }
+    if (tooLarge) {
+      return t.errors.mediaSlotImageTooLarge
+        .replace("{actualW}", String(w))
+        .replace("{actualH}", String(h))
+        .replace("{maxW}", String(c.maxWidth ?? 0))
+        .replace("{maxH}", String(c.maxHeight ?? 0));
+    }
+  }
+
+  return null;
+}
+
 export type TgFileKind = "photo" | "doc" | "video" | "audio" | "voice";
 
 /** Slot value format for Telegram-uploaded media: resolved lazily at submit. */

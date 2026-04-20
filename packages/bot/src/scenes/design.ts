@@ -6,6 +6,7 @@ import {
   userAvatarService,
   describeImageForPrompt,
   getFileUrl,
+  probeImageMetadata,
 } from "@metabox/api/services";
 import type { SubmitImageResult } from "@metabox/api/services";
 import { generateDownloadToken } from "@metabox/api/utils/download-token";
@@ -37,6 +38,7 @@ import {
   buildTgSlotValue,
   TG_DOWNLOAD_LIMIT_BYTES,
   sendSlotPreview,
+  validateMediaAgainstSlot,
 } from "../utils/media-input-state.js";
 
 // ── Random design pending messages (Russian) ────────────────────────────────
@@ -669,6 +671,32 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   const activeSlot = getActiveSlot(ctx.user.id);
   if (activeSlot && activeSlot.section === "design") {
     const slotModelId = activeSlot.modelId;
+    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+
+    if (slot?.constraints) {
+      let widthPx = photoSize?.width;
+      let heightPx = photoSize?.height;
+      let fileSizeBytes: number | undefined = fileSize || undefined;
+      if (isImageDoc) {
+        try {
+          const probeUrl = await getLiveTgUrl();
+          const meta = await probeImageMetadata(probeUrl);
+          widthPx = meta.width;
+          heightPx = meta.height;
+          fileSizeBytes = meta.fileSizeBytes;
+        } catch (err) {
+          logger.warn({ err }, "probeImageMetadata failed for document");
+          await ctx.reply(ctx.t.errors.mediaSlotReadMetadataFailed);
+          return;
+        }
+      }
+      const violation = validateMediaAgainstSlot(slot, { widthPx, heightPx, fileSizeBytes }, ctx.t);
+      if (violation) {
+        await ctx.reply(violation);
+        return;
+      }
+    }
+
     const current = await userStateService.getMediaInputs(ctx.user.id, slotModelId);
     const existing = current[activeSlot.slotKey] ?? [];
     if (existing.length >= activeSlot.maxImages) {
@@ -677,7 +705,6 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     const userId = ctx.user.id;
     await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
 
-    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
     const label = slot
       ? (ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey)
       : activeSlot.slotKey;

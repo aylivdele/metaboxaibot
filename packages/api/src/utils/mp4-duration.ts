@@ -38,6 +38,31 @@ export function parseMp4Duration(buf: Buffer): number | null {
   return parseMp4Info(buf).duration;
 }
 
+export interface VideoProbeInfo {
+  durationSec: number | null;
+  width: number | null;
+  height: number | null;
+  fileSizeBytes: number;
+}
+
+/**
+ * Fetches a video URL and extracts duration + dimensions from the MP4 moov atom.
+ * Falls back to null fields when the container isn't MP4 or moov isn't present
+ * (caller decides how to surface that).
+ */
+export async function probeVideoMetadata(videoUrl: string): Promise<VideoProbeInfo> {
+  const res = await fetch(videoUrl);
+  if (!res.ok) throw new Error(`Failed to fetch video for probe: ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const info = parseMp4Info(buf);
+  return {
+    durationSec: info.duration,
+    width: info.width,
+    height: info.height,
+    fileSizeBytes: buf.byteLength,
+  };
+}
+
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 /**

@@ -14,6 +14,7 @@ export type {
   AIModel,
   MediaInputMode,
   MediaInputSlot,
+  MediaInputConstraints,
   ModelFamily,
   ModelFamilyMember,
   ModelSettingDef,

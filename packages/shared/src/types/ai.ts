@@ -96,6 +96,27 @@ export type MediaInputMode =
   | "first_clip"
   | "motion_video";
 
+/**
+ * Per-slot media validation constraints. Enforced on upload so the user gets
+ * immediate feedback instead of a provider error mid-generation.
+ */
+export interface MediaInputConstraints {
+  /** Minimum video/audio duration in seconds (inclusive). */
+  minDurationSec?: number;
+  /** Maximum video/audio duration in seconds (inclusive). */
+  maxDurationSec?: number;
+  /** Maximum file size in bytes — rejected before download is attempted. */
+  maxFileSizeBytes?: number;
+  /** Minimum image/video width in pixels (inclusive). */
+  minWidth?: number;
+  /** Maximum image/video width in pixels (inclusive). */
+  maxWidth?: number;
+  /** Minimum image/video height in pixels (inclusive). */
+  minHeight?: number;
+  /** Maximum image/video height in pixels (inclusive). */
+  maxHeight?: number;
+}
+
 export interface MediaInputSlot {
   /** Unique key for this slot within the model, used as storage key. */
   slotKey: string;
@@ -113,6 +134,13 @@ export interface MediaInputSlot {
    * are hidden until the filled slot is cleared.
    */
   exclusiveGroup?: string;
+  /**
+   * Upload-time validation rules (duration, file size). When a constraint is
+   * violated, the upload is rejected with a user-facing error built from
+   * `t.errors.mediaSlot*` strings. Reusable across models — e.g. Kling motion
+   * enforces 3–30 s on `motion_video`.
+   */
+  constraints?: MediaInputConstraints;
 }
 
 // ── Model family types ───────────────────────────────────────────────────────

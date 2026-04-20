@@ -168,6 +168,13 @@ export interface Translations {
     fileTooLargeForTelegram: string;
     fileTooLargeForBotApi: string;
     mediaSlotExpired: string;
+    mediaSlotDurationTooShort: string;
+    mediaSlotDurationTooLong: string;
+    mediaSlotDurationOutOfRange: string;
+    mediaSlotFileTooLarge: string;
+    mediaSlotImageTooSmall: string;
+    mediaSlotImageTooLarge: string;
+    mediaSlotReadMetadataFailed: string;
     contentPolicyViolation: string;
     recraftImg2imgSvgUnsupported: string;
     recraftImg2imgFileTooLarge: string;

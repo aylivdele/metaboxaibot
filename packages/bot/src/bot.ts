@@ -361,6 +361,7 @@ export function createBot(token: string): Bot<BotContext> {
       if (ctx.message?.photo) return handleVideoPhoto(ctx);
       if (ctx.message?.document?.mime_type?.startsWith("image/")) return handleVideoPhoto(ctx);
       if (ctx.message?.video) return handleVideoVideo(ctx);
+      if (ctx.message?.document?.mime_type?.startsWith("video/")) return handleVideoVideo(ctx);
       if (ctx.message?.voice || ctx.message?.audio) return handleVideoVoice(ctx);
       return handleVideoMessage(ctx);
     }

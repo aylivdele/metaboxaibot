@@ -213,6 +213,18 @@ export default {
       "❌ File is too large. The maximum upload size via the bot is 20 MB. Please compress the file and try again.",
     mediaSlotExpired:
       "❌ The uploaded file is no longer available. Please upload it again and try once more.",
+    mediaSlotDurationTooShort:
+      "❌ Video is too short ({actual} s). Minimum duration is {min} s. Please upload a different file.",
+    mediaSlotDurationTooLong:
+      "❌ Video is too long ({actual} s). Maximum duration is {max} s. Trim the video and try again.",
+    mediaSlotDurationOutOfRange:
+      "❌ Video length of {actual} s is not accepted. Allowed duration is {min}–{max} s.",
+    mediaSlotFileTooLarge: "❌ File is too large ({actualMb} MB). Maximum size is {maxMb} MB.",
+    mediaSlotImageTooSmall:
+      "❌ The image is too small ({actualW}×{actualH} px). Minimum size is {minW}×{minH} px.",
+    mediaSlotImageTooLarge:
+      "❌ The image is too large ({actualW}×{actualH} px). Maximum size is {maxW}×{maxH} px.",
+    mediaSlotReadMetadataFailed: "❌ Failed to read file metadata. Check the format and try again.",
     contentPolicyViolation:
       "❌ Your request was rejected due to a content policy violation. Please modify your prompt and try again.",
     recraftImg2imgSvgUnsupported:

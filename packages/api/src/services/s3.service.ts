@@ -207,6 +207,25 @@ export async function measureImageMegapixels(imageUrl: string): Promise<number> 
   return (meta.width * meta.height) / 1_000_000;
 }
 
+export interface ImageProbeInfo {
+  width: number;
+  height: number;
+  fileSizeBytes: number;
+}
+
+/**
+ * Fetches an image URL and reads width/height via sharp, plus the byte length.
+ * Throws on fetch/decode failures so the caller can decide how to surface the error.
+ */
+export async function probeImageMetadata(imageUrl: string): Promise<ImageProbeInfo> {
+  const res = await fetch(imageUrl);
+  if (!res.ok) throw new Error(`Failed to fetch image for probe: ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const meta = await sharp(buf).metadata();
+  if (!meta.width || !meta.height) throw new Error("Could not read image dimensions");
+  return { width: meta.width, height: meta.height, fileSizeBytes: buf.byteLength };
+}
+
 /**
  * Generates a 400px-wide WebP thumbnail from an image buffer.
  * Returns null for SVG or non-image content types.

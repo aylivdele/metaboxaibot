@@ -9,7 +9,9 @@ import {
   checkBalance,
   deductTokens,
   usdToTokens,
+  probeImageMetadata,
 } from "@metabox/api/services";
+import { probeVideoMetadata } from "@metabox/api/utils/mp4-duration";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { HeyGenAvatarAdapter } from "@metabox/api/ai/avatar/heygen";
@@ -40,6 +42,7 @@ import {
   buildTgSlotValue,
   TG_DOWNLOAD_LIMIT_BYTES,
   sendSlotPreview,
+  validateMediaAgainstSlot,
 } from "../utils/media-input-state.js";
 import {
   SOUL_MAX_PHOTOS,
@@ -820,6 +823,32 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
   const activeSlot = getActiveSlot(ctx.user.id);
   if (activeSlot && activeSlot.section === "video") {
     const slotModelId = activeSlot.modelId;
+    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+
+    if (slot?.constraints) {
+      let widthPx = photoSize?.width;
+      let heightPx = photoSize?.height;
+      let fileSizeBytes: number | undefined = fileSize || undefined;
+      if (isImageDoc) {
+        try {
+          const probeUrl = await getLiveTgUrl();
+          const meta = await probeImageMetadata(probeUrl);
+          widthPx = meta.width;
+          heightPx = meta.height;
+          fileSizeBytes = meta.fileSizeBytes;
+        } catch (err) {
+          logger.warn({ err }, "probeImageMetadata failed for document");
+          await ctx.reply(ctx.t.errors.mediaSlotReadMetadataFailed);
+          return;
+        }
+      }
+      const violation = validateMediaAgainstSlot(slot, { widthPx, heightPx, fileSizeBytes }, ctx.t);
+      if (violation) {
+        await ctx.reply(violation);
+        return;
+      }
+    }
+
     const current = await userStateService.getMediaInputs(ctx.user.id, slotModelId);
     const existing = current[activeSlot.slotKey] ?? [];
     if (existing.length >= activeSlot.maxImages) {
@@ -829,7 +858,6 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     const userId = ctx.user.id;
     await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
 
-    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
     const label = slot
       ? (ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey)
       : activeSlot.slotKey;
@@ -954,25 +982,61 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
 // ── Video handler in VIDEO_ACTIVE state (D-ID driver_url) ─────────────────────
 
 export async function handleVideoVideo(ctx: BotContext): Promise<void> {
-  if (!ctx.user || !ctx.message?.video) return;
+  if (!ctx.user) return;
+  const isVideoMsg = !!ctx.message?.video;
+  const isVideoDoc = !!ctx.message?.document?.mime_type?.startsWith("video/");
+  if (!isVideoMsg && !isVideoDoc) return;
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.videoModelId;
   if (!modelId) return;
   const model = AI_MODELS[modelId];
 
-  const videoMsg = ctx.message.video;
-  const fileSize = videoMsg.file_size ?? 0;
+  const videoMsg = isVideoMsg ? ctx.message!.video! : null;
+  const videoDoc = isVideoDoc ? ctx.message!.document! : null;
+  const fileId = (videoMsg?.file_id ?? videoDoc!.file_id) as string;
+  const fileSize = videoMsg?.file_size ?? videoDoc?.file_size ?? 0;
+  const tgKind: "video" | "doc" = videoMsg ? "video" : "doc";
   if (fileSize > TG_DOWNLOAD_LIMIT_BYTES) {
     await ctx.reply(ctx.t.errors.fileTooLargeForBotApi);
     return;
   }
-  const tgSlotValue = buildTgSlotValue("video", videoMsg.file_id);
+  const tgSlotValue = buildTgSlotValue(tgKind, fileId);
 
   // Active reference_element slot: videos are exclusive (replace any images).
   const activeSlot = getActiveSlot(ctx.user.id);
   if (activeSlot && activeSlot.section === "video") {
     const slotModelId = activeSlot.modelId;
     const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+    if (slot?.constraints) {
+      let durationSec: number | undefined = videoMsg?.duration;
+      let widthPx: number | undefined = videoMsg?.width;
+      let heightPx: number | undefined = videoMsg?.height;
+      let fileSizeBytes: number | undefined = fileSize || undefined;
+      if (isVideoDoc) {
+        try {
+          const file = await ctx.api.getFile(fileId);
+          const probeUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+          const meta = await probeVideoMetadata(probeUrl);
+          if (meta.durationSec !== null) durationSec = meta.durationSec;
+          if (meta.width !== null) widthPx = meta.width;
+          if (meta.height !== null) heightPx = meta.height;
+          fileSizeBytes = meta.fileSizeBytes;
+        } catch (err) {
+          logger.warn({ err }, "probeVideoMetadata failed for document");
+          await ctx.reply(ctx.t.errors.mediaSlotReadMetadataFailed);
+          return;
+        }
+      }
+      const violation = validateMediaAgainstSlot(
+        slot,
+        { durationSec, widthPx, heightPx, fileSizeBytes },
+        ctx.t,
+      );
+      if (violation) {
+        await ctx.reply(violation);
+        return;
+      }
+    }
     if (slot?.mode === "reference_element") {
       await userStateService.clearMediaInputSlot(ctx.user.id, slotModelId, activeSlot.slotKey);
       await userStateService.addMediaInput(
@@ -1031,7 +1095,7 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
   }
 
   if (!model?.supportsVideo) return;
-  const file = await ctx.api.getFile(videoMsg.file_id);
+  const file = await ctx.api.getFile(fileId);
   const fileUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
   await userStateService.setVideoRefDriverUrl(ctx.user.id, fileUrl);
   await ctx.reply(ctx.t.video.videoDriverSaved);
