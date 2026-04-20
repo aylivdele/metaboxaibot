@@ -3054,26 +3054,38 @@ textarea::placeholder {
 }
 
 .settings-panel__advanced {
-  margin-top: 12px;
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
+  margin-top: 16px;
+  padding-top: 4px;
 }
 .settings-panel__advanced-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 10px 0;
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.05s;
+}
+.settings-panel__advanced-toggle:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--accent);
+}
+.settings-panel__advanced-toggle:active {
+  transform: scale(0.99);
 }
 .settings-panel__advanced-arrow {
   transition: transform 0.2s;
-  font-size: 10px;
+  font-size: 12px;
 }
 .settings-panel__advanced-arrow.open {
   transform: rotate(180deg);
