@@ -12,6 +12,11 @@ import { fetchWithLog } from "../../utils/fetch.js";
 import { transcodeToMp3 } from "../../utils/audio-transcode.js";
 import { parseHeyGenErrorBody, parseHeyGenPollFailure } from "../../utils/heygen-error.js";
 import { resolveImageMimeType, resolveAudioMimeType } from "../../utils/mime-detect.js";
+import sharp from "sharp";
+
+// HeyGen /v3/assets upload constraints (see docs/schema/heygen/asset-upload.md).
+// Supported types: png, jpeg (image); mp4, webm (video); mp3, wav (audio); pdf.
+const HEYGEN_ASSET_MAX_BYTES = 32 * 1024 * 1024;
 
 const HEYGEN_API = "https://api.heygen.com";
 
@@ -92,6 +97,10 @@ export class HeyGenAdapter implements VideoAdapter {
       }
     }
 
+    if (audioBuffer.byteLength > HEYGEN_ASSET_MAX_BYTES) {
+      throw new Error(`HeyGen: audio asset exceeds 32 MB limit (${audioBuffer.byteLength} bytes)`);
+    }
+
     const audioExt = contentType === "audio/wav" ? "wav" : "mp3";
     const audioForm = new FormData();
     audioForm.append(
@@ -129,25 +138,39 @@ export class HeyGenAdapter implements VideoAdapter {
 
     const imgRes = await fetchWithLog(imageUrl);
     if (!imgRes.ok) throw new Error(`Failed to fetch image for HeyGen upload: ${imgRes.status}`);
-    const imgBuffer = await imgRes.arrayBuffer();
-
-    // Detect actual image type from magic bytes — HTTP Content-Type may be unreliable
-    // (S3 presigned URLs and Telegram file URLs often return application/octet-stream).
-    const contentType = resolveImageMimeType(imgBuffer, imgRes.headers.get("content-type"));
-
-    const imgExt = contentType.includes("png")
-      ? "png"
-      : contentType.includes("webp")
-        ? "webp"
-        : "jpg";
+    let imgBuffer: Buffer = Buffer.from(await imgRes.arrayBuffer());
     if (!imgBuffer.byteLength) {
       throw new Error("HeyGen: image buffer is empty after fetch");
     }
 
+    // Detect actual image type from magic bytes — HTTP Content-Type may be unreliable
+    // (S3 presigned URLs and Telegram file URLs often return application/octet-stream).
+    let contentType = resolveImageMimeType(imgBuffer, imgRes.headers.get("content-type"));
+
+    // HeyGen /v3/assets accepts only png and jpeg for images. Convert anything else
+    // (webp, gif, ...) to JPEG via sharp.
+    const isHeyGenSupported = contentType === "image/png" || contentType === "image/jpeg";
+    if (!isHeyGenSupported) {
+      logger.info({ from: contentType }, "HeyGen: transcoding image to JPEG");
+      imgBuffer = await sharp(imgBuffer).rotate().jpeg({ quality: 90 }).toBuffer();
+      contentType = "image/jpeg";
+      if (!imgBuffer.byteLength) {
+        throw new Error("HeyGen: image buffer empty after transcode to JPEG");
+      }
+    }
+
+    if (imgBuffer.byteLength > HEYGEN_ASSET_MAX_BYTES) {
+      throw new Error(`HeyGen: image asset exceeds 32 MB limit (${imgBuffer.byteLength} bytes)`);
+    }
+
+    const imgExt = contentType === "image/png" ? "png" : "jpg";
+
     const imgFormData = new FormData();
     imgFormData.append(
       "file",
-      new Blob([new Uint8Array(imgBuffer)], { type: contentType }),
+      new Blob([new Uint8Array(imgBuffer.buffer, imgBuffer.byteOffset, imgBuffer.byteLength)], {
+        type: contentType,
+      }),
       `image.${imgExt}`,
     );
 
