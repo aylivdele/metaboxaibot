@@ -358,6 +358,10 @@ export default {
     falFeatureNotSupported: "❌ Запрошенная функция не поддерживается данной моделью.",
     falOneOf: "❌ Недопустимое значение. Допустимые значения: {expected}.",
     falOneOfField: "❌ Недопустимое значение для поля «{field}». Допустимые значения: {expected}.",
+    falStringTooShort: "❌ Значение слишком короткое (минимум {min} символов).",
+    falStringTooShortField: "❌ Значение поля «{field}» слишком короткое (минимум {min} символов).",
+    falStringTooLong: "❌ Значение слишком длинное (максимум {max} символов).",
+    falStringTooLongField: "❌ Значение поля «{field}» слишком длинное (максимум {max} символов).",
     // ElevenLabs
     elevenlabsPromptTooLong:
       "❌ Текст слишком длинный ({current} символов). Максимум для генерации звуков — {max} символов. Сократите запрос и попробуйте снова.",

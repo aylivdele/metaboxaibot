@@ -31,6 +31,8 @@ const USER_FACING_TYPES = new Set([
   "multiple_of",
   "sequence_too_short",
   "sequence_too_long",
+  "string_too_short",
+  "string_too_long",
   "one_of",
   "feature_not_supported",
   "invalid_archive",
@@ -184,6 +186,24 @@ function formatFalError(d: FalErrorDetail, t: { errors: Record<string, string> }
       const field = d.loc?.slice(1).join(".") ?? "";
       if (!expected) return `❌ ${d.msg}`;
       return field ? sub(e.falOneOfField, { field, expected }) : sub(e.falOneOf, { expected });
+    }
+
+    case "string_too_short": {
+      const min = ctx.min_length != null ? String(ctx.min_length) : null;
+      const field = d.loc?.slice(1).join(".") ?? "";
+      if (!min) return `❌ ${d.msg}`;
+      return field
+        ? sub(e.falStringTooShortField, { field, min })
+        : sub(e.falStringTooShort, { min });
+    }
+
+    case "string_too_long": {
+      const max = ctx.max_length != null ? String(ctx.max_length) : null;
+      const field = d.loc?.slice(1).join(".") ?? "";
+      if (!max) return `❌ ${d.msg}`;
+      return field
+        ? sub(e.falStringTooLongField, { field, max })
+        : sub(e.falStringTooLong, { max });
     }
 
     default:

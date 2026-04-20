@@ -363,6 +363,10 @@ export default {
     falFeatureNotSupported: "❌ The requested feature is not supported by this model.",
     falOneOf: "❌ Invalid value. Allowed values: {expected}.",
     falOneOfField: "❌ Invalid value for field '{field}'. Allowed values: {expected}.",
+    falStringTooShort: "❌ Value is too short (minimum {min} characters).",
+    falStringTooShortField: "❌ Value for field '{field}' is too short (minimum {min} characters).",
+    falStringTooLong: "❌ Value is too long (maximum {max} characters).",
+    falStringTooLongField: "❌ Value for field '{field}' is too long (maximum {max} characters).",
     // ElevenLabs
     elevenlabsPromptTooLong:
       "❌ Your prompt is too long ({current} characters). The maximum for sound generation is {max} characters. Please shorten your prompt and try again.",

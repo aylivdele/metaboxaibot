@@ -503,9 +503,12 @@ type TelegramImageInfo =
 
 /**
  * Returns the best source info for sending an image to Telegram:
- * 1. S3 public/presigned URL if available (always reachable by Telegram).
- * 2. Downloaded buffer (for providers like fal.media that block Telegram's
- *    HTTP fetcher, or when we need bytes in hand for re-encoding).
+ * 1. S3 presigned URL if HEAD confirms reachability + size (Telegram can fetch directly).
+ * 2. S3 presigned URL downloaded as a buffer (when HEAD fails / lacks content-length,
+ *    e.g. some S3-compat stores omit it on presigned responses).
+ * 3. Provider URL as a last resort — only when S3 isn't configured or we never
+ *    stored the file. Provider URLs from fal / Google (nano banana 2) are often
+ *    single-use or short-lived and will 409/410 on re-fetch by this point.
  */
 async function resolveTelegramSource(
   s3Key: string | null,
@@ -520,6 +523,15 @@ async function resolveTelegramSource(
         const byteSize = contentLength ? parseInt(contentLength, 10) : NaN;
         if (!isNaN(byteSize) && byteSize > 0) {
           return { kind: "url", url: s3Url, byteSize };
+        }
+      }
+      // HEAD not usable — GET the S3 copy directly instead of re-fetching
+      // the (possibly single-use / expired) provider URL.
+      const s3Res = await fetch(s3Url).catch(() => null);
+      if (s3Res?.ok) {
+        const buffer = Buffer.from(await s3Res.arrayBuffer());
+        if (buffer.byteLength > 0) {
+          return { kind: "buffer", buffer, byteSize: buffer.byteLength };
         }
       }
     }

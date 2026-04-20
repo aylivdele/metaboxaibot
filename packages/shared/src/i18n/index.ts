@@ -270,6 +270,10 @@ export interface Translations {
     falFeatureNotSupported: string;
     falOneOf: string;
     falOneOfField: string;
+    falStringTooShort: string;
+    falStringTooShortField: string;
+    falStringTooLong: string;
+    falStringTooLongField: string;
     // ElevenLabs
     elevenlabsPromptTooLong: string;
     // Suno
