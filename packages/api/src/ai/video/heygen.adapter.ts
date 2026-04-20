@@ -13,6 +13,36 @@ import { transcodeToMp3 } from "../../utils/audio-transcode.js";
 import { parseHeyGenErrorBody, parseHeyGenPollFailure } from "../../utils/heygen-error.js";
 import { resolveImageMimeType, resolveAudioMimeType } from "../../utils/mime-detect.js";
 import sharp from "sharp";
+import { randomBytes } from "crypto";
+
+/**
+ * Build a multipart/form-data body by hand for a single file field.
+ *
+ * Why not native FormData + Blob/File? In Node / undici, when the multipart
+ * serializer walks the FormData, it sometimes loses the Blob's `type` and
+ * writes the part's Content-Type as `application/octet-stream` (observed
+ * with pooled Buffer backing stores and with File built from a Uint8Array
+ * view). HeyGen validates that per-part Content-Type strictly, so we build
+ * the wire format directly — zero surprises.
+ */
+function buildSingleFileMultipart(
+  fieldName: string,
+  filename: string,
+  contentType: string,
+  data: Uint8Array,
+): { body: Buffer; contentType: string } {
+  const boundary = `----metabox${randomBytes(16).toString("hex")}`;
+  const header = Buffer.from(
+    `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="${fieldName}"; filename="${filename}"\r\n` +
+      `Content-Type: ${contentType}\r\n\r\n`,
+  );
+  const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
+  return {
+    body: Buffer.concat([header, Buffer.from(data), footer]),
+    contentType: `multipart/form-data; boundary=${boundary}`,
+  };
+}
 
 // HeyGen /v3/assets upload constraints (see docs/schema/heygen/asset-upload.md).
 // Supported types: png, jpeg (image); mp4, webm (video); mp3, wav (audio); pdf.
@@ -104,30 +134,25 @@ export class HeyGenAdapter implements VideoAdapter {
     }
 
     const audioExt = contentType === "audio/wav" ? "wav" : "mp3";
-    // Copy into a freshly-allocated Uint8Array — Node's Buffer may share a
-    // pooled backing ArrayBuffer, and some undici versions drop the Blob's
-    // `type` when the backing buffer is shared, causing the multipart part
-    // Content-Type to default to application/octet-stream.
-    const bytes = new Uint8Array(audioBuffer.byteLength);
-    bytes.set(audioBuffer);
-    const audioFile = new File([bytes], `audio.${audioExt}`, { type: contentType });
-    const audioForm = new FormData();
-    audioForm.append("file", audioFile);
+    const multipart = buildSingleFileMultipart(
+      "file",
+      `audio.${audioExt}`,
+      contentType,
+      audioBuffer,
+    );
 
     logger.info(
-      {
-        contentType,
-        size: audioBuffer.byteLength,
-        fileType: audioFile.type,
-        fileName: audioFile.name,
-      },
+      { contentType, size: audioBuffer.byteLength, multipartSize: multipart.body.byteLength },
       "HeyGen: uploading audio asset",
     );
 
     const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
       method: "POST",
-      headers: { "X-Api-Key": this.apiKey },
-      body: audioForm,
+      headers: {
+        "X-Api-Key": this.apiKey,
+        "Content-Type": multipart.contentType,
+      },
+      body: multipart.body,
     });
     if (!uploadRes.ok) {
       const text = await uploadRes.text();
@@ -177,23 +202,20 @@ export class HeyGenAdapter implements VideoAdapter {
 
     const imgExt = contentType === "image/png" ? "png" : "jpg";
 
-    // Copy into a freshly-allocated Uint8Array to avoid pooled-Buffer
-    // backing-store issues (see uploadAudioAsset for context).
-    const imgBytes = new Uint8Array(imgBuffer.byteLength);
-    imgBytes.set(imgBuffer);
-    const imgFile = new File([imgBytes], `image.${imgExt}`, { type: contentType });
-    const imgFormData = new FormData();
-    imgFormData.append("file", imgFile);
+    const multipart = buildSingleFileMultipart("file", `image.${imgExt}`, contentType, imgBuffer);
 
     logger.info(
-      { contentType, size: imgBuffer.byteLength, fileType: imgFile.type, fileName: imgFile.name },
+      { contentType, size: imgBuffer.byteLength, multipartSize: multipart.body.byteLength },
       "HeyGen: uploading image asset",
     );
 
     const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
       method: "POST",
-      headers: { "X-Api-Key": this.apiKey },
-      body: imgFormData,
+      headers: {
+        "X-Api-Key": this.apiKey,
+        "Content-Type": multipart.contentType,
+      },
+      body: multipart.body,
     });
     if (!uploadRes.ok) {
       const text = await uploadRes.text();
