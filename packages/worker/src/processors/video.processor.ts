@@ -311,10 +311,15 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
     const tooLargeForTelegram = videoBuf.byteLength > VIDEO_MAX_BYTES;
     const model = AI_MODELS[modelId];
+    const hasAudioDriver =
+      !!(modelSettings?.voice_s3key || modelSettings?.voice_url) ||
+      !!mediaInputs?.driving_audio?.length ||
+      !!mediaInputs?.reference_audios?.length;
     const caption = buildResultCaption(t, model?.name ?? modelId, prompt, {
       cost: deductResult?.deducted,
       subscriptionBalance: deductResult?.subscriptionTokenBalance,
       tokenBalance: deductResult?.tokenBalance,
+      emptyPromptLabel: hasAudioDriver ? t.common.generationAudioPrompt : undefined,
     });
 
     if (tooLargeForTelegram && downloadRow) {

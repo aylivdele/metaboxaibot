@@ -288,6 +288,8 @@ export interface Translations {
     sendOriginal: string;
     downloadFile: string;
     generationCostLine: string;
+    generationNoPrompt: string;
+    generationAudioPrompt: string;
     tariffs: string;
     costPerRequest: string;
     costRangePerRequest: string;
@@ -414,10 +416,12 @@ export function getT(lang: Language): Translations {
 /**
  * Builds the standard caption shown with a generation result:
  *   ✅ {modelName}: {prompt}{suffix}
- *   💰 Spent: {cost} ✦ · 💳 Balance: {total} ✦ (sub {sub} + {regular})
+ *
+ *   💸 Spent: {cost} ✦
+ *   💳 Balance: {total} ✦
  *
  * `cost`/`sub`/`regular` may be undefined when deduction context is unavailable
- * (e.g. crash recovery) — the cost line is then omitted.
+ * (e.g. crash recovery) — the cost block is then omitted.
  */
 export function buildResultCaption(
   t: Translations,
@@ -429,11 +433,18 @@ export function buildResultCaption(
     tokenBalance?: number;
     suffix?: string;
     maxPromptLen?: number;
+    emptyPromptLabel?: string;
   },
 ): string {
   const maxLen = opts?.maxPromptLen ?? 200;
-  let sliced = prompt.slice(0, maxLen);
-  if (prompt.length > maxLen) sliced += "...";
+  const hasPrompt = !!prompt && prompt.trim().length > 0;
+  let sliced: string;
+  if (hasPrompt) {
+    sliced = prompt.slice(0, maxLen);
+    if (prompt.length > maxLen) sliced += "...";
+  } else {
+    sliced = opts?.emptyPromptLabel ?? t.common.generationNoPrompt;
+  }
   const suffix = opts?.suffix ? ` ${opts.suffix}` : "";
   let caption = `✅ ${displayName}: ${sliced}${suffix}`;
   const cost = opts?.cost;
@@ -443,10 +454,8 @@ export function buildResultCaption(
     const total = sub + reg;
     const line = t.common.generationCostLine
       .replace("{cost}", String(Math.round(cost)))
-      .replace("{total}", String(Math.round(total)))
-      .replace("{sub}", String(Math.round(sub)))
-      .replace("{regular}", String(Math.round(reg)));
-    caption += `\n${line}`;
+      .replace("{total}", String(Math.round(total)));
+    caption += `\n\n${line}`;
   }
   return caption;
 }
