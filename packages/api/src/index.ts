@@ -2,7 +2,7 @@ import "dotenv/config";
 import { initSentry } from "./sentry.js";
 initSentry();
 
-import Fastify from "fastify";
+import Fastify, { type FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
@@ -100,6 +100,48 @@ await server.register(fastifyStatic, {
   root: join(__dirname, "..", "uploads"),
   prefix: "/uploads/",
   decorateReply: false,
+});
+
+// ── Request logging (debug level) ─────────────────────────────────────────────
+// Logs every mini-app / webapp call with method, path, userId (if auth ran),
+// status, and duration. Skips noisy endpoints (health checks, metrics, docs,
+// static uploads) to keep the output focused on user-driven traffic.
+const REQUEST_LOG_SKIP_PREFIX = ["/health", "/metrics", "/docs", "/uploads/"];
+function shouldSkipRequestLog(url: string): boolean {
+  const path = url.split("?")[0];
+  return REQUEST_LOG_SKIP_PREFIX.some((p) => path === p || path.startsWith(`${p}/`) || path === p);
+}
+
+server.addHook("onRequest", async (request) => {
+  if (!logger.isLevelEnabled("debug")) return;
+  if (shouldSkipRequestLog(request.url)) return;
+  (request as FastifyRequest & { _startTime?: number })._startTime = Date.now();
+  logger.debug(
+    {
+      method: request.method,
+      url: request.url,
+      ip: request.ip,
+      ua: request.headers["user-agent"],
+    },
+    "api request",
+  );
+});
+
+server.addHook("onResponse", async (request, reply) => {
+  if (!logger.isLevelEnabled("debug")) return;
+  if (shouldSkipRequestLog(request.url)) return;
+  const started = (request as FastifyRequest & { _startTime?: number })._startTime;
+  const durationMs = started ? Date.now() - started : undefined;
+  logger.debug(
+    {
+      method: request.method,
+      url: request.url,
+      status: reply.statusCode,
+      durationMs,
+      userId: (request as FastifyRequest & { userId?: bigint }).userId?.toString(),
+    },
+    "api response",
+  );
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────

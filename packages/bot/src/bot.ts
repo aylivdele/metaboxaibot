@@ -83,11 +83,59 @@ import { logger } from "./logger.js";
 export function createBot(token: string): Bot<BotContext> {
   const bot = new Bot<BotContext>(token);
 
-  // ── Raw update logger (debug payments) ──────────────────────────────────
+  // ── Raw update logger — every incoming update at debug level ────────────
   bot.use(async (ctx, next) => {
     const updateType = Object.keys(ctx.update)
       .filter((k) => k !== "update_id")
       .join(",");
+
+    if (logger.isLevelEnabled("debug")) {
+      const msg = ctx.message ?? ctx.editedMessage;
+      const preview: Record<string, unknown> = {};
+      if (msg?.text !== undefined) {
+        preview.text =
+          msg.text.length > 80
+            ? `${msg.text.slice(0, 80)}…(${msg.text.length - 80} more)`
+            : msg.text;
+      }
+      if (msg?.caption !== undefined) {
+        preview.caption =
+          msg.caption.length > 80
+            ? `${msg.caption.slice(0, 80)}…(${msg.caption.length - 80} more)`
+            : msg.caption;
+      }
+      if (msg?.photo) preview.photo = msg.photo.length;
+      if (msg?.video) preview.video = msg.video.file_id;
+      if (msg?.voice) preview.voice = msg.voice.file_id;
+      if (msg?.audio) preview.audio = msg.audio.file_id;
+      if (msg?.document)
+        preview.document = { mime: msg.document.mime_type, name: msg.document.file_name };
+      if (msg?.media_group_id) preview.mediaGroupId = msg.media_group_id;
+      if (msg?.successful_payment)
+        preview.successfulPayment = {
+          currency: msg.successful_payment.currency,
+          amount: msg.successful_payment.total_amount,
+        };
+      if (ctx.callbackQuery?.data) preview.callbackData = ctx.callbackQuery.data;
+      if (ctx.preCheckoutQuery)
+        preview.preCheckoutQuery = {
+          currency: ctx.preCheckoutQuery.currency,
+          amount: ctx.preCheckoutQuery.total_amount,
+        };
+
+      logger.debug(
+        {
+          updateId: ctx.update.update_id,
+          updateType,
+          userId: ctx.from?.id,
+          chatId: ctx.chat?.id,
+          ...(Object.keys(preview).length ? { preview } : {}),
+        },
+        "bot update",
+      );
+    }
+
+    // Keep payment-related updates at info level for visibility.
     if (updateType.includes("pre_checkout") || updateType.includes("payment")) {
       logger.info({ updateType, updateId: ctx.update.update_id }, "RAW UPDATE (payment-related)");
     }
