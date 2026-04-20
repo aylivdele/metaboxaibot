@@ -414,6 +414,14 @@ export function getT(lang: Language): Translations {
 }
 
 /**
+ * Rounds a token amount to at most 3 decimals and strips trailing zeros:
+ *   0.0255 → "0.03", 0.02 → "0.02", 8 → "8".
+ */
+function formatTokens(n: number): string {
+  return String(parseFloat(n.toFixed(2)));
+}
+
+/**
  * Builds the standard caption shown with a generation result:
  *   ✅ {modelName}: {prompt}{suffix}
  *
@@ -453,8 +461,8 @@ export function buildResultCaption(
   if (cost !== undefined && sub !== undefined && reg !== undefined) {
     const total = sub + reg;
     const line = t.common.generationCostLine
-      .replace("{cost}", String(Math.round(cost)))
-      .replace("{total}", String(Math.round(total)));
+      .replace("{cost}", formatTokens(cost))
+      .replace("{total}", formatTokens(total));
     caption += `\n\n${line}`;
   }
   return caption;
