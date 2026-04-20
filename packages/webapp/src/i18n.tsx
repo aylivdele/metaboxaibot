@@ -34,6 +34,7 @@ const translations = {
     "profile.reason.referral_bonus": "🎁 Referral bonus",
     "profile.reason.admin": "🔧 Admin adjustment",
     "profile.reason.autotranslate": "📜 Autotranslation",
+    "profile.reason.describe_image": "🔍 Reference image description",
     "profile.reason.soul_creation": "🧬 Character creation",
 
     // Banner
@@ -352,6 +353,7 @@ const translations = {
     "profile.reason.metabox_purchase": "💳 Покупка через Metabox",
     "profile.reason.referral_bonus": "🎁 Реферальный бонус",
     "profile.reason.autotranslate": "📜 Автоперевод",
+    "profile.reason.describe_image": "🔍 Описание референсного изображения",
     "profile.reason.soul_creation": "🧬 Создание персонажа",
     "profile.reason.admin": "🔧 Корректировка",
 

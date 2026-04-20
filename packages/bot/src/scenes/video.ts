@@ -359,6 +359,7 @@ export async function sendVideoMediaInputStatus(
   const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
   const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "video", ctx.t, {
     promptOptional: model.promptOptional,
+    promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
   });
   const webappUrl = config.bot.webappUrl;
   if (webappUrl) {
@@ -374,30 +375,13 @@ export async function sendVideoMediaInputStatus(
 
 // ── Media input slot callback (mi:video:{slotKey}) ──────────────────────────
 
-export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
-  if (!ctx.user) return;
-  const data = ctx.callbackQuery?.data ?? "";
-  const slotKey = data.replace("mi:video:", "");
-  await ctx.answerCallbackQuery();
-
-  const state = await userStateService.get(ctx.user.id);
-  const modelId = state?.videoModelId ?? "kling";
-  const model = AI_MODELS[modelId];
-  const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
-  if (!slot) return;
-
-  // Filled slot → preview content instead of entering upload mode.
-  const filled = await userStateService.getMediaInputs(ctx.user.id);
-  const existing = filled[slotKey] ?? [];
-  if (existing.length) {
-    await sendSlotPreview(ctx, slot, existing);
-    return;
-  }
-
-  // Remove inline keyboard from the old menu message, keep the text for history
-  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
-
-  setActiveSlot(ctx.user.id, {
+/** Sends the upload-prompt message with hint and cancel button for a video slot. */
+async function sendVideoSlotUploadPrompt(
+  ctx: BotContext,
+  slot: NonNullable<(typeof AI_MODELS)[string]["mediaInputs"]>[number],
+  modelId: string,
+): Promise<void> {
+  setActiveSlot(ctx.user!.id, {
     slotKey: slot.slotKey,
     modelId,
     maxImages: slot.maxImages ?? 1,
@@ -444,6 +428,39 @@ export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
                         : null;
   if (hint) await ctx.reply(hint);
   await ctx.reply(msg, { reply_markup: kb });
+}
+
+export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const data = ctx.callbackQuery?.data ?? "";
+  const slotKey = data.replace("mi:video:", "");
+  await ctx.answerCallbackQuery();
+
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.videoModelId ?? "kling";
+  const model = AI_MODELS[modelId];
+  const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
+  if (!slot) return;
+
+  const filled = await userStateService.getMediaInputs(ctx.user.id);
+  const existing = filled[slotKey] ?? [];
+  const maxImages = slot.maxImages ?? 1;
+
+  if (existing.length) {
+    // Drop the menu message we tapped, send preview, then either resume upload or re-show menu.
+    await ctx.deleteMessage().catch(() => void 0);
+    await sendSlotPreview(ctx, slot, existing);
+    if (existing.length < maxImages) {
+      await sendVideoSlotUploadPrompt(ctx, slot, modelId);
+    } else {
+      await sendVideoMediaInputStatus(ctx);
+    }
+    return;
+  }
+
+  // Empty slot → strip keyboard from the menu (keep text in history) and enter upload mode.
+  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
+  await sendVideoSlotUploadPrompt(ctx, slot, modelId);
 }
 
 /** Callback for mi_cancel:video — cancel active upload slot. */

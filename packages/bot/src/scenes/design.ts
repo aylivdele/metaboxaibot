@@ -3,6 +3,8 @@ import {
   dialogService,
   generationService,
   userStateService,
+  userAvatarService,
+  describeImageForPrompt,
   getFileUrl,
 } from "@metabox/api/services";
 import type { SubmitImageResult } from "@metabox/api/services";
@@ -292,7 +294,10 @@ export async function sendDesignMediaInputStatus(
   if (!model?.mediaInputs?.length) return;
 
   const filledInputs = await userStateService.getMediaInputs(ctx.user.id);
-  const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "design", ctx.t);
+  const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "design", ctx.t, {
+    promptOptional: model.promptOptional,
+    promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
+  });
   const webappUrl = config.bot.webappUrl;
   if (webappUrl) {
     kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
@@ -307,30 +312,13 @@ export async function sendDesignMediaInputStatus(
 
 // ── Media input slot callback (mi:design:{slotKey}) ─────────────────────────
 
-export async function handleDesignMediaInput(ctx: BotContext): Promise<void> {
-  if (!ctx.user) return;
-  const data = ctx.callbackQuery?.data ?? "";
-  const slotKey = data.replace("mi:design:", "");
-  await ctx.answerCallbackQuery();
-
-  const state = await userStateService.get(ctx.user.id);
-  const modelId = state?.designModelId ?? "dall-e-3";
-  const model = AI_MODELS[modelId];
-  const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
-  if (!slot) return;
-
-  // Filled slot → preview content instead of entering upload mode.
-  const filled = await userStateService.getMediaInputs(ctx.user.id);
-  const existing = filled[slotKey] ?? [];
-  if (existing.length) {
-    await sendSlotPreview(ctx, slot, existing);
-    return;
-  }
-
-  // Remove inline keyboard from the old menu message, keep the text for history
-  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
-
-  setActiveSlot(ctx.user.id, {
+/** Sends the upload-prompt message with cancel button for a design slot. */
+async function sendDesignSlotUploadPrompt(
+  ctx: BotContext,
+  slot: NonNullable<(typeof AI_MODELS)[string]["mediaInputs"]>[number],
+  modelId: string,
+): Promise<void> {
+  setActiveSlot(ctx.user!.id, {
     slotKey: slot.slotKey,
     modelId,
     maxImages: slot.maxImages ?? 1,
@@ -347,6 +335,39 @@ export async function handleDesignMediaInput(ctx: BotContext): Promise<void> {
       : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
   const kb = new InlineKeyboard().text(ctx.t.mediaInput.cancel, `mi_cancel:design`);
   await ctx.reply(msg, { reply_markup: kb });
+}
+
+export async function handleDesignMediaInput(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const data = ctx.callbackQuery?.data ?? "";
+  const slotKey = data.replace("mi:design:", "");
+  await ctx.answerCallbackQuery();
+
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.designModelId ?? "dall-e-3";
+  const model = AI_MODELS[modelId];
+  const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
+  if (!slot) return;
+
+  const filled = await userStateService.getMediaInputs(ctx.user.id);
+  const existing = filled[slotKey] ?? [];
+  const maxImages = slot.maxImages ?? 1;
+
+  if (existing.length) {
+    // Drop the menu message we tapped, send preview, then either resume upload or re-show menu.
+    await ctx.deleteMessage().catch(() => void 0);
+    await sendSlotPreview(ctx, slot, existing);
+    if (existing.length < maxImages) {
+      await sendDesignSlotUploadPrompt(ctx, slot, modelId);
+    } else {
+      await sendDesignMediaInputStatus(ctx);
+    }
+    return;
+  }
+
+  // Empty slot → strip keyboard from the menu (keep text in history) and enter upload mode.
+  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
+  await sendDesignSlotUploadPrompt(ctx, slot, modelId);
 }
 
 /** Callback for mi_cancel:design — cancel active upload slot. */
@@ -370,6 +391,47 @@ export async function handleDesignMediaInputDone(ctx: BotContext): Promise<void>
   await ctx.answerCallbackQuery();
   clearActiveSlot(ctx.user.id);
   await sendDesignMediaInputStatus(ctx, { edit: true });
+}
+
+/**
+ * Callback for mi_generate:design — start generation without a text prompt.
+ * For Higgsfield Soul: describes the uploaded reference image via cheap vision LLM
+ * and uses that description as the prompt (token cost deducted from user).
+ */
+export async function handleDesignGenerateNoPrompt(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
+
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.designModelId ?? "dall-e-3";
+  const filled = await userStateService.getMediaInputs(ctx.user.id);
+  const firstFilled = Object.values(filled).find((v) => v?.length);
+
+  if (!firstFilled?.length) {
+    await executeDesignPrompt(ctx, "");
+    return;
+  }
+
+  const resolved = await resolveMediaInputUrls({ ref: [firstFilled[0]] }).catch(() => null);
+  const refUrl = resolved?.ref?.[0];
+  if (!refUrl) {
+    await ctx.reply(ctx.t.errors.soulDescribeFailed);
+    return;
+  }
+
+  const pendingMsg = await ctx.reply(ctx.t.errors.soulDescribingReference);
+  let description: string;
+  try {
+    description = await describeImageForPrompt(ctx.user.id, refUrl, modelId);
+  } catch (err) {
+    logger.error(err, "describeImageForPrompt failed");
+    await ctx.api.deleteMessage(ctx.chat!.id, pendingMsg.message_id).catch(() => void 0);
+    await ctx.reply(ctx.t.errors.soulDescribeFailed);
+    return;
+  }
+  await ctx.api.deleteMessage(ctx.chat!.id, pendingMsg.message_id).catch(() => void 0);
+  await executeDesignPrompt(ctx, description);
 }
 
 /** Callback for mi_remove:design:{slotKey} — clear a filled slot. */
@@ -424,6 +486,17 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
         await sendDesignMediaInputStatus(ctx);
         return;
       }
+    }
+  }
+
+  // Higgsfield Soul pre-flight: must have a created+selected character avatar.
+  if (modelId === "higgsfield-soul") {
+    const allSettings = await userStateService.getModelSettings(ctx.user.id);
+    const customRefId = allSettings[modelId]?.custom_reference_id as string | null | undefined;
+    const validation = await userAvatarService.validateSoulAvatar(ctx.user.id, customRefId);
+    if (validation) {
+      await ctx.reply(ctx.t.errors[validation]);
+      return;
     }
   }
 

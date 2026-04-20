@@ -47,4 +47,21 @@ export const userAvatarService = {
     await db.userAvatar.delete({ where: { id } });
     return true;
   },
+
+  /**
+   * Validates that the user owns a Higgsfield Soul avatar matching `externalId` and that it's `ready`.
+   * Returns null if everything is fine, or a key for `Translations.errors` to show to the user.
+   */
+  async validateSoulAvatar(
+    userId: bigint,
+    externalId: string | null | undefined,
+  ): Promise<"soulMissingAvatar" | "soulAvatarNotReady" | null> {
+    if (!externalId) return "soulMissingAvatar";
+    const avatar = await db.userAvatar.findFirst({
+      where: { userId, provider: "higgsfield_soul", externalId },
+    });
+    if (!avatar) return "soulMissingAvatar";
+    if (avatar.status !== "ready") return "soulAvatarNotReady";
+    return null;
+  },
 };

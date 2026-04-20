@@ -239,6 +239,13 @@ export default {
     modelTemporarilyUnavailable:
       "❌ {modelName} is temporarily unavailable due to provider limits. Please try later or choose another model.",
     soulProviderUnavailable: "❌ Character creation is temporarily unavailable. Please try later.",
+    soulMissingAvatar:
+      "⚠️ To generate with Higgsfield Soul, select your character in the Management menu.",
+    soulAvatarNotReady:
+      "⚠️ The selected character isn't ready yet. Wait for it to finish or pick another one in Management.",
+    soulDescribingReference: "🔍 Analyzing reference...",
+    soulDescribeFailed:
+      "❌ Failed to describe the reference image. Please try again or send a text prompt.",
     // HeyGen
     heygenBlockedWords:
       "❌ Your request contains prohibited words or content. Please edit your text and try again.",

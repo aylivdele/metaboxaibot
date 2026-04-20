@@ -1,5 +1,5 @@
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
-import { config } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { logger } from "../../logger.js";
 
@@ -57,7 +57,11 @@ export class HiggsFieldSoulImageAdapter implements ImageAdapter {
   async submit(input: ImageInput): Promise<string> {
     const ms = input.modelSettings ?? {};
     const customRefId = ms.custom_reference_id as string | undefined;
-    if (!customRefId) throw new Error("custom_reference_id is required for Higgsfield Soul");
+    if (!customRefId) {
+      throw new UserFacingError("custom_reference_id is required for Higgsfield Soul", {
+        key: "soulMissingAvatar",
+      });
+    }
 
     const customRefStrength = (ms.custom_reference_strength as number | undefined) ?? 1;
     const aspectRatio = (input.aspectRatio || ms.aspect_ratio || "4:3") as string;

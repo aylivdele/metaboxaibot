@@ -205,6 +205,12 @@ export interface AIModel {
    * The bot shows a "Start generation" button once all required media slots are filled.
    */
   promptOptional?: boolean;
+  /**
+   * When true (in combination with `promptOptional`), the "Start generation" button only
+   * appears once at least one media slot is filled. Used by Higgsfield Soul, where a
+   * reference image is required to auto-generate the prompt via vision LLM.
+   */
+  promptOptionalRequiresMedia?: boolean;
   isAsync: boolean; // требует очереди (для image/video/audio)
   contextStrategy: ContextStrategy;
   contextMaxMessages: number; // актуально для db_history: сколько сообщений отправлять

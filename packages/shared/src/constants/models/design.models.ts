@@ -1660,6 +1660,8 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       "Генерация изображений с вашим персонажем (Soul ID). Создайте персонажа из 20+ фотографий — и генерируйте любые сцены с его внешностью. Поддерживает стили, референсные изображения и режим batch.",
     section: "design",
     provider: "higgsfield",
+    promptOptional: true,
+    promptOptionalRequiresMedia: true,
     costUsdPerRequest: 0.09,
     costMatrix: {
       dims: ["resolution", "batch_size"],

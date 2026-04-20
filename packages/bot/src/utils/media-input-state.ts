@@ -62,7 +62,7 @@ export function buildMediaInputStatusMenu(
   filledInputs: Record<string, string[]>,
   section: string,
   t: Translations,
-  options?: { promptOptional?: boolean },
+  options?: { promptOptional?: boolean; promptOptionalRequiresMedia?: boolean },
 ): { text: string; kb: InlineKeyboard } {
   const kb = new InlineKeyboard();
 
@@ -118,13 +118,17 @@ export function buildMediaInputStatusMenu(
   }
 
   const promptOptional = options?.promptOptional ?? false;
+  const requiresMedia = options?.promptOptionalRequiresMedia ?? false;
+  const hasAnyFilled = Object.values(filledInputs).some((v) => v?.length);
+  const showGenerateButton =
+    allRequiredFilled && promptOptional && (!requiresMedia || hasAnyFilled);
 
-  if (allRequiredFilled && promptOptional) {
+  if (showGenerateButton) {
     kb.text(t.mediaInput.startGeneration, `mi_generate:${section}`).row();
   }
 
   const text = allRequiredFilled
-    ? promptOptional
+    ? promptOptional && (!requiresMedia || hasAnyFilled)
       ? t.mediaInput.readyForPromptOptional
       : t.mediaInput.readyForPrompt
     : "";

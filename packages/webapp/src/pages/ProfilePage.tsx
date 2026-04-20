@@ -32,6 +32,7 @@ const REASON_KEYS: Record<string, string> = {
   referral_bonus: "profile.reason.referral_bonus",
   admin: "profile.reason.admin",
   autotranslate: "profile.reason.autotranslate",
+  describe_image: "profile.reason.describe_image",
   soul_creation: "profile.reason.soul_creation",
 };
 

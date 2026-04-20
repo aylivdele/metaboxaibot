@@ -29,6 +29,7 @@ import {
   handleDesignMediaInput,
   handleDesignMediaInputCancel,
   handleDesignMediaInputRemove,
+  handleDesignGenerateNoPrompt,
 } from "./scenes/design.js";
 import {
   handleVideoModelSelect,
@@ -176,6 +177,7 @@ export function createBot(token: string): Bot<BotContext> {
   bot.callbackQuery(/^mi_cancel:design$/, handleDesignMediaInputCancel);
   bot.callbackQuery(/^mi_done:/, handleVideoMediaInputDone); // section-agnostic: just clears active slot
   bot.callbackQuery(/^mi_generate:video$/, handleVideoGenerateNoPrompt);
+  bot.callbackQuery(/^mi_generate:design$/, handleDesignGenerateNoPrompt);
   bot.callbackQuery(/^mi_remove:video:/, handleVideoMediaInputRemove);
   bot.callbackQuery(/^mi_remove:design:/, handleDesignMediaInputRemove);
 

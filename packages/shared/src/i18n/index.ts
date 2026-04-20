@@ -183,6 +183,10 @@ export interface Translations {
     generationTimedOut24h: string;
     modelTemporarilyUnavailable: string;
     soulProviderUnavailable: string;
+    soulMissingAvatar: string;
+    soulAvatarNotReady: string;
+    soulDescribingReference: string;
+    soulDescribeFailed: string;
     // HeyGen
     heygenBlockedWords: string;
     heygenNsfw: string;
