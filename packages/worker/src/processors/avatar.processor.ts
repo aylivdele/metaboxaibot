@@ -16,6 +16,7 @@ import {
   isRateLimitDeferredError,
   isRateLimitLongWindowError,
 } from "../utils/submit-with-throttle.js";
+import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
 import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
 
 const telegram = new Api(config.bot.token);
@@ -80,6 +81,17 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
 
         logger.info({ userAvatarId, externalId }, "Soul creation submitted, poll scheduled");
       } catch (err) {
+        if (
+          await deferIfTransientNetworkError({
+            err,
+            job,
+            queue: getAvatarQueue(),
+            section: "avatar",
+            jobName: "create",
+          })
+        ) {
+          return;
+        }
         logger.error({ userAvatarId, err }, "Soul creation failed");
         await userAvatarService.updateStatus(userAvatarId, { status: "failed" });
         await notifyTechError(err, { jobId: userAvatarId, section: "avatar", modelId: provider });
@@ -149,6 +161,17 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         );
         logger.info({ userAvatarId, nextAttempt }, "Soul still processing, rescheduled");
       } catch (err) {
+        if (
+          await deferIfTransientNetworkError({
+            err,
+            job,
+            queue: getAvatarQueue(),
+            section: "avatar",
+            jobName: "poll",
+          })
+        ) {
+          return;
+        }
         logger.error({ userAvatarId, err }, "Soul poll error");
         await notifyTechError(err, {
           jobId: userAvatarId,
@@ -226,6 +249,17 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
           .catch(() => void 0);
         return;
       }
+      if (
+        await deferIfTransientNetworkError({
+          err,
+          job,
+          queue: getAvatarQueue(),
+          section: "avatar",
+          jobName: "create",
+        })
+      ) {
+        return;
+      }
       logger.error({ userAvatarId, err }, "Avatar creation failed");
       await userAvatarService.updateStatus(userAvatarId, { status: "failed" });
       await notifyTechError(err, { jobId: userAvatarId, section: "avatar", modelId: provider });
@@ -294,6 +328,17 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
 
       logger.info({ userAvatarId, nextAttempt }, "Avatar still processing, rescheduled");
     } catch (err) {
+      if (
+        await deferIfTransientNetworkError({
+          err,
+          job,
+          queue: getAvatarQueue(),
+          section: "avatar",
+          jobName: "poll",
+        })
+      ) {
+        return;
+      }
       logger.error({ userAvatarId, err }, "Avatar poll error");
       await notifyTechError(err, {
         jobId: userAvatarId,

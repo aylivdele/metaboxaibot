@@ -37,6 +37,7 @@ import {
   isRateLimitDeferredError,
   isRateLimitLongWindowError,
 } from "../utils/submit-with-throttle.js";
+import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
 
@@ -365,6 +366,16 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       });
       await telegram.sendMessage(telegramChatId, msg).catch(() => void 0);
       throw new UnrecoverableError(msg);
+    }
+    if (
+      await deferIfTransientNetworkError({
+        err,
+        job,
+        queue: getVideoQueue(),
+        section: "video",
+      })
+    ) {
+      return;
     }
     if (isHeyGenProviderUnavailable(err)) {
       const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);

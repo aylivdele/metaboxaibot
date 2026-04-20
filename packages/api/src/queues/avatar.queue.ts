@@ -20,6 +20,8 @@ export interface AvatarJobData {
   s3Keys?: string[];
   /** Display name for the character */
   characterName?: string;
+  /** Soft retry counter for transient network failures (DNS hiccups etc.). */
+  transientRetries?: number;
 }
 
 export function getAvatarQueue(): Queue<AvatarJobData> {

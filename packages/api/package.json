@@ -92,6 +92,10 @@
       "types": "./src/utils/rate-limit-error.ts",
       "default": "./dist/utils/rate-limit-error.js"
     },
+    "./utils/fetch": {
+      "types": "./src/utils/fetch.ts",
+      "default": "./dist/utils/fetch.js"
+    },
     "./services/throttle": {
       "types": "./src/services/throttle.service.ts",
       "default": "./dist/services/throttle.service.js"

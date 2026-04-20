@@ -22,6 +22,8 @@ export interface AudioJobData {
   pollStartedAt?: number;
   /** Last poll interval used, so we can detect interval tier changes. */
   lastIntervalMs?: number;
+  /** Soft retry counter for transient network failures (DNS hiccups etc.). */
+  transientRetries?: number;
 }
 
 export function getAudioQueue(): Queue<AudioJobData> {

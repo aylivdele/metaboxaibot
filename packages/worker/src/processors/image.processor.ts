@@ -31,6 +31,7 @@ import {
   isRateLimitDeferredError,
   isRateLimitLongWindowError,
 } from "../utils/submit-with-throttle.js";
+import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
 
@@ -458,6 +459,16 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       });
       await telegram.sendMessage(telegramChatId, msg).catch(() => void 0);
       throw new UnrecoverableError(msg);
+    }
+    if (
+      await deferIfTransientNetworkError({
+        err,
+        job,
+        queue: getImageQueue(),
+        section: "image",
+      })
+    ) {
+      return;
     }
     const userMsg = resolveUserFacingMessage(err, t);
     if (userMsg !== null) {
