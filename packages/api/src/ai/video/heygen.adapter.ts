@@ -92,13 +92,21 @@ export class HeyGenAdapter implements VideoAdapter {
       }
     }
 
-    // HeyGen's /v3/assets expects raw binary with the file's MIME in the
-    // request Content-Type header. A multipart/form-data request gets
-    // rejected as "Content type not supported application/octet-stream".
+    const audioExt = contentType === "audio/wav" ? "wav" : "mp3";
+    const audioForm = new FormData();
+    audioForm.append(
+      "file",
+      new Blob(
+        [new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.byteLength)],
+        { type: contentType },
+      ),
+      `audio.${audioExt}`,
+    );
+
     const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
       method: "POST",
-      headers: { "X-Api-Key": this.apiKey, "Content-Type": contentType },
-      body: new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.byteLength),
+      headers: { "X-Api-Key": this.apiKey },
+      body: audioForm,
     });
     if (!uploadRes.ok) {
       const text = await uploadRes.text();
