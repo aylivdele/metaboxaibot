@@ -18,6 +18,7 @@ import {
   getFileUrl,
   generateThumbnail,
   measureImageMegapixels,
+  compressForTelegramPhoto,
 } from "@metabox/api/services/s3";
 import { generateDownloadToken } from "@metabox/api/utils/download-token";
 import { InputFile } from "grammy";
@@ -311,11 +312,9 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       const batchCaption = buildCaption();
       for (let i = 0; i < outputRecords.length; i++) {
         const rec = outputRecords[i];
-        const { source } = await resolveTelegramSource(
-          rec.s3Key,
-          rec.outputUrl ?? "",
-          `image-${i + 1}.png`,
-        );
+        const filename = `image-${i + 1}.png`;
+        const info = await resolveTelegramSource(rec.s3Key, rec.outputUrl ?? "");
+        const { source } = await prepareTelegramPhoto(info, rec.outputUrl ?? "", filename);
         mediaGroup.push({
           type: "photo",
           media: source,
@@ -424,27 +423,16 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
     const rows = [refineRow, downloadRow].filter(Boolean) as InlineKeyboardButton[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
 
-    const { source: tgImageSource, byteSize } = await resolveTelegramSource(
-      s3Key,
+    const filename = finalImageResult.filename ?? "image.png";
+    const info = await resolveTelegramSource(s3Key, finalImageResult.url);
+    const { source: tgImageSource, isSvg } = await prepareTelegramPhoto(
+      info,
       finalImageResult.url,
-      finalImageResult.filename ?? "image.png",
+      filename,
     );
 
-    const isUrl = typeof tgImageSource === "string";
-    const PHOTO_MAX_BYTES = isUrl ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
-    const DOCUMENT_MAX_BYTES = isUrl ? 20 * 1024 * 1024 : 50 * 1024 * 1024;
-    const isSvg = finalImageResult.filename?.endsWith("svg") ?? false;
-    const useDocument = isSvg || byteSize > PHOTO_MAX_BYTES;
-    const tooLargeForTelegram = byteSize > DOCUMENT_MAX_BYTES;
-
     const singleCaption = buildCaption();
-    if (tooLargeForTelegram) {
-      await telegram.sendMessage(
-        telegramChatId,
-        `${singleCaption}\n\n${t.errors.fileTooLargeForTelegram}`,
-        { reply_markup: replyMarkup },
-      );
-    } else if (useDocument) {
+    if (isSvg) {
       await telegram.sendDocument(telegramChatId, tgImageSource, {
         caption: singleCaption,
         reply_markup: replyMarkup,
@@ -509,17 +497,20 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
   }
 }
 
+type TelegramImageInfo =
+  | { kind: "url"; url: string; byteSize: number }
+  | { kind: "buffer"; buffer: Buffer; byteSize: number };
+
 /**
- * Returns the best source to send to Telegram:
+ * Returns the best source info for sending an image to Telegram:
  * 1. S3 public/presigned URL if available (always reachable by Telegram).
- * 2. Downloaded buffer wrapped in InputFile (for providers like fal.media that
- *    block Telegram's HTTP fetcher).
+ * 2. Downloaded buffer (for providers like fal.media that block Telegram's
+ *    HTTP fetcher, or when we need bytes in hand for re-encoding).
  */
 async function resolveTelegramSource(
   s3Key: string | null,
   providerUrl: string,
-  filename: string,
-): Promise<{ source: string | InstanceType<typeof InputFile>; byteSize: number }> {
+): Promise<TelegramImageInfo> {
   if (s3Key) {
     const s3Url = await getFileUrl(s3Key).catch(() => null);
     if (s3Url) {
@@ -528,7 +519,7 @@ async function resolveTelegramSource(
         const contentLength = head.headers.get("content-length");
         const byteSize = contentLength ? parseInt(contentLength, 10) : NaN;
         if (!isNaN(byteSize) && byteSize > 0) {
-          return { source: s3Url, byteSize };
+          return { kind: "url", url: s3Url, byteSize };
         }
       }
     }
@@ -536,5 +527,53 @@ async function resolveTelegramSource(
   const res = await fetch(providerUrl);
   if (!res.ok) throw new Error(`Failed to fetch image from provider: ${res.status}`);
   const buffer = Buffer.from(await res.arrayBuffer());
-  return { source: new InputFile(buffer, filename), byteSize: buffer.byteLength };
+  return { kind: "buffer", buffer, byteSize: buffer.byteLength };
+}
+
+/** Telegram photo limits: 5MB for URL-based sendPhoto, 10MB for multipart upload. */
+const PHOTO_URL_MAX_BYTES = 5 * 1024 * 1024;
+const PHOTO_BUFFER_MAX_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Prepares a Telegram photo source. If the image exceeds photo size limits
+ * (and isn't SVG), it's re-encoded in-memory to a JPEG that fits, so we can
+ * still deliver it as a photo instead of a document. The re-encoded bytes
+ * are not persisted — original S3 copy stays intact.
+ */
+async function prepareTelegramPhoto(
+  info: TelegramImageInfo,
+  providerUrl: string,
+  filename: string,
+): Promise<{ source: string | InstanceType<typeof InputFile>; isSvg: boolean }> {
+  const isSvg = filename.toLowerCase().endsWith(".svg");
+  if (isSvg) {
+    const src = info.kind === "url" ? info.url : new InputFile(info.buffer, filename);
+    return { source: src, isSvg: true };
+  }
+
+  if (info.kind === "url" && info.byteSize <= PHOTO_URL_MAX_BYTES) {
+    return { source: info.url, isSvg: false };
+  }
+  if (info.kind === "buffer" && info.byteSize <= PHOTO_BUFFER_MAX_BYTES) {
+    return { source: new InputFile(info.buffer, filename), isSvg: false };
+  }
+
+  // Too large for sendPhoto — download (if URL) and compress in memory.
+  let buffer: Buffer;
+  if (info.kind === "buffer") {
+    buffer = info.buffer;
+  } else {
+    const res = await fetch(info.url).catch(() => null);
+    if (!res || !res.ok) {
+      // Fallback to provider URL if S3 fetch fails.
+      const fallback = await fetch(providerUrl);
+      if (!fallback.ok) throw new Error(`Failed to fetch image: ${fallback.status}`);
+      buffer = Buffer.from(await fallback.arrayBuffer());
+    } else {
+      buffer = Buffer.from(await res.arrayBuffer());
+    }
+  }
+  const compressed = await compressForTelegramPhoto(buffer);
+  const jpegName = filename.replace(/\.[^.]+$/, "") + ".jpg";
+  return { source: new InputFile(compressed, jpegName), isSvg: false };
 }

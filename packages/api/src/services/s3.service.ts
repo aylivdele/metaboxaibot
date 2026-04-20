@@ -257,6 +257,45 @@ export async function generateThumbnail(buf: Buffer, contentType: string): Promi
 }
 
 /**
+ * Re-encodes an image to a JPEG small enough for Telegram sendPhoto.
+ * Telegram rejects photos over ~10MB and dimensions whose sum exceeds 10000.
+ * Scales down to max 4096 on the longest side and steps JPEG quality down
+ * until the result fits `targetBytes`. Halves dimensions as last resort.
+ */
+export async function compressForTelegramPhoto(
+  input: Buffer,
+  targetBytes: number = 9 * 1024 * 1024,
+): Promise<Buffer> {
+  const MAX_DIM = 4096;
+  const meta = await sharp(input).metadata();
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+
+  const needsResize = width > MAX_DIM || height > MAX_DIM;
+  const base = () => {
+    const p = sharp(input).rotate();
+    return needsResize
+      ? p.resize({ width: MAX_DIM, height: MAX_DIM, fit: "inside", withoutEnlargement: true })
+      : p;
+  };
+
+  let quality = 90;
+  let out = await base().jpeg({ quality, mozjpeg: true }).toBuffer();
+  while (out.byteLength > targetBytes && quality > 30) {
+    quality -= 15;
+    out = await base().jpeg({ quality, mozjpeg: true }).toBuffer();
+  }
+  if (out.byteLength > targetBytes && width > 0) {
+    out = await sharp(input)
+      .rotate()
+      .resize({ width: Math.max(512, Math.floor(width / 2)) })
+      .jpeg({ quality: 80, mozjpeg: true })
+      .toBuffer();
+  }
+  return out;
+}
+
+/**
  * Extracts a single frame (~1s in) from a video buffer and returns a
  * 400px-wide WebP thumbnail. Returns null on any failure.
  *
