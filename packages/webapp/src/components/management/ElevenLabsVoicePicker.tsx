@@ -48,10 +48,11 @@ export function ElevenLabsVoicePicker({ voiceId, onChange }: ElevenLabsVoicePick
     onChange("voice_id", voice.externalId ?? "");
   };
 
-  const languages = [
-    "all",
-    ...Array.from(new Set(voices.map((v) => v.language).filter(Boolean) as string[])).sort(),
-  ];
+  const uniqueLanguages = Array.from(
+    new Set(voices.map((v) => v.language).filter(Boolean) as string[]),
+  ).sort();
+  const showLanguage = uniqueLanguages.length > 1;
+  const languages = ["all", ...uniqueLanguages];
 
   const filtered = voices.filter(
     (v) =>
@@ -63,7 +64,7 @@ export function ElevenLabsVoicePicker({ voiceId, onChange }: ElevenLabsVoicePick
     id: v.voice_id,
     name: v.name,
     meta: [
-      v.language,
+      showLanguage ? v.language : null,
       v.gender ? (v.gender === "male" ? "М" : v.gender === "female" ? "Ж" : v.gender) : null,
     ]
       .filter(Boolean)
@@ -106,18 +107,21 @@ export function ElevenLabsVoicePicker({ voiceId, onChange }: ElevenLabsVoicePick
           <div className="voice-picker__loading">Загрузка голосов…</div>
         ) : (
           <>
+            <div className="voice-picker__hint">💡 {t("uploads.elevenlabsLangHint")}</div>
             <div className="voice-picker__filters">
-              <select
-                className="voice-picker__filter-select"
-                value={langFilter}
-                onChange={(e) => setLangFilter(e.target.value)}
-              >
-                {languages.map((l) => (
-                  <option key={l} value={l}>
-                    {l === "all" ? "Все языки" : l}
-                  </option>
-                ))}
-              </select>
+              {showLanguage && (
+                <select
+                  className="voice-picker__filter-select"
+                  value={langFilter}
+                  onChange={(e) => setLangFilter(e.target.value)}
+                >
+                  {languages.map((l) => (
+                    <option key={l} value={l}>
+                      {l === "all" ? "Все языки" : l}
+                    </option>
+                  ))}
+                </select>
+              )}
               <div className="voice-picker__gender-btns">
                 {(["all", "male", "female"] as const).map((g) => (
                   <button

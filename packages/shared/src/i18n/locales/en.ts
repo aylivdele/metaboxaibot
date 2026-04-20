@@ -106,7 +106,7 @@ export default {
     ttsActivated:
       "🗣 Text-to-Speech (OpenAI) activated.\nSend me any text and I will convert it to speech.",
     ttsElActivated:
-      "🔊 ElevenLabs TTS activated.\nSend me any text to synthesize. Configure the voice in Management settings.",
+      "🔊 ElevenLabs TTS activated.\nSend me any text to synthesize. Configure the voice in Management settings.\n\n━━━━━━━━━━━━━━━━━━\n💡 <b>The model automatically synthesizes speech in whatever language the text is written in.</b>\n━━━━━━━━━━━━━━━━━━",
     voiceCloneActivated:
       "🎙 Voice cloning.\nSend me a voice message or audio file (MP3/WAV/OGG) — I will create your voice profile in ElevenLabs.\nThe recommended minimum length is 30 seconds.\nThe voice will then be available in TTS ElevenLabs and video avatar settings.\n",
     voiceCloneNeedsAudio: "Please send a voice message or audio file for voice cloning.",

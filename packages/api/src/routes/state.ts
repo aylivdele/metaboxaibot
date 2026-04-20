@@ -292,6 +292,7 @@ async function sendModelActivatedNotification(
         chat_id: String(userId),
         text: audioText,
         ...(audioReplyMarkup ? { reply_markup: audioReplyMarkup } : {}),
+        ...(modelId === "tts-el" ? { parse_mode: "HTML" } : {}),
       }),
     }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
     return;

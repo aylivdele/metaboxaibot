@@ -302,6 +302,8 @@ const translations = {
     "uploads.rename": "Rename",
     "uploads.officialVoices": "Official voices",
     "uploads.myVoices": "My voices",
+    "uploads.elevenlabsLangHint":
+      "The model automatically synthesizes speech in the language the text is written in.",
     "uploads.useVoice": "Use",
     "uploads.voiceActive": "Active",
     "uploads.officialAvatars": "Official avatars",
@@ -619,6 +621,8 @@ const translations = {
     "uploads.rename": "Переименовать",
     "uploads.officialVoices": "Официальные",
     "uploads.myVoices": "Мои голоса",
+    "uploads.elevenlabsLangHint":
+      "Модель автоматически синтезирует речь на том языке, на котором написан текст для озвучки.",
     "uploads.useVoice": "Использовать",
     "uploads.voiceActive": "Активен",
     "uploads.officialAvatars": "Официальные",

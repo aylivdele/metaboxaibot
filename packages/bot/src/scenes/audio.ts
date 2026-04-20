@@ -81,7 +81,7 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
       );
       await ctx.reply(
         `${modelName}\n\n${modelDesc}\n\n${hint}\n${ctx.t.voice.inputHint}\n\n${costLine}`,
-        { reply_markup: kb },
+        { reply_markup: kb, parse_mode: modelId === "tts-el" ? "HTML" : undefined },
       );
       return;
     }

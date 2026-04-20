@@ -3179,6 +3179,17 @@ textarea::placeholder {
   padding: 8px 0;
 }
 
+.voice-picker__hint {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .voice-picker__filters {
   display: flex;
   gap: 8px;
