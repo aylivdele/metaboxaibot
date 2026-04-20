@@ -8,6 +8,17 @@ import { closeMiniApp } from "../../utils/telegram.js";
 
 type ModelFilter = "images" | "files" | "web";
 
+const PROVIDER_ORDER = [
+  "openai",
+  "anthropic",
+  "google",
+  "deepseek",
+  "xai",
+  "perplexity",
+  "alibaba",
+] as const;
+type ProviderId = (typeof PROVIDER_ORDER)[number];
+
 function formatModelPrice(
   m: Model,
   perReqLabel: string,
@@ -47,6 +58,7 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
   const [dialogSettings, setDialogSettings] = useState<Record<string, unknown>>({});
   const [dialogSettingsLoading, setDialogSettingsLoading] = useState(false);
   const [filters, setFilters] = useState<Set<ModelFilter>>(new Set());
+  const [familyFilter, setFamilyFilter] = useState<ProviderId | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState("");
@@ -251,81 +263,100 @@ export function GptManagementView({ initialAction }: { initialAction?: string } 
       </div>
 
       {isCreating ? (
-        <div className="model-picker">
-          <div className="model-picker__header">
-            <span>{t("manage.chooseModel")}</span>
-            <button className="action-btn" onClick={() => setIsCreating(false)}>
-              ✕
-            </button>
-          </div>
-
-          <div className="model-filter-bar">
-            {(["images", "files", "web"] as ModelFilter[]).map((f) => (
-              <button
-                key={f}
-                className={`model-filter-btn${filters.has(f) ? " model-filter-btn--active" : ""}`}
-                onClick={() =>
-                  setFilters((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(f)) next.delete(f);
-                    else next.add(f);
-                    return next;
-                  })
-                }
-              >
-                {t(`manage.filter.${f}` as Parameters<typeof t>[0])}
-              </button>
-            ))}
-          </div>
-
-          <div className="model-legend">
-            <span>{t("manage.legend.images")}</span>
-            <span>{t("manage.legend.files")}</span>
-            <span>{t("manage.legend.web")}</span>
-          </div>
-
-          {models.filter((m) => {
+        (() => {
+          const availableFamilies = PROVIDER_ORDER.filter((p) =>
+            models.some((m) => m.provider === p),
+          );
+          const filteredModels = models.filter((m) => {
+            if (familyFilter && m.provider !== familyFilter) return false;
             if (filters.size === 0) return true;
             if (filters.has("images") && !m.supportsImages) return false;
             if (filters.has("files") && !m.supportsDocuments) return false;
             if (filters.has("web") && !m.supportsWeb) return false;
             return true;
-          }).length === 0 ? (
-            <div className="empty-state">{t("manage.noModels")}</div>
-          ) : (
-            models
-              .filter((m) => {
-                if (filters.size === 0) return true;
-                if (filters.has("images") && !m.supportsImages) return false;
-                if (filters.has("files") && !m.supportsDocuments) return false;
-                if (filters.has("web") && !m.supportsWeb) return false;
-                return true;
-              })
-              .map((m) => (
-                <div
-                  key={m.id}
-                  className={`model-item${creating ? " model-item--disabled" : ""}`}
-                  onClick={() => !creating && void handleCreateDialog(m.id)}
+          });
+          return (
+            <div className="model-picker">
+              <div className="model-picker__header">
+                <span>{t("manage.chooseModel")}</span>
+                <button className="action-btn" onClick={() => setIsCreating(false)}>
+                  ✕
+                </button>
+              </div>
+
+              <div className="model-family-bar">
+                <button
+                  className={`model-family-btn${familyFilter === null ? " model-family-btn--active" : ""}`}
+                  onClick={() => setFamilyFilter(null)}
                 >
-                  <div className="model-item__name">{m.name}</div>
-                  {m.description && <div className="model-item__desc">{m.description}</div>}
-                  <div className="model-item__meta">
-                    {formatModelPrice(
-                      m,
-                      t("manage.price.perReq"),
-                      t("manage.price.perMsg"),
-                      t("manage.price.perMPixel"),
-                      t("manage.price.perSec"),
-                    )}{" "}
-                    · {m.provider}
-                    {m.supportsImages && " · 🖼"}
-                    {m.supportsDocuments && " · 📄"}
-                    {m.supportsWeb && " · 🌐"}
+                  {t("manage.filter.family.all")}
+                </button>
+                {availableFamilies.map((p) => (
+                  <button
+                    key={p}
+                    className={`model-family-btn${familyFilter === p ? " model-family-btn--active" : ""}`}
+                    onClick={() => setFamilyFilter(p)}
+                  >
+                    {t(`manage.filter.family.${p}` as Parameters<typeof t>[0])}
+                  </button>
+                ))}
+              </div>
+
+              <div className="model-filter-bar">
+                {(["images", "files", "web"] as ModelFilter[]).map((f) => (
+                  <button
+                    key={f}
+                    className={`model-filter-btn${filters.has(f) ? " model-filter-btn--active" : ""}`}
+                    onClick={() =>
+                      setFilters((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(f)) next.delete(f);
+                        else next.add(f);
+                        return next;
+                      })
+                    }
+                  >
+                    {t(`manage.filter.${f}` as Parameters<typeof t>[0])}
+                  </button>
+                ))}
+              </div>
+
+              <div className="model-legend">
+                <span>{t("manage.legend.images")}</span>
+                <span>{t("manage.legend.files")}</span>
+                <span>{t("manage.legend.web")}</span>
+              </div>
+
+              {filteredModels.length === 0 ? (
+                <div className="empty-state">{t("manage.noModels")}</div>
+              ) : (
+                filteredModels.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`model-item${creating ? " model-item--disabled" : ""}`}
+                    onClick={() => !creating && void handleCreateDialog(m.id)}
+                  >
+                    <div className="model-item__name">{m.name}</div>
+                    {m.description && <div className="model-item__desc">{m.description}</div>}
+                    <div className="model-item__meta">
+                      {formatModelPrice(
+                        m,
+                        t("manage.price.perReq"),
+                        t("manage.price.perMsg"),
+                        t("manage.price.perMPixel"),
+                        t("manage.price.perSec"),
+                      )}{" "}
+                      · {m.provider}
+                      {m.supportsImages && " · 🖼"}
+                      {m.supportsDocuments && " · 📄"}
+                      {m.supportsWeb && " · 🌐"}
+                    </div>
                   </div>
-                </div>
-              ))
-          )}
-        </div>
+                ))
+              )}
+            </div>
+          );
+        })()
       ) : (
         <div className="dialog-list">
           <button className="new-dialog-btn" onClick={() => setIsCreating(true)}>

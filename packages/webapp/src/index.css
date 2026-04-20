@@ -944,6 +944,28 @@ textarea::placeholder {
   color: var(--accent-light);
 }
 
+.model-family-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.model-family-btn {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+.model-family-btn--active {
+  border-color: var(--accent);
+  background: var(--accent-lighter);
+  color: var(--accent-light);
+}
+
 .model-legend {
   display: flex;
   flex-direction: column;
