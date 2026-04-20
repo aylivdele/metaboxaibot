@@ -851,12 +851,17 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
 
     const current = await userStateService.getMediaInputs(ctx.user.id, slotModelId);
     const existing = current[activeSlot.slotKey] ?? [];
-    if (existing.length >= activeSlot.maxImages) {
-      // Replace if max reached (single-image slot)
-      await userStateService.clearMediaInputSlot(ctx.user.id, slotModelId, activeSlot.slotKey);
-    }
     const userId = ctx.user.id;
-    await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
+    if (existing.length >= activeSlot.maxImages) {
+      // Single-image slot: replace existing. Multi-image slot: drop overflow
+      // silently (an album larger than maxImages shouldn't wipe earlier items).
+      if (activeSlot.maxImages === 1) {
+        await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
+        await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
+      }
+    } else {
+      await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
+    }
 
     const label = slot
       ? (ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey)

@@ -45,9 +45,9 @@ const KLING_MODEL_MAP: Record<string, "std" | "pro"> = {
 };
 
 /** Kling 3.0 motion-control: std vs pro selected via modelId → `mode` param. */
-const KLING_MOTION_MODEL_MAP: Record<string, "std" | "pro"> = {
-  "kling-motion": "std",
-  "kling-motion-pro": "pro",
+const KLING_MOTION_MODEL_MAP: Record<string, "720p" | "1080p"> = {
+  "kling-motion": "720p",
+  "kling-motion-pro": "1080p",
 };
 
 /**
