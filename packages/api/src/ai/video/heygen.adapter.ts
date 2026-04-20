@@ -85,9 +85,11 @@ export class HeyGenAdapter implements VideoAdapter {
     // Detect actual audio type from magic bytes — HTTP Content-Type may be unreliable.
     let contentType = resolveAudioMimeType(audioBuffer, audioRes.headers.get("content-type"));
 
-    // HeyGen accepts only MP3 and WAV. Transcode anything else (OGG, M4A, AAC, FLAC, ...).
-    const isHeyGenSupported =
-      contentType === "audio/mpeg" || contentType === "audio/mp3" || contentType === "audio/wav";
+    // HeyGen /v3/assets accepts only audio/mpeg (mp3) and audio/wav. Transcode
+    // everything else (OGG/Opus from Telegram voice, M4A, AAC, FLAC, ...) to MP3.
+    // Anything that isn't an *exact* match transcodes — including exotic aliases
+    // like audio/mp3 — so we never gamble on HeyGen accepting non-canonical MIMEs.
+    const isHeyGenSupported = contentType === "audio/mpeg" || contentType === "audio/wav";
     if (!isHeyGenSupported) {
       logger.info({ from: contentType }, "HeyGen: transcoding audio to MP3");
       audioBuffer = await transcodeToMp3(audioBuffer);
@@ -102,14 +104,24 @@ export class HeyGenAdapter implements VideoAdapter {
     }
 
     const audioExt = contentType === "audio/wav" ? "wav" : "mp3";
+    // Copy into a freshly-allocated Uint8Array — Node's Buffer may share a
+    // pooled backing ArrayBuffer, and some undici versions drop the Blob's
+    // `type` when the backing buffer is shared, causing the multipart part
+    // Content-Type to default to application/octet-stream.
+    const bytes = new Uint8Array(audioBuffer.byteLength);
+    bytes.set(audioBuffer);
+    const audioFile = new File([bytes], `audio.${audioExt}`, { type: contentType });
     const audioForm = new FormData();
-    audioForm.append(
-      "file",
-      new Blob(
-        [new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.byteLength)],
-        { type: contentType },
-      ),
-      `audio.${audioExt}`,
+    audioForm.append("file", audioFile);
+
+    logger.info(
+      {
+        contentType,
+        size: audioBuffer.byteLength,
+        fileType: audioFile.type,
+        fileName: audioFile.name,
+      },
+      "HeyGen: uploading audio asset",
     );
 
     const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
@@ -165,13 +177,17 @@ export class HeyGenAdapter implements VideoAdapter {
 
     const imgExt = contentType === "image/png" ? "png" : "jpg";
 
+    // Copy into a freshly-allocated Uint8Array to avoid pooled-Buffer
+    // backing-store issues (see uploadAudioAsset for context).
+    const imgBytes = new Uint8Array(imgBuffer.byteLength);
+    imgBytes.set(imgBuffer);
+    const imgFile = new File([imgBytes], `image.${imgExt}`, { type: contentType });
     const imgFormData = new FormData();
-    imgFormData.append(
-      "file",
-      new Blob([new Uint8Array(imgBuffer.buffer, imgBuffer.byteOffset, imgBuffer.byteLength)], {
-        type: contentType,
-      }),
-      `image.${imgExt}`,
+    imgFormData.append("file", imgFile);
+
+    logger.info(
+      { contentType, size: imgBuffer.byteLength, fileType: imgFile.type, fileName: imgFile.name },
+      "HeyGen: uploading image asset",
     );
 
     const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
