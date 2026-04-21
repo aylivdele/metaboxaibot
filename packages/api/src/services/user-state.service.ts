@@ -299,9 +299,9 @@ export const userStateService = {
   ): Promise<Record<string, string[]>> {
     const all = await this.getAllMediaInputs(userId);
     const forModel = all[modelId] ?? {};
-    const arr = forModel[slotKey] ?? [];
-    arr.push(url);
-    const updatedForModel = { ...forModel, [slotKey]: arr };
+    const forSlot = forModel[slotKey] ?? [];
+    forSlot.push(url);
+    const updatedForModel = { ...forModel, [slotKey]: [...forSlot] };
     const updated = { ...all, [modelId]: updatedForModel };
     await db.userState.upsert({
       where: { userId },

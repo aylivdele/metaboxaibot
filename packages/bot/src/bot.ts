@@ -28,6 +28,7 @@ import {
   handleDesignPhoto,
   handleDesignMediaInput,
   handleDesignMediaInputCancel,
+  handleDesignMediaInputDone,
   handleDesignMediaInputRemove,
   handleDesignGenerateNoPrompt,
 } from "./scenes/design.js";
@@ -68,6 +69,7 @@ import {
   handleVoiceCloneUpload,
 } from "./scenes/audio.js";
 import { handleSendOriginal } from "./handlers/send-original.handler.js";
+import { getActiveSlot } from "./utils/media-input-state.js";
 import { handleVoicePromptCallback } from "./handlers/voice-prompt.handler.js";
 import {
   handleMergeChoice,
@@ -223,7 +225,14 @@ export function createBot(token: string): Bot<BotContext> {
   bot.callbackQuery(/^mi:design:/, handleDesignMediaInput);
   bot.callbackQuery(/^mi_cancel:video$/, handleVideoMediaInputCancel);
   bot.callbackQuery(/^mi_cancel:design$/, handleDesignMediaInputCancel);
-  bot.callbackQuery(/^mi_done:/, handleVideoMediaInputDone); // section-agnostic: just clears active slot
+  bot.callbackQuery(/^mi_done:/, async (ctx) => {
+    const section = ctx.user ? getActiveSlot(ctx.user.id)?.section : undefined;
+    if (section === "design") {
+      await handleDesignMediaInputDone(ctx);
+    } else {
+      await handleVideoMediaInputDone(ctx);
+    }
+  });
   bot.callbackQuery(/^mi_generate:video$/, handleVideoGenerateNoPrompt);
   bot.callbackQuery(/^mi_generate:design$/, handleDesignGenerateNoPrompt);
   bot.callbackQuery(/^mi_remove:video:/, handleVideoMediaInputRemove);

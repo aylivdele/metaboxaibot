@@ -5,6 +5,7 @@ import { config, generateWebToken, AI_MODELS, buildDialogHint } from "@metabox/s
 import type { Section } from "@metabox/shared";
 import { buildDesignModelKeyboard } from "../scenes/design.js";
 import { buildVideoModelKeyboard } from "../scenes/video.js";
+import { clearActiveSlot } from "../utils/media-input-state.js";
 
 /** Returns the active dialog label + modelId for a section, or undefined. */
 async function activeDialogInfo(
@@ -21,6 +22,7 @@ async function activeDialogInfo(
 export async function handleMenu(ctx: BotContext): Promise<void> {
   if (ctx.user) {
     await userStateService.setState(ctx.user.id, "MAIN_MENU", null);
+    clearActiveSlot(ctx.user.id);
   }
   await ctx.reply(ctx.t.start.mainMenuTitle, {
     reply_markup: buildMainMenuKeyboard(ctx.t, ctx.user?.id),
@@ -29,6 +31,7 @@ export async function handleMenu(ctx: BotContext): Promise<void> {
 
 export async function handleGpt(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
+  clearActiveSlot(ctx.user.id);
   const info = await activeDialogInfo(ctx.user.id, "gpt");
   // If a dialog is already active — go straight to GPT_ACTIVE so the user
   // can start chatting immediately without pressing an extra button.
@@ -71,6 +74,7 @@ export async function handleGpt(ctx: BotContext): Promise<void> {
 
 export async function handleDesign(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
+  clearActiveSlot(ctx.user.id);
   const state = await userStateService.get(ctx.user.id);
   await userStateService.setState(ctx.user.id, "DESIGN_SECTION", "design");
   const text = ctx.t.design.sectionTitle;
@@ -102,6 +106,7 @@ export async function handleDesign(ctx: BotContext): Promise<void> {
 
 export async function handleAudio(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
+  clearActiveSlot(ctx.user.id);
   await userStateService.setState(ctx.user.id, "AUDIO_SECTION", "audio");
 
   const webappUrl = config.bot.webappUrl;
@@ -129,6 +134,7 @@ export async function handleAudio(ctx: BotContext): Promise<void> {
 
 export async function handleVideo(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
+  clearActiveSlot(ctx.user.id);
   const state = await userStateService.get(ctx.user.id);
   await userStateService.setState(ctx.user.id, "VIDEO_SECTION", "video");
 
