@@ -7,21 +7,49 @@ import { config, getT } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
-const SECTION_SEND_METHOD: Record<string, string> = {
-  image: "sendPhoto",
-  audio: "sendAudio",
-  video: "sendVideo",
-};
+// Telegram URL-fetch limits when the bot sends a remote URL to the Bot API:
+// images go through sendPhoto (5 MB), other media + documents use 20 MB.
+const PHOTO_URL_MAX_BYTES = 5 * 1024 * 1024;
+const MEDIA_URL_MAX_BYTES = 20 * 1024 * 1024;
+
+type TelegramSendMethod = "sendPhoto" | "sendVideo" | "sendAudio" | "sendDocument";
+
+function sectionToMethod(section: string): TelegramSendMethod {
+  if (section === "image") return "sendPhoto";
+  if (section === "video") return "sendVideo";
+  if (section === "audio") return "sendAudio";
+  return "sendDocument";
+}
+
+function methodParamKey(method: TelegramSendMethod): "photo" | "video" | "audio" | "document" {
+  if (method === "sendPhoto") return "photo";
+  if (method === "sendVideo") return "video";
+  if (method === "sendAudio") return "audio";
+  return "document";
+}
+
+/** Probe Content-Length via HEAD. Returns null on any failure (network, 4xx, missing header). */
+async function probeFileSize(url: string): Promise<number | null> {
+  try {
+    const res = await fetch(url, { method: "HEAD" });
+    if (!res.ok) return null;
+    const len = res.headers.get("content-length");
+    if (!len) return null;
+    const n = parseInt(len, 10);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
 
 async function sendFileToUser(
   userId: bigint,
-  section: string,
+  method: TelegramSendMethod,
   fileUrl: string,
   caption: string,
   replyMarkup?: object,
 ): Promise<void> {
-  const method = SECTION_SEND_METHOD[section] ?? "sendDocument";
-  const paramKey = section === "image" ? "photo" : section === "audio" ? "audio" : "video";
+  const paramKey = methodParamKey(method);
 
   const body: Record<string, unknown> = {
     chat_id: userId.toString(),
@@ -177,24 +205,65 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           }
         : undefined;
 
+    // Three-tier delivery, matching generation-result button logic:
+    //  1. Fits in section's compressed send method (5 MB photo / 20 MB av) →
+    //     send via sendPhoto/sendVideo/sendAudio + "Send original" callback button
+    //     (lets the user fetch the uncompressed file via the bot's orig_ handler).
+    //  2. Larger than section limit but ≤ 20 MB (sendDocument by URL limit) →
+    //     send as document directly. No buttons — this *is* the original.
+    //  3. Larger than sendDocument's URL limit → only a text message + "Download"
+    //     link button, with a "file too large" warning.
+    const fileSize = await probeFileSize(fileUrl);
+    const sectionMethod = sectionToMethod(output.job.section);
+    const sectionLimit = sectionMethod === "sendPhoto" ? PHOTO_URL_MAX_BYTES : MEDIA_URL_MAX_BYTES;
+    const sendOriginalMarkup = {
+      inline_keyboard: [[{ text: t.common.sendOriginal, callback_data: `orig_${output.id}` }]],
+    };
+
+    const tooLargeForDocument = fileSize !== null && fileSize > MEDIA_URL_MAX_BYTES;
+    const tooLargeForSectionMethod =
+      fileSize !== null && fileSize > sectionLimit && fileSize <= MEDIA_URL_MAX_BYTES;
+
+    if (tooLargeForDocument) {
+      // Branch 3: send only a text + download link
+      await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: userId.toString(),
+          text: `${caption}\n\n${t.errors.fileTooLargeForTelegram}`,
+          ...(downloadMarkup ? { reply_markup: downloadMarkup } : {}),
+        }),
+      });
+      return { success: true };
+    }
+
     try {
-      await sendFileToUser(userId, output.job.section, fileUrl, caption, downloadMarkup);
+      if (tooLargeForSectionMethod) {
+        // Branch 2: uncompressed document, no buttons (file is already the original)
+        await sendFileToUser(userId, "sendDocument", fileUrl, caption);
+      } else {
+        // Branch 1 (or unknown size — optimistically try section method,
+        // catch-block handles too-large rejection from Telegram)
+        await sendFileToUser(userId, sectionMethod, fileUrl, caption, sendOriginalMarkup);
+      }
     } catch (err) {
-      // If Telegram rejected the file (e.g. too large), send a download link instead
+      // If Telegram rejected the file (e.g. too large for the chosen method),
+      // fall back to a text + download link.
       const isTooLarge =
         err instanceof Error &&
         (err.message.includes("Request Entity Too Large") ||
           err.message.includes("file is too big") ||
           err.message.includes("wrong file identifier"));
 
-      if (isTooLarge && downloadMarkup) {
+      if (isTooLarge) {
         await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: userId.toString(),
             text: `${caption}\n\n${t.errors.fileTooLargeForTelegram}`,
-            reply_markup: downloadMarkup,
+            ...(downloadMarkup ? { reply_markup: downloadMarkup } : {}),
           }),
         });
       } else {
