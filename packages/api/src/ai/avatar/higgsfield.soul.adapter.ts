@@ -23,6 +23,12 @@ interface SoulIdStatusResponse {
   reference_media?: ReferenceMedia[];
 }
 
+function buildEnvCombinedKey(): string {
+  const k = config.ai.higgsfieldApiKey ?? "";
+  const s = config.ai.higgsfieldApiSecret ?? "";
+  return `${k}:${s}`;
+}
+
 /**
  * Higgsfield Soul adapter for character (Soul ID) creation.
  * Uses the Higgsfield platform API directly — NOT fal.ai.
@@ -32,12 +38,18 @@ interface SoulIdStatusResponse {
 export class HiggsFieldSoulAdapter {
   readonly provider = "higgsfield_soul";
   private readonly authHeader: string;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
 
-  constructor(
-    apiKey = config.ai.higgsfieldApiKey ?? "",
-    apiSecret = config.ai.higgsfieldApiSecret ?? "",
-  ) {
-    this.authHeader = `Key ${apiKey}:${apiSecret}`;
+  /**
+   * Higgsfield требует пару `apiKey:apiSecret`. Пул хранит секрет одной строкой,
+   * поэтому KeyPool отдаёт `apiKey:apiSecret` целиком — мы только подставляем
+   * её в Authorization. Если строка пришла без `:` — считаем, что это уже
+   * собранный header (env-fallback или старый формат).
+   */
+  constructor(combinedKey?: string, fetchFn?: typeof globalThis.fetch) {
+    const key = combinedKey ?? buildEnvCombinedKey();
+    this.authHeader = `Key ${key}`;
+    this.fetchFn = fetchFn;
   }
 
   private headers() {
@@ -58,11 +70,15 @@ export class HiggsFieldSoulAdapter {
       })),
     };
 
-    const res = await fetchWithLog(`${HIGGSFIELD_API}/v1/custom-references`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithLog(
+      `${HIGGSFIELD_API}/v1/custom-references`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();
@@ -86,9 +102,11 @@ export class HiggsFieldSoulAdapter {
   async poll(
     externalId: string,
   ): Promise<{ status: "ready" | "processing" | "failed"; previewUrl?: string }> {
-    const res = await fetchWithLog(`${HIGGSFIELD_API}/v1/custom-references/${externalId}`, {
-      headers: this.headers(),
-    });
+    const res = await fetchWithLog(
+      `${HIGGSFIELD_API}/v1/custom-references/${externalId}`,
+      { headers: this.headers() },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();

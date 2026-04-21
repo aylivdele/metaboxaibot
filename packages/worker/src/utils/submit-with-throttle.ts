@@ -25,6 +25,7 @@
 import type { Job, Queue } from "bullmq";
 import { checkThrottle, tripThrottle } from "@metabox/api/services/throttle";
 import { classifyRateLimit, LONG_WINDOW_THRESHOLD_MS } from "@metabox/api/utils/rate-limit-error";
+import { markRateLimited, recordSuccess, recordError } from "@metabox/api/services/key-pool";
 import { notifyRateLimit } from "./notify-error.js";
 import { logger } from "../logger.js";
 
@@ -72,6 +73,12 @@ interface SubmitWithThrottleOptions<T, D> {
   queue: Queue;
   /** Job name to use when re-enqueueing (defaults to "generate"). */
   jobName?: string;
+  /**
+   * ID ключа из ProviderKey-пула. Если задан — при 429 throttle ставится
+   * на ключ (не на модель), чтобы остальные ключи провайдера продолжали работу.
+   * null/undefined → трипается model-gate (env-fallback режим).
+   */
+  keyId?: string | null;
   /** The actual provider submit call. */
   submit: () => Promise<T>;
 }
@@ -86,33 +93,52 @@ function withJitter(ms: number): number {
 export async function submitWithThrottle<T, D extends object>(
   opts: SubmitWithThrottleOptions<T, D>,
 ): Promise<T> {
-  const { modelId, provider, section, job, queue, submit } = opts;
+  const { modelId, provider, section, job, queue, submit, keyId } = opts;
   const jobName = opts.jobName ?? "generate";
 
-  // 1. Pre-check the gate.
-  const status = await checkThrottle(modelId);
-  if (status) {
-    const delay = withJitter(status.remainingMs);
-    logger.info(
-      { modelId, delay, reason: status.reason },
-      "submitWithThrottle: gate active, deferring job",
-    );
-    await queue.add(jobName, job.data, {
-      delay,
-      attempts: 1,
-      removeOnComplete: true,
-    });
-    throw new RateLimitDeferredError(modelId, delay);
+  // 1. Pre-check the model-level gate (legacy; protects env-fallback case).
+  // Per-key gate is pre-checked inside KeyPool.acquireKey before we get here.
+  if (!keyId) {
+    const status = await checkThrottle(modelId);
+    if (status) {
+      const delay = withJitter(status.remainingMs);
+      logger.info(
+        { modelId, delay, reason: status.reason },
+        "submitWithThrottle: gate active, deferring job",
+      );
+      await queue.add(jobName, job.data, {
+        delay,
+        attempts: 1,
+        removeOnComplete: true,
+      });
+      throw new RateLimitDeferredError(modelId, delay);
+    }
   }
 
   // 2. Try the submit.
   try {
-    return await submit();
+    const result = await submit();
+    if (keyId) void recordSuccess(keyId);
+    return result;
   } catch (err) {
     const cls = classifyRateLimit(err, provider);
-    if (!cls.isRateLimit) throw err;
+    if (!cls.isRateLimit) {
+      if (keyId) {
+        void recordError(keyId, err instanceof Error ? err.message : String(err));
+      }
+      throw err;
+    }
 
-    const tripped = await tripThrottle(modelId, cls.cooldownMs, cls.reason);
+    // Per-key trip when KeyPool supplied a keyId — isolates bad key, other keys keep flowing.
+    // Per-model trip as fallback for env-only case.
+    let tripped: boolean;
+    if (keyId) {
+      await markRateLimited(keyId, cls.cooldownMs, cls.reason);
+      tripped = true;
+    } else {
+      tripped = await tripThrottle(modelId, cls.cooldownMs, cls.reason);
+    }
+
     if (tripped) {
       await notifyRateLimit({
         section,
@@ -125,7 +151,7 @@ export async function submitWithThrottle<T, D extends object>(
 
     if (cls.isLongWindow || cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS) {
       logger.warn(
-        { modelId, cooldownMs: cls.cooldownMs, reason: cls.reason },
+        { modelId, keyId, cooldownMs: cls.cooldownMs, reason: cls.reason },
         "submitWithThrottle: long-window quota — failing job",
       );
       throw new RateLimitLongWindowError(modelId, cls.cooldownMs);
@@ -133,7 +159,7 @@ export async function submitWithThrottle<T, D extends object>(
 
     const delay = withJitter(cls.cooldownMs);
     logger.info(
-      { modelId, delay, reason: cls.reason },
+      { modelId, keyId, delay, reason: cls.reason },
       "submitWithThrottle: rate-limited, deferring job",
     );
     await queue.add(jobName, job.data, {

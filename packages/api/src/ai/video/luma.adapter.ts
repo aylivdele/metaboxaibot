@@ -24,10 +24,16 @@ export class LumaAdapter implements VideoAdapter {
   readonly modelId: string;
 
   private readonly apiKey: string;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
 
-  constructor(modelId = "luma-ray2", apiKey = config.ai.luma ?? "") {
+  constructor(
+    modelId = "luma-ray2",
+    apiKey = config.ai.luma ?? "",
+    fetchFn?: typeof globalThis.fetch,
+  ) {
     this.modelId = modelId;
     this.apiKey = apiKey;
+    this.fetchFn = fetchFn;
   }
 
   private headers() {
@@ -57,11 +63,15 @@ export class LumaAdapter implements VideoAdapter {
     if (lastFrame) keyframes.frame1 = { type: "image", url: lastFrame };
     if (Object.keys(keyframes).length > 0) body.keyframes = keyframes;
 
-    const res = await fetchWithLog(`${LUMA_API}/generations`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithLog(
+      `${LUMA_API}/generations`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();
@@ -81,9 +91,13 @@ export class LumaAdapter implements VideoAdapter {
   }
 
   async poll(generationId: string): Promise<VideoResult | null> {
-    const res = await fetchWithLog(`${LUMA_API}/generations/${generationId}`, {
-      headers: this.headers(),
-    });
+    const res = await fetchWithLog(
+      `${LUMA_API}/generations/${generationId}`,
+      {
+        headers: this.headers(),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();

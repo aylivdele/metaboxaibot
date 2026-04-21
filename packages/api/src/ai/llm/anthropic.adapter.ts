@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Anthropic, { type ClientOptions as AnthropicClientOptions } from "@anthropic-ai/sdk";
 import {
   BaseLLMAdapter,
   type LLMInput,
@@ -29,10 +29,18 @@ export class AnthropicAdapter extends BaseLLMAdapter {
   private client: Anthropic;
   private apiModel: string;
 
-  constructor(modelId: string, contextMaxMessages = 50, apiKey = config.ai.anthropic) {
+  constructor(
+    modelId: string,
+    contextMaxMessages = 50,
+    apiKey = config.ai.anthropic,
+    fetchFn?: typeof globalThis.fetch,
+  ) {
     super();
     this.modelId = modelId;
-    this.client = new Anthropic({ apiKey });
+    this.client = new Anthropic({
+      apiKey,
+      ...(fetchFn ? { fetch: fetchFn as unknown as AnthropicClientOptions["fetch"] } : {}),
+    });
     this.apiModel = MODEL_MAP[modelId] ?? modelId;
     this.contextMaxMessages = contextMaxMessages;
   }

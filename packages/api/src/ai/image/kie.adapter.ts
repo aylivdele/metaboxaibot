@@ -46,8 +46,16 @@ export class KieImageAdapter implements ImageAdapter {
   readonly modelId = "grok-imagine-image";
   readonly isAsync = true;
 
+  private readonly apiKeyOverride: string | undefined;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
+
+  constructor(apiKey?: string, fetchFn?: typeof globalThis.fetch) {
+    this.apiKeyOverride = apiKey;
+    this.fetchFn = fetchFn;
+  }
+
   private get apiKey(): string {
-    const key = config.ai.kie;
+    const key = this.apiKeyOverride ?? config.ai.kie;
     if (!key) throw new Error("KIE_API_KEY not configured");
     return key;
   }
@@ -93,11 +101,15 @@ export class KieImageAdapter implements ImageAdapter {
       input: inputPayload,
     };
 
-    const resp = await fetchWithLog(`${KIE_BASE}/api/v1/jobs/createTask`, {
-      method: "POST",
-      headers: this.jsonHeaders,
-      body: JSON.stringify(body),
-    });
+    const resp = await fetchWithLog(
+      `${KIE_BASE}/api/v1/jobs/createTask`,
+      {
+        method: "POST",
+        headers: this.jsonHeaders,
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
 
     if (!resp.ok) {
       const txt = await resp.text();
@@ -115,6 +127,7 @@ export class KieImageAdapter implements ImageAdapter {
     const resp = await fetchWithLog(
       `${KIE_BASE}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`,
       { headers: { Authorization: `Bearer ${this.apiKey}` } },
+      this.fetchFn,
     );
 
     if (!resp.ok) throw new Error(`KIE image poll error ${resp.status}`);

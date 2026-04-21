@@ -35,7 +35,11 @@ export class VeoAdapter implements VideoAdapter {
   private readonly apiKey: string;
   private readonly apiModel: string;
 
-  constructor(modelId = "veo", apiKey = config.ai.google ?? "") {
+  constructor(
+    modelId = "veo",
+    apiKey = config.ai.google ?? "",
+    _fetchFn?: typeof globalThis.fetch,
+  ) {
     this.modelId = modelId;
     this.apiKey = apiKey;
     this.ai = new GoogleGenAI({ apiKey });

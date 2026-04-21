@@ -255,6 +255,8 @@ export default {
       "⚠️ To generate with Higgsfield Soul, select your character in the Management menu.",
     soulAvatarNotReady:
       "⚠️ The selected character isn't ready yet. Wait for it to finish or pick another one in Management.",
+    avatarOrphaned:
+      "❌ This avatar is no longer available. Please create a new one in the Management menu.",
     soulDescribingReference: "🔍 Analyzing reference...",
     soulDescribeFailed:
       "❌ Failed to describe the reference image. Please try again or send a text prompt.",

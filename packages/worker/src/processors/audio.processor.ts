@@ -17,6 +17,14 @@ import {
   isRateLimitDeferredError,
   isRateLimitLongWindowError,
 } from "../utils/submit-with-throttle.js";
+import {
+  acquireForSubmit,
+  acquireForPoll,
+  acquireForSubmitSticky,
+} from "../utils/acquire-for-processor.js";
+import { resolveKeyProvider } from "@metabox/api/ai/key-provider";
+import { resolveVoiceForTTS } from "@metabox/api/services/user-voice";
+import type { AcquiredKey } from "@metabox/api/services/key-pool";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
@@ -65,14 +73,14 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
   const t = getT(userLang);
   const modelMeta = AI_MODELS[modelId];
   const modelName = modelMeta?.name ?? modelId;
-
-  const adapter = createAudioAdapter(modelId);
+  const keyProvider = resolveKeyProvider(modelId);
 
   try {
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
       select: {
         providerJobId: true,
+        providerKeyId: true,
         status: true,
         outputs: { orderBy: { index: "asc" as const }, take: 1 },
       },
@@ -108,6 +116,45 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
         modelId,
       );
 
+      // Cloned-voice path: TTS на ElevenLabs с user-cloned voice. Voice_id живёт
+      // на конкретном ключе → нужен sticky key. Если voice пропал — resolveVoiceForTTS
+      // его пересоздаст и вернёт новый voice_id + ключ свежего создания.
+      let stickyVoice: { voiceId: string; acquired: AcquiredKey } | null = null;
+      if (modelId === "tts-el" || modelId === "voice-clone") {
+        const requestedVoice = (modelSettings?.voice_id as string | undefined) ?? voiceId ?? null;
+        if (requestedVoice) {
+          const userVoice = await db.userVoice.findFirst({
+            where: { provider: "elevenlabs", externalId: requestedVoice },
+            select: { id: true },
+          });
+          if (userVoice) {
+            const resolved = await resolveVoiceForTTS(userVoice.id);
+            stickyVoice = { voiceId: resolved.voiceId, acquired: resolved.acquired };
+          }
+        }
+      }
+
+      const acquired = stickyVoice
+        ? await acquireForSubmitSticky({
+            acquired: stickyVoice.acquired,
+            modelId,
+            job,
+            queue: getAudioQueue(),
+          })
+        : await acquireForSubmit({
+            provider: keyProvider,
+            modelId,
+            job,
+            queue: getAudioQueue(),
+          });
+      const adapter = createAudioAdapter(modelId, acquired);
+
+      // Если был re-clone — подменяем voice_id, чтобы адаптер дернул свежий.
+      const effectiveVoiceId = stickyVoice?.voiceId ?? voiceId;
+      const effectiveModelSettings = stickyVoice
+        ? { ...(modelSettings ?? {}), voice_id: stickyVoice.voiceId }
+        : modelSettings;
+
       if (!adapter.isAsync && adapter.generate) {
         // Sync adapter — generate inline, then fall through to finalize.
         audioResult = await submitWithThrottle({
@@ -116,12 +163,13 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
           section: "audio",
           job,
           queue: getAudioQueue(),
+          keyId: acquired.keyId,
           submit: () =>
             adapter.generate!({
               prompt: effectivePrompt,
-              voiceId,
+              voiceId: effectiveVoiceId,
               sourceAudioUrl,
-              modelSettings,
+              modelSettings: effectiveModelSettings,
             }),
         });
       } else {
@@ -139,17 +187,18 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
             section: "audio",
             job,
             queue: getAudioQueue(),
+            keyId: acquired.keyId,
             submit: () =>
               adapter.submit!({
                 prompt: effectivePrompt,
-                voiceId,
+                voiceId: effectiveVoiceId,
                 sourceAudioUrl,
-                modelSettings,
+                modelSettings: effectiveModelSettings,
               }),
           });
           await db.generationJob.update({
             where: { id: dbJobId },
-            data: { providerJobId },
+            data: { providerJobId, providerKeyId: acquired.keyId },
           });
         }
 
@@ -170,6 +219,9 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
       // ── Stage 2: poll ──────────────────────────────────────────────────
       const providerJobId = existingJob?.providerJobId;
       if (!providerJobId) throw new Error(`Audio poll stage without providerJobId: ${dbJobId}`);
+
+      const acquired = await acquireForPoll(existingJob?.providerKeyId, keyProvider);
+      const adapter = createAudioAdapter(modelId, acquired);
       if (!adapter.poll) throw new Error(`Adapter ${modelId} has no poll()`);
 
       audioResult = await adapter.poll(providerJobId);

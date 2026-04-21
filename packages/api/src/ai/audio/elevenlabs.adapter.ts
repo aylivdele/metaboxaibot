@@ -21,6 +21,7 @@ export class ElevenLabsAdapter implements AudioAdapter {
   constructor(
     readonly modelId: "voice-clone" | "tts-el" | "sounds-el" | "music-el",
     private readonly apiKey = config.ai.elevenlabs ?? "",
+    private readonly fetchFn?: typeof globalThis.fetch,
   ) {}
 
   private headers() {
@@ -50,15 +51,19 @@ export class ElevenLabsAdapter implements AudioAdapter {
 
     const modelId = (ms.model_id as string | undefined) ?? "eleven_multilingual_v2";
 
-    const res = await fetchWithLog(`${ELEVENLABS_API}/text-to-speech/${voiceId}`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify({
-        text: input.prompt,
-        model_id: modelId,
-        voice_settings: voiceSettings,
-      }),
-    });
+    const res = await fetchWithLog(
+      `${ELEVENLABS_API}/text-to-speech/${voiceId}`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify({
+          text: input.prompt,
+          model_id: modelId,
+          voice_settings: voiceSettings,
+        }),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();
@@ -81,11 +86,15 @@ export class ElevenLabsAdapter implements AudioAdapter {
     };
     if (durationSeconds !== undefined) body.duration_seconds = durationSeconds;
 
-    const res = await fetchWithLog(`${ELEVENLABS_API}/sound-generation`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithLog(
+      `${ELEVENLABS_API}/sound-generation`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();

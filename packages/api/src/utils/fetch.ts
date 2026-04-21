@@ -28,8 +28,16 @@ export function truncateStrings(value: unknown, maxLen = 20): unknown {
  *  - Other string → logged as `<string N chars>`
  *  - ArrayBuffer / TypedArray → logged as `<binary N bytes>`
  *  - null / undefined → not logged
+ *
+ * Третий аргумент `customFetch` позволяет подменить транспорт (например, на
+ * undici fetch с ProxyAgent — см. `ai/transport/proxy-fetch.ts`). Если не
+ * передан — используется глобальный `fetch`.
  */
-export function fetchWithLog(url: string | URL | Request, init?: RequestInit): Promise<Response> {
+export function fetchWithLog(
+  url: string | URL | Request,
+  init?: RequestInit,
+  customFetch?: typeof globalThis.fetch,
+): Promise<Response> {
   if (logger.isLevelEnabled("debug")) {
     const method = init?.method ?? "GET";
     const urlStr = url instanceof Request ? url.url : String(url);
@@ -65,7 +73,8 @@ export function fetchWithLog(url: string | URL | Request, init?: RequestInit): P
     logger.debug({ method, url: urlStr, ...(bodyLog !== undefined && { body: bodyLog }) }, "fetch");
   }
 
-  return fetch(url as Parameters<typeof fetch>[0], init);
+  const f = customFetch ?? fetch;
+  return f(url as Parameters<typeof fetch>[0], init);
 }
 
 /**

@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
-import { ProtectedRoute, GuestOnlyRoute } from "./guards";
+import { ProtectedRoute, GuestOnlyRoute, AdminRoute } from "./guards";
 
 // Lazy-loaded pages — каждый роут отдельным чанком
 const LoginPage = lazy(() => import("@/pages/Login"));
@@ -21,6 +21,10 @@ const PaymentPendingPage = lazy(() => import("@/pages/PaymentPending"));
 const PaymentFailedPage = lazy(() => import("@/pages/PaymentFailed"));
 
 const NotFoundPage = lazy(() => import("@/pages/NotFound"));
+
+const AdminLayout = lazy(() => import("@/pages/AdminLayout"));
+const AdminKeysPage = lazy(() => import("@/pages/AdminKeys"));
+const AdminProxiesPage = lazy(() => import("@/pages/AdminProxies"));
 
 function PageFallback() {
   return (
@@ -76,6 +80,17 @@ export const router = createBrowserRouter([
       { path: "tokens", element: withSuspense(<TokensPage />) },
       { path: "profile", element: withSuspense(<ProfilePage />) },
       { path: "billing", element: withSuspense(<BillingPage />) },
+    ],
+  },
+
+  // Админ
+  {
+    path: "/admin",
+    element: <AdminRoute>{withSuspense(<AdminLayout />)}</AdminRoute>,
+    children: [
+      { index: true, element: <Navigate to="keys" replace /> },
+      { path: "keys", element: withSuspense(<AdminKeysPage />) },
+      { path: "proxies", element: withSuspense(<AdminProxiesPage />) },
     ],
   },
 

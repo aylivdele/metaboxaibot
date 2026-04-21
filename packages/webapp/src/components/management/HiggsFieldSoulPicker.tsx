@@ -73,24 +73,37 @@ export function HiggsFieldSoulPicker({ soulId, onChange }: HiggsFieldSoulPickerP
         <div className="avatar-picker__grid">
           {souls.map((soul) => {
             const isReady = soul.status === "ready";
+            const isOrphaned = soul.status === "orphaned";
             const isSelected = isReady && soul.externalId === soulId;
+            const isDisabled = !isReady;
             return (
               <div
                 key={soul.id}
-                className={`avatar-picker__item${isSelected ? " avatar-picker__item--selected" : ""}${!isReady ? " avatar-picker__item--disabled" : ""}`}
+                className={`avatar-picker__item${isSelected ? " avatar-picker__item--selected" : ""}${isDisabled ? " avatar-picker__item--disabled" : ""}`}
                 onClick={() => (isSelected ? deselectSoul() : selectSoul(soul))}
+                title={isOrphaned ? t("uploads.avatarOrphanedHint") : undefined}
               >
-                {soul.previewUrl ? (
+                {soul.previewUrl && !isOrphaned ? (
                   <img className="avatar-picker__img" src={soul.previewUrl} alt={soul.name} />
                 ) : (
                   <div className="avatar-picker__img avatar-picker__img--placeholder">
-                    {soul.status === "creating" ? "⏳" : soul.status === "failed" ? "❌" : "👤"}
+                    {soul.status === "creating"
+                      ? "⏳"
+                      : isOrphaned
+                        ? "⚠️"
+                        : soul.status === "failed"
+                          ? "❌"
+                          : "👤"}
                   </div>
                 )}
                 <span className="avatar-picker__name">
-                  {soul.status === "creating" ? t("uploads.soulCreating") : soul.name}
+                  {soul.status === "creating"
+                    ? t("uploads.soulCreating")
+                    : isOrphaned
+                      ? `${soul.name} — ${t("uploads.avatarOrphaned")}`
+                      : soul.name}
                 </span>
-                {isReady && (
+                {(isReady || isOrphaned) && (
                   <button
                     className="avatar-picker__delete-btn"
                     onClick={(e) => handleDelete(e, soul.id)}

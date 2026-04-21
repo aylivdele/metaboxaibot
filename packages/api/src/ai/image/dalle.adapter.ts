@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { type ClientOptions as OpenAIClientOptions } from "openai";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
@@ -25,9 +25,14 @@ export class DalleAdapter implements ImageAdapter {
   readonly isAsync = false;
 
   private client: OpenAI;
+  private fetchFn: typeof globalThis.fetch | undefined;
 
-  constructor(apiKey = config.ai.openai) {
-    this.client = new OpenAI({ apiKey });
+  constructor(apiKey = config.ai.openai, fetchFn?: typeof globalThis.fetch) {
+    this.client = new OpenAI({
+      apiKey,
+      ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
+    });
+    this.fetchFn = fetchFn;
   }
 
   async generate(input: ImageInput): Promise<ImageResult> {

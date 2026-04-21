@@ -648,10 +648,20 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     const current = await userStateService.getMediaInputs(ctx.user.id, modelId);
     const targetSlot =
       model.mediaInputs.find((s) => !current[s.slotKey]?.length) ?? model.mediaInputs[0];
-    if (current[targetSlot.slotKey]?.length) {
-      await userStateService.clearMediaInputSlot(ctx.user.id, modelId, targetSlot.slotKey);
+    let overflow = false;
+    if (
+      current[targetSlot.slotKey]?.length &&
+      (!targetSlot.maxImages || targetSlot.maxImages === current[targetSlot.slotKey]?.length)
+    ) {
+      overflow = true;
     }
-    await userStateService.addMediaInput(ctx.user.id, modelId, targetSlot.slotKey, tgSlotValue);
+    await userStateService.addMediaInput(
+      ctx.user.id,
+      modelId,
+      targetSlot.slotKey,
+      tgSlotValue,
+      overflow,
+    );
     await sendDesignMediaInputStatus(ctx);
     return;
   }

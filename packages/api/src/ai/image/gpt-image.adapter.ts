@@ -1,4 +1,4 @@
-import OpenAI, { toFile } from "openai";
+import OpenAI, { toFile, type ClientOptions as OpenAIClientOptions } from "openai";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config, UserFacingError } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
@@ -64,8 +64,11 @@ export class GptImageAdapter implements ImageAdapter {
 
   private client: OpenAI;
 
-  constructor(apiKey = config.ai.openai) {
-    this.client = new OpenAI({ apiKey });
+  constructor(apiKey = config.ai.openai, fetchFn?: typeof globalThis.fetch) {
+    this.client = new OpenAI({
+      apiKey,
+      ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
+    });
   }
 
   async generate(input: ImageInput): Promise<ImageResult> {

@@ -56,9 +56,13 @@ const SEP = "||";
 export class FalAdapter implements ImageAdapter {
   readonly isAsync = true;
 
+  // FAL SDK не позволяет per-instance подменять fetch (singleton config),
+  // поэтому прокси на MVP не поддерживается — fetchFn принимается ради
+  // совместимости с factory, но игнорируется.
   constructor(
     readonly modelId: string,
     apiKey = config.ai.fal,
+    _fetchFn?: typeof globalThis.fetch,
   ) {
     fal.config({ credentials: apiKey });
   }

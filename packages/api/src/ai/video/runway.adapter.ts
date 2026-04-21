@@ -25,9 +25,11 @@ export class RunwayAdapter implements VideoAdapter {
   readonly modelId = "runway";
 
   private readonly apiKey: string;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
 
-  constructor(apiKey = config.ai.runway ?? "") {
+  constructor(apiKey = config.ai.runway ?? "", fetchFn?: typeof globalThis.fetch) {
     this.apiKey = apiKey;
+    this.fetchFn = fetchFn;
   }
 
   private headers() {
@@ -79,11 +81,15 @@ export class RunwayAdapter implements VideoAdapter {
       };
     }
 
-    const res = await fetchWithLog(`${RUNWAY_API}/image_to_video`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithLog(
+      `${RUNWAY_API}/image_to_video`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();
@@ -95,9 +101,13 @@ export class RunwayAdapter implements VideoAdapter {
   }
 
   async poll(taskId: string): Promise<VideoResult | null> {
-    const res = await fetchWithLog(`${RUNWAY_API}/tasks/${taskId}`, {
-      headers: this.headers(),
-    });
+    const res = await fetchWithLog(
+      `${RUNWAY_API}/tasks/${taskId}`,
+      {
+        headers: this.headers(),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();

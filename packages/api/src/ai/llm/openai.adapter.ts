@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { type ClientOptions as OpenAIClientOptions } from "openai";
 import {
   BaseLLMAdapter,
   type LLMInput,
@@ -20,11 +20,14 @@ export class OpenAIAdapter extends BaseLLMAdapter {
   private client: OpenAI;
   private model: string;
 
-  constructor(model: string, apiKey = config.ai.openai) {
+  constructor(model: string, apiKey = config.ai.openai, fetchFn?: typeof globalThis.fetch) {
     super();
     this.model = model;
     this.modelId = model;
-    this.client = new OpenAI({ apiKey });
+    this.client = new OpenAI({
+      apiKey,
+      ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
+    });
   }
 
   /**

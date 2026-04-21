@@ -33,9 +33,11 @@ function isVideoUrl(url: string): boolean {
 }
 
 export class FalVideoAdapter implements VideoAdapter {
+  // FAL SDK глобальный config — proxy на MVP не поддерживается, fetchFn игнорируется.
   constructor(
     readonly modelId: string,
     apiKey = config.ai.fal,
+    _fetchFn?: typeof globalThis.fetch,
   ) {
     fal.config({ credentials: apiKey });
   }

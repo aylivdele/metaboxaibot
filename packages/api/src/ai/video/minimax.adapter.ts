@@ -60,10 +60,20 @@ interface MinimaxFileResponse {
  * Docs: https://platform.minimax.io/docs/guides/video-generation
  */
 export class MinimaxVideoAdapter implements VideoAdapter {
-  constructor(readonly modelId: string) {}
+  private readonly apiKeyOverride: string | undefined;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
+
+  constructor(
+    readonly modelId: string,
+    apiKeyOverride?: string,
+    fetchFn?: typeof globalThis.fetch,
+  ) {
+    this.apiKeyOverride = apiKeyOverride;
+    this.fetchFn = fetchFn;
+  }
 
   private get apiKey(): string {
-    const key = config.ai.minimax;
+    const key = this.apiKeyOverride ?? config.ai.minimax;
     if (!key) throw new Error("MINIMAX_API_KEY not configured");
     return key;
   }
@@ -92,14 +102,18 @@ export class MinimaxVideoAdapter implements VideoAdapter {
     if (firstFrame && SUPPORTS_IMAGE.has(this.modelId)) body.first_frame_image = firstFrame;
     if (lastFrame && SUPPORTS_IMAGE.has(this.modelId)) body.last_frame_image = lastFrame;
 
-    const resp = await fetchWithLog(`${MINIMAX_API_BASE}/video_generation`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
+    const resp = await fetchWithLog(
+      `${MINIMAX_API_BASE}/video_generation`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+      this.fetchFn,
+    );
 
     if (!resp.ok) {
       const txt = await resp.text();
@@ -120,6 +134,7 @@ export class MinimaxVideoAdapter implements VideoAdapter {
         {
           headers: { Authorization: `Bearer ${this.apiKey}` },
         },
+        this.fetchFn,
       );
 
       if (!resp.ok) throw new Error(`MiniMax poll error ${resp.status}`);
@@ -141,6 +156,7 @@ export class MinimaxVideoAdapter implements VideoAdapter {
         {
           headers: { Authorization: `Bearer ${this.apiKey}` },
         },
+        this.fetchFn,
       );
 
       if (!fileResp.ok) throw new Error(`MiniMax file retrieve error ${fileResp.status}`);

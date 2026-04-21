@@ -7,26 +7,38 @@ import { QwenAdapter } from "./qwen.adapter.js";
 import { GrokAdapter } from "./grok.adapter.js";
 import { DeepSeekAdapter } from "./deepseek.adapter.js";
 import { PerplexityAdapter } from "./perplexity.adapter.js";
+import type { AdapterContext } from "../with-pool.js";
+import { buildProxyFetch } from "../transport/proxy-fetch.js";
 
-export function createLLMAdapter(modelId: string): LLMAdapter {
+/**
+ * Если `ctx` передан — используем выбранный из пула ключ + (опционально) прокси.
+ * Если `ctx` не передан — каждый адаптер падает в env-default из config.ai.*.
+ *
+ * Gemini SDK (@google/genai) не поддерживает custom fetch — прокси для него
+ * на MVP игнорируется (используется только apiKey).
+ */
+export function createLLMAdapter(modelId: string, ctx?: AdapterContext): LLMAdapter {
   const model = AI_MODELS[modelId];
   if (!model) throw new Error(`Unknown model: ${modelId}`);
 
+  const apiKey = ctx?.apiKey;
+  const fetchFn = ctx ? (buildProxyFetch(ctx.proxy) ?? undefined) : undefined;
+
   switch (model.provider) {
     case "openai":
-      return new OpenAIAdapter(modelId);
+      return new OpenAIAdapter(modelId, apiKey, fetchFn);
     case "anthropic":
-      return new AnthropicAdapter(modelId, model.contextMaxMessages);
+      return new AnthropicAdapter(modelId, model.contextMaxMessages, apiKey, fetchFn);
     case "google":
-      return new GeminiAdapter(modelId, model.contextMaxMessages);
+      return new GeminiAdapter(modelId, model.contextMaxMessages, apiKey);
     case "alibaba":
-      return new QwenAdapter(modelId, model.contextMaxMessages);
+      return new QwenAdapter(modelId, model.contextMaxMessages, apiKey, fetchFn);
     case "xai":
-      return new GrokAdapter(modelId, model.contextMaxMessages);
+      return new GrokAdapter(modelId, model.contextMaxMessages, apiKey, fetchFn);
     case "deepseek":
-      return new DeepSeekAdapter(modelId, model.contextMaxMessages);
+      return new DeepSeekAdapter(modelId, model.contextMaxMessages, apiKey, fetchFn);
     case "perplexity":
-      return new PerplexityAdapter(modelId, model.contextMaxMessages);
+      return new PerplexityAdapter(modelId, model.contextMaxMessages, apiKey, fetchFn);
     default:
       throw new Error(`No LLM adapter for provider: ${model.provider}`);
   }

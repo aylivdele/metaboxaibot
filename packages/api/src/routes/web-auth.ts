@@ -80,6 +80,7 @@ async function findAibUser(metaboxUserId: string) {
       tokenBalance: true,
       subscriptionTokenBalance: true,
       isBlocked: true,
+      role: true,
     },
   });
 }
@@ -112,6 +113,7 @@ async function buildWebUserResponse(args: {
     isTelegramLinked: !!aib,
     tokenBalance: aib?.tokenBalance.toString() ?? "0",
     subscriptionTokenBalance: aib?.subscriptionTokenBalance.toString() ?? "0",
+    role: aib?.role ?? "USER",
     createdAt: new Date().toISOString(),
   };
 }

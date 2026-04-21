@@ -1,7 +1,11 @@
-import OpenAI from "openai";
-import { AI_MODELS, config } from "@metabox/shared";
+import OpenAI, { type ClientOptions as OpenAIClientOptions } from "openai";
+import { AI_MODELS } from "@metabox/shared";
 import { calculateCost, deductTokens } from "./token.service.js";
 import { logger } from "../logger.js";
+import { acquireKey, recordSuccess, recordError, markRateLimited } from "./key-pool.service.js";
+import { isPoolExhaustedError } from "../utils/pool-exhausted-error.js";
+import { classifyRateLimit } from "../utils/rate-limit-error.js";
+import { buildProxyFetch } from "../ai/transport/proxy-fetch.js";
 
 const TRANSLATE_MODEL_ID = "gpt-5-nano";
 const SYSTEM_PROMPT =
@@ -32,12 +36,6 @@ function looksEnglish(text: string): boolean {
   return true;
 }
 
-let cachedClient: OpenAI | null = null;
-function getClient(): OpenAI {
-  if (!cachedClient) cachedClient = new OpenAI({ apiKey: config.ai.openai });
-  return cachedClient;
-}
-
 /**
  * If `modelSettings.auto_translate_prompt === true`, translates `prompt` to English
  * via `gpt-5-nano` and deducts the actual token-based cost from `userId`.
@@ -45,6 +43,9 @@ function getClient(): OpenAI {
  * (translation errors are swallowed so the primary generation still runs).
  *
  * Safe to call from both API services and worker processors.
+ *
+ * Ключ берётся из пула (provider="openai") — поддержка ротации/прокси.
+ * Если пул исчерпан — silent fallback на оригинальный prompt.
  */
 export async function translatePromptIfNeeded(
   prompt: string,
@@ -61,8 +62,23 @@ export async function translatePromptIfNeeded(
     return prompt;
   }
 
+  let acquired;
   try {
-    const client = getClient();
+    acquired = await acquireKey("openai");
+  } catch (err) {
+    if (isPoolExhaustedError(err)) {
+      logger.warn({ err }, "Auto-translate skipped: OpenAI pool exhausted");
+      return prompt;
+    }
+    throw err;
+  }
+
+  try {
+    const fetchFn = buildProxyFetch(acquired.proxy) ?? undefined;
+    const client = new OpenAI({
+      apiKey: acquired.apiKey,
+      ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
+    });
     const response = await (
       client.responses.create as (p: unknown) => Promise<OpenAI.Responses.Response>
     )({
@@ -73,6 +89,8 @@ export async function translatePromptIfNeeded(
 
     const translated = response.output_text?.trim();
     if (!translated) throw new Error("empty translation");
+
+    if (acquired.keyId) void recordSuccess(acquired.keyId);
 
     const inputTokens = response.usage?.input_tokens ?? 0;
     const outputTokens = response.usage?.output_tokens ?? 0;
@@ -85,6 +103,14 @@ export async function translatePromptIfNeeded(
 
     return translated;
   } catch (err) {
+    if (acquired.keyId) {
+      const cls = classifyRateLimit(err, "openai");
+      if (cls.isRateLimit) {
+        void markRateLimited(acquired.keyId, cls.cooldownMs, cls.reason);
+      } else {
+        void recordError(acquired.keyId, err instanceof Error ? err.message : String(err));
+      }
+    }
     logger.warn({ err }, "Auto-translate failed, falling back to original prompt");
     return prompt;
   }

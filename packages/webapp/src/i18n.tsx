@@ -321,6 +321,8 @@ const translations = {
     "uploads.createAvatarHint":
       "Return to the chat and send a photo with your face — the bot will create a personal avatar based on it.",
     "uploads.avatarCreating": "Creating...",
+    "uploads.avatarOrphaned": "Unavailable",
+    "uploads.avatarOrphanedHint": "This avatar is no longer available. Create a new one.",
     "uploads.emptyAvatars": 'No avatars yet. Click "Create avatar" to start.',
     "uploads.mySouls": "My Characters",
     "uploads.createSoul": "➕ Create Character",
@@ -648,6 +650,8 @@ const translations = {
     "uploads.createAvatarHint":
       "Вернитесь в чат и отправьте фото с лицом — бот создаст персональный аватар на его основе.",
     "uploads.avatarCreating": "Создаётся...",
+    "uploads.avatarOrphaned": "Недоступен",
+    "uploads.avatarOrphanedHint": "Этот аватар больше недоступен. Создайте новый.",
     "uploads.emptyAvatars": "Аватаров пока нет. Нажмите «Создать аватар».",
     "uploads.mySouls": "Мои персонажи",
     "uploads.createSoul": "➕ Создать персонажа",

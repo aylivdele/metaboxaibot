@@ -2,7 +2,7 @@ import { createLLMAdapter } from "../ai/llm/factory.js";
 import { dialogService, type StoredAttachment } from "./dialog.service.js";
 import { calculateCost, checkBalance, deductTokens } from "./token.service.js";
 import type { LLMInput, MessageAttachment } from "../ai/llm/base.adapter.js";
-import { AI_MODELS } from "@metabox/shared";
+import { AI_MODELS, UserFacingError } from "@metabox/shared";
 import { userStateService } from "./user-state.service.js";
 import { getFileUrl } from "./s3.service.js";
 import {
@@ -14,6 +14,10 @@ import {
 import type { MessageRecord } from "../ai/llm/base.adapter.js";
 import { ContextOverflowError, isContextOverflowError } from "../ai/llm/truncate.js";
 import { logger } from "../logger.js";
+import { acquireKey, markRateLimited, recordSuccess, recordError } from "./key-pool.service.js";
+import { isPoolExhaustedError } from "../utils/pool-exhausted-error.js";
+import { resolveKeyProvider } from "../ai/key-provider.js";
+import { classifyRateLimit } from "../utils/rate-limit-error.js";
 
 export { ContextOverflowError } from "../ai/llm/truncate.js";
 
@@ -86,8 +90,26 @@ export const chatService = {
     const dialog = await dialogService.findById(dialogId);
     if (!dialog) throw new Error(`Dialog ${dialogId} not found`);
 
-    const adapter = createLLMAdapter(dialog.modelId);
     const model = AI_MODELS[dialog.modelId];
+    const keyProvider = resolveKeyProvider(dialog.modelId);
+
+    // Acquire a key from the pool before any work — if the pool is exhausted
+    // (all keys throttled), surface a user-facing "model temporarily unavailable"
+    // error rather than enqueueing (chat is interactive, no re-enqueue path).
+    let acquired;
+    try {
+      acquired = await acquireKey(keyProvider);
+    } catch (err) {
+      if (isPoolExhaustedError(err)) {
+        throw new UserFacingError(`Pool exhausted for ${keyProvider}`, {
+          key: "modelTemporarilyUnavailable",
+          params: { modelName: model?.name ?? dialog.modelId },
+        });
+      }
+      throw err;
+    }
+    const acquiredKeyId = acquired.keyId;
+    const adapter = createLLMAdapter(dialog.modelId, acquired);
 
     // Split attachments into two classes:
     //  - text-class (.txt, .csv, .docx, .xlsx, etc.) — always extracted + inlined.
@@ -270,9 +292,31 @@ export const chatService = {
         yield* runStream(retryInput);
       }
     } catch (err) {
+      // Per-key metrics + throttle on 429-class errors. We only attribute when
+      // the pool actually gave us a DB-tracked key (env-fallback yields keyId=null).
+      if (acquiredKeyId) {
+        const cls = classifyRateLimit(err, keyProvider);
+        if (cls.isRateLimit) {
+          void markRateLimited(acquiredKeyId, cls.cooldownMs, cls.reason);
+        } else {
+          void recordError(acquiredKeyId, err instanceof Error ? err.message : String(err));
+        }
+      }
       await dialogService.markMessageFailed(userMessage.id);
+      // Convert raw 429 into a user-facing message; pool selection already gave us
+      // the best available key, so a 429 here means the picked key is now also
+      // throttled — the user can retry shortly and a different key may be free.
+      const cls = classifyRateLimit(err, keyProvider);
+      if (cls.isRateLimit) {
+        throw new UserFacingError(`Rate-limited on ${keyProvider}`, {
+          key: "modelTemporarilyUnavailable",
+          params: { modelName: model?.name ?? dialog.modelId },
+        });
+      }
       throw err;
     }
+
+    if (acquiredKeyId) void recordSuccess(acquiredKeyId);
 
     const responseText = stripThinkingBlocks(chunks.join(""));
     const tokensUsed =

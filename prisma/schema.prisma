@@ -187,6 +187,7 @@ model GenerationJob {
   prompt    String
   inputData Json?  // доп. параметры (размер, стиль и т.д.)
   providerJobId  String? // external provider task ID — persisted after submit for poll resume on restart
+  providerKeyId  String? // ProviderKey.id выбранный на submit; null = был использован env-fallback
   error          String?
 
   createdAt   DateTime  @default(now())
@@ -239,21 +240,27 @@ model UserUpload {
 // Пользовательские аватары (кастомные, создаются через провайдеры)
 // ─────────────────────────────────────────────
 model UserAvatar {
-  id         String   @id @default(cuid())
-  userId     BigInt
-  provider   String   // "heygen" | расширяется для других провайдеров
-  name       String
-  externalId String?  // talking_photo_id (заполняется когда аватар готов)
-  previewUrl String?
-  status     String   @default("creating") // "creating" | "ready" | "failed"
+  id            String  @id @default(cuid())
+  userId        BigInt
+  provider      String // "heygen" | "higgsfield_soul"
+  name          String
+  externalId    String? // talking_photo_id (HeyGen) / Soul ID
+  previewUrl    String?
+  status        String  @default("creating") // "creating" | "ready" | "failed" | "orphaned"
+  // ProviderKey, на котором был создан внешний ресурс. Внешние provider-айди
+  // (talking_photo_id и т.п.) живут в аккаунте конкретного API-ключа, поэтому
+  // потреблять их можно только тем же ключом. null = был использован env-fallback.
+  providerKeyId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerKey ProviderKey? @relation(fields: [providerKeyId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userId, provider])
+  @@index([providerKeyId])
   @@map("user_avatars")
 }
 
@@ -261,23 +268,29 @@ model UserAvatar {
 // Пользовательские голоса (клонированные через ElevenLabs)
 // ─────────────────────────────────────────────
 model UserVoice {
-  id          String   @id @default(cuid())
-  userId      BigInt
-  provider    String   // "elevenlabs"
-  name        String
-  externalId  String?  // ElevenLabs voice_id
-  previewUrl  String?
-  audioS3Key  String?  // S3 key of the original audio — used to recreate the voice if EL slot is lost
-  status      String   @default("ready") // "ready" | "failed"
-  lastUsedAt  DateTime? // updated on each TTS generation — used for LRU eviction
+  id            String    @id @default(cuid())
+  userId        BigInt
+  provider      String // "elevenlabs"
+  name          String
+  externalId    String? // ElevenLabs voice_id
+  previewUrl    String?
+  audioS3Key    String? // S3 key of the original audio — used to recreate the voice if EL slot is lost
+  status        String    @default("ready") // "ready" | "failed"
+  lastUsedAt    DateTime? // updated on each TTS generation — used for LRU eviction
+  // Аккаунт ElevenLabs, в котором сейчас живёт voice_id. При утере (ключ удалён
+  // из пула, slot выселен) — пересоздаём из audioS3Key на любом активном ключе
+  // и обновляем это поле + externalId.
+  providerKeyId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerKey ProviderKey? @relation(fields: [providerKeyId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userId, provider])
+  @@index([providerKeyId])
   @@map("user_voices")
 }
 
@@ -330,4 +343,58 @@ model ExchangeRate {
   updatedAt DateTime @updatedAt
 
   @@map("exchange_rates")
+}
+
+// ─────────────────────────────────────────────
+// Прокси (для маршрутизации запросов к AI-провайдерам)
+// ─────────────────────────────────────────────
+model Proxy {
+  id        String  @id @default(cuid())
+  label     String  // человекочитаемое имя ("DE-1", "US-East")
+  protocol  String  // "http" | "https" | "socks5"
+  host      String
+  port      Int
+  username       String? // зашифрованный (AES-GCM ciphertext, base64) — может быть null
+  passwordCipher String? // зашифрованный пароль
+  isActive  Boolean @default(true)
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  keys ProviderKey[]
+
+  @@map("proxies")
+}
+
+// ─────────────────────────────────────────────
+// API-ключи провайдеров (пул с балансировкой)
+// ─────────────────────────────────────────────
+model ProviderKey {
+  id        String  @id @default(cuid())
+  provider  String  // "openai" | "anthropic" | "google" | "fal" | ...
+  label     String  // "OpenAI Main", "OpenAI Backup #1"
+  keyCipher String  // AES-GCM ciphertext значения ключа (base64)
+  keyMask   String  // последние 4 символа для UI ("…1234")
+  proxyId   String?
+  priority  Int     @default(0) // выше = приоритетнее (берётся первым)
+  isActive  Boolean @default(true)
+  notes     String?
+
+  // Метрики (best-effort)
+  requestCount  BigInt    @default(0)
+  errorCount    BigInt    @default(0)
+  lastUsedAt    DateTime?
+  lastErrorAt   DateTime?
+  lastErrorText String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  proxy        Proxy?        @relation(fields: [proxyId], references: [id], onDelete: SetNull)
+  userVoices   UserVoice[]
+  userAvatars  UserAvatar[]
+
+  @@index([provider, isActive, priority])
+  @@map("provider_keys")
 }

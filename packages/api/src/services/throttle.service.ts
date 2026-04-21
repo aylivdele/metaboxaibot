@@ -14,9 +14,14 @@ import { logger } from "../logger.js";
  */
 
 const PREFIX = "throttle:model:";
+const KEY_PREFIX = "throttle:key:";
 
 function key(modelId: string): string {
   return `${PREFIX}${modelId}`;
+}
+
+function keyKey(keyId: string): string {
+  return `${KEY_PREFIX}${keyId}`;
 }
 
 export interface ThrottleStatus {
@@ -64,4 +69,45 @@ export async function tripThrottle(
  */
 export async function clearThrottle(modelId: string): Promise<void> {
   await getRedis().del(key(modelId));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Key-level throttle (для пула API-ключей)
+//
+// Семантика та же что и model-level: per-key Redis-gate с атомарным `SET NX PX`.
+// Используется KeyPool: при 429 от провайдера маркируем конкретный ключ как
+// throttled, остальные ключи провайдера продолжают принимать нагрузку.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Активный cooldown по ключу или null если ключ свободен. */
+export async function checkKeyThrottle(keyId: string): Promise<ThrottleStatus | null> {
+  const redis = getRedis();
+  const k = keyKey(keyId);
+  const [reason, pttl] = await Promise.all([redis.get(k), redis.pttl(k)]);
+  if (reason === null || pttl <= 0) return null;
+  return { remainingMs: pttl, reason };
+}
+
+/**
+ * Атомарно ставит throttle на конкретный ключ. Возвращает true если cooldown
+ * был установлен этим вызовом (первый tripper), false — если уже активен.
+ */
+export async function tripKeyThrottle(
+  keyId: string,
+  durationMs: number,
+  reason: string,
+): Promise<boolean> {
+  if (durationMs <= 0) return false;
+  const redis = getRedis();
+  const result = await redis.set(keyKey(keyId), reason, "PX", durationMs, "NX");
+  const tripped = result === "OK";
+  if (tripped) {
+    logger.warn({ keyId, durationMs, reason }, "throttle.tripKeyThrottle: gate set");
+  }
+  return tripped;
+}
+
+/** Сбросить cooldown с ключа вручную (используется admin clear-throttle endpoint). */
+export async function clearKeyThrottle(keyId: string): Promise<void> {
+  await getRedis().del(keyKey(keyId));
 }

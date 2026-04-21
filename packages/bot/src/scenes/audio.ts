@@ -1,6 +1,7 @@
 import { InlineKeyboard } from "grammy";
 import type { BotContext } from "../types/context.js";
 import { audioGenerationService, userStateService } from "@metabox/api/services";
+import { acquireKey, recordSuccess, recordError } from "@metabox/api/services/key-pool";
 import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
 import { db } from "@metabox/api/db";
 import {
@@ -103,34 +104,48 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
     });
     const name = `Голос ${ctx.user.id} #${count + 1}`;
 
-    // 3. Clone voice on ElevenLabs (with LRU eviction on limit error)
+    // 3. Clone voice on ElevenLabs (with LRU eviction on limit error).
+    // Voice_id живёт на конкретном аккаунте → сохраняем providerKeyId,
+    // чтобы при TTS дёргать тот же ключ. Если ключ удалят — voice пересоздастся
+    // через resolveVoiceForTTS (см. user-voice.service.ts).
     const allSettings = await userStateService.getModelSettings(ctx.user.id);
     const cloneSettings = allSettings["voice-clone"] ?? {};
     const removeBackgroundNoise = Boolean(cloneSettings.remove_background_noise ?? false);
 
+    const acquired = await acquireKey("elevenlabs");
     let voiceId: string;
     try {
-      voiceId = await ElevenLabsAdapter.cloneVoice(
-        audioBuffer,
-        filename,
-        name,
-        removeBackgroundNoise,
-      );
-    } catch (err) {
-      // ElevenLabs returns 400 with voice_limit_reached when the workspace slot limit is exceeded.
-      if (err instanceof Error && err.message.includes("voice_limit_reached")) {
-        const freed = await evictOneElevenLabsVoice();
-        if (!freed) throw err;
-        // Retry cloning
+      try {
         voiceId = await ElevenLabsAdapter.cloneVoice(
           audioBuffer,
           filename,
           name,
           removeBackgroundNoise,
+          acquired.apiKey,
         );
-      } else {
-        throw err;
+      } catch (err) {
+        // ElevenLabs returns 400 with voice_limit_reached when the workspace slot limit is exceeded.
+        // Эвиктим на ТОМ ЖЕ ключе — слот-лимит per-account.
+        if (err instanceof Error && err.message.includes("voice_limit_reached")) {
+          const freed = await evictOneElevenLabsVoice(acquired.apiKey);
+          if (!freed) throw err;
+          voiceId = await ElevenLabsAdapter.cloneVoice(
+            audioBuffer,
+            filename,
+            name,
+            removeBackgroundNoise,
+            acquired.apiKey,
+          );
+        } else {
+          throw err;
+        }
       }
+      if (acquired.keyId) void recordSuccess(acquired.keyId);
+    } catch (err) {
+      if (acquired.keyId) {
+        void recordError(acquired.keyId, err instanceof Error ? err.message : String(err));
+      }
+      throw err;
     }
 
     // 4. Upload original audio to S3 for future voice recreation
@@ -138,11 +153,10 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
     const audioS3Key = buildS3Key("voices", ctx.user.id.toString(), voiceId, ext);
     await uploadBuffer(audioS3Key, audioBuffer, `audio/${ext}`).catch(() => null);
 
-    // 5. Fetch preview URL from ElevenLabs
-    const previewUrl = await ElevenLabsAdapter.getPreviewUrl(
-      voiceId,
-      config.ai.elevenlabs ?? "",
-    ).catch(() => null);
+    // 5. Fetch preview URL from ElevenLabs (используем тот же ключ, на котором голос создан)
+    const previewUrl = await ElevenLabsAdapter.getPreviewUrl(voiceId, acquired.apiKey).catch(
+      () => null,
+    );
 
     // 6. Save to DB
     await db.userVoice.create({
@@ -154,6 +168,7 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
         previewUrl,
         audioS3Key,
         status: "ready",
+        providerKeyId: acquired.keyId,
       },
     });
 
@@ -182,10 +197,10 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
  *
  * Returns true if a slot was freed, false otherwise.
  */
-async function evictOneElevenLabsVoice(): Promise<boolean> {
+async function evictOneElevenLabsVoice(apiKey: string): Promise<boolean> {
   let elVoices: Awaited<ReturnType<typeof ElevenLabsAdapter.listVoices>>;
   try {
-    elVoices = await ElevenLabsAdapter.listVoices();
+    elVoices = await ElevenLabsAdapter.listVoices(apiKey);
   } catch (e) {
     logger.error({ err: e }, "Voice eviction: failed to list ElevenLabs voices");
     return false;
@@ -226,7 +241,7 @@ async function evictOneElevenLabsVoice(): Promise<boolean> {
 
   if (!targetExternalId) return false;
 
-  const deleted = await ElevenLabsAdapter.deleteVoice(targetExternalId);
+  const deleted = await ElevenLabsAdapter.deleteVoice(targetExternalId, apiKey);
   if (!deleted) return false;
 
   if (targetDbId) {

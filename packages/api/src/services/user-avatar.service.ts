@@ -21,6 +21,7 @@ export const userAvatarService = {
       externalId?: string;
       status?: string;
       previewUrl?: string;
+      providerKeyId?: string | null;
     },
   ): Promise<UserAvatar> {
     return db.userAvatar.create({
@@ -30,9 +31,23 @@ export const userAvatarService = {
 
   async updateStatus(
     id: string,
-    params: { status: string; externalId?: string; previewUrl?: string },
+    params: {
+      status: string;
+      externalId?: string;
+      previewUrl?: string;
+      providerKeyId?: string | null;
+    },
   ): Promise<UserAvatar> {
     return db.userAvatar.update({ where: { id }, data: params });
+  },
+
+  /**
+   * Аватар привязан к ProviderKey, который удалён/отключён, либо ресурс
+   * пропал из аккаунта. Помечаем status="orphaned" — UI должен показать
+   * пользователю, что аватар недоступен и его нужно пересоздать.
+   */
+  async markOrphaned(id: string): Promise<UserAvatar> {
+    return db.userAvatar.update({ where: { id }, data: { status: "orphaned" } });
   },
 
   async rename(id: string, userId: bigint, name: string): Promise<UserAvatar | null> {

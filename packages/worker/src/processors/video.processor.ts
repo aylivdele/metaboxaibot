@@ -37,7 +37,17 @@ import {
   isRateLimitDeferredError,
   isRateLimitLongWindowError,
 } from "../utils/submit-with-throttle.js";
+import {
+  acquireForSubmit,
+  acquireForPoll,
+  acquireForSubmitSticky,
+} from "../utils/acquire-for-processor.js";
+import { resolveKeyProvider } from "@metabox/api/ai/key-provider";
+import { acquireById } from "@metabox/api/services/key-pool";
+import type { AcquiredKey } from "@metabox/api/services/key-pool";
+import { userAvatarService } from "@metabox/api/services/user-avatar";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
+import { UserFacingError } from "@metabox/shared";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
 
@@ -68,14 +78,14 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
   const t = getT(userLang);
   const modelMeta = AI_MODELS[modelId];
   const modelName = modelMeta?.name ?? modelId;
-
-  const adapter = createVideoAdapter(modelId);
+  const keyProvider = resolveKeyProvider(modelId);
 
   try {
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
       select: {
         providerJobId: true,
+        providerKeyId: true,
         status: true,
         outputs: { orderBy: { index: "asc" as const }, take: 1 },
       },
@@ -85,8 +95,10 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
     let s3Key: string | null;
     let outputId: string;
     let videoBuffer: Buffer | null = null;
-    let videoResult: Awaited<ReturnType<typeof adapter.poll>> | null = null;
+    let videoResult: Awaited<ReturnType<ReturnType<typeof createVideoAdapter>["poll"]>> | null =
+      null;
     let deductResult: DeductResult | undefined;
+    let pollAdapter: ReturnType<typeof createVideoAdapter> | null = null;
 
     if (existingJob?.outputs?.length) {
       logger.info({ dbJobId }, "Generation already done, skipping to send");
@@ -111,14 +123,68 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
           BigInt(userIdStr),
           modelId,
         );
+
+        // HeyGen с user-avatar (talking_photo): аватар живёт на конкретном
+        // ключе, на котором был создан. Sticky-acquire по providerKeyId аватара.
+        // Если ключ удалён → markOrphaned + UserFacingError.
+        let stickyAvatar: { acquired: AcquiredKey; userAvatarId: string } | null = null;
+        if (modelId === "heygen") {
+          const candidateAvatarId = (modelSettings?.avatar_id as string | undefined)?.trim();
+          if (candidateAvatarId) {
+            const userAvatar = await db.userAvatar.findFirst({
+              where: {
+                userId: BigInt(userIdStr),
+                provider: "heygen",
+                externalId: candidateAvatarId,
+              },
+              select: { id: true, providerKeyId: true, status: true },
+            });
+            if (userAvatar) {
+              if (userAvatar.status === "orphaned") {
+                throw new UserFacingError(`Avatar ${candidateAvatarId} is orphaned`, {
+                  key: "avatarOrphaned",
+                });
+              }
+              try {
+                const stickKey = await acquireById(userAvatar.providerKeyId, "heygen");
+                stickyAvatar = { acquired: stickKey, userAvatarId: userAvatar.id };
+              } catch (e) {
+                logger.warn(
+                  { userAvatarId: userAvatar.id, keyId: userAvatar.providerKeyId, err: e },
+                  "Video submit: HeyGen avatar key gone, marking orphaned",
+                );
+                await userAvatarService.markOrphaned(userAvatar.id);
+                throw new UserFacingError(`Avatar key gone for ${candidateAvatarId}`, {
+                  key: "avatarOrphaned",
+                });
+              }
+            }
+          }
+        }
+
+        const acquired = stickyAvatar
+          ? await acquireForSubmitSticky({
+              acquired: stickyAvatar.acquired,
+              modelId,
+              job,
+              queue: getVideoQueue(),
+            })
+          : await acquireForSubmit({
+              provider: keyProvider,
+              modelId,
+              job,
+              queue: getVideoQueue(),
+            });
+        const submitAdapter = createVideoAdapter(modelId, acquired);
         providerJobId = await submitWithThrottle({
           modelId,
           provider: modelMeta?.provider,
           section: "video",
           job,
           queue: getVideoQueue(),
+          keyId: acquired.keyId,
           submit: () =>
-            adapter.submit({
+            submitAdapter.submit({
               prompt: effectivePrompt,
               imageUrl,
               mediaInputs,
@@ -131,7 +197,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
         logger.info({ dbJobId, modelId, providerJobId }, "Submitted video generation task");
         await db.generationJob.update({
           where: { id: dbJobId },
-          data: { providerJobId },
+          data: { providerJobId, providerKeyId: acquired.keyId },
         });
       }
 
@@ -152,7 +218,10 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       const providerJobId = existingJob?.providerJobId;
       if (!providerJobId) throw new Error(`Video poll stage without providerJobId: ${dbJobId}`);
 
-      videoResult = await adapter.poll(providerJobId);
+      const acquired = await acquireForPoll(existingJob?.providerKeyId, keyProvider);
+      pollAdapter = createVideoAdapter(modelId, acquired);
+
+      videoResult = await pollAdapter.poll(providerJobId);
 
       if (!videoResult) {
         const elapsed = Date.now() - (job.data.pollStartedAt ?? Date.now());
@@ -197,8 +266,8 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
       let actualHeight: number | null = null;
       let actualFps: number | null = null;
       try {
-        const buf = adapter.fetchBuffer
-          ? await adapter.fetchBuffer(videoResult.url)
+        const buf = pollAdapter?.fetchBuffer
+          ? await pollAdapter.fetchBuffer(videoResult.url)
           : await fetch(videoResult.url).then((r) =>
               r.ok
                 ? r.arrayBuffer().then(Buffer.from)

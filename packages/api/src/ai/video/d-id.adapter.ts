@@ -22,14 +22,17 @@ export class DIDAdapter implements VideoAdapter {
   private readonly apiKey: string;
   /** Default presenter image used when no sourceImage is provided */
   private readonly defaultPresenterUrl: string;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
 
   constructor(
     apiKey = config.ai.did ?? "",
     defaultPresenterUrl = config.ai.didPresenterUrl ??
       "https://d-id-public-bucket.s3.amazonaws.com/alice.jpg",
+    fetchFn?: typeof globalThis.fetch,
   ) {
     this.apiKey = apiKey;
     this.defaultPresenterUrl = defaultPresenterUrl;
+    this.fetchFn = fetchFn;
   }
 
   private headers() {
@@ -76,11 +79,15 @@ export class DIDAdapter implements VideoAdapter {
       // ...(driverUrl ? { driver_url: driverUrl } : {}),
     };
 
-    const res = await fetchWithLog(`${DID_API}/talks`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithLog(
+      `${DID_API}/talks`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();
@@ -92,9 +99,13 @@ export class DIDAdapter implements VideoAdapter {
   }
 
   async poll(talkId: string): Promise<VideoResult | null> {
-    const res = await fetchWithLog(`${DID_API}/talks/${talkId}`, {
-      headers: this.headers(),
-    });
+    const res = await fetchWithLog(
+      `${DID_API}/talks/${talkId}`,
+      {
+        headers: this.headers(),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();

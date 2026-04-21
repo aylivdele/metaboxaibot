@@ -86,13 +86,16 @@ export class HeyGenAdapter implements VideoAdapter {
 
   private readonly apiKey: string;
   private readonly defaultAvatarId: string;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
 
   constructor(
     apiKey = config.ai.heygen ?? "",
     defaultAvatarId = config.ai.heygenAvatarId ?? "Angela-inblackskirt-20220820",
+    fetchFn?: typeof globalThis.fetch,
   ) {
     this.apiKey = apiKey;
     this.defaultAvatarId = defaultAvatarId;
+    this.fetchFn = fetchFn;
   }
 
   private get jsonHeaders() {
@@ -146,14 +149,18 @@ export class HeyGenAdapter implements VideoAdapter {
       "HeyGen: uploading audio asset",
     );
 
-    const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
-      method: "POST",
-      headers: {
-        "X-Api-Key": this.apiKey,
-        "Content-Type": multipart.contentType,
+    const uploadRes = await fetchWithLog(
+      `${HEYGEN_API}/v3/assets`,
+      {
+        method: "POST",
+        headers: {
+          "X-Api-Key": this.apiKey,
+          "Content-Type": multipart.contentType,
+        },
+        body: multipart.body,
       },
-      body: multipart.body,
-    });
+      this.fetchFn,
+    );
     if (!uploadRes.ok) {
       const text = await uploadRes.text();
       throw new Error(`HeyGen audio asset upload failed: ${uploadRes.status} ${text}`);
@@ -209,14 +216,18 @@ export class HeyGenAdapter implements VideoAdapter {
       "HeyGen: uploading image asset",
     );
 
-    const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
-      method: "POST",
-      headers: {
-        "X-Api-Key": this.apiKey,
-        "Content-Type": multipart.contentType,
+    const uploadRes = await fetchWithLog(
+      `${HEYGEN_API}/v3/assets`,
+      {
+        method: "POST",
+        headers: {
+          "X-Api-Key": this.apiKey,
+          "Content-Type": multipart.contentType,
+        },
+        body: multipart.body,
       },
-      body: multipart.body,
-    });
+      this.fetchFn,
+    );
     if (!uploadRes.ok) {
       const text = await uploadRes.text();
       throw new Error(`HeyGen asset upload failed: ${uploadRes.status} ${text}`);
@@ -346,11 +357,15 @@ export class HeyGenAdapter implements VideoAdapter {
       }
     }
 
-    const res = await fetchWithLog(`${HEYGEN_API}/v3/videos`, {
-      method: "POST",
-      headers: this.jsonHeaders,
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithLog(
+      `${HEYGEN_API}/v3/videos`,
+      {
+        method: "POST",
+        headers: this.jsonHeaders,
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();
@@ -372,9 +387,13 @@ export class HeyGenAdapter implements VideoAdapter {
   }
 
   async poll(videoId: string): Promise<VideoResult | null> {
-    const res = await fetchWithLog(`${HEYGEN_API}/v3/videos/${videoId}`, {
-      headers: { "X-Api-Key": this.apiKey },
-    });
+    const res = await fetchWithLog(
+      `${HEYGEN_API}/v3/videos/${videoId}`,
+      {
+        headers: { "X-Api-Key": this.apiKey },
+      },
+      this.fetchFn,
+    );
     const text = await res.text();
 
     if (!res.ok) {

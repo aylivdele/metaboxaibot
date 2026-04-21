@@ -15,6 +15,7 @@ export interface WebUser {
   isTelegramLinked: boolean;
   tokenBalance: string; // BigInt сериализуется в string
   subscriptionTokenBalance?: string;
+  role?: "USER" | "MODERATOR" | "ADMIN";
   createdAt: string;
 }
 

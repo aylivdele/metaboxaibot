@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { type ClientOptions as OpenAIClientOptions } from "openai";
 import {
   BaseLLMAdapter,
   type LLMInput,
@@ -28,13 +28,19 @@ export class QwenAdapter extends BaseLLMAdapter {
   private client: OpenAI;
   private apiModel: string;
 
-  constructor(model: string, contextMaxMessages = 40, apiKey = config.ai.qwen) {
+  constructor(
+    model: string,
+    contextMaxMessages = 40,
+    apiKey = config.ai.qwen,
+    fetchFn?: typeof globalThis.fetch,
+  ) {
     super();
     if (!apiKey) throw new Error("[QwenAdapter] QWEN_API_KEY is not set");
     this.modelId = model;
     this.client = new OpenAI({
       apiKey,
       baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
     });
     this.apiModel = MODEL_MAP[model] ?? model;
     this.contextMaxMessages = contextMaxMessages;

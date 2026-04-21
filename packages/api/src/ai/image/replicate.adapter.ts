@@ -50,8 +50,12 @@ export class ReplicateAdapter implements ImageAdapter {
   constructor(
     readonly modelId: string,
     apiKey = config.ai.replicate,
+    fetchFn?: typeof globalThis.fetch,
   ) {
-    this.client = new Replicate({ auth: apiKey });
+    this.client = new Replicate({
+      auth: apiKey,
+      ...(fetchFn ? { fetch: fetchFn } : {}),
+    });
   }
 
   private resolveSize(input: ImageInput): { width: number; height: number } {

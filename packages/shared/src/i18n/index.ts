@@ -192,6 +192,7 @@ export interface Translations {
     soulProviderUnavailable: string;
     soulMissingAvatar: string;
     soulAvatarNotReady: string;
+    avatarOrphaned: string;
     soulDescribingReference: string;
     soulDescribeFailed: string;
     // HeyGen

@@ -296,10 +296,14 @@ export const userStateService = {
     modelId: string,
     slotKey: string,
     url: string,
+    overflow?: boolean,
   ): Promise<Record<string, string[]>> {
     const all = await this.getAllMediaInputs(userId);
     const forModel = all[modelId] ?? {};
     const forSlot = forModel[slotKey] ?? [];
+    if (overflow) {
+      forSlot.splice(0, 1);
+    }
     forSlot.push(url);
     const updatedForModel = { ...forModel, [slotKey]: [...forSlot] };
     const updated = { ...all, [modelId]: updatedForModel };

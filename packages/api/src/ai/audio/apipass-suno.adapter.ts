@@ -50,9 +50,22 @@ export class ApipassSunoAdapter implements AudioAdapter {
   readonly modelId = "suno";
   readonly isAsync = true;
 
+  private readonly apiKeyOverride: string | undefined;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
+
+  constructor(apiKeyOverride?: string, fetchFn?: typeof globalThis.fetch) {
+    this.apiKeyOverride = apiKeyOverride;
+    this.fetchFn = fetchFn;
+  }
+
+  private get apiKey(): string {
+    const key = this.apiKeyOverride ?? config.ai.apipass;
+    if (!key) throw new Error("APIPASS_API_KEY not configured");
+    return key;
+  }
+
   async submit(input: AudioInput): Promise<string> {
-    const apiKey = config.ai.apipass;
-    if (!apiKey) throw new Error("APIPASS_API_KEY not configured");
+    const apiKey = this.apiKey;
 
     const ms = input.modelSettings ?? {};
     const lyrics = (ms.lyrics as string | undefined)?.trim() || undefined;
@@ -86,14 +99,18 @@ export class ApipassSunoAdapter implements AudioAdapter {
       };
     }
 
-    const resp = await fetchWithLog(`${SUNOAPI_BASE}/api/v1/generate`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    const resp = await fetchWithLog(
+      `${SUNOAPI_BASE}/api/v1/generate`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+      this.fetchFn,
+    );
 
     if (!resp.ok) {
       const txt = await resp.text();
@@ -117,12 +134,12 @@ export class ApipassSunoAdapter implements AudioAdapter {
   }
 
   async poll(taskId: string): Promise<AudioResult | null> {
-    const apiKey = config.ai.apipass;
-    if (!apiKey) throw new Error("APIPASS_API_KEY not configured");
+    const apiKey = this.apiKey;
 
     const resp = await fetchWithLog(
       `${SUNOAPI_BASE}/api/v1/generate/record-info?taskId=${encodeURIComponent(taskId)}`,
       { headers: { Authorization: `Bearer ${apiKey}` } },
+      this.fetchFn,
     );
 
     if (!resp.ok) throw new Error(`Suno API poll error ${resp.status}`);

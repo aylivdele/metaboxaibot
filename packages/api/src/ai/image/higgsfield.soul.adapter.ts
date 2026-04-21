@@ -36,13 +36,16 @@ export class HiggsFieldSoulImageAdapter implements ImageAdapter {
 
   private readonly apiKey: string;
   private readonly apiSecret: string;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
 
   constructor(
     apiKey = config.ai.higgsfieldApiKey ?? "",
     apiSecret = config.ai.higgsfieldApiSecret ?? "",
+    fetchFn?: typeof globalThis.fetch,
   ) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
+    this.fetchFn = fetchFn;
   }
 
   private headers() {
@@ -89,11 +92,15 @@ export class HiggsFieldSoulImageAdapter implements ImageAdapter {
 
     logger.info({ body }, "Higgsfield Soul submit request");
 
-    const res = await fetchWithLog(`${HIGGSFIELD_API}/higgsfield-ai/soul/character`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithLog(
+      `${HIGGSFIELD_API}/higgsfield-ai/soul/character`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();
@@ -112,9 +119,13 @@ export class HiggsFieldSoulImageAdapter implements ImageAdapter {
   }
 
   async poll(statusUrl: string): Promise<ImageResult[] | ImageResult | null> {
-    const res = await fetchWithLog(statusUrl, {
-      headers: this.headers(),
-    });
+    const res = await fetchWithLog(
+      statusUrl,
+      {
+        headers: this.headers(),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();

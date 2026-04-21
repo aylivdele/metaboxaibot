@@ -64,6 +64,11 @@ export const config = {
     adminSecret: opt("ADMIN_SECRET"),
     /** Public base URL for this API server, used to generate download links (e.g. https://api.meta-box.ru). */
     publicUrl: opt("API_PUBLIC_URL"),
+    /**
+     * Master-секрет для шифрования значений в provider_keys / proxies (AES-256-GCM).
+     * Обязателен: без него нечем расшифровать сохранённые ключи провайдеров.
+     */
+    keyVaultMaster: req("KEY_VAULT_MASTER"),
   },
 
   /** Observability */

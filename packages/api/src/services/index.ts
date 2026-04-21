@@ -65,8 +65,22 @@ export type {
 export { getRate, calcStars, updateRate, STAR_PRICE_USD } from "./exchange-rate.service.js";
 export { userUploadsService } from "./user-uploads.service.js";
 export { userAvatarService } from "./user-avatar.service.js";
+export { resolveVoiceForTTS } from "./user-voice.service.js";
+export type { ResolvedVoice } from "./user-voice.service.js";
 export { translatePromptIfNeeded } from "./prompt-translate.service.js";
 export { describeImageForPrompt } from "./image-describe.service.js";
 
 // ── Web (ai.metabox.global) ─────────────────────────────────────────────
 export { consumeLinkTelegramState, markLinkTelegramLinked } from "./web-session.service.js";
+
+// ── Пул API-ключей с прокси и балансировкой ─────────────────────────────
+export {
+  acquireKey,
+  acquireById,
+  markRateLimited,
+  recordSuccess,
+  recordError,
+  getKeyStats,
+  invalidatePoolCache,
+} from "./key-pool.service.js";
+export type { AcquiredKey, ProxyConfig } from "./key-pool.service.js";

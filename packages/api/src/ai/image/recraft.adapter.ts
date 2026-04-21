@@ -116,10 +116,20 @@ async function readImageDimensions(blob: Blob): Promise<{ width: number; height:
 export class RecraftAdapter implements ImageAdapter {
   readonly isAsync = false;
 
-  constructor(readonly modelId: string) {}
+  private fetchFn: typeof globalThis.fetch | undefined;
+  private apiKeyOverride: string | undefined;
+
+  constructor(
+    readonly modelId: string,
+    apiKey?: string,
+    fetchFn?: typeof globalThis.fetch,
+  ) {
+    this.apiKeyOverride = apiKey;
+    this.fetchFn = fetchFn;
+  }
 
   async generate(input: ImageInput): Promise<ImageResult> {
-    const apiKey = config.ai.recraft;
+    const apiKey = this.apiKeyOverride ?? config.ai.recraft;
     if (!apiKey) throw new Error("RECRAFT_API_KEY not configured");
 
     const ms = input.modelSettings ?? {};
@@ -201,11 +211,15 @@ export class RecraftAdapter implements ImageAdapter {
       if (ms.seed != null) form.append("random_seed", String(ms.seed));
       if (Object.keys(controls).length) form.append("controls", JSON.stringify(controls));
 
-      const resp = await fetchWithLog(`${RECRAFT_API_BASE}/images/imageToImage`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}` },
-        body: form,
-      });
+      const resp = await fetchWithLog(
+        `${RECRAFT_API_BASE}/images/imageToImage`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}` },
+          body: form,
+        },
+        this.fetchFn,
+      );
       if (!resp.ok) {
         const txt = await resp.text();
         throw new Error(`Recraft API error ${resp.status}: ${txt}`);
@@ -230,14 +244,18 @@ export class RecraftAdapter implements ImageAdapter {
       if (ms.seed != null) body.random_seed = ms.seed;
       if (Object.keys(controls).length) body.controls = controls;
 
-      const resp = await fetchWithLog(`${RECRAFT_API_BASE}/images/generations`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
+      const resp = await fetchWithLog(
+        `${RECRAFT_API_BASE}/images/generations`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      });
+        this.fetchFn,
+      );
       if (!resp.ok) {
         const txt = await resp.text();
         throw new Error(`Recraft API error ${resp.status}: ${txt}`);

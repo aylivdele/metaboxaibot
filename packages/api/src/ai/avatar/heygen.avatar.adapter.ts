@@ -9,9 +9,11 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
   readonly provider = "heygen";
 
   private readonly apiKey: string;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
 
-  constructor(apiKey = config.ai.heygen ?? "") {
+  constructor(apiKey = config.ai.heygen ?? "", fetchFn?: typeof globalThis.fetch) {
     this.apiKey = apiKey;
+    this.fetchFn = fetchFn;
   }
 
   /**
@@ -40,11 +42,15 @@ export class HeyGenAvatarAdapter implements AvatarAdapter {
       `image.${ext}`,
     );
 
-    const uploadRes = await fetchWithLog(`${HEYGEN_API}/v3/assets`, {
-      method: "POST",
-      headers: { "X-Api-Key": this.apiKey },
-      body: formData,
-    });
+    const uploadRes = await fetchWithLog(
+      `${HEYGEN_API}/v3/assets`,
+      {
+        method: "POST",
+        headers: { "X-Api-Key": this.apiKey },
+        body: formData,
+      },
+      this.fetchFn,
+    );
     if (!uploadRes.ok) {
       const text = await uploadRes.text();
       throw new Error(`HeyGen asset upload failed: ${uploadRes.status} ${text}`);

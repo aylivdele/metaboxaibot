@@ -9,7 +9,8 @@
     "dev": "tsx watch src/index.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "seed:keys": "tsx scripts/seed-keys-from-env.ts"
   },
   "exports": {
     ".": {
@@ -55,6 +56,10 @@
     "./services/user-avatar": {
       "types": "./src/services/user-avatar.service.ts",
       "default": "./dist/services/user-avatar.service.js"
+    },
+    "./services/user-voice": {
+      "types": "./src/services/user-voice.service.ts",
+      "default": "./dist/services/user-voice.service.js"
     },
     "./ai/avatar/heygen": {
       "types": "./src/ai/avatar/heygen.avatar.adapter.ts",
@@ -104,6 +109,26 @@
       "types": "./src/services/throttle.service.ts",
       "default": "./dist/services/throttle.service.js"
     },
+    "./services/key-pool": {
+      "types": "./src/services/key-pool.service.ts",
+      "default": "./dist/services/key-pool.service.js"
+    },
+    "./utils/pool-exhausted-error": {
+      "types": "./src/utils/pool-exhausted-error.ts",
+      "default": "./dist/utils/pool-exhausted-error.js"
+    },
+    "./ai/with-pool": {
+      "types": "./src/ai/with-pool.ts",
+      "default": "./dist/ai/with-pool.js"
+    },
+    "./ai/key-provider": {
+      "types": "./src/ai/key-provider.ts",
+      "default": "./dist/ai/key-provider.js"
+    },
+    "./ai/proxy-fetch": {
+      "types": "./src/ai/transport/proxy-fetch.ts",
+      "default": "./dist/ai/transport/proxy-fetch.js"
+    },
     "./services/transcription": {
       "types": "./src/services/transcription.service.ts",
       "default": "./dist/services/transcription.service.js"
@@ -144,6 +169,7 @@
     "prom-client": "^15.1.3",
     "replicate": "^1.0.1",
     "sharp": "^0.34.5",
+    "undici": "^7.2.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

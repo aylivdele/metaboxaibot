@@ -249,14 +249,17 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
             <div className="avatar-picker__grid">
               {myAvatars.map((avatar) => {
                 const isReady = avatar.status === "ready";
+                const isOrphaned = avatar.status === "orphaned";
                 const isSelected = isReady && avatar.externalId === imageAssetId;
+                const isDisabled = !isReady;
                 return (
                   <div
                     key={avatar.id}
-                    className={`avatar-picker__item${isSelected ? " avatar-picker__item--selected" : ""}${!isReady ? " avatar-picker__item--disabled" : ""}`}
+                    className={`avatar-picker__item${isSelected ? " avatar-picker__item--selected" : ""}${isDisabled ? " avatar-picker__item--disabled" : ""}`}
                     onClick={() => selectMyAvatar(avatar)}
+                    title={isOrphaned ? t("uploads.avatarOrphanedHint") : undefined}
                   >
-                    {avatar.previewUrl ? (
+                    {avatar.previewUrl && !isOrphaned ? (
                       <img
                         className="avatar-picker__img"
                         src={avatar.previewUrl}
@@ -266,15 +269,21 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
                       <div className="avatar-picker__img avatar-picker__img--placeholder">
                         {avatar.status === "creating"
                           ? "⏳"
-                          : avatar.status === "failed"
-                            ? "❌"
-                            : "👤"}
+                          : isOrphaned
+                            ? "⚠️"
+                            : avatar.status === "failed"
+                              ? "❌"
+                              : "👤"}
                       </div>
                     )}
                     <span className="avatar-picker__name">
-                      {avatar.status === "creating" ? t("uploads.avatarCreating") : avatar.name}
+                      {avatar.status === "creating"
+                        ? t("uploads.avatarCreating")
+                        : isOrphaned
+                          ? `${avatar.name} — ${t("uploads.avatarOrphaned")}`
+                          : avatar.name}
                     </span>
-                    {isReady && (
+                    {(isReady || isOrphaned) && (
                       <button
                         className="avatar-picker__delete-btn"
                         onClick={(e) => handleDeleteAvatar(e, avatar.id)}

@@ -48,6 +48,9 @@ export { generateWebToken, verifyWebToken } from "./webtoken.js";
 export { config } from "./config.js";
 export type { Config } from "./config.js";
 
+// Crypto: симметричное шифрование секретов (provider keys, proxy passwords)
+export { encryptSecret, decryptSecret, maskKey } from "./crypto/secret-vault.js";
+
 // i18n
 export { getT, preloadLocales, buildDialogHint, buildResultCaption } from "./i18n/index.js";
 export type { Translations } from "./i18n/index.js";

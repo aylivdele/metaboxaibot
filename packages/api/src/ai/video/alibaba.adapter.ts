@@ -77,10 +77,20 @@ interface DashScopePollResponse {
  * Docs: https://www.alibabacloud.com/help/en/model-studio/developer-reference/wan2-6-api
  */
 export class AlibabaVideoAdapter implements VideoAdapter {
-  constructor(readonly modelId: string) {}
+  private readonly apiKeyOverride: string | undefined;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
+
+  constructor(
+    readonly modelId: string,
+    apiKeyOverride?: string,
+    fetchFn?: typeof globalThis.fetch,
+  ) {
+    this.apiKeyOverride = apiKeyOverride;
+    this.fetchFn = fetchFn;
+  }
 
   private get apiKey(): string {
-    const key = config.ai.alibaba;
+    const key = this.apiKeyOverride ?? config.ai.alibaba;
     if (!key) throw new Error("ALIBABA_API_KEY not configured");
     return key;
   }
@@ -131,15 +141,19 @@ export class AlibabaVideoAdapter implements VideoAdapter {
 
     const body = { model: dashscopeModel, input: apiInput, parameters };
 
-    const resp = await fetchWithLog(`${DASHSCOPE_BASE}${SUBMIT_PATH}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-        "X-DashScope-Async": "enable",
+    const resp = await fetchWithLog(
+      `${DASHSCOPE_BASE}${SUBMIT_PATH}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+          "X-DashScope-Async": "enable",
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
+      this.fetchFn,
+    );
 
     if (!resp.ok) {
       const txt = await resp.text();
@@ -152,9 +166,13 @@ export class AlibabaVideoAdapter implements VideoAdapter {
   }
 
   async poll(taskId: string): Promise<VideoResult | null> {
-    const resp = await fetchWithLog(`${DASHSCOPE_BASE}/tasks/${taskId}`, {
-      headers: { Authorization: `Bearer ${this.apiKey}` },
-    });
+    const resp = await fetchWithLog(
+      `${DASHSCOPE_BASE}/tasks/${taskId}`,
+      {
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+      },
+      this.fetchFn,
+    );
 
     if (!resp.ok) throw new Error(`Alibaba poll error ${resp.status}`);
 

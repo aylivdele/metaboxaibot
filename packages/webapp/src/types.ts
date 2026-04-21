@@ -168,7 +168,7 @@ export interface UserAvatar {
   name: string;
   externalId: string | null;
   previewUrl: string | null;
-  status: "creating" | "ready" | "failed";
+  status: "creating" | "ready" | "failed" | "orphaned";
   createdAt: string;
 }
 

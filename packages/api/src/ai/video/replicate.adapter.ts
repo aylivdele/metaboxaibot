@@ -19,8 +19,12 @@ export class ReplicateVideoAdapter implements VideoAdapter {
   constructor(
     readonly modelId: string,
     apiToken = config.ai.replicate,
+    fetchFn?: typeof globalThis.fetch,
   ) {
-    this.client = new Replicate({ auth: apiToken });
+    this.client = new Replicate({
+      auth: apiToken,
+      ...(fetchFn ? { fetch: fetchFn } : {}),
+    });
   }
 
   private get model(): `${string}/${string}` | `${string}/${string}:${string}` {

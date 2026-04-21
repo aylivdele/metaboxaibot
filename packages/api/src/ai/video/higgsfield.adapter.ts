@@ -46,15 +46,18 @@ export class HiggsFieldAdapter implements VideoAdapter {
   readonly modelId: string;
   private readonly dopModel: string;
   private readonly authHeader: string;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
 
   constructor(
     modelId = "higgsfield",
     apiKey = config.ai.higgsfieldApiKey ?? "",
     apiSecret = config.ai.higgsfieldApiSecret ?? "",
+    fetchFn?: typeof globalThis.fetch,
   ) {
     this.modelId = modelId;
     this.dopModel = DOP_MODEL[modelId] ?? "dop-turbo";
     this.authHeader = `Key ${apiKey}:${apiSecret}`;
+    this.fetchFn = fetchFn;
   }
 
   private headers() {
@@ -82,11 +85,15 @@ export class HiggsFieldAdapter implements VideoAdapter {
       ...(motions?.length ? { motions } : {}),
     };
 
-    const res = await fetchWithLog(`${HIGGSFIELD_API}/v1/image2video/dop`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify({ params: body }),
-    });
+    const res = await fetchWithLog(
+      `${HIGGSFIELD_API}/v1/image2video/dop`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify({ params: body }),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();
@@ -125,9 +132,13 @@ export class HiggsFieldAdapter implements VideoAdapter {
   }
 
   async poll(statusUrl: string): Promise<VideoResult | null> {
-    const res = await fetchWithLog(statusUrl, {
-      headers: this.headers(),
-    });
+    const res = await fetchWithLog(
+      statusUrl,
+      {
+        headers: this.headers(),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();

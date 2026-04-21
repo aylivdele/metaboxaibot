@@ -62,10 +62,20 @@ const KLING_MOTION_MODEL_MAP: Record<string, "720p" | "1080p"> = {
  * to ensure KIE can access them (presigned URLs may expire or be blocked).
  */
 export class KieVideoAdapter implements VideoAdapter {
-  constructor(readonly modelId: string) {}
+  private readonly apiKeyOverride: string | undefined;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
+
+  constructor(
+    readonly modelId: string,
+    apiKeyOverride?: string,
+    fetchFn?: typeof globalThis.fetch,
+  ) {
+    this.apiKeyOverride = apiKeyOverride;
+    this.fetchFn = fetchFn;
+  }
 
   private get apiKey(): string {
-    const key = config.ai.kie;
+    const key = this.apiKeyOverride ?? config.ai.kie;
     if (!key) throw new Error("KIE_API_KEY not configured");
     return key;
   }
@@ -230,11 +240,15 @@ export class KieVideoAdapter implements VideoAdapter {
 
     const body = { model, input: inputPayload };
 
-    const resp = await fetchWithLog(`${KIE_BASE}/api/v1/jobs/createTask`, {
-      method: "POST",
-      headers: this.jsonHeaders,
-      body: JSON.stringify(body),
-    });
+    const resp = await fetchWithLog(
+      `${KIE_BASE}/api/v1/jobs/createTask`,
+      {
+        method: "POST",
+        headers: this.jsonHeaders,
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
 
     if (!resp.ok) {
       const txt = await resp.text();
@@ -252,6 +266,7 @@ export class KieVideoAdapter implements VideoAdapter {
     const resp = await fetchWithLog(
       `${KIE_BASE}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`,
       { headers: { Authorization: `Bearer ${this.apiKey}` } },
+      this.fetchFn,
     );
 
     if (!resp.ok) throw new Error(`KIE poll error ${resp.status}`);

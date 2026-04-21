@@ -1,8 +1,10 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
-import { config } from "@metabox/shared";
 import { getFileUrl } from "../services/s3.service.js";
+import { acquireById } from "../services/key-pool.service.js";
+import { ElevenLabsAdapter } from "../ai/audio/elevenlabs.adapter.js";
+import { logger } from "../logger.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
@@ -90,12 +92,20 @@ export const userVoicesRoutes: FastifyPluginAsync = async (fastify) => {
     const voice = await db.userVoice.findFirst({ where: { id, userId } });
     if (!voice) return reply.status(404).send({ error: "Voice not found" });
 
-    // Delete from ElevenLabs if we have the external ID
-    if (voice.externalId && config.ai.elevenlabs) {
-      await fetch(`https://api.elevenlabs.io/v1/voices/${voice.externalId}`, {
-        method: "DELETE",
-        headers: { "xi-api-key": config.ai.elevenlabs },
-      }).catch(() => void 0); // non-critical — delete from DB regardless
+    // Delete from ElevenLabs on the SAME key the voice was created on — voice_id
+    // живёт per-account, env-ключ может его не видеть. Если ключ уже удалён из
+    // пула — acquireById fallback'ается на env (best-effort). Failure не блокирует
+    // удаление из БД.
+    if (voice.externalId) {
+      try {
+        const acquired = await acquireById(voice.providerKeyId, "elevenlabs");
+        await ElevenLabsAdapter.deleteVoice(voice.externalId, acquired.apiKey);
+      } catch (err) {
+        logger.warn(
+          { voiceId: voice.id, externalId: voice.externalId, err },
+          "user-voices DELETE: ElevenLabs cleanup failed (continuing with DB delete)",
+        );
+      }
     }
 
     await db.userVoice.delete({ where: { id } });

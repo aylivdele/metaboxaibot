@@ -18,6 +18,10 @@ import {
 } from "../utils/submit-with-throttle.js";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
 import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
+import { acquireKey, acquireById } from "@metabox/api/services/key-pool";
+import type { AcquiredKey } from "@metabox/api/services/key-pool";
+import { buildProxyFetch } from "@metabox/api/ai/proxy-fetch";
+import { isPoolExhaustedError } from "@metabox/api/utils/pool-exhausted-error";
 
 const telegram = new Api(config.bot.token);
 
@@ -26,10 +30,14 @@ const POLL_DELAY_MS = 1 * 60 * 1000;
 /** Maximum poll attempts (~2 hours) */
 const MAX_POLL_ATTEMPTS = 30;
 
-function getAdapter(provider: string) {
-  if (provider === "heygen") return new HeyGenAvatarAdapter();
-  if (provider === "higgsfield_soul") return null; // Soul uses its own adapter
-  throw new Error(`Unknown avatar provider: ${provider}`);
+function buildHeyGenAdapter(acquired: AcquiredKey): HeyGenAvatarAdapter {
+  const fetchFn = buildProxyFetch(acquired.proxy) ?? undefined;
+  return new HeyGenAvatarAdapter(acquired.apiKey, fetchFn);
+}
+
+function buildSoulAdapter(acquired: AcquiredKey): HiggsFieldSoulAdapter {
+  const fetchFn = buildProxyFetch(acquired.proxy) ?? undefined;
+  return new HiggsFieldSoulAdapter(acquired.apiKey, fetchFn);
 }
 
 export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
@@ -50,11 +58,32 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
 
   // ── Higgsfield Soul: dedicated create/poll flow ──────────────────────────
   if (provider === "higgsfield_soul") {
-    const soulAdapter = new HiggsFieldSoulAdapter();
-
     if (action === "create") {
       try {
         if (!s3Keys?.length) throw new Error("No S3 keys for Soul creation");
+
+        // Soul ID живёт в аккаунте конкретного API-ключа. Привязываемся к нему
+        // на этапе create и сохраняем providerKeyId — poll и удаление пойдут
+        // через тот же ключ.
+        let acquired: AcquiredKey;
+        try {
+          acquired = await acquireKey("higgsfield_soul");
+        } catch (e) {
+          if (isPoolExhaustedError(e)) {
+            await getAvatarQueue().add("create", job.data, {
+              delay: e.retryAfterMs,
+              attempts: 1,
+              removeOnComplete: true,
+            });
+            logger.info(
+              { userAvatarId, retryAfterMs: e.retryAfterMs },
+              "Soul create deferred: pool exhausted",
+            );
+            return;
+          }
+          throw e;
+        }
+        const soulAdapter = buildSoulAdapter(acquired);
 
         // Resolve all S3 keys to presigned URLs
         const imageUrls = await Promise.all(
@@ -70,6 +99,7 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         await userAvatarService.updateStatus(userAvatarId, {
           status: "creating",
           externalId,
+          providerKeyId: acquired.keyId,
         });
 
         // Schedule first poll
@@ -79,7 +109,10 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
           { delay: POLL_DELAY_MS },
         );
 
-        logger.info({ userAvatarId, externalId }, "Soul creation submitted, poll scheduled");
+        logger.info(
+          { userAvatarId, externalId, keyId: acquired.keyId },
+          "Soul creation submitted, poll scheduled",
+        );
       } catch (err) {
         if (
           await deferIfTransientNetworkError({
@@ -116,12 +149,28 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
           return;
         }
 
-        const result = await soulAdapter.poll(avatar.externalId);
-
         const userLang = (await db.user
           .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
           .then((u) => u?.language ?? "en")) as Language;
         const t = getT(userLang);
+
+        // Sticky-key poll: ресурс live на конкретном аккаунте. Если ключ удалён
+        // → markOrphaned + ошибка пользователю (пересоздать персонажа).
+        let acquired: AcquiredKey;
+        try {
+          acquired = await acquireById(avatar.providerKeyId, "higgsfield_soul");
+        } catch (e) {
+          logger.warn(
+            { userAvatarId, keyId: avatar.providerKeyId, err: e },
+            "Soul poll: owning key gone, marking avatar orphaned",
+          );
+          await userAvatarService.markOrphaned(userAvatarId);
+          await telegram.sendMessage(telegramChatId, t.video.soulFailed).catch(() => void 0);
+          return;
+        }
+        const soulAdapter = buildSoulAdapter(acquired);
+
+        const result = await soulAdapter.poll(avatar.externalId);
 
         if (result.status === "ready") {
           await userAvatarService.updateStatus(userAvatarId, {
@@ -195,7 +244,6 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
   }
 
   // ── Standard avatar providers (HeyGen, etc.) ────────────────────────────
-  const adapter = getAdapter(provider)!;
 
   if (action === "create") {
     try {
@@ -211,6 +259,28 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
       const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
       const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
 
+      // talking_photo_id живёт в аккаунте конкретного HeyGen-ключа.
+      // Привязываемся на этапе create — poll и видео-генерация пойдут через него.
+      let acquired: AcquiredKey;
+      try {
+        acquired = await acquireKey(provider);
+      } catch (e) {
+        if (isPoolExhaustedError(e)) {
+          await getAvatarQueue().add("create", job.data, {
+            delay: e.retryAfterMs,
+            attempts: 1,
+            removeOnComplete: true,
+          });
+          logger.info(
+            { userAvatarId, retryAfterMs: e.retryAfterMs },
+            "Avatar create deferred: pool exhausted",
+          );
+          return;
+        }
+        throw e;
+      }
+      const adapter = buildHeyGenAdapter(acquired);
+
       const { externalId } = await submitWithThrottle({
         modelId: provider,
         provider,
@@ -218,10 +288,15 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         job,
         queue: getAvatarQueue(),
         jobName: "create",
+        keyId: acquired.keyId,
         submit: () => adapter.create(imgBuffer, contentType),
       });
 
-      await userAvatarService.updateStatus(userAvatarId, { status: "creating", externalId });
+      await userAvatarService.updateStatus(userAvatarId, {
+        status: "creating",
+        externalId,
+        providerKeyId: acquired.keyId,
+      });
 
       // Schedule first poll after 5 minutes
       await getAvatarQueue().add(
@@ -230,7 +305,10 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         { delay: POLL_DELAY_MS },
       );
 
-      logger.info({ userAvatarId, externalId }, "Avatar creation submitted, poll scheduled");
+      logger.info(
+        { userAvatarId, externalId, keyId: acquired.keyId },
+        "Avatar creation submitted, poll scheduled",
+      );
     } catch (err) {
       if (isRateLimitDeferredError(err)) {
         logger.info(
@@ -277,6 +355,26 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         logger.warn({ userAvatarId }, "Avatar not found or no externalId, skipping poll");
         return;
       }
+
+      // Sticky-key poll. Если ключ удалён → markOrphaned + ошибка пользователю.
+      let acquired: AcquiredKey;
+      try {
+        acquired = await acquireById(avatar.providerKeyId, provider);
+      } catch (e) {
+        logger.warn(
+          { userAvatarId, keyId: avatar.providerKeyId, err: e },
+          "Avatar poll: owning key gone, marking avatar orphaned",
+        );
+        await userAvatarService.markOrphaned(userAvatarId);
+        await telegram
+          .sendMessage(
+            telegramChatId,
+            "❌ Этот аватар больше недоступен (удалён ключ провайдера). Создайте новый.",
+          )
+          .catch(() => void 0);
+        return;
+      }
+      const adapter = buildHeyGenAdapter(acquired);
 
       const result = await adapter.poll(avatar.externalId);
 

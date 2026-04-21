@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { type ClientOptions as OpenAIClientOptions } from "openai";
 import type { AudioAdapter, AudioInput, AudioResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
@@ -14,8 +14,11 @@ export class OpenAiTtsAdapter implements AudioAdapter {
 
   private client: OpenAI;
 
-  constructor(apiKey = config.ai.openai) {
-    this.client = new OpenAI({ apiKey });
+  constructor(apiKey = config.ai.openai, fetchFn?: typeof globalThis.fetch) {
+    this.client = new OpenAI({
+      apiKey,
+      ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
+    });
   }
 
   async generate(input: AudioInput): Promise<AudioResult> {

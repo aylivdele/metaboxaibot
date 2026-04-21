@@ -31,6 +31,8 @@ import {
   isRateLimitDeferredError,
   isRateLimitLongWindowError,
 } from "../utils/submit-with-throttle.js";
+import { acquireForSubmit, acquireForPoll } from "../utils/acquire-for-processor.js";
+import { resolveKeyProvider } from "@metabox/api/ai/key-provider";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
@@ -108,14 +110,14 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
   const t = getT(userLang);
   const modelMeta = AI_MODELS[modelId];
   const modelName = modelMeta?.name ?? modelId;
-
-  const adapter = createImageAdapter(modelId);
+  const keyProvider = resolveKeyProvider(modelId);
 
   try {
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
       select: {
         providerJobId: true,
+        providerKeyId: true,
         status: true,
         outputs: { orderBy: { index: "asc" as const } },
       },
@@ -230,6 +232,14 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         modelId,
       );
 
+      const acquired = await acquireForSubmit({
+        provider: keyProvider,
+        modelId,
+        job,
+        queue: getImageQueue(),
+      });
+      const adapter = createImageAdapter(modelId, acquired);
+
       if (!adapter.isAsync && adapter.generate) {
         // Sync adapter (DALL-E, gpt-image, recraft) — generate inline, then finalize.
         const genResult = await submitWithThrottle({
@@ -238,6 +248,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
           section: "image",
           job,
           queue: getImageQueue(),
+          keyId: acquired.keyId,
           submit: () =>
             adapter.generate!({
               prompt: effectivePrompt,
@@ -265,6 +276,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
             section: "image",
             job,
             queue: getImageQueue(),
+            keyId: acquired.keyId,
             submit: () =>
               adapter.submit!({
                 prompt: effectivePrompt,
@@ -277,7 +289,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
           });
           await db.generationJob.update({
             where: { id: dbJobId },
-            data: { providerJobId },
+            data: { providerJobId, providerKeyId: acquired.keyId },
           });
         }
 
@@ -298,6 +310,9 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
       // ── Stage 2: poll ──────────────────────────────────────────────────
       const providerJobId = existingJob?.providerJobId;
       if (!providerJobId) throw new Error(`Image poll stage without providerJobId: ${dbJobId}`);
+
+      const acquired = await acquireForPoll(existingJob?.providerKeyId, keyProvider);
+      const adapter = createImageAdapter(modelId, acquired);
       if (!adapter.poll) throw new Error(`Adapter ${modelId} has no poll()`);
 
       const pollResult = await adapter.poll(providerJobId);

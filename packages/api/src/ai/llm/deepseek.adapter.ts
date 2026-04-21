@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { type ClientOptions as OpenAIClientOptions } from "openai";
 import {
   BaseLLMAdapter,
   type LLMInput,
@@ -26,12 +26,18 @@ export class DeepSeekAdapter extends BaseLLMAdapter {
   private client: OpenAI;
   private apiModel: string;
 
-  constructor(modelId: string, contextMaxMessages = 40, apiKey = config.ai.deepseek) {
+  constructor(
+    modelId: string,
+    contextMaxMessages = 40,
+    apiKey = config.ai.deepseek,
+    fetchFn?: typeof globalThis.fetch,
+  ) {
     super();
     this.modelId = modelId;
     this.client = new OpenAI({
       apiKey,
       baseURL: "https://api.deepseek.com/v1",
+      ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
     });
     this.apiModel = MODEL_MAP[modelId] ?? modelId;
     this.contextMaxMessages = contextMaxMessages;
