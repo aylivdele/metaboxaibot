@@ -324,6 +324,7 @@ export interface Translations {
     reference: string;
     edit: string;
     styleReference: string;
+    multiple_edit: string;
     refElement1: string;
     refElement2: string;
     refElement3: string;

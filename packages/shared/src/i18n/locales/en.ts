@@ -421,6 +421,7 @@ export default {
     lastFrame: "Last Frame",
     reference: "Reference Image",
     edit: "Source Image",
+    multiple_edit: "References",
     styleReference: "Style Reference",
     refElement1: "Element 1",
     refElement2: "Element 2",

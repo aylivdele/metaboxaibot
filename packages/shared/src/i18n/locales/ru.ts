@@ -417,6 +417,7 @@ export default {
     lastFrame: "Последний кадр",
     reference: "Референс",
     edit: "Исходное изображение",
+    multiple_edit: "Референсы",
     styleReference: "Стилевой референс",
     refElement1: "Элемент 1",
     refElement2: "Элемент 2",

@@ -9,19 +9,19 @@ const MI_EDIT: MediaInputSlot = {
 const MI_EDIT_4: MediaInputSlot = {
   slotKey: "edit",
   mode: "edit",
-  labelKey: "edit",
+  labelKey: "multiple_edit",
   maxImages: 4,
 };
 const MI_EDIT_8: MediaInputSlot = {
   slotKey: "edit",
   mode: "edit",
-  labelKey: "edit",
+  labelKey: "multiple_edit",
   maxImages: 8,
 };
 const MI_EDIT_10: MediaInputSlot = {
   slotKey: "edit",
   mode: "edit",
-  labelKey: "edit",
+  labelKey: "multiple_edit",
   maxImages: 10,
 };
 const MI_STYLE_REF: MediaInputSlot = {
