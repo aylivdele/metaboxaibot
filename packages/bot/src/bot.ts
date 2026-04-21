@@ -1,4 +1,5 @@
 import { Bot, InlineKeyboard } from "grammy";
+import { sequentialize } from "@grammyjs/runner";
 import type { BotContext } from "./types/context.js";
 import { authMiddleware } from "./middlewares/auth.middleware.js";
 import { i18nMiddleware } from "./middlewares/i18n.middleware.js";
@@ -85,6 +86,12 @@ import { logger } from "./logger.js";
 export function createBot(token: string): Bot<BotContext> {
   const bot = new Bot<BotContext>(token);
 
+  // ── Sequentialize updates per chat (must be the very first middleware so
+  //    every downstream handler — auth, i18n, scenes, addMediaInput etc. — is
+  //    serialized per chat). Without this, two photos from a media group race
+  //    each other in addMediaInput's read-modify-write and one gets overwritten.
+  bot.use(sequentialize((ctx) => ctx.chat?.id.toString()));
+
   // ── Raw update logger — every incoming update at debug level ────────────
   bot.use(async (ctx, next) => {
     const updateType = Object.keys(ctx.update)
@@ -141,7 +148,14 @@ export function createBot(token: string): Bot<BotContext> {
     if (updateType.includes("pre_checkout") || updateType.includes("payment")) {
       logger.info({ updateType, updateId: ctx.update.update_id }, "RAW UPDATE (payment-related)");
     }
-    return next();
+    try {
+      return next();
+    } finally {
+      logger.debug(
+        { updateid: ctx.update.update_id, updateType, userId: ctx.from?.id, chatId: ctx.chat?.id },
+        "finished processing update finished",
+      );
+    }
   });
 
   // ── Global middlewares ───────────────────────────────────────────────────

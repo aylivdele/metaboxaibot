@@ -4,16 +4,13 @@ initSentry(); // must be before any other imports that could throw
 import { createBot } from "./bot.js";
 import { preloadLocales, SUPPORTED_LANGUAGES, config } from "@metabox/shared";
 import { logger } from "./logger.js";
-import { run, sequentialize } from "@grammyjs/runner";
+import { run } from "@grammyjs/runner";
 
 async function main() {
   logger.info("Loading i18n locales...");
   await preloadLocales(SUPPORTED_LANGUAGES);
 
   const bot = createBot(config.bot.token);
-
-  // Process updates from the same chat sequentially, different chats in parallel
-  bot.use(sequentialize((ctx) => ctx.chat?.id.toString()));
 
   // Reset webhook and pending updates to ensure allowed_updates takes effect
   logger.info("Resetting webhook and pending updates...");
