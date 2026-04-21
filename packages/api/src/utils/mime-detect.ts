@@ -65,6 +65,60 @@ export function detectAudioMimeType(buf: ArrayBuffer | Buffer): string | null {
 }
 
 /**
+ * Detects video MIME type from the first bytes of the buffer.
+ * Returns null if the format is not recognized.
+ */
+export function detectVideoMimeType(buf: ArrayBuffer | Buffer): string | null {
+  const b = buf instanceof Buffer ? buf : new Uint8Array(buf);
+  // ISO BMFF (MP4/MOV): "....ftyp" at bytes 0-7 (size + 'ftyp')
+  if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
+    // brand at bytes 8-11: qt → quicktime, isom/mp4*/avc1/dash → mp4
+    if (b[8] === 0x71 && b[9] === 0x74 && b[10] === 0x20 && b[11] === 0x20)
+      return "video/quicktime";
+    return "video/mp4";
+  }
+  // WebM / Matroska: EBML header 1A 45 DF A3
+  if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return "video/webm";
+  return null;
+}
+
+/** Maps a MIME type to its canonical file extension (no leading dot). */
+export function mimeToExtension(mime: string): string | null {
+  switch (mime) {
+    case "image/jpeg":
+      return "jpg";
+    case "image/png":
+      return "png";
+    case "image/gif":
+      return "gif";
+    case "image/webp":
+      return "webp";
+    case "image/svg+xml":
+      return "svg";
+    case "audio/mpeg":
+      return "mp3";
+    case "audio/ogg":
+      return "ogg";
+    case "audio/wav":
+      return "wav";
+    case "audio/flac":
+      return "flac";
+    case "audio/aac":
+      return "aac";
+    case "audio/mp4":
+      return "m4a";
+    case "video/mp4":
+      return "mp4";
+    case "video/webm":
+      return "webm";
+    case "video/quicktime":
+      return "mov";
+    default:
+      return null;
+  }
+}
+
+/**
  * Returns a safe image MIME type: detects from magic bytes first,
  * then falls back to the HTTP Content-Type header value (if it starts with "image/"),
  * then falls back to the provided default.

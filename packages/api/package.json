@@ -96,6 +96,10 @@
       "types": "./src/utils/fetch.ts",
       "default": "./dist/utils/fetch.js"
     },
+    "./utils/mime-detect": {
+      "types": "./src/utils/mime-detect.ts",
+      "default": "./dist/utils/mime-detect.js"
+    },
     "./services/throttle": {
       "types": "./src/services/throttle.service.ts",
       "default": "./dist/services/throttle.service.js"
