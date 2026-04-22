@@ -102,11 +102,17 @@ export function createBot(token: string): Bot<BotContext> {
     const key = `dedup:upd:${ctx.update.update_id}`;
     try {
       if (!(await acquireLock(key, 300))) {
-        logger.warn({ updateId: ctx.update.update_id }, "duplicate update_id, skipping re-delivery");
+        logger.warn(
+          { updateId: ctx.update.update_id },
+          "duplicate update_id, skipping re-delivery",
+        );
         return;
       }
     } catch (err) {
-      logger.error({ err, updateId: ctx.update.update_id }, "dedup: Redis unavailable, passing through");
+      logger.error(
+        { err, updateId: ctx.update.update_id },
+        "dedup: Redis unavailable, passing through",
+      );
     }
     return next();
   });
