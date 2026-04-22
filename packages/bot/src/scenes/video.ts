@@ -1520,7 +1520,11 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
   await ctx.answerCallbackQuery();
 
   const userId = ctx.user.id;
-  if (!(await acquireLock(`dedup:soul:${userId}`, 120))) return;
+  try {
+    if (!(await acquireLock(`dedup:soul:${userId}`, 120))) return;
+  } catch {
+    // Redis unavailable — proceed without dedup rather than blocking the user
+  }
 
   try {
     const buf = await clearSoulBuffer(userId);

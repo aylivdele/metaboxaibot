@@ -86,7 +86,11 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
   if (!file) return;
 
   const lockKey = `dedup:voice:${ctx.user.id}:${file.file_id}`;
-  if (!(await acquireLock(lockKey, 120))) return;
+  try {
+    if (!(await acquireLock(lockKey, 120))) return;
+  } catch {
+    // Redis unavailable — proceed without dedup rather than blocking the user
+  }
 
   const pendingMsg = await ctx.reply(ctx.t.audio.voiceCloneProcessing);
 
