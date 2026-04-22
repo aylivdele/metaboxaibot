@@ -94,7 +94,12 @@ export function MediaSettingsView({
   const handleModelActivate = async (modelId: string) => {
     setActiveModelId(modelId);
     setState(SECTION_ACTIVE_STATE[section]);
-    await api.state.activate(section, modelId);
+    try {
+      await api.state.activate(section, modelId);
+    } catch (e) {
+      console.error("[settings] activate failed", modelId, e);
+      return;
+    }
     setActivatedPopup(true);
     setTimeout(() => setActivatedPopup(false), 3000);
     closeMiniApp();
@@ -143,7 +148,9 @@ export function MediaSettingsView({
 
   const handleModeChange = (modelId: string, modeId: string) => {
     setSelectedModes((prev) => ({ ...prev, [modelId]: modeId }));
-    void api.state.setSelectedMode(modelId, modeId);
+    api.state
+      .setSelectedMode(modelId, modeId)
+      .catch((e) => console.error("[settings] setSelectedMode failed", modelId, modeId, e));
     // Changing the mode invalidates the current "active" state — the bot needs
     // to be re-activated so it asks for the new mode. Drop active state locally
     // so the Activate button reappears for this model.
@@ -161,7 +168,9 @@ export function MediaSettingsView({
       defaults[def.key] = def.default ?? null;
     }
     setAllModelSettings((prev) => ({ ...prev, [modelId]: defaults }));
-    void api.modelSettings.set(modelId, defaults);
+    api.modelSettings
+      .set(modelId, defaults)
+      .catch((e) => console.error("[settings] reset failed", modelId, e));
   };
 
   const { families, standalone } = useMemo(() => groupByFamily(models), [models]);

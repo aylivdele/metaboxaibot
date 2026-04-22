@@ -129,20 +129,46 @@ server.addHook("onRequest", async (request) => {
 });
 
 server.addHook("onResponse", async (request, reply) => {
-  if (!logger.isLevelEnabled("debug")) return;
   if (shouldSkipRequestLog(request.url)) return;
   const started = (request as FastifyRequest & { _startTime?: number })._startTime;
   const durationMs = started ? Date.now() - started : undefined;
-  logger.debug(
-    {
-      method: request.method,
-      url: request.url,
-      status: reply.statusCode,
-      durationMs,
-      userId: (request as FastifyRequest & { userId?: bigint }).userId?.toString(),
-    },
-    "api response",
-  );
+  const ctx = {
+    method: request.method,
+    url: request.url,
+    status: reply.statusCode,
+    durationMs,
+    userId: (request as FastifyRequest & { userId?: bigint }).userId?.toString(),
+  };
+  if (reply.statusCode >= 500) {
+    logger.error(ctx, "api response 5xx");
+  } else if (reply.statusCode >= 400) {
+    logger.warn(ctx, "api response 4xx");
+  } else if (logger.isLevelEnabled("debug")) {
+    logger.debug(ctx, "api response");
+  }
+});
+
+// ── Error handler ─────────────────────────────────────────────────────────────
+// Fastify is configured with `logger: false`, so unhandled errors thrown by
+// route handlers are otherwise invisible. Log them with full context (method,
+// URL, userId, error message + stack) before forwarding to the default reply.
+server.setErrorHandler((error: Error & { statusCode?: number; code?: string }, request, reply) => {
+  const status =
+    typeof error.statusCode === "number" && error.statusCode >= 400 ? error.statusCode : 500;
+  const ctx = {
+    method: request.method,
+    url: request.url,
+    status,
+    userId: (request as FastifyRequest & { userId?: bigint }).userId?.toString(),
+    code: error.code,
+    err: { message: error.message, stack: error.stack, name: error.name },
+  };
+  if (status >= 500) {
+    logger.error(ctx, "api handler error");
+  } else {
+    logger.warn(ctx, "api handler error");
+  }
+  reply.status(status).send({ error: error.message ?? "Internal Server Error" });
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────

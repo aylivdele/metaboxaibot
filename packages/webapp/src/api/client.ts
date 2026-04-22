@@ -43,11 +43,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers["Authorization"] = `wtoken ${_webToken}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-    cache: "no-store",
-  });
+  const method = options.method ?? "GET";
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+      cache: "no-store",
+    });
+  } catch (networkErr) {
+    console.error(`[api] network error ${method} ${path}`, networkErr);
+    throw networkErr;
+  }
 
   if (!res.ok) {
     const err = (await res.json().catch(() => ({ error: res.statusText }))) as Record<
@@ -62,6 +69,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (err.botMentor) error.botMentor = err.botMentor;
     if (err.linkedEmail) error.linkedEmail = err.linkedEmail;
     if (err.linkedUsername) error.linkedUsername = err.linkedUsername;
+    console.error(`[api] ${method} ${path} → ${res.status}`, err);
     throw error;
   }
 
@@ -76,14 +84,21 @@ async function uploadRequest<T>(path: string, body: FormData): Promise<T> {
     headers["Authorization"] = `wtoken ${_webToken}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers,
-    body,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers,
+      body,
+    });
+  } catch (networkErr) {
+    console.error(`[api] network error POST ${path}`, networkErr);
+    throw networkErr;
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
+    console.error(`[api] POST ${path} → ${res.status}`, err);
     throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
   }
 
