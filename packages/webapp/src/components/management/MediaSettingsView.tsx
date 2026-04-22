@@ -144,6 +144,13 @@ export function MediaSettingsView({
   const handleModeChange = (modelId: string, modeId: string) => {
     setSelectedModes((prev) => ({ ...prev, [modelId]: modeId }));
     void api.state.setSelectedMode(modelId, modeId);
+    // Changing the mode invalidates the current "active" state — the bot needs
+    // to be re-activated so it asks for the new mode. Drop active state locally
+    // so the Activate button reappears for this model.
+    if (modelId === activeModelId) {
+      setActiveModelId("");
+      setState(undefined);
+    }
   };
 
   const handleReset = (modelId: string) => {

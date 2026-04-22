@@ -10,8 +10,6 @@ import {
   getT,
   resolveModelDisplay,
   getResolvedModes,
-  resolveActiveMode,
-  getActiveSlots,
   type AIModel,
   type Section,
   type Translations,
@@ -309,19 +307,8 @@ async function sendModelActivatedNotification(
   // Build the unified inline keyboard: media input slots (if any) + management.
   // Model activation clears media inputs, so all slots start empty.
   const modes = section === "video" || section === "design" ? getResolvedModes(model) : null;
-  const savedModeId =
-    modes && (section === "video" || section === "design")
-      ? await userStateService.getSelectedMode(userId, modelId)
-      : null;
-  const activeMode = modes ? resolveActiveMode(model, savedModeId) : null;
   const slotsForKeyboard =
-    section === "video" || section === "design"
-      ? modes
-        ? activeMode && !activeMode.textOnly
-          ? getActiveSlots(model, activeMode.id)
-          : []
-        : (model.mediaInputs ?? [])
-      : [];
+    section === "video" || section === "design" ? (modes ? [] : (model.mediaInputs ?? [])) : [];
 
   const inlineKeyboard: { text: string; callback_data?: string; web_app?: { url: string } }[][] =
     [];
@@ -378,71 +365,28 @@ async function sendModelActivatedNotification(
     }).catch((reason) => logger.warn(reason, `Could not send model hint`));
   }
 
-  // Modes-aware models: send mode picker (no saved mode) or mode-activated
-  // message with slot keyboard filtered to the active mode.
+  // Modes-aware models: always re-prompt for the mode on activation.
   if (modes && (section === "video" || section === "design")) {
-    if (activeMode && savedModeId) {
-      const modeLabel = String(
-        (t.modelModes as Record<string, string>)[activeMode.labelKey] ?? activeMode.labelKey,
-      );
-      const modeKb: { text: string; callback_data?: string; web_app?: { url: string } }[][] = [];
-      if (!activeMode.textOnly) {
-        let firstElementShown = false;
-        for (const slot of slotsForKeyboard) {
-          if (slot.mode === "reference_element") {
-            if (firstElementShown) continue;
-            firstElementShown = true;
-          }
-          const label = (t.mediaInput as Record<string, string>)[slot.labelKey] ?? slot.labelKey;
-          const suffix = slot.required ? ` ${t.mediaInput.required}` : ` ${t.mediaInput.optional}`;
-          modeKb.push([
-            { text: `${label}${suffix}`, callback_data: `mi:${section}:${slot.slotKey}` },
-          ]);
-        }
+    const pickerKb: { text: string; callback_data: string }[][] = [];
+    let row: { text: string; callback_data: string }[] = [];
+    for (const m of modes) {
+      const label = String((t.modelModes as Record<string, string>)[m.labelKey] ?? m.labelKey);
+      row.push({ text: label, callback_data: `mode:${section}:${modelId}:${m.id}` });
+      if (row.length === 2) {
+        pickerKb.push(row);
+        row = [];
       }
-      if (webappUrl) {
-        modeKb.push([
-          {
-            text: t.common.management,
-            web_app: { url: `${webappUrl}?page=management&section=${section}` },
-          },
-        ]);
-      }
-      const modeText = (
-        activeMode.textOnly ? t.modelModes.activatedTextOnly : t.modelModes.activated
-      ).replace("{mode}", modeLabel);
-      await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: String(userId),
-          text: modeText,
-          ...(modeKb.length ? { reply_markup: { inline_keyboard: modeKb } } : {}),
-        }),
-      }).catch((reason) => logger.warn(reason, `Could not send mode activated`));
-    } else {
-      const pickerKb: { text: string; callback_data: string }[][] = [];
-      const rows = modes;
-      let row: { text: string; callback_data: string }[] = [];
-      for (const m of rows) {
-        const label = String((t.modelModes as Record<string, string>)[m.labelKey] ?? m.labelKey);
-        row.push({ text: label, callback_data: `mode:${section}:${modelId}:${m.id}` });
-        if (row.length === 2) {
-          pickerKb.push(row);
-          row = [];
-        }
-      }
-      if (row.length) pickerKb.push(row);
-      await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: String(userId),
-          text: t.modelModes.pickerTitle,
-          reply_markup: { inline_keyboard: pickerKb },
-        }),
-      }).catch((reason) => logger.warn(reason, `Could not send mode picker`));
     }
+    if (row.length) pickerKb.push(row);
+    await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: String(userId),
+        text: t.modelModes.pickerTitle,
+        reply_markup: { inline_keyboard: pickerKb },
+      }),
+    }).catch((reason) => logger.warn(reason, `Could not send mode picker`));
   }
 }
 

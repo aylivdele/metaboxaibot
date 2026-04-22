@@ -20,8 +20,6 @@ import {
   resolveUserFacingError,
   resolveModelDisplay,
   getResolvedModes,
-  resolveActiveMode,
-  getActiveSlots,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -189,13 +187,7 @@ export async function activateDesignModel(
     });
 
     if (modes && !options.suppressKeyboard) {
-      const savedModeId = await userStateService.getSelectedMode(ctx.user.id, modelId);
-      const activeMode = resolveActiveMode(model, savedModeId);
-      if (savedModeId && activeMode) {
-        await sendDesignModeActivatedMessage(ctx, modelId, activeMode);
-      } else {
-        await sendDesignModePicker(ctx, modelId, modes);
-      }
+      await sendDesignModePicker(ctx, modelId, modes);
     }
   } else {
     await ctx.reply(`${ctx.t.design.modelActivated}\n\n${ctx.t.voice.inputHint}`);
@@ -210,47 +202,6 @@ async function sendDesignModePicker(
 ): Promise<void> {
   const { text, kb } = buildModePickerMenu(modes, "design", modelId, ctx.t);
   await ctx.reply(text, { reply_markup: kb });
-}
-
-/**
- * Send the "mode activated" message for design models with modes, attaching
- * a slot keyboard filtered to only the slots active in the chosen mode.
- */
-async function sendDesignModeActivatedMessage(
-  ctx: BotContext,
-  modelId: string,
-  mode: { id: string; labelKey: string; textOnly?: boolean },
-): Promise<void> {
-  if (!ctx.user) return;
-  const model = AI_MODELS[modelId];
-  if (!model) return;
-  const modeLabel = String(
-    ctx.t.modelModes[mode.labelKey as keyof typeof ctx.t.modelModes] ?? mode.labelKey,
-  );
-  const webappUrl = config.bot.webappUrl;
-  const kb = new InlineKeyboard();
-
-  if (mode.textOnly) {
-    if (webappUrl) {
-      kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
-    }
-    const text = ctx.t.modelModes.activatedTextOnly.replace("{mode}", modeLabel);
-    await ctx.reply(text, { reply_markup: kb.inline_keyboard.length ? kb : undefined });
-    return;
-  }
-
-  const activeSlots = getActiveSlots(model, mode.id);
-  const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
-  const { kb: slotsKb } = buildMediaInputStatusMenu(activeSlots, filledInputs, "design", ctx.t, {
-    promptOptional: model.promptOptional,
-    promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
-  });
-  for (const row of slotsKb.inline_keyboard) kb.row(...row);
-  if (webappUrl) {
-    kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
-  }
-  const text = ctx.t.modelModes.activated.replace("{mode}", modeLabel);
-  await ctx.reply(text, { reply_markup: kb.inline_keyboard.length ? kb : undefined });
 }
 
 // ── Model selected via inline callback ───────────────────────────────────────

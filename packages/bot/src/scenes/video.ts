@@ -25,8 +25,6 @@ import {
   resolveModelDisplay,
   generateWebToken,
   getResolvedModes,
-  resolveActiveMode,
-  getActiveSlots,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -336,13 +334,7 @@ export async function activateVideoModel(
     // the filtered slot keyboard. If the user already has a saved mode for
     // this model, send the mode-activated message directly instead.
     if (modes && !options.suppressKeyboard) {
-      const savedModeId = await userStateService.getSelectedMode(ctx.user.id, modelId);
-      const activeMode = resolveActiveMode(model, savedModeId);
-      if (savedModeId && activeMode) {
-        await sendModeActivatedMessage(ctx, modelId, activeMode);
-      } else {
-        await sendVideoModePicker(ctx, modelId, modes);
-      }
+      await sendVideoModePicker(ctx, modelId, modes);
     }
   } else {
     await ctx.reply(ctx.t.video.modelActivated);
@@ -357,48 +349,6 @@ async function sendVideoModePicker(
 ): Promise<void> {
   const { text, kb } = buildModePickerMenu(modes, "video", modelId, ctx.t);
   await ctx.reply(text, { reply_markup: kb });
-}
-
-/**
- * Send the "mode activated" message and attach a keyboard built from only
- * the slots active in the chosen mode. For text-only modes (no slots), the
- * message just instructs the user to send a prompt.
- */
-async function sendModeActivatedMessage(
-  ctx: BotContext,
-  modelId: string,
-  mode: { id: string; labelKey: string; textOnly?: boolean },
-): Promise<void> {
-  if (!ctx.user) return;
-  const model = AI_MODELS[modelId];
-  if (!model) return;
-  const modeLabel = String(
-    ctx.t.modelModes[mode.labelKey as keyof typeof ctx.t.modelModes] ?? mode.labelKey,
-  );
-  const webappUrl = config.bot.webappUrl;
-  const kb = new InlineKeyboard();
-
-  if (mode.textOnly) {
-    if (webappUrl) {
-      kb.webApp(ctx.t.video.management, `${webappUrl}?page=management&section=video`);
-    }
-    const text = ctx.t.modelModes.activatedTextOnly.replace("{mode}", modeLabel);
-    await ctx.reply(text, { reply_markup: kb.inline_keyboard.length ? kb : undefined });
-    return;
-  }
-
-  const activeSlots = getActiveSlots(model, mode.id);
-  const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
-  const { kb: slotsKb } = buildMediaInputStatusMenu(activeSlots, filledInputs, "video", ctx.t, {
-    promptOptional: model.promptOptional,
-    promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
-  });
-  for (const row of slotsKb.inline_keyboard) kb.row(...row);
-  if (webappUrl) {
-    kb.webApp(ctx.t.video.management, `${webappUrl}?page=management&section=video`);
-  }
-  const text = ctx.t.modelModes.activated.replace("{mode}", modeLabel);
-  await ctx.reply(text, { reply_markup: kb.inline_keyboard.length ? kb : undefined });
 }
 
 // ── Model selected via inline callback ───────────────────────────────────────
