@@ -132,6 +132,10 @@
     "./services/transcription": {
       "types": "./src/services/transcription.service.ts",
       "default": "./dist/services/transcription.service.js"
+    },
+    "./redis": {
+      "types": "./src/redis.ts",
+      "default": "./dist/redis.js"
     }
   },
   "dependencies": {

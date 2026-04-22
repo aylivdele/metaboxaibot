@@ -55,6 +55,7 @@ import {
   clearSoulBuffer,
   debounceSoulReply,
 } from "../utils/soul-photo-buffer.js";
+import { acquireLock, releaseLock } from "../utils/dedup.js";
 
 // ── Avatar voice choice store (TTL 10 min) ──────────────────────────────────
 
@@ -1519,89 +1520,98 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
   await ctx.answerCallbackQuery();
 
   const userId = ctx.user.id;
-  const buf = await clearSoulBuffer(userId);
+  try {
+    if (!(await acquireLock(`dedup:soul:${userId}`, 120))) return;
+  } catch {
+    // Redis unavailable — proceed without dedup rather than blocking the user
+  }
 
-  if (!buf || buf.fileIds.length < SOUL_MIN_PHOTOS) {
-    const n = buf?.fileIds.length ?? 0;
-    await ctx
-      .editMessageText(
+  try {
+    const buf = await clearSoulBuffer(userId);
+
+    if (!buf || buf.fileIds.length < SOUL_MIN_PHOTOS) {
+      const n = buf?.fileIds.length ?? 0;
+      await ctx
+        .editMessageText(
+          ctx.t.video.soulMinPhotos
+            .replace("{min}", String(SOUL_MIN_PHOTOS))
+            .replace("{n}", String(n)),
+        )
+        .catch(() => void 0);
+      await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
+      return;
+    }
+
+    // Check balance ($2.50)
+    const costTokens = usdToTokens(SOUL_COST_USD);
+    try {
+      await checkBalance(userId, costTokens);
+    } catch {
+      await ctx.editMessageText(ctx.t.errors.insufficientTokens).catch(() => void 0);
+      await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
+      return;
+    }
+
+    // Show progress message while we download + upload photos
+    await ctx.editMessageText(ctx.t.video.soulCreating).catch(() => void 0);
+
+    // Resolve Telegram file_ids → S3 keys. Deferred from capture time so the user
+    // can take their time uploading without TTL pressure.
+    const s3Keys: string[] = [];
+    for (const entry of buf.fileIds) {
+      const rest = entry.startsWith("tg:") ? entry.slice(3) : entry;
+      const idx = rest.indexOf(":");
+      const fileId = idx === -1 ? rest : rest.slice(idx + 1);
+      if (!fileId) continue;
+      try {
+        const file = await ctx.api.getFile(fileId);
+        const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+        const s3Key = `soul_photos/${userId.toString()}/${Date.now()}_${file.file_id}.jpg`;
+        const uploaded = await s3Service.uploadFromUrl(s3Key, tgUrl, "image/jpeg");
+        if (uploaded) s3Keys.push(uploaded);
+      } catch (err) {
+        logger.warn({ userId, fileId, err }, "Soul photo S3 upload failed, skipping");
+      }
+    }
+
+    if (s3Keys.length < SOUL_MIN_PHOTOS) {
+      await ctx.reply(
         ctx.t.video.soulMinPhotos
           .replace("{min}", String(SOUL_MIN_PHOTOS))
-          .replace("{n}", String(n)),
-      )
-      .catch(() => void 0);
-    // Restore FSM
-    await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
-    return;
-  }
-
-  // Check balance ($2.50)
-  const costTokens = usdToTokens(SOUL_COST_USD);
-  try {
-    await checkBalance(userId, costTokens);
-  } catch {
-    await ctx.editMessageText(ctx.t.errors.insufficientTokens).catch(() => void 0);
-    await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
-    return;
-  }
-
-  // Show progress message while we download + upload photos
-  await ctx.editMessageText(ctx.t.video.soulCreating).catch(() => void 0);
-
-  // Resolve Telegram file_ids → S3 keys. Deferred from capture time so the user
-  // can take their time uploading without TTL pressure.
-  const s3Keys: string[] = [];
-  for (const entry of buf.fileIds) {
-    const rest = entry.startsWith("tg:") ? entry.slice(3) : entry;
-    const idx = rest.indexOf(":");
-    const fileId = idx === -1 ? rest : rest.slice(idx + 1);
-    if (!fileId) continue;
-    try {
-      const file = await ctx.api.getFile(fileId);
-      const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
-      const s3Key = `soul_photos/${userId.toString()}/${Date.now()}_${file.file_id}.jpg`;
-      const uploaded = await s3Service.uploadFromUrl(s3Key, tgUrl, "image/jpeg");
-      if (uploaded) s3Keys.push(uploaded);
-    } catch (err) {
-      logger.warn({ userId, fileId, err }, "Soul photo S3 upload failed, skipping");
+          .replace("{n}", String(s3Keys.length)),
+      );
+      await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
+      return;
     }
-  }
 
-  if (s3Keys.length < SOUL_MIN_PHOTOS) {
-    await ctx.reply(
-      ctx.t.video.soulMinPhotos
-        .replace("{min}", String(SOUL_MIN_PHOTOS))
-        .replace("{n}", String(s3Keys.length)),
-    );
+    // Deduct tokens only after we have enough usable photos
+    await deductTokens(userId, costTokens, "higgsfield_soul", undefined, "soul_creation");
+
+    // Create UserAvatar record
+    const avatar = await userAvatarService.create(userId, {
+      provider: "higgsfield_soul",
+      name: ctx.t.video.myAvatarDefaultName,
+      externalId: undefined,
+      status: "creating",
+      previewUrl: undefined,
+    });
+
+    // Enqueue avatar creation job
+    await getAvatarQueue().add("create", {
+      userAvatarId: avatar.id,
+      userId: userId.toString(),
+      provider: "higgsfield_soul",
+      action: "create",
+      telegramChatId: ctx.chat?.id ?? Number(userId),
+      s3Keys,
+      characterName: ctx.t.video.myAvatarDefaultName,
+    });
+
+    // Restore FSM to DESIGN_ACTIVE
     await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
-    return;
+  } finally {
+    await releaseLock(`dedup:soul:${userId}`);
   }
-
-  // Deduct tokens only after we have enough usable photos
-  await deductTokens(userId, costTokens, "higgsfield_soul", undefined, "soul_creation");
-
-  // Create UserAvatar record
-  const avatar = await userAvatarService.create(userId, {
-    provider: "higgsfield_soul",
-    name: ctx.t.video.myAvatarDefaultName,
-    externalId: undefined,
-    status: "creating",
-    previewUrl: undefined,
-  });
-
-  // Enqueue avatar creation job
-  await getAvatarQueue().add("create", {
-    userAvatarId: avatar.id,
-    userId: userId.toString(),
-    provider: "higgsfield_soul",
-    action: "create",
-    telegramChatId: ctx.chat?.id ?? Number(userId),
-    s3Keys,
-    characterName: ctx.t.video.myAvatarDefaultName,
-  });
-
-  // Restore FSM to DESIGN_ACTIVE
-  await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
 }
 
 /**
