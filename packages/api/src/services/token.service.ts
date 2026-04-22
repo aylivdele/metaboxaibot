@@ -96,7 +96,8 @@ export async function checkBalance(userId: bigint, required: number): Promise<vo
 
 /**
  * Throw NO_SUBSCRIPTION if the user has no active subscription.
- * Used in payment flow to gate token package purchases.
+ * Triаl counts as active — используется для гейта AI-генерации (chat / image /
+ * video / audio), где триальщик должен иметь доступ.
  */
 export async function checkSubscription(userId: bigint): Promise<void> {
   const user = await db.user.findUniqueOrThrow({
@@ -108,6 +109,27 @@ export async function checkSubscription(userId: bigint): Promise<void> {
   }
   const sub = await db.localSubscription.findUnique({ where: { userId } });
   if (!sub || !sub.isActive || sub.endDate <= new Date()) {
+    throw new Error("NO_SUBSCRIPTION");
+  }
+}
+
+/**
+ * Throw NO_SUBSCRIPTION если у юзера нет активной **платной** подписки.
+ * Триал (planName === "Trial") здесь НЕ считается подпиской.
+ *
+ * Используется для гейта покупки пакетов токенов: триальщик сначала должен
+ * оформить нормальную подписку, только потом докупать пакеты.
+ */
+export async function checkPaidSubscription(userId: bigint): Promise<void> {
+  const user = await db.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (user.role === "ADMIN") {
+    return;
+  }
+  const sub = await db.localSubscription.findUnique({ where: { userId } });
+  if (!sub || !sub.isActive || sub.endDate <= new Date() || sub.planName === "Trial") {
     throw new Error("NO_SUBSCRIPTION");
   }
 }

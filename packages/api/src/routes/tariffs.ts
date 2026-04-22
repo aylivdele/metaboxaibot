@@ -24,8 +24,8 @@ export const tariffsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/tariffs/catalog", async (request) => {
     const { userId } = request as AuthRequest;
 
-    // Fetch catalog from Metabox (with fallback) + exchange rate in parallel
-    const [catalog, usdtRubRate, user] = await Promise.all([
+    // Fetch catalog from Metabox (with fallback) + exchange rate + user + sub
+    const [catalog, usdtRubRate, user, localSub] = await Promise.all([
       getAiBotCatalog().catch((err) => {
         console.error("[tariffs/catalog] Metabox catalog unavailable:", err.message);
         return emptyCatalog();
@@ -33,9 +33,23 @@ export const tariffsRoutes: FastifyPluginAsync = async (fastify) => {
       getRate(),
       db.user.findUnique({
         where: { id: userId },
-        select: { metaboxUserId: true },
+        select: { metaboxUserId: true, role: true },
+      }),
+      db.localSubscription.findUnique({
+        where: { userId },
+        select: { planName: true, isActive: true, endDate: true },
       }),
     ]);
+
+    // Триал НЕ считается платной подпиской — для гейта покупки пакетов токенов.
+    const hasPaidSubscription =
+      user?.role === "ADMIN" ||
+      !!(
+        localSub &&
+        localSub.isActive &&
+        localSub.endDate > new Date() &&
+        localSub.planName !== "Trial"
+      );
 
     // Enrich subscriptions with Stars prices — only include available periods
     const subscriptions = catalog.subscriptions.map((sub) => {
@@ -85,6 +99,7 @@ export const tariffsRoutes: FastifyPluginAsync = async (fastify) => {
       subscriptions,
       tokenPackages,
       canPayByCard: !!user?.metaboxUserId,
+      hasPaidSubscription,
       usdtRubRate,
       metaboxUrl: config.metabox.apiUrl || "https://app.meta-box.ru",
     };

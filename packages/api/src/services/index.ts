@@ -20,6 +20,7 @@ export {
   deductTokens,
   checkBalance,
   checkSubscription,
+  checkPaidSubscription,
   calculateCost,
   computeVideoTokens,
   usdToTokens,

@@ -278,26 +278,48 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
         <>
           <h3 className="section-title">{t("tariffs.tokenPackages")}</h3>
 
+          {/* Триальщики и юзеры без подписки не могут докупать пакеты токенов.
+              Сначала нужна активная платная подписка. */}
+          {!catalog.hasPaidSubscription && (
+            <div className="tariff-note" style={{ marginTop: 0, marginBottom: 12 }}>
+              Докупить пакеты токенов можно только при активной подписке. Сначала оформите любой
+              тариф выше.
+            </div>
+          )}
+
           <div className="plans-grid">
-            {catalog.tokenPackages.map((pkg) => (
-              <div key={pkg.id} className={`plan-card${pkg.badge ? " plan-card--popular" : ""}`}>
-                {pkg.badge && (
-                  <div className="plan-card__badge">{BADGE_LABELS[pkg.badge] ?? pkg.badge}</div>
-                )}
-                <div className="plan-card__info">
-                  <div className="plan-card__label">{pkg.name}</div>
-                  <div className="plan-card__tokens">
-                    {"⚡"} {pkg.tokens.toLocaleString("ru-RU")} токенов
+            {catalog.tokenPackages.map((pkg) => {
+              const locked = !catalog.hasPaidSubscription;
+              return (
+                <div
+                  key={pkg.id}
+                  className={`plan-card${pkg.badge ? " plan-card--popular" : ""}`}
+                  style={locked ? { opacity: 0.55 } : undefined}
+                >
+                  {pkg.badge && (
+                    <div className="plan-card__badge">{BADGE_LABELS[pkg.badge] ?? pkg.badge}</div>
+                  )}
+                  <div className="plan-card__info">
+                    <div className="plan-card__label">{pkg.name}</div>
+                    <div className="plan-card__tokens">
+                      {"⚡"} {pkg.tokens.toLocaleString("ru-RU")} токенов
+                    </div>
                   </div>
+                  <div className="plan-card__price">
+                    {Number(pkg.priceRub).toLocaleString("ru-RU")} {"₽"}
+                  </div>
+                  <button
+                    className="plan-card__btn"
+                    onClick={() => openPkgModal(pkg)}
+                    disabled={locked}
+                    style={locked ? { cursor: "not-allowed" } : undefined}
+                    title={locked ? "Нужна активная подписка" : undefined}
+                  >
+                    {locked ? "Нужна подписка" : t("tariffs.buy")}
+                  </button>
                 </div>
-                <div className="plan-card__price">
-                  {Number(pkg.priceRub).toLocaleString("ru-RU")} {"₽"}
-                </div>
-                <button className="plan-card__btn" onClick={() => openPkgModal(pkg)}>
-                  {t("tariffs.buy")}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

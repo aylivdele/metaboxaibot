@@ -1,5 +1,10 @@
 import type { BotContext } from "../types/context.js";
-import { paymentService, getRate, STAR_PRICE_USD, checkSubscription } from "@metabox/api/services";
+import {
+  paymentService,
+  getRate,
+  STAR_PRICE_USD,
+  checkPaidSubscription,
+} from "@metabox/api/services";
 import type { SaleUserInfo } from "@metabox/api/services";
 import { logger } from "../logger.js";
 import { getT } from "@metabox/shared";
@@ -10,10 +15,10 @@ export async function handlePreCheckoutQuery(ctx: BotContext): Promise<void> {
   logger.info({ userId: ctx.from?.id, payload }, "pre_checkout_query received");
 
   try {
-    // Token packages require an active subscription
+    // Token packages require an active PAID subscription (trial не проходит).
     if (payload.startsWith("product:") && ctx.from?.id) {
       try {
-        await checkSubscription(BigInt(ctx.from.id));
+        await checkPaidSubscription(BigInt(ctx.from.id));
       } catch {
         const t = ctx.t ?? getT("en");
         await ctx.answerPreCheckoutQuery(false, t.errors.noSubscriptionForPurchase);
