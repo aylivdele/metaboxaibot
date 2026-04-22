@@ -8,15 +8,26 @@
 export class UserFacingError extends Error {
   public readonly key?: string;
   public readonly params?: Record<string, string | number>;
+  /**
+   * When true, the worker should ALSO send a tech-channel alert despite
+   * showing a friendly message to the user. Use for cases we want to keep
+   * tracking (e.g. AI-classified provider errors that aren't yet hardcoded).
+   */
+  public readonly notifyOps?: boolean;
 
   constructor(
     message: string,
-    options?: { key?: string; params?: Record<string, string | number> },
+    options?: {
+      key?: string;
+      params?: Record<string, string | number>;
+      notifyOps?: boolean;
+    },
   ) {
     super(message);
     this.name = "UserFacingError";
     this.key = options?.key;
     this.params = options?.params;
+    this.notifyOps = options?.notifyOps;
   }
 }
 

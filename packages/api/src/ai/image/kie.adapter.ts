@@ -2,6 +2,7 @@ import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { uploadFileUrl } from "../../utils/kie-upload.js";
+import { classifyAIError } from "../../services/ai-error-classifier.service.js";
 
 const KIE_BASE = "https://api.kie.ai";
 
@@ -203,19 +204,23 @@ export class KieImageAdapter implements ImageAdapter {
     if (task.state === "fail") {
       const failMsg = task.failMsg ?? "unknown error";
       const failCode = task.failCode;
+      const technicalMessage = `KIE ${this.modelId} generation failed: ${failCode ?? ""} ${failMsg}`;
       const isCopyright = failCode === "501" || /copyright/i.test(failMsg);
-      const isPolicy = /sensitive|restricted|policy|prohibited|nsfw|violat/i.test(failMsg);
-      if (isCopyright)
-        throw new UserFacingError(
-          `KIE ${this.modelId} generation failed: ${failCode ?? ""} ${failMsg}`,
-          { key: "copyrightViolation" },
-        );
-      if (isPolicy)
-        throw new UserFacingError(
-          `KIE ${this.modelId} generation failed: ${failCode ?? ""} ${failMsg}`,
-          { key: "contentPolicyViolation" },
-        );
-      throw new Error(`KIE ${this.modelId} generation failed: ${failCode ?? ""} ${failMsg}`);
+      const isPolicy =
+        failCode === "430" ||
+        /sensitive|restricted|policy|prohibited|nsfw|violat|inappropriate/i.test(failMsg);
+      if (isCopyright) throw new UserFacingError(technicalMessage, { key: "copyrightViolation" });
+      if (isPolicy) throw new UserFacingError(technicalMessage, { key: "contentPolicyViolation" });
+
+      const classified = await classifyAIError(`${failCode ?? ""} ${failMsg}`.trim());
+      if (classified?.shouldShow) {
+        throw new UserFacingError(technicalMessage, {
+          key: "aiClassifiedError",
+          params: { messageRu: classified.messageRu, messageEn: classified.messageEn },
+          notifyOps: true,
+        });
+      }
+      throw new Error(technicalMessage);
     }
     if (task.state !== "success") return null;
 

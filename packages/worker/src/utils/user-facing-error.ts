@@ -25,3 +25,12 @@ export function resolveUserFacingMessage(err: unknown, t: Translations): string 
     return getFalUserMessage(err, t) ?? t.errors.contentPolicyViolation;
   return null;
 }
+
+/**
+ * Returns true when a user-facing error should ALSO send a tech-channel alert
+ * (e.g. AI-classified provider errors that we want to keep tracking until we
+ * add a hardcoded handler for them).
+ */
+export function shouldNotifyOps(err: unknown): boolean {
+  return err instanceof UserFacingError && err.notifyOps === true;
+}

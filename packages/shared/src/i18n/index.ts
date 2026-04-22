@@ -178,6 +178,7 @@ export interface Translations {
     mediaSlotReadMetadataFailed: string;
     contentPolicyViolation: string;
     copyrightViolation: string;
+    aiClassifiedError: string;
     recraftImg2imgSvgUnsupported: string;
     recraftImg2imgFileTooLarge: string;
     recraftImg2imgDimensionsTooLarge: string;

@@ -229,6 +229,7 @@ export default {
       "❌ Your request was rejected due to a content policy violation. Please modify your prompt and try again.",
     copyrightViolation:
       "❌ The output looks similar to copyrighted material (recognizable characters, brands, celebrities). Please rephrase your prompt and try again.",
+    aiClassifiedError: "❌ {messageEn}",
     recraftImg2imgSvgUnsupported:
       "❌ SVG images cannot be used as a reference for Recraft img2img. Please send a raster image (PNG, JPEG, or WebP) instead.",
     recraftImg2imgFileTooLarge:

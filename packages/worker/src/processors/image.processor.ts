@@ -1,6 +1,6 @@
 import { UnrecoverableError } from "bullmq";
 import type { Job } from "bullmq";
-import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
+import { resolveUserFacingMessage, shouldNotifyOps } from "../utils/user-facing-error.js";
 import { getIntervalForElapsed } from "../utils/poll-schedule.js";
 import { Api } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
@@ -549,6 +549,15 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         where: { id: dbJobId },
         data: { status: "failed", error: userMsg },
       });
+      if (shouldNotifyOps(err)) {
+        await notifyTechError(err, {
+          jobId: dbJobId,
+          modelId,
+          section: "image",
+          userId: userIdStr,
+          attempt: job.attemptsMade,
+        });
+      }
       await telegram.sendMessage(telegramChatId, userMsg).catch(() => void 0);
       throw new UnrecoverableError(userMsg);
     }

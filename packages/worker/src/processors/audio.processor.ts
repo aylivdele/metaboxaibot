@@ -10,7 +10,7 @@ import { buildS3Key, uploadBuffer, uploadFromUrl, getFileUrl } from "@metabox/ap
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
-import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
+import { resolveUserFacingMessage, shouldNotifyOps } from "../utils/user-facing-error.js";
 import { getIntervalForElapsed } from "../utils/poll-schedule.js";
 import {
   submitWithThrottle,
@@ -335,6 +335,15 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
         where: { id: dbJobId },
         data: { status: "failed", error: providerMsg },
       });
+      if (shouldNotifyOps(err)) {
+        await notifyTechError(err, {
+          jobId: dbJobId,
+          modelId,
+          section: "audio",
+          userId: userIdStr,
+          attempt: job.attemptsMade,
+        });
+      }
       await telegram.sendMessage(telegramChatId, providerMsg).catch(() => void 0);
       throw new UnrecoverableError(providerMsg);
     }
