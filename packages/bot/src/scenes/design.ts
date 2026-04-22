@@ -256,8 +256,13 @@ export async function sendDesignMediaInputStatus(
   if (webappUrl) {
     kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
   }
-  const statusBody = options.statusText ?? (text || ctx.t.mediaInput.doneUploading);
-  const body = options.prependText ? `${options.prependText}\n\n${statusBody}` : statusBody;
+  const statusBody =
+    options.statusText ?? (text || (options.prependText ? "" : ctx.t.mediaInput.doneUploading));
+  const body = options.prependText
+    ? statusBody
+      ? `${options.prependText}\n\n${statusBody}`
+      : options.prependText
+    : statusBody;
   if (options.edit) {
     await ctx.editMessageText(body, { reply_markup: kb }).catch(() => void 0);
   } else {
@@ -442,8 +447,9 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
     if (missing) {
       const label =
         ctx.t.mediaInput[missing.labelKey as keyof typeof ctx.t.mediaInput] ?? missing.labelKey;
-      await ctx.reply(ctx.t.mediaInput.slotRequired.replace("{slot}", String(label)));
-      await sendDesignMediaInputStatus(ctx);
+      await sendDesignMediaInputStatus(ctx, {
+        prependText: ctx.t.mediaInput.slotRequired.replace("{slot}", String(label)),
+      });
       return;
     }
   }

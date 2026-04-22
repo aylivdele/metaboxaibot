@@ -55,7 +55,7 @@ import {
   handleVideoMediaInputRemove,
   handleVideoGenerateNoPrompt,
 } from "./scenes/video.js";
-import { handleModeSet } from "./scenes/mode-select.js";
+import { handleModeSet, handleChangeMode } from "./scenes/mode-select.js";
 import {
   handleRefineEntry,
   handleRefineUseActive,
@@ -262,6 +262,7 @@ export function createBot(token: string): Bot<BotContext> {
 
   // ── Mode picker callback (video + design) ────────────────────────────────
   bot.callbackQuery(/^mode:/, handleModeSet);
+  bot.callbackQuery(/^change_mode:/, handleChangeMode);
 
   // ── Media input slot callbacks ────────────────────────────────────────────
   bot.callbackQuery(/^mi:video:/, handleVideoMediaInput);

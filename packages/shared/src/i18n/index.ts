@@ -383,6 +383,7 @@ export interface Translations {
     pickerTitle: string;
     activated: string;
     activatedTextOnly: string;
+    change: string;
     t2v: string;
     t2i: string;
     i2v: string;

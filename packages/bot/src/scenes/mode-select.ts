@@ -8,7 +8,11 @@ import {
 } from "@metabox/shared";
 import { userStateService } from "@metabox/api/services";
 import { InlineKeyboard } from "grammy";
-import { buildMediaInputStatusMenu, clearActiveSlot } from "../utils/media-input-state.js";
+import {
+  buildMediaInputStatusMenu,
+  buildModePickerMenu,
+  clearActiveSlot,
+} from "../utils/media-input-state.js";
 
 /**
  * Callback handler for `mode:<section>:<modelId>:<modeId>`. Persists the
@@ -62,6 +66,7 @@ export async function handleModeSet(ctx: BotContext): Promise<void> {
   const mgmtLabel = section === "video" ? ctx.t.video.management : ctx.t.design.management;
 
   if (mode.textOnly) {
+    kb.text(ctx.t.modelModes.change, `change_mode:${section}:${modelId}`).row();
     if (webappUrl) kb.webApp(mgmtLabel, `${webappUrl}?page=management&section=${section}`);
     const text = ctx.t.modelModes.activatedTextOnly.replace("{mode}", modeLabel);
     await ctx.reply(text, { reply_markup: kb.inline_keyboard.length ? kb : undefined });
@@ -75,7 +80,41 @@ export async function handleModeSet(ctx: BotContext): Promise<void> {
     promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
   });
   for (const row of slotsKb.inline_keyboard) kb.row(...row);
+  kb.text(ctx.t.modelModes.change, `change_mode:${section}:${modelId}`).row();
   if (webappUrl) kb.webApp(mgmtLabel, `${webappUrl}?page=management&section=${section}`);
   const text = ctx.t.modelModes.activated.replace("{mode}", modeLabel);
   await ctx.reply(text, { reply_markup: kb.inline_keyboard.length ? kb : undefined });
+}
+
+/**
+ * Callback handler for `change_mode:<section>:<modelId>`. Removes the current
+ * mode-activated message and shows the mode picker again so the user can
+ * pick a different mode without re-activating the model.
+ */
+export async function handleChangeMode(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const data = ctx.callbackQuery?.data ?? "";
+  const parts = data.split(":");
+  if (parts.length < 3 || parts[0] !== "change_mode") {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const section = parts[1];
+  const modelId = parts.slice(2).join(":");
+  if (section !== "video" && section !== "design") {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const model = AI_MODELS[modelId];
+  const modes = model ? getResolvedModes(model) : null;
+  if (!model || !modes) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
+  await ctx.answerCallbackQuery();
+  await ctx.deleteMessage().catch(() => void 0);
+
+  const { text, kb } = buildModePickerMenu(modes, section, modelId, ctx.t);
+  await ctx.reply(text, { reply_markup: kb });
 }

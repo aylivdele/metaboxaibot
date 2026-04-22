@@ -496,6 +496,7 @@ export default {
     pickerTitle: "Choose mode:",
     activated: "Mode «{mode}» activated.",
     activatedTextOnly: "Mode «{mode}» activated. Send a text prompt to start generation.",
+    change: "🔄 Change mode",
     t2v: "Text → video",
     t2i: "Text → image",
     i2v: "Image → video",

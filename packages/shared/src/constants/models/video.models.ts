@@ -163,22 +163,6 @@ const SEEDANCE_MODES: ModelMode[] = [
   },
 ];
 
-/** Seedance 2.0 Fast — same as standard but no last_frame slot in i2v. */
-const SEEDANCE_FAST_MODES: ModelMode[] = [
-  { id: "t2v", labelKey: "t2v", slotKeys: [], textOnly: true, default: true },
-  {
-    id: "i2v",
-    labelKey: "i2v",
-    slotKeys: ["first_frame"],
-    requiredSlotKeys: ["first_frame"],
-  },
-  {
-    id: "r2v",
-    labelKey: "r2v",
-    slotKeys: ["ref_images", "ref_videos", "ref_audios"],
-  },
-];
-
 const VEO_MODES: ModelMode[] = [
   { id: "t2v", labelKey: "t2v", slotKeys: [], textOnly: true, default: true },
   {
@@ -452,8 +436,14 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    mediaInputs: [MI_SEEDANCE_FIRST_FRAME, MI_REF_IMAGES, MI_REF_VIDEOS, MI_REF_AUDIOS],
-    modes: SEEDANCE_FAST_MODES,
+    mediaInputs: [
+      MI_SEEDANCE_FIRST_FRAME,
+      MI_SEEDANCE_LAST_FRAME,
+      MI_REF_IMAGES,
+      MI_REF_VIDEOS,
+      MI_REF_AUDIOS,
+    ],
+    modes: SEEDANCE_MODES,
     supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
     durationRange: { min: 4, max: 15 },
     settings: [
