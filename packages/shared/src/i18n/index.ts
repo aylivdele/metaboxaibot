@@ -152,6 +152,7 @@ export interface Translations {
     avatarCreationCancelled: string;
     avatarCreationStarted: string;
     avatarReady: string;
+    avatarFailed: string;
   };
   errors: {
     noTool: string;

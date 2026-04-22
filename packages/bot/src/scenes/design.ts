@@ -213,7 +213,7 @@ export async function handleDesignFamilySelect(ctx: BotContext): Promise<void> {
 /** Sends an updated media-input status menu showing filled/empty slots. */
 export async function sendDesignMediaInputStatus(
   ctx: BotContext,
-  options: { edit?: boolean; prependText?: string } = {},
+  options: { edit?: boolean; prependText?: string; statusText?: string } = {},
 ): Promise<void> {
   if (!ctx.user) return;
   const state = await userStateService.get(ctx.user.id);
@@ -230,7 +230,7 @@ export async function sendDesignMediaInputStatus(
   if (webappUrl) {
     kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
   }
-  const statusBody = text || ctx.t.mediaInput.doneUploading;
+  const statusBody = options.statusText ?? (text || ctx.t.mediaInput.doneUploading);
   const body = options.prependText ? `${options.prependText}\n\n${statusBody}` : statusBody;
   if (options.edit) {
     await ctx.editMessageText(body, { reply_markup: kb }).catch(() => void 0);
@@ -308,7 +308,10 @@ export async function handleDesignMediaInputCancel(ctx: BotContext): Promise<voi
   const modelId = state?.designModelId ?? "dall-e-3";
   const model = AI_MODELS[modelId];
   if (model?.mediaInputs?.length) {
-    await sendDesignMediaInputStatus(ctx, { edit: true });
+    await sendDesignMediaInputStatus(ctx, {
+      edit: true,
+      statusText: ctx.t.mediaInput.uploadCancelled,
+    });
   } else {
     await ctx.editMessageText(ctx.t.mediaInput.uploadCancelled).catch(() => void 0);
   }

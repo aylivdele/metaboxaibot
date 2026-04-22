@@ -280,15 +280,16 @@ export class KieVideoAdapter implements VideoAdapter {
 
     if (task.state === "fail") {
       const failMsg = task.failMsg ?? "unknown error";
-      const isSensitive = /sensitive/i.test(failMsg);
-      if (isSensitive)
+      const failCode = task.failCode;
+      const isPolicy =
+        /sensitive|copyright|restricted|policy|prohibited|nsfw|violat/i.test(failMsg) ||
+        failCode === "501";
+      if (isPolicy)
         throw new UserFacingError(
-          `KIE ${this.modelId} generation failed: ${task.failCode ?? ""} ${failMsg}`,
+          `KIE ${this.modelId} generation failed: ${failCode ?? ""} ${failMsg}`,
           { key: "contentPolicyViolation" },
         );
-      throw new Error(
-        `KIE ${this.modelId} generation failed: ${task.failCode ?? ""} ${task.failMsg ?? "unknown error"}`,
-      );
+      throw new Error(`KIE ${this.modelId} generation failed: ${failCode ?? ""} ${failMsg}`);
     }
     if (task.state !== "success") return null;
 

@@ -14,7 +14,6 @@ import {
 import { probeVideoMetadata } from "@metabox/api/utils/mp4-duration";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
-import { HeyGenAvatarAdapter } from "@metabox/api/ai/avatar/heygen";
 import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
 import { getAvatarQueue } from "@metabox/api/queues";
 import {
@@ -357,7 +356,7 @@ export async function handleVideoFamilySelect(ctx: BotContext): Promise<void> {
 /** Sends an updated media-input status menu showing filled/empty slots. */
 export async function sendVideoMediaInputStatus(
   ctx: BotContext,
-  options: { edit?: boolean; prependText?: string } = {},
+  options: { edit?: boolean; prependText?: string; statusText?: string } = {},
 ): Promise<void> {
   if (!ctx.user) return;
   const state = await userStateService.get(ctx.user.id);
@@ -374,7 +373,7 @@ export async function sendVideoMediaInputStatus(
   if (webappUrl) {
     kb.webApp(ctx.t.video.management, `${webappUrl}?page=management&section=video`);
   }
-  const statusBody = text || ctx.t.mediaInput.doneUploading;
+  const statusBody = options.statusText ?? (text || ctx.t.mediaInput.doneUploading);
   const body = options.prependText ? `${options.prependText}\n\n${statusBody}` : statusBody;
   if (options.edit) {
     await ctx.editMessageText(body, { reply_markup: kb }).catch(() => void 0);
@@ -482,7 +481,10 @@ export async function handleVideoMediaInputCancel(ctx: BotContext): Promise<void
   const modelId = state?.videoModelId ?? "kling";
   const model = AI_MODELS[modelId];
   if (model?.mediaInputs?.length) {
-    await sendVideoMediaInputStatus(ctx, { edit: true });
+    await sendVideoMediaInputStatus(ctx, {
+      edit: true,
+      statusText: ctx.t.mediaInput.uploadCancelled,
+    });
   } else {
     await ctx.editMessageText(ctx.t.mediaInput.uploadCancelled).catch(() => void 0);
   }
@@ -1175,7 +1177,7 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
   await ctx.reply(ctx.t.video.videoDriverSaved);
 }
 
-// ── HEYGEN_AVATAR_PHOTO state: capture photo and synchronously upload as HeyGen asset ──
+// ── HEYGEN_AVATAR_PHOTO state: capture photo, persist to S3, enqueue worker ──
 
 export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
@@ -1195,24 +1197,25 @@ export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
   const tgUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
 
   const userId = ctx.user.id;
+  const chatId = ctx.chat?.id ?? Number(userId);
 
-  // Fetch image buffer
+  // Fetch original image to (a) detect content-type and (b) build a thumbnail.
   const imgRes = await fetch(tgUrl);
   if (!imgRes.ok) throw new Error(`Failed to fetch avatar photo from Telegram: ${imgRes.status}`);
   const imageBuffer = Buffer.from(await imgRes.arrayBuffer());
-  // Telegram photo downloads often return application/octet-stream;
-  // for compressed photos mimeHint is undefined — default to image/jpeg.
   const contentType =
     mimeHint ??
     (imgRes.headers.get("content-type")?.startsWith("image/")
       ? imgRes.headers.get("content-type")!
       : "image/jpeg");
 
-  // Upload directly to HeyGen asset storage — synchronous, no worker needed
-  const adapter = new HeyGenAvatarAdapter();
-  const { externalId } = await adapter.create(imageBuffer, contentType);
+  // Persist original to S3 so the worker can fetch it via presigned URL.
+  const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+  const s3Key = `avatar_photo/${userId.toString()}/${file.file_id}.${ext}`;
+  const uploadedKey = await s3Service.uploadBuffer(s3Key, imageBuffer, contentType);
+  if (!uploadedKey) throw new Error("Failed to upload avatar source to S3");
 
-  // Generate thumbnail and upload to S3 — store S3 key, not presigned URL
+  // Thumbnail (best-effort, used as preview).
   let previewUrl: string | undefined;
   const thumbBuffer = await s3Service.generateThumbnail(imageBuffer, contentType).catch(() => null);
   if (thumbBuffer) {
@@ -1220,21 +1223,28 @@ export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
     const uploadedThumbKey = await s3Service
       .uploadBuffer(thumbKey, thumbBuffer, "image/webp")
       .catch(() => null);
-    if (uploadedThumbKey) {
-      previewUrl = uploadedThumbKey; // resolved to fresh URL at serve time
-    }
+    if (uploadedThumbKey) previewUrl = uploadedThumbKey;
   }
 
-  // Persist UserAvatar record (status ready immediately)
-  await userAvatarService.create(userId, {
+  // Create UserAvatar in `creating` state — worker will fill in externalId + providerKeyId.
+  const avatar = await userAvatarService.create(userId, {
     provider: "heygen",
     name: ctx.t.video.myAvatarDefaultName,
-    externalId,
-    status: "ready",
+    externalId: undefined,
+    status: "creating",
     previewUrl,
   });
 
-  // Send the section reply keyboard so the user can immediately interact.
+  await getAvatarQueue().add("create", {
+    userAvatarId: avatar.id,
+    userId: userId.toString(),
+    provider: "heygen",
+    action: "create",
+    s3Key: uploadedKey,
+    telegramChatId: chatId,
+  });
+
+  // Show the section reply keyboard immediately; ready message arrives async from worker.
   const webappUrl = config.bot.webappUrl;
   const token = webappUrl ? generateWebToken(userId, config.bot.token) : "";
   const managementBtn = webappUrl
@@ -1244,7 +1254,7 @@ export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
       }
     : { text: ctx.t.video.management };
 
-  await ctx.reply(ctx.t.video.avatarReady, {
+  await ctx.reply(ctx.t.video.avatarCreationStarted, {
     reply_markup: {
       keyboard: [
         [{ text: ctx.t.video.newDialog }],
@@ -1258,8 +1268,6 @@ export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
   });
 
   // Auto-activate HeyGen so the user can immediately submit a prompt.
-  // If HeyGen is already the active model, just switch state to VIDEO_ACTIVE
-  // without re-sending the model intro + hint.
   const currentState = await userStateService.get(userId);
   if (currentState?.videoModelId === "heygen" || currentState?.state !== "VIDEO_ACTIVE") {
     await activateVideoModel(ctx, "heygen");

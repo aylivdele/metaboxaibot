@@ -10,6 +10,7 @@ import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
 import { config, encryptSecret, maskKey, decryptSecret } from "@metabox/shared";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
+import { extractWebUserFromRequest } from "../middlewares/web-auth.js";
 import { invalidatePoolCache, getKeyStats } from "../services/key-pool.service.js";
 import { clearKeyThrottle } from "../services/throttle.service.js";
 import { envKeyForProvider } from "../ai/key-provider.js";
@@ -115,14 +116,30 @@ export async function adminKeysRoutes(fastify: FastifyInstance): Promise<void> {
     const provided = request.headers["x-admin-secret"];
     if (secret && provided === secret) return;
 
-    try {
-      await telegramAuthHook(request, reply);
-    } catch {
-      await reply.status(403).send({ error: "Forbidden" });
+    const authHeader = request.headers.authorization ?? "";
+    let userId: bigint | null = null;
+
+    if (authHeader.startsWith("Bearer ")) {
+      const webUser = await extractWebUserFromRequest(request);
+      if (!webUser || webUser.aibUserId === null) {
+        await reply.status(401).send({ error: "Unauthorized" });
+        return;
+      }
+      userId = webUser.aibUserId;
+    } else if (authHeader.startsWith("tma ") || authHeader.startsWith("wtoken ")) {
+      try {
+        await telegramAuthHook(request, reply);
+      } catch {
+        await reply.status(403).send({ error: "Forbidden" });
+        return;
+      }
+      userId = (request as unknown as AuthRequest).userId ?? null;
+      if (userId === null) return;
+    } else {
+      await reply.status(401).send({ error: "Unauthorized" });
       return;
     }
 
-    const { userId } = request as unknown as AuthRequest;
     const user = await db.user.findUnique({
       where: { id: userId },
       select: { role: true },

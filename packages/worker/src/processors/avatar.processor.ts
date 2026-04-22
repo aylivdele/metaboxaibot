@@ -292,6 +292,22 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         submit: () => adapter.create(imgBuffer, contentType),
       });
 
+      // HeyGen asset upload is synchronous — mark ready immediately, skip poll.
+      if (provider === "heygen") {
+        await userAvatarService.updateStatus(userAvatarId, {
+          status: "ready",
+          externalId,
+          providerKeyId: acquired.keyId,
+        });
+        const userLang = (await db.user
+          .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
+          .then((u) => u?.language ?? "en")) as Language;
+        const t = getT(userLang);
+        await telegram.sendMessage(telegramChatId, t.video.avatarReady).catch(() => void 0);
+        logger.info({ userAvatarId, externalId, keyId: acquired.keyId }, "HeyGen avatar ready");
+        return;
+      }
+
       await userAvatarService.updateStatus(userAvatarId, {
         status: "creating",
         externalId,
@@ -317,14 +333,13 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         );
         return;
       }
+      const userLang = (await db.user
+        .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
+        .then((u) => u?.language ?? "en")) as Language;
+      const t = getT(userLang);
       if (isRateLimitLongWindowError(err)) {
         await userAvatarService.updateStatus(userAvatarId, { status: "failed" });
-        await telegram
-          .sendMessage(
-            telegramChatId,
-            "❌ Аватары временно недоступны из-за лимитов провайдера. Попробуйте позже.",
-          )
-          .catch(() => void 0);
+        await telegram.sendMessage(telegramChatId, t.video.avatarFailed).catch(() => void 0);
         return;
       }
       if (
@@ -341,9 +356,7 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
       logger.error({ userAvatarId, err }, "Avatar creation failed");
       await userAvatarService.updateStatus(userAvatarId, { status: "failed" });
       await notifyTechError(err, { jobId: userAvatarId, section: "avatar", modelId: provider });
-      await telegram
-        .sendMessage(telegramChatId, "❌ Не удалось создать аватар. Попробуйте снова.")
-        .catch(() => void 0);
+      await telegram.sendMessage(telegramChatId, t.video.avatarFailed).catch(() => void 0);
     }
     return;
   }
@@ -356,6 +369,11 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         return;
       }
 
+      const userLang = (await db.user
+        .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
+        .then((u) => u?.language ?? "en")) as Language;
+      const t = getT(userLang);
+
       // Sticky-key poll. Если ключ удалён → markOrphaned + ошибка пользователю.
       let acquired: AcquiredKey;
       try {
@@ -366,12 +384,7 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
           "Avatar poll: owning key gone, marking avatar orphaned",
         );
         await userAvatarService.markOrphaned(userAvatarId);
-        await telegram
-          .sendMessage(
-            telegramChatId,
-            "❌ Этот аватар больше недоступен (удалён ключ провайдера). Создайте новый.",
-          )
-          .catch(() => void 0);
+        await telegram.sendMessage(telegramChatId, t.video.avatarFailed).catch(() => void 0);
         return;
       }
       const adapter = buildHeyGenAdapter(acquired);
@@ -385,21 +398,14 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
           externalId: result.talkingPhotoId ?? undefined,
           previewUrl: result.previewUrl,
         });
-        await telegram
-          .sendMessage(
-            telegramChatId,
-            "✅ Ваш аватар готов! Откройте настройки HeyGen и выберите его для генерации видео.",
-          )
-          .catch(() => void 0);
+        await telegram.sendMessage(telegramChatId, t.video.avatarReady).catch(() => void 0);
         logger.info({ userAvatarId }, "Avatar ready");
         return;
       }
 
       if (result.status === "failed") {
         await userAvatarService.updateStatus(userAvatarId, { status: "failed" });
-        await telegram
-          .sendMessage(telegramChatId, "❌ Не удалось создать аватар. Попробуйте снова.")
-          .catch(() => void 0);
+        await telegram.sendMessage(telegramChatId, t.video.avatarFailed).catch(() => void 0);
         logger.warn({ userAvatarId }, "Avatar processing failed");
         return;
       }
@@ -408,12 +414,7 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
       const nextAttempt = pollAttempt + 1;
       if (nextAttempt >= MAX_POLL_ATTEMPTS) {
         await userAvatarService.updateStatus(userAvatarId, { status: "failed" });
-        await telegram
-          .sendMessage(
-            telegramChatId,
-            "❌ Аватар не был создан в отведённое время. Попробуйте снова.",
-          )
-          .catch(() => void 0);
+        await telegram.sendMessage(telegramChatId, t.video.avatarFailed).catch(() => void 0);
         logger.warn({ userAvatarId }, "Avatar poll timed out");
         return;
       }
