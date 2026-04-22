@@ -38,6 +38,7 @@ import {
   trackDistribution,
   consumeDistribution,
   buildOverflowMessage,
+  buildSlotUploadedMessage,
 } from "../utils/media-input-state.js";
 
 // ── Random design pending messages (Russian) ────────────────────────────────
@@ -664,6 +665,17 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     const targetSlot = pickAutoSlot(model.mediaInputs!, current, "image");
     if (targetSlot) {
       await userStateService.addMediaInput(userId, modelId, targetSlot.slotKey, tgSlotValue);
+      debounceSlotReply(
+        userId,
+        mediaGroupId,
+        async () => {
+          const fresh = await userStateService.getMediaInputs(userId, modelId);
+          const count = fresh[targetSlot.slotKey]?.length ?? 0;
+          if (count === 0) return;
+          await ctx.reply(buildSlotUploadedMessage(targetSlot, count, ctx.t));
+        },
+        targetSlot.slotKey,
+      );
     }
     trackDistribution(userId, mediaGroupId, {
       overflow: !targetSlot,

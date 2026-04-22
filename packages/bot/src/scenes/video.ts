@@ -46,6 +46,7 @@ import {
   trackDistribution,
   consumeDistribution,
   buildOverflowMessage,
+  buildSlotUploadedMessage,
 } from "../utils/media-input-state.js";
 import {
   SOUL_MAX_PHOTOS,
@@ -916,6 +917,17 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     const targetSlot = pickAutoSlot(model.mediaInputs!, current, "image");
     if (targetSlot) {
       await userStateService.addMediaInput(userId, modelId, targetSlot.slotKey, tgSlotValue);
+      debounceSlotReply(
+        userId,
+        mediaGroupId,
+        async () => {
+          const fresh = await userStateService.getMediaInputs(userId, modelId);
+          const count = fresh[targetSlot.slotKey]?.length ?? 0;
+          if (count === 0) return;
+          await ctx.reply(buildSlotUploadedMessage(targetSlot, count, ctx.t));
+        },
+        targetSlot.slotKey,
+      );
     }
     trackDistribution(userId, mediaGroupId, {
       overflow: !targetSlot,
@@ -1076,59 +1088,53 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
         return;
       }
     }
+    const userId = ctx.user.id;
+    const mediaGroupId = ctx.message?.media_group_id;
     if (slot?.mode === "reference_element") {
-      await userStateService.clearMediaInputSlot(ctx.user.id, slotModelId, activeSlot.slotKey);
-      await userStateService.addMediaInput(
-        ctx.user.id,
-        slotModelId,
-        activeSlot.slotKey,
-        tgSlotValue,
-      );
-      clearActiveSlot(ctx.user.id);
-      await sendVideoMediaInputStatus(ctx);
+      await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
+      await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
+      debounceSlotReply(userId, mediaGroupId, async () => {
+        clearActiveSlot(userId);
+        await sendVideoMediaInputStatus(ctx);
+      });
       return;
     }
     if (slot?.mode === "first_clip" || slot?.mode === "motion_video") {
-      await userStateService.clearMediaInputSlot(ctx.user.id, slotModelId, activeSlot.slotKey);
-      await userStateService.addMediaInput(
-        ctx.user.id,
-        slotModelId,
-        activeSlot.slotKey,
-        tgSlotValue,
-      );
-      clearActiveSlot(ctx.user.id);
-      await sendVideoMediaInputStatus(ctx);
+      await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
+      await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
+      debounceSlotReply(userId, mediaGroupId, async () => {
+        clearActiveSlot(userId);
+        await sendVideoMediaInputStatus(ctx);
+      });
       return;
     }
     if (slot?.mode === "reference_video") {
-      const current = await userStateService.getMediaInputs(ctx.user.id, slotModelId);
+      const current = await userStateService.getMediaInputs(userId, slotModelId);
       const existing = current[activeSlot.slotKey] ?? [];
       if (existing.length >= activeSlot.maxImages) {
-        await userStateService.clearMediaInputSlot(ctx.user.id, slotModelId, activeSlot.slotKey);
+        await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
       }
-      await userStateService.addMediaInput(
-        ctx.user.id,
-        slotModelId,
-        activeSlot.slotKey,
-        tgSlotValue,
-      );
-      const updatedCount = Math.min(existing.length + 1, activeSlot.maxImages);
-      if (updatedCount >= activeSlot.maxImages) {
-        clearActiveSlot(ctx.user.id);
-        await sendVideoMediaInputStatus(ctx);
-      } else {
-        const kb = new InlineKeyboard().text(
-          ctx.t.mediaInput.doneUploading,
-          `mi_done:${activeSlot.slotKey}`,
-        );
-        const label =
-          ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
-        const m = ctx.t.mediaInput.imageSaved
-          .replace("{slot}", String(label))
-          .replace("{n}", String(updatedCount))
-          .replace("{max}", String(activeSlot.maxImages));
-        await ctx.reply(m, { reply_markup: kb });
-      }
+      await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
+      debounceSlotReply(userId, mediaGroupId, async () => {
+        const freshInputs = await userStateService.getMediaInputs(userId, slotModelId);
+        const freshCount = freshInputs[activeSlot.slotKey]?.length ?? 0;
+        if (freshCount >= activeSlot.maxImages) {
+          clearActiveSlot(userId);
+          await sendVideoMediaInputStatus(ctx);
+        } else {
+          const kb = new InlineKeyboard().text(
+            ctx.t.mediaInput.doneUploading,
+            `mi_done:${activeSlot.slotKey}`,
+          );
+          const label =
+            ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+          const m = ctx.t.mediaInput.imageSaved
+            .replace("{slot}", String(label))
+            .replace("{n}", String(freshCount))
+            .replace("{max}", String(activeSlot.maxImages));
+          await ctx.reply(m, { reply_markup: kb });
+        }
+      });
       return;
     }
   }
@@ -1145,6 +1151,17 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
     const targetSlot = pickAutoSlot(model.mediaInputs, current, "video");
     if (targetSlot) {
       await userStateService.addMediaInput(userId, modelId, targetSlot.slotKey, tgSlotValue);
+      debounceSlotReply(
+        userId,
+        mediaGroupId,
+        async () => {
+          const fresh = await userStateService.getMediaInputs(userId, modelId);
+          const count = fresh[targetSlot.slotKey]?.length ?? 0;
+          if (count === 0) return;
+          await ctx.reply(buildSlotUploadedMessage(targetSlot, count, ctx.t));
+        },
+        targetSlot.slotKey,
+      );
     }
     trackDistribution(userId, mediaGroupId, {
       overflow: !targetSlot,

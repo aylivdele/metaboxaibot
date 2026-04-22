@@ -288,6 +288,27 @@ export function buildOverflowMessage(model: AIModel, t: Translations): string {
 }
 
 /**
+ * Builds the per-slot "uploaded" toast shown after auto-distribution settles.
+ * Single-image slots get "✅ {slot} uploaded"; multi-image slots get the
+ * counted "✅ {slot}: {n}/{max} saved" form.
+ */
+export function buildSlotUploadedMessage(
+  slot: MediaInputSlot,
+  count: number,
+  t: Translations,
+): string {
+  const label = String(t.mediaInput[slot.labelKey as keyof typeof t.mediaInput] ?? slot.labelKey);
+  const max = slot.maxImages ?? 1;
+  if (max === 1) {
+    return t.mediaInput.imageSavedSingle.replace("{slot}", label);
+  }
+  return t.mediaInput.imageSaved
+    .replace("{slot}", label)
+    .replace("{n}", String(count))
+    .replace("{max}", String(max));
+}
+
+/**
  * Builds an inline keyboard showing current media input slot status + a text line.
  * Filled slots: "✅ {label}" with remove callback.
  * Empty slots: "🖼 {label} (optional/required)" with upload callback.
@@ -373,23 +394,26 @@ export function buildMediaInputStatusMenu(
 }
 
 /**
- * Debounce reply when receiving a media group into a slot.
- * Each photo in the group saves immediately, but the status reply is delayed.
- * Only the last callback (after no more photos arrive within 500ms) fires.
- * For non-group messages, the callback executes immediately.
+ * Debounce reply when receiving media into a slot. Each upload saves
+ * immediately, but the reply is delayed: only the last callback (after no
+ * more uploads arrive within the window) fires. Albums use `mediaGroupId`
+ * as the key; individually-sent files fall back to a per-user key, so
+ * rapid sequential uploads also coalesce.
+ *
+ * `scope` further partitions the timer (e.g. by slotKey for per-slot
+ * "uploaded" messages, since one media group can fill multiple slots and
+ * each needs its own debounced reply).
  */
 const slotReplyTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const SLOT_REPLY_DEBOUNCE_MS = 500;
 
 export function debounceSlotReply(
   userId: bigint,
   mediaGroupId: string | undefined,
   callback: () => Promise<void>,
+  scope?: string,
 ): void {
-  if (!mediaGroupId) {
-    void callback();
-    return;
-  }
-  const key = `${userId}__${mediaGroupId}`;
+  const key = `${userId}__${mediaGroupId ?? "single"}${scope ? `__${scope}` : ""}`;
   const existing = slotReplyTimers.get(key);
   if (existing) clearTimeout(existing);
   slotReplyTimers.set(
@@ -397,7 +421,7 @@ export function debounceSlotReply(
     setTimeout(() => {
       slotReplyTimers.delete(key);
       void callback();
-    }, 500),
+    }, SLOT_REPLY_DEBOUNCE_MS),
   );
 }
 
