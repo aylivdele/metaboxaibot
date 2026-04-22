@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import {
   AI_MODELS,
   MODEL_FAMILIES,
@@ -14,7 +14,7 @@ import { calculateCost } from "../services/token.service.js";
 import { db } from "../db.js";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 
-type AuthRequestM = import("fastify").FastifyRequest & { userId: bigint };
+type AuthRequestM = FastifyRequest & { userId: bigint };
 
 /** Typical message size used for LLM cost estimation */
 const TYPICAL_INPUT_TOKENS = 500;
