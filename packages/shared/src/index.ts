@@ -15,6 +15,7 @@ export type {
   MediaInputMode,
   MediaInputSlot,
   MediaInputConstraints,
+  ModelMode,
   ModelFamily,
   ModelFamilyMember,
   ModelSettingDef,
@@ -50,6 +51,15 @@ export type { Config } from "./config.js";
 
 // Crypto: симметричное шифрование секретов (provider keys, proxy passwords)
 export { encryptSecret, decryptSecret, maskKey } from "./crypto/secret-vault.js";
+
+// Model modes: per-model operation modes (t2v / i2v / r2v) and slot filtering
+export {
+  getResolvedModes,
+  defaultModeId,
+  resolveActiveMode,
+  getActiveSlots,
+  isKnownModeId,
+} from "./utils/model-modes.js";
 
 // i18n
 export { getT, preloadLocales, buildDialogHint, buildResultCaption } from "./i18n/index.js";

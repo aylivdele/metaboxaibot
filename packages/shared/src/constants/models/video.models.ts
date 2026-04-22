@@ -1,4 +1,4 @@
-import type { AIModel, MediaInputSlot, ModelSettingDef } from "../../types/ai.js";
+import type { AIModel, MediaInputSlot, ModelMode, ModelSettingDef } from "../../types/ai.js";
 import { mkAspectRatio, mkDurationSelect, mkDurationSlider } from "./_helpers.js";
 
 const MI_FIRST_FRAME: MediaInputSlot = {
@@ -140,6 +140,82 @@ const MI_GROK_IMAGINE_REFS: MediaInputSlot = {
   labelKey: "referenceImages",
   maxImages: 7,
 };
+
+// ── Mode definitions per model ────────────────────────────────────────────
+//
+// A model with `modes` always shows a mode picker after activation. Slots are
+// then filtered to only those listed in `slotKeys`. When `requiredSlotKeys` is
+// set, it overrides each slot's intrinsic `required` flag for this mode (lets
+// the same slot be required in one mode and optional in another).
+
+const SEEDANCE_MODES: ModelMode[] = [
+  { id: "t2v", labelKey: "t2v", slotKeys: [], textOnly: true, default: true },
+  {
+    id: "i2v",
+    labelKey: "i2v",
+    slotKeys: ["first_frame", "last_frame"],
+    requiredSlotKeys: ["first_frame"],
+  },
+  {
+    id: "r2v",
+    labelKey: "r2v",
+    slotKeys: ["ref_images", "ref_videos", "ref_audios"],
+  },
+];
+
+/** Seedance 2.0 Fast — same as standard but no last_frame slot in i2v. */
+const SEEDANCE_FAST_MODES: ModelMode[] = [
+  { id: "t2v", labelKey: "t2v", slotKeys: [], textOnly: true, default: true },
+  {
+    id: "i2v",
+    labelKey: "i2v",
+    slotKeys: ["first_frame"],
+    requiredSlotKeys: ["first_frame"],
+  },
+  {
+    id: "r2v",
+    labelKey: "r2v",
+    slotKeys: ["ref_images", "ref_videos", "ref_audios"],
+  },
+];
+
+const VEO_MODES: ModelMode[] = [
+  { id: "t2v", labelKey: "t2v", slotKeys: [], textOnly: true, default: true },
+  {
+    id: "i2v",
+    labelKey: "i2v",
+    slotKeys: ["first_frame", "last_frame"],
+    requiredSlotKeys: ["first_frame"],
+  },
+  {
+    id: "r2v",
+    labelKey: "r2v",
+    slotKeys: ["reference"],
+    requiredSlotKeys: ["reference"],
+  },
+];
+
+/**
+ * Wan 2.7 supports two distinct image-driven modes per provider docs:
+ *  - i2v: starts from a still frame, optional last_frame and driving_audio.
+ *  - clipExtend: continues from an existing short video, optional last_frame.
+ * The two are mutually exclusive in the provider API, hence separate modes.
+ */
+const WAN_MODES: ModelMode[] = [
+  { id: "t2v", labelKey: "t2v", slotKeys: [], textOnly: true, default: true },
+  {
+    id: "i2v",
+    labelKey: "i2v",
+    slotKeys: ["first_frame", "last_frame", "driving_audio"],
+    requiredSlotKeys: ["first_frame"],
+  },
+  {
+    id: "clipExtend",
+    labelKey: "clipExtend",
+    slotKeys: ["first_clip", "last_frame"],
+    requiredSlotKeys: ["first_clip"],
+  },
+];
 
 const KLING_SETTINGS: ModelSettingDef[] = [
   mkAspectRatio(["16:9", "9:16", "1:1"]),
@@ -317,6 +393,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       MI_REF_VIDEOS,
       MI_REF_AUDIOS,
     ],
+    modes: SEEDANCE_MODES,
     supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
     durationRange: { min: 4, max: 15 },
     settings: [
@@ -376,6 +453,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     mediaInputs: [MI_SEEDANCE_FIRST_FRAME, MI_REF_IMAGES, MI_REF_VIDEOS, MI_REF_AUDIOS],
+    modes: SEEDANCE_FAST_MODES,
     supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
     durationRange: { min: 4, max: 15 },
     settings: [
@@ -580,6 +658,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     outputCostUsdPerMToken: 0,
     supportsImages: true,
     mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
+    modes: VEO_MODES,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -669,6 +748,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     outputCostUsdPerMToken: 0,
     supportsImages: true,
     mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
+    modes: VEO_MODES,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -1273,6 +1353,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     outputCostUsdPerMToken: 0,
     supportsImages: true,
     mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_DRIVING_AUDIO, MI_FIRST_CLIP],
+    modes: WAN_MODES,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,

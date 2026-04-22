@@ -379,6 +379,18 @@ export interface Translations {
     refineVideo: string;
     refineSaved: string;
   };
+  modelModes: {
+    pickerTitle: string;
+    activated: string;
+    activatedTextOnly: string;
+    t2v: string;
+    t2i: string;
+    i2v: string;
+    i2i: string;
+    r2v: string;
+    r2i: string;
+    clipExtend: string;
+  };
   linkMetabox: {
     title: string;
     subtitle: string;

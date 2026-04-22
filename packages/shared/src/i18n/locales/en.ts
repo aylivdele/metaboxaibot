@@ -492,6 +492,18 @@ export default {
     refineVideo: "🎥 Video",
     refineSaved: "✅ Image loaded into «{slot}».",
   },
+  modelModes: {
+    pickerTitle: "Choose mode:",
+    activated: "Mode «{mode}» activated.",
+    activatedTextOnly: "Mode «{mode}» activated. Send a text prompt to start generation.",
+    t2v: "Text → video",
+    t2i: "Text → image",
+    i2v: "Image → video",
+    i2i: "Image → image",
+    r2v: "References → video",
+    r2i: "References → image",
+    clipExtend: "Clip extend",
+  },
   linkMetabox: {
     title: "Metabox Learning",
     subtitle: "Link your Metabox account to access the learning section.",

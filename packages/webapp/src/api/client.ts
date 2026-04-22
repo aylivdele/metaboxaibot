@@ -169,6 +169,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ section, modelId }),
       }),
+    setSelectedMode: (modelId: string, modeId: string) =>
+      request<{ success: boolean }>("/state/selected-mode", {
+        method: "POST",
+        body: JSON.stringify({ modelId, modeId }),
+      }),
   },
 
   models: {

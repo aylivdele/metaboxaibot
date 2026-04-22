@@ -12,8 +12,10 @@ interface StandaloneCardProps {
   isActive: boolean;
   savedId: string | null;
   allModelSettings: Record<string, Record<string, unknown>>;
+  selectedModeId?: string;
   onActivate: (modelId: string) => Promise<void>;
   onSettingChange: (key: string, value: unknown) => void;
+  onModeChange?: (modeId: string) => void;
   onReset: (modelId: string) => void;
 }
 
@@ -22,8 +24,10 @@ export function StandaloneCard({
   isActive,
   savedId,
   allModelSettings,
+  selectedModeId,
   onActivate,
   onSettingChange,
+  onModeChange,
   onReset,
 }: StandaloneCardProps) {
   const { t, locale } = useI18n();
@@ -56,6 +60,25 @@ export function StandaloneCard({
             modelT?.description ??
             model.description}
         </p>
+      )}
+      {model.modes && model.modes.length > 0 && (
+        <div className="family-card__row">
+          <span className="family-card__row-label">{t("modelModes.label")}</span>
+          <div className="image-settings-ratios">
+            {model.modes.map((m) => {
+              const active = selectedModeId === m.id || (!selectedModeId && m.default);
+              return (
+                <button
+                  key={m.id}
+                  className={`ratio-btn${active ? " ratio-btn--active" : ""}`}
+                  onClick={() => onModeChange?.(m.id)}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
       {model.settings.length > 0 && (
         <div className="family-card__row family-card__row--settings">

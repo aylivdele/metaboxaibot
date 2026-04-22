@@ -4,21 +4,41 @@ import {
   MODEL_FAMILIES,
   MODELS_BY_SECTION,
   config,
+  getResolvedModes,
+  defaultModeId,
+  getT,
   type AIModel,
+  type Language,
 } from "@metabox/shared";
 import { calculateCost } from "../services/token.service.js";
+import { db } from "../db.js";
+import { telegramAuthHook } from "../middlewares/telegram-auth.js";
+
+type AuthRequestM = import("fastify").FastifyRequest & { userId: bigint };
 
 /** Typical message size used for LLM cost estimation */
 const TYPICAL_INPUT_TOKENS = 500;
 const TYPICAL_OUTPUT_TOKENS = 500;
 
-function serializeModel(m: AIModel) {
+function serializeModel(m: AIModel, lang: Language) {
   const isLLM = m.inputCostUsdPerMToken > 0;
   const isPerMPixel = (m.costUsdPerMPixel ?? 0) > 0;
   const isPerMVideoToken = (m.costUsdPerMVideoToken ?? 0) > 0;
   const isPerSecond = (m.costUsdPerSecond ?? 0) > 0;
   const isPerKChar = m.costUsdPerKChar !== undefined;
+  const t = getT(lang);
+  const resolvedModes = getResolvedModes(m);
+  const modes = resolvedModes
+    ? resolvedModes.map((mode) => ({
+        id: mode.id,
+        label: String((t.modelModes as Record<string, string>)[mode.labelKey] ?? mode.labelKey),
+        textOnly: mode.textOnly ?? false,
+        default: mode.id === defaultModeId(resolvedModes),
+      }))
+    : null;
   return {
+    /** Operation modes (e.g. t2v, i2v, r2v) — null if model has no modes. */
+    modes,
     /** Family id this model belongs to, null for standalone models. */
     familyId: m.familyId ?? null,
     /** Display name of the family (includes emoji), null for standalone models. */
@@ -130,12 +150,17 @@ function serializeModel(m: AIModel) {
 }
 
 export const modelsRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.addHook("preHandler", telegramAuthHook);
+
   /** GET /models?section=gpt — list all models or filter by section */
   fastify.get<{ Querystring: { section?: string } }>("/models", async (request) => {
+    const { userId } = request as AuthRequestM;
     const { section } = request.query;
+    const user = await db.user.findUnique({ where: { id: userId }, select: { language: true } });
+    const lang = (user?.language ?? "en") as Language;
 
     const models = section ? (MODELS_BY_SECTION[section] ?? []) : Object.values(AI_MODELS);
 
-    return models.map(serializeModel);
+    return models.map((m) => serializeModel(m, lang));
   });
 };

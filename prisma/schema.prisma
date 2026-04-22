@@ -93,6 +93,10 @@ model UserState {
   // "soul_creation" (file_id без TTL, resolve → S3 на submit).
   mediaInputs Json?
 
+  // Выбранный режим работы модели: { [modelId]: modeId } — например { "veo": "i2v" }.
+  // Независим для каждой модели, влияет на набор показанных media-слотов.
+  selectedModes Json?
+
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

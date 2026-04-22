@@ -54,6 +54,7 @@ export function MediaSettingsView({
   const [stateStr, setState] = useState<string | undefined>();
   const [selectedPickerId, setSelectedPickerId] = useState<string>("");
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [selectedModes, setSelectedModes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [activatedPopup, setActivatedPopup] = useState(false);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -65,6 +66,7 @@ export function MediaSettingsView({
       .then(([ms, state, ms2]) => {
         setModels(ms);
         setAllModelSettings(ms2);
+        setSelectedModes(state.selectedModes ?? {});
         const fromSection = (state[SECTION_ACTIVE_KEY[section]] as string | null) ?? undefined;
         // activeModelId always reflects the real bot state
         const activeId = fromSection && ms.some((m) => m.id === fromSection) ? fromSection : "";
@@ -139,6 +141,11 @@ export function MediaSettingsView({
     }, 800);
   };
 
+  const handleModeChange = (modelId: string, modeId: string) => {
+    setSelectedModes((prev) => ({ ...prev, [modelId]: modeId }));
+    void api.state.setSelectedMode(modelId, modeId);
+  };
+
   const handleReset = (modelId: string) => {
     const model = models.find((m) => m.id === modelId);
     if (!model) return;
@@ -192,8 +199,10 @@ export function MediaSettingsView({
           activeState={stateStr}
           savedId={savedId}
           allModelSettings={allModelSettings}
+          selectedModes={selectedModes}
           onModelActivate={handleModelActivate}
           onSettingChange={(modelId, key, val) => handleSettingChange(modelId, key, val)}
+          onModeChange={handleModeChange}
           onReset={handleReset}
         />
       )}
@@ -207,8 +216,10 @@ export function MediaSettingsView({
           }
           savedId={savedId}
           allModelSettings={allModelSettings}
+          selectedModeId={selectedModes[standaloneModel.id]}
           onActivate={handleModelActivate}
           onSettingChange={(key, val) => handleSettingChange(standaloneModel.id, key, val)}
+          onModeChange={(modeId) => handleModeChange(standaloneModel.id, modeId)}
           onReset={handleReset}
         />
       )}

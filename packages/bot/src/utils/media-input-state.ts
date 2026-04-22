@@ -1,4 +1,6 @@
 import type { Section, AIModel, MediaInputSlot, Translations } from "@metabox/shared";
+import { AI_MODELS, getActiveSlots, getResolvedModes } from "@metabox/shared";
+import { userStateService } from "@metabox/api/services";
 import { config, UserFacingError } from "@metabox/shared";
 import { InlineKeyboard, InputFile } from "grammy";
 import type { Context } from "grammy";
@@ -285,6 +287,81 @@ export function buildOverflowMessage(model: AIModel, t: Translations): string {
     .replace("{modelName}", model.name)
     .replace("{totalMax}", String(totalMax))
     .replace("{breakdown}", lines.join("\n"));
+}
+
+/**
+ * Returns the slots active for the user's currently-selected mode on the
+ * given model. For models without `modes` defined, returns all `mediaInputs`
+ * unchanged. Centralizes the (load model + load saved mode + filter) chain so
+ * scene handlers don't have to repeat it.
+ */
+export async function getActiveModelSlots(
+  userId: bigint,
+  modelId: string,
+): Promise<MediaInputSlot[]> {
+  const model = AI_MODELS[modelId];
+  if (!model?.mediaInputs?.length) return [];
+  const modes = getResolvedModes(model);
+  if (!modes) return model.mediaInputs;
+  const savedModeId = await userStateService.getSelectedMode(userId, modelId);
+  return getActiveSlots(model, savedModeId);
+}
+
+/**
+ * Returns the first slot that's required-but-missing for this model, or null
+ * if all required inputs are present.
+ *
+ * Beyond the intrinsic `slot.required` flag, this also enforces conditional
+ * requirements: for kling/kling-pro the `first_frame` slot becomes required
+ * whenever any `ref_element_*` is filled (KIE's @element references can only
+ * be resolved against an explicit first frame).
+ */
+export function findMissingRequiredSlot(
+  modelId: string,
+  activeSlots: MediaInputSlot[],
+  filledInputs: Record<string, string[]>,
+): MediaInputSlot | null {
+  for (const slot of activeSlots) {
+    if (slot.required && !filledInputs[slot.slotKey]?.length) return slot;
+  }
+  if (modelId === "kling" || modelId === "kling-pro") {
+    const anyRefFilled = Object.entries(filledInputs).some(
+      ([key, vals]) => key.startsWith("ref_element_") && vals?.length,
+    );
+    if (anyRefFilled && !filledInputs["first_frame"]?.length) {
+      const firstFrameSlot = activeSlots.find((s) => s.slotKey === "first_frame");
+      if (firstFrameSlot) return { ...firstFrameSlot, required: true };
+    }
+  }
+  return null;
+}
+
+/**
+ * Builds the inline keyboard for the mode picker (one button per mode, two
+ * per row). Callback data: `mode:<section>:<modelId>:<modeId>`.
+ *
+ * Returned alongside the message body so callers can attach their own
+ * additional buttons (e.g. management web-app) before sending.
+ */
+export function buildModePickerMenu(
+  modes: readonly { id: string; labelKey: string }[],
+  section: string,
+  modelId: string,
+  t: Translations,
+): { text: string; kb: InlineKeyboard } {
+  const kb = new InlineKeyboard();
+  for (let i = 0; i < modes.length; i += 2) {
+    const a = modes[i];
+    const labelA = String(t.modelModes[a.labelKey as keyof typeof t.modelModes] ?? a.labelKey);
+    kb.text(labelA, `mode:${section}:${modelId}:${a.id}`);
+    const b = modes[i + 1];
+    if (b) {
+      const labelB = String(t.modelModes[b.labelKey as keyof typeof t.modelModes] ?? b.labelKey);
+      kb.text(labelB, `mode:${section}:${modelId}:${b.id}`);
+    }
+    kb.row();
+  }
+  return { text: t.modelModes.pickerTitle, kb };
 }
 
 /**

@@ -171,6 +171,32 @@ export interface ModelFamily {
   members: ModelFamilyMember[];
 }
 
+/**
+ * One operation mode of a model (e.g. "t2v", "i2v", "r2v").
+ *
+ * Modes filter which `mediaInputs` slots are exposed to the user. A model with
+ * `modes` defined ALWAYS goes through a mode picker after activation; without
+ * `modes`, all `mediaInputs` are shown (legacy single-mode behavior).
+ *
+ * `requiredSlotKeys` overrides the intrinsic `slot.required` flag for this
+ * mode — e.g. a slot that is optional in one mode may be mandatory in another.
+ * If absent, the slot's own `required` value is used.
+ */
+export interface ModelMode {
+  /** Stable identifier persisted in user state, e.g. "t2v", "i2v", "r2v". */
+  id: string;
+  /** i18n key resolved against `t.modelModes.*` for the picker label. */
+  labelKey: string;
+  /** Slots from the model's `mediaInputs` that are active in this mode. */
+  slotKeys: string[];
+  /** Subset of `slotKeys` that are required to start generation in this mode. */
+  requiredSlotKeys?: string[];
+  /** Pure text-to-* mode with no media slots. Skips slot menu entirely. */
+  textOnly?: boolean;
+  /** Selected by default if the user has not chosen a mode yet. */
+  default?: boolean;
+}
+
 export interface AIModel {
   id: string;
   name: string;
@@ -210,6 +236,13 @@ export interface AIModel {
    * When absent, falls back to legacy single-image behavior based on supportsImages.
    */
   mediaInputs?: MediaInputSlot[];
+  /**
+   * Operation modes (e.g. text-to-video, image-to-video, reference-to-video).
+   * When defined, the bot/webapp asks the user to pick a mode after activation
+   * and only the slots referenced by that mode are shown / accepted.
+   * When absent, all `mediaInputs` are visible (legacy behavior).
+   */
+  modes?: ModelMode[];
   /**
    * Model accepts PDF documents natively via content blocks (OpenAI Responses `input_file`,
    * Anthropic `document`). When set, the chat service forwards attachment s3Keys to the

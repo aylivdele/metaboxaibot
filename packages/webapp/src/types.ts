@@ -224,6 +224,8 @@ export interface Model {
   tokenCostVariants?: { settingKey: string; map: Record<string, number> } | null;
   /** Additive token cost per setting value (costAddons). null if not applicable. */
   tokenCostAddons?: Array<{ settingKey: string; map: Record<string, number> }> | null;
+  /** Operation modes (e.g. t2v, i2v, r2v) — null when the model has only one implicit mode. */
+  modes?: Array<{ id: string; label: string; textOnly: boolean; default: boolean }> | null;
 }
 
 export interface UserState {
@@ -237,6 +239,8 @@ export interface UserState {
   designModelId: string | null;
   audioModelId: string | null;
   videoModelId: string | null;
+  /** Map of modelId → user-chosen modeId. Empty when no modes have been picked. */
+  selectedModes?: Record<string, string>;
 }
 
 export interface AdminUser {

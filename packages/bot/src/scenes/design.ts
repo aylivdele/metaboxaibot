@@ -19,6 +19,9 @@ import {
   UserFacingError,
   resolveUserFacingError,
   resolveModelDisplay,
+  getResolvedModes,
+  resolveActiveMode,
+  getActiveSlots,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -39,6 +42,9 @@ import {
   consumeDistribution,
   buildOverflowMessage,
   buildSlotUploadedMessage,
+  buildModePickerMenu,
+  getActiveModelSlots,
+  findMissingRequiredSlot,
 } from "../utils/media-input-state.js";
 
 // ── Random design pending messages (Russian) ────────────────────────────────
@@ -120,8 +126,10 @@ export async function activateDesignModel(
     const webappUrl = config.bot.webappUrl;
     const kb = new InlineKeyboard();
 
-    if (!options.suppressKeyboard) {
-      // Add media input slot buttons (with progressive element reveal)
+    const modes = getResolvedModes(model);
+
+    if (!options.suppressKeyboard && !modes) {
+      // Legacy single-mode behavior — slot keyboard goes on the description message.
       if (model.mediaInputs?.length) {
         const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
         const { kb: slotsKb } = buildMediaInputStatusMenu(
@@ -142,6 +150,10 @@ export async function activateDesignModel(
       if (webappUrl) {
         kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
       }
+    } else if (!options.suppressKeyboard && webappUrl && modes) {
+      // For modes-aware models, the slot menu lives on the mode-activation
+      // message — only attach the management webapp button to the description.
+      kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
     }
 
     const { name: modelName, description: modelDesc } = resolveModelDisplay(
@@ -175,9 +187,70 @@ export async function activateDesignModel(
     await ctx.reply(`🎨 ${modelName}\n\n${modelDesc}\n\n${costLine}\n\n${ctx.t.voice.inputHint}`, {
       reply_markup: replyMarkup,
     });
+
+    if (modes && !options.suppressKeyboard) {
+      const savedModeId = await userStateService.getSelectedMode(ctx.user.id, modelId);
+      const activeMode = resolveActiveMode(model, savedModeId);
+      if (savedModeId && activeMode) {
+        await sendDesignModeActivatedMessage(ctx, modelId, activeMode);
+      } else {
+        await sendDesignModePicker(ctx, modelId, modes);
+      }
+    }
   } else {
     await ctx.reply(`${ctx.t.design.modelActivated}\n\n${ctx.t.voice.inputHint}`);
   }
+}
+
+/** Send the design mode picker — one button per mode, two per row. */
+async function sendDesignModePicker(
+  ctx: BotContext,
+  modelId: string,
+  modes: readonly { id: string; labelKey: string }[],
+): Promise<void> {
+  const { text, kb } = buildModePickerMenu(modes, "design", modelId, ctx.t);
+  await ctx.reply(text, { reply_markup: kb });
+}
+
+/**
+ * Send the "mode activated" message for design models with modes, attaching
+ * a slot keyboard filtered to only the slots active in the chosen mode.
+ */
+async function sendDesignModeActivatedMessage(
+  ctx: BotContext,
+  modelId: string,
+  mode: { id: string; labelKey: string; textOnly?: boolean },
+): Promise<void> {
+  if (!ctx.user) return;
+  const model = AI_MODELS[modelId];
+  if (!model) return;
+  const modeLabel = String(
+    ctx.t.modelModes[mode.labelKey as keyof typeof ctx.t.modelModes] ?? mode.labelKey,
+  );
+  const webappUrl = config.bot.webappUrl;
+  const kb = new InlineKeyboard();
+
+  if (mode.textOnly) {
+    if (webappUrl) {
+      kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
+    }
+    const text = ctx.t.modelModes.activatedTextOnly.replace("{mode}", modeLabel);
+    await ctx.reply(text, { reply_markup: kb.inline_keyboard.length ? kb : undefined });
+    return;
+  }
+
+  const activeSlots = getActiveSlots(model, mode.id);
+  const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
+  const { kb: slotsKb } = buildMediaInputStatusMenu(activeSlots, filledInputs, "design", ctx.t, {
+    promptOptional: model.promptOptional,
+    promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
+  });
+  for (const row of slotsKb.inline_keyboard) kb.row(...row);
+  if (webappUrl) {
+    kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
+  }
+  const text = ctx.t.modelModes.activated.replace("{mode}", modeLabel);
+  await ctx.reply(text, { reply_markup: kb.inline_keyboard.length ? kb : undefined });
 }
 
 // ── Model selected via inline callback ───────────────────────────────────────
@@ -220,12 +293,13 @@ export async function sendDesignMediaInputStatus(
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
   const model = AI_MODELS[modelId];
-  if (!model?.mediaInputs?.length) return;
+  const activeModeSlots = await getActiveModelSlots(ctx.user.id, modelId);
+  if (!activeModeSlots.length) return;
 
   const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
-  const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "design", ctx.t, {
-    promptOptional: model.promptOptional,
-    promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
+  const { text, kb } = buildMediaInputStatusMenu(activeModeSlots, filledInputs, "design", ctx.t, {
+    promptOptional: model?.promptOptional,
+    promptOptionalRequiresMedia: model?.promptOptionalRequiresMedia,
   });
   const webappUrl = config.bot.webappUrl;
   if (webappUrl) {
@@ -275,8 +349,8 @@ export async function handleDesignMediaInput(ctx: BotContext): Promise<void> {
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
-  const model = AI_MODELS[modelId];
-  const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
+  const activeModeSlots = await getActiveModelSlots(ctx.user.id, modelId);
+  const slot = activeModeSlots.find((s) => s.slotKey === slotKey);
   if (!slot) return;
 
   const filled = await userStateService.getMediaInputs(ctx.user.id, modelId);
@@ -307,8 +381,8 @@ export async function handleDesignMediaInputCancel(ctx: BotContext): Promise<voi
   clearActiveSlot(ctx.user.id);
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
-  const model = AI_MODELS[modelId];
-  if (model?.mediaInputs?.length) {
+  const activeModeSlots = await getActiveModelSlots(ctx.user.id, modelId);
+  if (activeModeSlots.length) {
     await sendDesignMediaInputStatus(ctx, {
       edit: true,
       statusText: ctx.t.mediaInput.uploadCancelled,
@@ -392,7 +466,6 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
-  const model = AI_MODELS[modelId];
 
   // Auto-create dialog if none exists for this design session
   let dialogId = state?.designDialogId ?? null;
@@ -412,15 +485,15 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
   clearActiveSlot(ctx.user.id);
 
   // Check required slots before proceeding
-  if (model?.mediaInputs?.length) {
-    for (const slot of model.mediaInputs) {
-      if (slot.required && !mediaInputs[slot.slotKey]?.length) {
-        const label =
-          ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
-        await ctx.reply(ctx.t.mediaInput.slotRequired.replace("{slot}", String(label)));
-        await sendDesignMediaInputStatus(ctx);
-        return;
-      }
+  const promptActiveModeSlots = await getActiveModelSlots(ctx.user.id, modelId);
+  if (promptActiveModeSlots.length) {
+    const missing = findMissingRequiredSlot(modelId, promptActiveModeSlots, mediaInputs);
+    if (missing) {
+      const label =
+        ctx.t.mediaInput[missing.labelKey as keyof typeof ctx.t.mediaInput] ?? missing.labelKey;
+      await ctx.reply(ctx.t.mediaInput.slotRequired.replace("{slot}", String(label)));
+      await sendDesignMediaInputStatus(ctx);
+      return;
     }
   }
 
@@ -513,13 +586,14 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
   const model = AI_MODELS[modelId];
+  const activeModeSlots = await getActiveModelSlots(ctx.user.id, modelId);
 
   // Auto-slot mode wants every album sibling to be distributed across slots.
   // Active-slot mode also processes every sibling. Only the legacy dialog-ref
   // and caption-immediate-generate paths need album dedup.
   const activeSlotForDedup = getActiveSlot(ctx.user.id);
   const isActiveSlotMode = activeSlotForDedup?.section === "design";
-  const isAutoSlotMode = !isActiveSlotMode && !!model?.mediaInputs?.length;
+  const isAutoSlotMode = !isActiveSlotMode && activeModeSlots.length > 0;
   const mediaGroupId = ctx.message?.media_group_id;
   if (mediaGroupId && !isActiveSlotMode && !isAutoSlotMode) {
     const key = `${ctx.user.id}__${mediaGroupId}`;
@@ -583,7 +657,11 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   const activeSlot = getActiveSlot(ctx.user.id);
   if (activeSlot && activeSlot.section === "design") {
     const slotModelId = activeSlot.modelId;
-    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+    const slotsForModel =
+      slotModelId === modelId
+        ? activeModeSlots
+        : await getActiveModelSlots(ctx.user.id, slotModelId);
+    const slot = slotsForModel.find((s) => s.slotKey === activeSlot.slotKey);
 
     if (slot?.constraints) {
       let widthPx = photoSize?.width;
@@ -662,7 +740,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   if (isAutoSlotMode && model) {
     const userId = ctx.user.id;
     const current = await userStateService.getMediaInputs(userId, modelId);
-    const targetSlot = pickAutoSlot(model.mediaInputs!, current, "image");
+    const targetSlot = pickAutoSlot(activeModeSlots, current, "image");
     if (targetSlot) {
       await userStateService.addMediaInput(userId, modelId, targetSlot.slotKey, tgSlotValue);
       debounceSlotReply(
@@ -690,7 +768,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
       await sendDesignMediaInputStatus(ctx, { prependText: overflowText });
       if (tracked?.caption) {
         const finalInputs = await userStateService.getMediaInputs(userId, modelId);
-        const missingRequired = model.mediaInputs!.find(
+        const missingRequired = activeModeSlots.find(
           (s) => s.required && !finalInputs[s.slotKey]?.length,
         );
         if (!missingRequired) {
@@ -735,8 +813,8 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
 
     // If model has media input slots, save the photo to the first slot
     let mediaInputs: Record<string, string[]> | undefined;
-    if (model?.mediaInputs?.length) {
-      const firstSlot = model.mediaInputs[0];
+    if (activeModeSlots.length) {
+      const firstSlot = activeModeSlots[0];
       mediaInputs = { [firstSlot.slotKey]: [fileUrl] };
     }
 

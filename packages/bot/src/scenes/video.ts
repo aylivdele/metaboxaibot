@@ -24,6 +24,9 @@ import {
   config,
   resolveModelDisplay,
   generateWebToken,
+  getResolvedModes,
+  resolveActiveMode,
+  getActiveSlots,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
@@ -47,6 +50,9 @@ import {
   consumeDistribution,
   buildOverflowMessage,
   buildSlotUploadedMessage,
+  buildModePickerMenu,
+  getActiveModelSlots,
+  findMissingRequiredSlot,
 } from "../utils/media-input-state.js";
 import {
   SOUL_MAX_PHOTOS,
@@ -239,8 +245,10 @@ export async function activateVideoModel(
     const webappUrl = config.bot.webappUrl;
     const kb = new InlineKeyboard();
 
-    if (!options.suppressKeyboard) {
-      // Add media input slot buttons (with progressive element reveal)
+    const modes = getResolvedModes(model);
+
+    if (!options.suppressKeyboard && !modes) {
+      // Legacy single-mode behavior — slot keyboard goes on the hint message.
       if (model.mediaInputs?.length) {
         const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
         const { kb: slotsKb } = buildMediaInputStatusMenu(
@@ -319,11 +327,77 @@ export async function activateVideoModel(
         hint = ctx.t.video.hintHiggsfield;
     }
     await ctx.reply(appendVoiceHint ? `${hint}\n\n${ctx.t.voice.inputHint}` : hint, {
-      reply_markup: inlineKb,
+      reply_markup: modes ? undefined : inlineKb,
     });
+
+    // For modes-aware models, send a mode picker. The picker click handler
+    // (`mode:` callback) will follow up with the mode-activated message and
+    // the filtered slot keyboard. If the user already has a saved mode for
+    // this model, send the mode-activated message directly instead.
+    if (modes && !options.suppressKeyboard) {
+      const savedModeId = await userStateService.getSelectedMode(ctx.user.id, modelId);
+      const activeMode = resolveActiveMode(model, savedModeId);
+      if (savedModeId && activeMode) {
+        await sendModeActivatedMessage(ctx, modelId, activeMode);
+      } else {
+        await sendVideoModePicker(ctx, modelId, modes);
+      }
+    }
   } else {
     await ctx.reply(ctx.t.video.modelActivated);
   }
+}
+
+/** Send the mode picker message — one button per mode, two per row. */
+async function sendVideoModePicker(
+  ctx: BotContext,
+  modelId: string,
+  modes: readonly { id: string; labelKey: string }[],
+): Promise<void> {
+  const { text, kb } = buildModePickerMenu(modes, "video", modelId, ctx.t);
+  await ctx.reply(text, { reply_markup: kb });
+}
+
+/**
+ * Send the "mode activated" message and attach a keyboard built from only
+ * the slots active in the chosen mode. For text-only modes (no slots), the
+ * message just instructs the user to send a prompt.
+ */
+async function sendModeActivatedMessage(
+  ctx: BotContext,
+  modelId: string,
+  mode: { id: string; labelKey: string; textOnly?: boolean },
+): Promise<void> {
+  if (!ctx.user) return;
+  const model = AI_MODELS[modelId];
+  if (!model) return;
+  const modeLabel = String(
+    ctx.t.modelModes[mode.labelKey as keyof typeof ctx.t.modelModes] ?? mode.labelKey,
+  );
+  const webappUrl = config.bot.webappUrl;
+  const kb = new InlineKeyboard();
+
+  if (mode.textOnly) {
+    if (webappUrl) {
+      kb.webApp(ctx.t.video.management, `${webappUrl}?page=management&section=video`);
+    }
+    const text = ctx.t.modelModes.activatedTextOnly.replace("{mode}", modeLabel);
+    await ctx.reply(text, { reply_markup: kb.inline_keyboard.length ? kb : undefined });
+    return;
+  }
+
+  const activeSlots = getActiveSlots(model, mode.id);
+  const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
+  const { kb: slotsKb } = buildMediaInputStatusMenu(activeSlots, filledInputs, "video", ctx.t, {
+    promptOptional: model.promptOptional,
+    promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
+  });
+  for (const row of slotsKb.inline_keyboard) kb.row(...row);
+  if (webappUrl) {
+    kb.webApp(ctx.t.video.management, `${webappUrl}?page=management&section=video`);
+  }
+  const text = ctx.t.modelModes.activated.replace("{mode}", modeLabel);
+  await ctx.reply(text, { reply_markup: kb.inline_keyboard.length ? kb : undefined });
 }
 
 // ── Model selected via inline callback ───────────────────────────────────────
@@ -365,8 +439,10 @@ export async function sendVideoMediaInputStatus(
   const model = AI_MODELS[modelId];
   if (!model?.mediaInputs?.length) return;
 
+  const activeSlots = await getActiveModelSlots(ctx.user.id, modelId);
+  if (!activeSlots.length) return;
   const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
-  const { text, kb } = buildMediaInputStatusMenu(model.mediaInputs, filledInputs, "video", ctx.t, {
+  const { text, kb } = buildMediaInputStatusMenu(activeSlots, filledInputs, "video", ctx.t, {
     promptOptional: model.promptOptional,
     promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
   });
@@ -448,8 +524,8 @@ export async function handleVideoMediaInput(ctx: BotContext): Promise<void> {
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.videoModelId ?? "kling";
-  const model = AI_MODELS[modelId];
-  const slot = model?.mediaInputs?.find((s) => s.slotKey === slotKey);
+  const activeSlots = await getActiveModelSlots(ctx.user.id, modelId);
+  const slot = activeSlots.find((s) => s.slotKey === slotKey);
   if (!slot) return;
 
   const filled = await userStateService.getMediaInputs(ctx.user.id, modelId);
@@ -556,7 +632,6 @@ export async function executeVideoPrompt(ctx: BotContext, prompt: string): Promi
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.videoModelId ?? "kling";
-  const model = AI_MODELS[modelId];
 
   const videoSettings = await userStateService.getVideoSettings(ctx.user.id);
   const modelSettings = videoSettings[modelId];
@@ -566,16 +641,16 @@ export async function executeVideoPrompt(ctx: BotContext, prompt: string): Promi
   const hasMediaInputs = Object.keys(mediaInputs).length > 0;
   clearActiveSlot(ctx.user.id);
 
-  // Check required slots before proceeding
-  if (model?.mediaInputs?.length) {
-    for (const slot of model.mediaInputs) {
-      if (slot.required && !mediaInputs[slot.slotKey]?.length) {
-        const label =
-          ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
-        await ctx.reply(ctx.t.mediaInput.slotRequired.replace("{slot}", String(label)));
-        await sendVideoMediaInputStatus(ctx);
-        return;
-      }
+  // Check required slots before proceeding (filtered to active mode)
+  const activeSlots = await getActiveModelSlots(ctx.user.id, modelId);
+  if (activeSlots.length) {
+    const missing = findMissingRequiredSlot(modelId, activeSlots, mediaInputs);
+    if (missing) {
+      const label =
+        ctx.t.mediaInput[missing.labelKey as keyof typeof ctx.t.mediaInput] ?? missing.labelKey;
+      await ctx.reply(ctx.t.mediaInput.slotRequired.replace("{slot}", String(label)));
+      await sendVideoMediaInputStatus(ctx);
+      return;
     }
   }
 
@@ -781,8 +856,11 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
   // immediate generate" paths need album dedup.
   const activeSlotForDedup = getActiveSlot(ctx.user.id);
   const isActiveSlotMode = activeSlotForDedup?.section === "video";
+  // Slots filtered by the user's selected mode — the auto-distribution path
+  // and required-slot lookups must respect mode boundaries.
+  const activeModeSlots = await getActiveModelSlots(ctx.user.id, modelId);
   const isAutoSlotMode =
-    !isActiveSlotMode && !!model?.mediaInputs?.length && !AVATAR_MODELS.has(modelId);
+    !isActiveSlotMode && activeModeSlots.length > 0 && !AVATAR_MODELS.has(modelId);
   const mediaGroupId = ctx.message?.media_group_id;
   if (mediaGroupId && !isActiveSlotMode && !isAutoSlotMode) {
     const key = `${ctx.user.id}__${mediaGroupId}`;
@@ -835,7 +913,11 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
   const activeSlot = getActiveSlot(ctx.user.id);
   if (activeSlot && activeSlot.section === "video") {
     const slotModelId = activeSlot.modelId;
-    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+    const slotsForModel =
+      slotModelId === modelId
+        ? activeModeSlots
+        : await getActiveModelSlots(ctx.user.id, slotModelId);
+    const slot = slotsForModel.find((s) => s.slotKey === activeSlot.slotKey);
 
     if (slot?.constraints) {
       let widthPx = photoSize?.width;
@@ -914,7 +996,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
   if (isAutoSlotMode && model) {
     const userId = ctx.user.id;
     const current = await userStateService.getMediaInputs(userId, modelId);
-    const targetSlot = pickAutoSlot(model.mediaInputs!, current, "image");
+    const targetSlot = pickAutoSlot(activeModeSlots, current, "image");
     if (targetSlot) {
       await userStateService.addMediaInput(userId, modelId, targetSlot.slotKey, tgSlotValue);
       debounceSlotReply(
@@ -942,9 +1024,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       await sendVideoMediaInputStatus(ctx, { prependText: overflowText });
       if (tracked?.caption) {
         const finalInputs = await userStateService.getMediaInputs(userId, modelId);
-        const missingRequired = model.mediaInputs!.find(
-          (s) => s.required && !finalInputs[s.slotKey]?.length,
-        );
+        const missingRequired = findMissingRequiredSlot(modelId, activeModeSlots, finalInputs);
         if (!missingRequired) {
           await executeVideoPrompt(ctx, tracked.caption);
         }
@@ -965,8 +1045,9 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
 
     // If model has media input slots, save the photo to the first slot
     let mediaInputs: Record<string, string[]> | undefined;
-    if (supportsImages && model?.mediaInputs?.length) {
-      const firstSlot = model.mediaInputs[0];
+    const photoCaptionSlots = await getActiveModelSlots(ctx.user.id, modelId);
+    if (supportsImages && photoCaptionSlots.length) {
+      const firstSlot = photoCaptionSlots[0];
       mediaInputs = { [firstSlot.slotKey]: [tgUrl] };
     }
 
@@ -1052,12 +1133,17 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
     return;
   }
   const tgSlotValue = buildTgSlotValue(tgKind, fileId);
+  const activeModeSlots = await getActiveModelSlots(ctx.user.id, modelId);
 
   // Active reference_element slot: videos are exclusive (replace any images).
   const activeSlot = getActiveSlot(ctx.user.id);
   if (activeSlot && activeSlot.section === "video") {
     const slotModelId = activeSlot.modelId;
-    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+    const slotsForModel =
+      slotModelId === modelId
+        ? activeModeSlots
+        : await getActiveModelSlots(ctx.user.id, slotModelId);
+    const slot = slotsForModel.find((s) => s.slotKey === activeSlot.slotKey);
     if (slot?.constraints) {
       let durationSec: number | undefined = videoMsg?.duration;
       let widthPx: number | undefined = videoMsg?.width;
@@ -1143,12 +1229,12 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
   // Same mechanic as handleVideoPhoto, but only video-accepting slots are
   // candidates. Lets the user mix photos + videos in one album: each is
   // routed to the first slot that accepts its type.
-  if (!activeSlot && model?.mediaInputs?.length && !AVATAR_MODELS.has(modelId)) {
+  if (!activeSlot && activeModeSlots.length > 0 && !AVATAR_MODELS.has(modelId)) {
     const userId = ctx.user.id;
     const mediaGroupId = ctx.message?.media_group_id;
     const caption = ctx.message?.caption?.trim();
     const current = await userStateService.getMediaInputs(userId, modelId);
-    const targetSlot = pickAutoSlot(model.mediaInputs, current, "video");
+    const targetSlot = pickAutoSlot(activeModeSlots, current, "video");
     if (targetSlot) {
       await userStateService.addMediaInput(userId, modelId, targetSlot.slotKey, tgSlotValue);
       debounceSlotReply(
@@ -1176,9 +1262,7 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
       await sendVideoMediaInputStatus(ctx, { prependText: overflowText });
       if (tracked?.caption) {
         const finalInputs = await userStateService.getMediaInputs(userId, modelId);
-        const missingRequired = model.mediaInputs!.find(
-          (s) => s.required && !finalInputs[s.slotKey]?.length,
-        );
+        const missingRequired = findMissingRequiredSlot(modelId, activeModeSlots, finalInputs);
         if (!missingRequired) {
           await executeVideoPrompt(ctx, tracked.caption);
         }
@@ -1313,13 +1397,13 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
   const userId = ctx.user.id;
   const state = await userStateService.get(userId);
   const modelId = state?.videoModelId ?? "kling";
-  const model = AI_MODELS[modelId];
 
   // Active reference_audio slot: capture audio URL into slot.
   const activeSlot = getActiveSlot(userId);
   if (activeSlot && activeSlot.section === "video") {
     const slotModelId = activeSlot.modelId;
-    const slot = model?.mediaInputs?.find((s) => s.slotKey === activeSlot.slotKey);
+    const slotsForVoice = await getActiveModelSlots(userId, slotModelId);
+    const slot = slotsForVoice.find((s) => s.slotKey === activeSlot.slotKey);
     if (slot?.mode === "driving_audio" || slot?.mode === "reference_audio") {
       const audioSize = audioMsg.file_size ?? 0;
       if (audioSize > TG_DOWNLOAD_LIMIT_BYTES) {

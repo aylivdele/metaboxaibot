@@ -333,6 +333,43 @@ export const userStateService = {
     });
   },
 
+  // ── Selected mode (per-model) ─────────────────────────────────────────────
+  // Storage shape: { [modelId]: modeId }. Used for models with `modes` defined.
+
+  /** Returns the full { modelId: modeId } map. Empty object when nothing saved. */
+  async getSelectedModes(userId: bigint): Promise<Record<string, string>> {
+    const state = await db.userState.findUnique({ where: { userId } });
+    const raw = state?.selectedModes;
+    if (!raw || typeof raw !== "object") return {};
+    const result: Record<string, string> = {};
+    for (const [modelId, modeId] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof modeId === "string") result[modelId] = modeId;
+    }
+    return result;
+  },
+
+  /** Returns the saved mode id for a specific model, or null. */
+  async getSelectedMode(userId: bigint, modelId: string): Promise<string | null> {
+    const all = await this.getSelectedModes(userId);
+    return all[modelId] ?? null;
+  },
+
+  /** Persist the chosen mode for a specific model. Pass null to clear. */
+  async setSelectedMode(userId: bigint, modelId: string, modeId: string | null): Promise<void> {
+    const all = await this.getSelectedModes(userId);
+    if (modeId == null) {
+      delete all[modelId];
+    } else {
+      all[modelId] = modeId;
+    }
+    const hasAny = Object.keys(all).length > 0;
+    await db.userState.upsert({
+      where: { userId },
+      create: { userId, state: "IDLE", selectedModes: hasAny ? all : Prisma.DbNull },
+      update: { selectedModes: hasAny ? all : Prisma.DbNull },
+    });
+  },
+
   /** Clear a specific slot for a specific model. */
   async clearMediaInputSlot(userId: bigint, modelId: string, slotKey: string): Promise<void> {
     const all = await this.getAllMediaInputs(userId);

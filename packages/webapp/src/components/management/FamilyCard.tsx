@@ -13,8 +13,10 @@ interface FamilyCardProps {
   activeState?: string;
   savedId: string | null;
   allModelSettings: Record<string, Record<string, unknown>>;
+  selectedModes?: Record<string, string>;
   onModelActivate: (modelId: string) => Promise<void>;
   onSettingChange: (modelId: string, key: string, value: unknown) => void;
+  onModeChange?: (modelId: string, modeId: string) => void;
   onReset: (modelId: string) => void;
 }
 
@@ -24,8 +26,10 @@ export function FamilyCard({
   activeState,
   savedId,
   allModelSettings,
+  selectedModes,
   onModelActivate,
   onSettingChange,
+  onModeChange,
   onReset,
 }: FamilyCardProps) {
   const { t, locale } = useI18n();
@@ -134,6 +138,27 @@ export function FamilyCard({
                 {m.variantLabel?.toLowerCase().includes("vector") && " 📐"}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {selected.modes && selected.modes.length > 0 && (
+        <div className="family-card__row">
+          <span className="family-card__row-label">{t("modelModes.label")}</span>
+          <div className="image-settings-ratios">
+            {selected.modes.map((m) => {
+              const savedMode = selectedModes?.[selected.id];
+              const active = savedMode === m.id || (!savedMode && m.default);
+              return (
+                <button
+                  key={m.id}
+                  className={`ratio-btn${active ? " ratio-btn--active" : ""}`}
+                  onClick={() => onModeChange?.(selected.id, m.id)}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
