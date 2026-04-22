@@ -355,6 +355,7 @@ export interface Translations {
     uploadPromptElement: string;
     imageSaved: string;
     imageSavedSingle: string;
+    tooManyMedia: string;
     slotRequired: string;
     replace: string;
     remove: string;

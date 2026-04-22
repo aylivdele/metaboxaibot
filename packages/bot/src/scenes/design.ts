@@ -34,6 +34,10 @@ import {
   TG_DOWNLOAD_LIMIT_BYTES,
   sendSlotPreview,
   validateMediaAgainstSlot,
+  pickAutoSlot,
+  trackDistribution,
+  consumeDistribution,
+  buildOverflowMessage,
 } from "../utils/media-input-state.js";
 
 // ── Random design pending messages (Russian) ────────────────────────────────
@@ -209,7 +213,7 @@ export async function handleDesignFamilySelect(ctx: BotContext): Promise<void> {
 /** Sends an updated media-input status menu showing filled/empty slots. */
 export async function sendDesignMediaInputStatus(
   ctx: BotContext,
-  options: { edit?: boolean } = {},
+  options: { edit?: boolean; prependText?: string } = {},
 ): Promise<void> {
   if (!ctx.user) return;
   const state = await userStateService.get(ctx.user.id);
@@ -226,7 +230,8 @@ export async function sendDesignMediaInputStatus(
   if (webappUrl) {
     kb.webApp(ctx.t.design.management, `${webappUrl}?page=management&section=design`);
   }
-  const body = text || ctx.t.mediaInput.doneUploading;
+  const statusBody = text || ctx.t.mediaInput.doneUploading;
+  const body = options.prependText ? `${options.prependText}\n\n${statusBody}` : statusBody;
   if (options.edit) {
     await ctx.editMessageText(body, { reply_markup: kb }).catch(() => void 0);
   } else {
@@ -501,13 +506,18 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     !!ctx.message?.document && ctx.message.document.mime_type?.startsWith("image/");
   if (!ctx.user || (!isPhoto && !isImageDoc)) return;
 
-  // Deduplicate album messages — only the first photo-with-caption (or the first
-  // one overall, after a short buffering window) is processed.
-  // Exception: when a slot is active, every photo from the album is processed
-  // individually so that all images land in the slot.
+  const state = await userStateService.get(ctx.user.id);
+  const modelId = state?.designModelId ?? "dall-e-3";
+  const model = AI_MODELS[modelId];
+
+  // Auto-slot mode wants every album sibling to be distributed across slots.
+  // Active-slot mode also processes every sibling. Only the legacy dialog-ref
+  // and caption-immediate-generate paths need album dedup.
   const activeSlotForDedup = getActiveSlot(ctx.user.id);
+  const isActiveSlotMode = activeSlotForDedup?.section === "design";
+  const isAutoSlotMode = !isActiveSlotMode && !!model?.mediaInputs?.length;
   const mediaGroupId = ctx.message?.media_group_id;
-  if (mediaGroupId && !activeSlotForDedup) {
+  if (mediaGroupId && !isActiveSlotMode && !isAutoSlotMode) {
     const key = `${ctx.user.id}__${mediaGroupId}`;
     const hasCaption = !!ctx.message?.caption?.trim();
     const existing = designMediaGroupBuffer.get(key);
@@ -537,10 +547,6 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
       return; // skip non-captioned siblings entirely
     }
   }
-
-  const state = await userStateService.get(ctx.user.id);
-  const modelId = state?.designModelId ?? "dall-e-3";
-  const model = AI_MODELS[modelId];
 
   // Resolve file_id + size from message — without calling getFile.
   // file_id is durable (no TTL) and stored in slots as `tg:{kind}:{id}`.
@@ -643,26 +649,40 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     return;
   }
 
-  // ── Auto-slot: no active slot, but model has mediaInputs → save to first slot ─
-  if (!caption && model?.mediaInputs?.length) {
-    const current = await userStateService.getMediaInputs(ctx.user.id, modelId);
-    const targetSlot =
-      model.mediaInputs.find((s) => !current[s.slotKey]?.length) ?? model.mediaInputs[0];
-    let overflow = false;
-    if (
-      current[targetSlot.slotKey]?.length &&
-      (!targetSlot.maxImages || targetSlot.maxImages === current[targetSlot.slotKey]?.length)
-    ) {
-      overflow = true;
+  // ── Auto-slot distribution: distribute album siblings across slots in
+  // definition order; siblings that don't fit anywhere are reported as
+  // overflow. After the album debounce settles, send a single status reply
+  // (with overflow notice prepended). If the album carried a caption and all
+  // required slots end up filled, trigger generation with the caption — same
+  // as if the user had typed it after the upload finished.
+  if (isAutoSlotMode && model) {
+    const userId = ctx.user.id;
+    const current = await userStateService.getMediaInputs(userId, modelId);
+    const targetSlot = pickAutoSlot(model.mediaInputs!, current, "image");
+    if (targetSlot) {
+      await userStateService.addMediaInput(userId, modelId, targetSlot.slotKey, tgSlotValue);
     }
-    await userStateService.addMediaInput(
-      ctx.user.id,
+    trackDistribution(userId, mediaGroupId, {
+      overflow: !targetSlot,
+      caption: caption || undefined,
       modelId,
-      targetSlot.slotKey,
-      tgSlotValue,
-      overflow,
-    );
-    await sendDesignMediaInputStatus(ctx);
+      section: "design",
+    });
+    debounceSlotReply(userId, mediaGroupId, async () => {
+      const tracked = consumeDistribution(userId, mediaGroupId);
+      const overflowText =
+        tracked && tracked.overflowCount > 0 ? buildOverflowMessage(model, ctx.t) : "";
+      await sendDesignMediaInputStatus(ctx, { prependText: overflowText });
+      if (tracked?.caption) {
+        const finalInputs = await userStateService.getMediaInputs(userId, modelId);
+        const missingRequired = model.mediaInputs!.find(
+          (s) => s.required && !finalInputs[s.slotKey]?.length,
+        );
+        if (!missingRequired) {
+          await executeDesignPrompt(ctx, tracked.caption);
+        }
+      }
+    });
     return;
   }
 

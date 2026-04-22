@@ -459,6 +459,8 @@ export default {
     uploadPromptElement:
       "Отправьте 1–4 фото или 1 видео для «{slot}». Первое фото — главный вид, остальные (до 3) — референсы с других ракурсов.",
     imageSaved: "✅ {slot}: изображение {n}/{max} сохранено.",
+    tooManyMedia:
+      "{modelName} принимает максимум {totalMax} файлов, из них:\n{breakdown}\n\nЛишние файлы пропущены.",
     imageSavedSingle: "✅ {slot} загружен.",
     slotRequired: "⚠️ «{slot}» обязательно. Отправьте изображение.",
     replace: "🔄 Заменить",

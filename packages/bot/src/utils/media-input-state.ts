@@ -1,8 +1,10 @@
-import type { Section, MediaInputSlot, Translations } from "@metabox/shared";
+import type { Section, AIModel, MediaInputSlot, Translations } from "@metabox/shared";
 import { config, UserFacingError } from "@metabox/shared";
 import { InlineKeyboard, InputFile } from "grammy";
 import type { Context } from "grammy";
 import { getFileUrl } from "@metabox/api/services";
+
+export type SlotMediaType = "image" | "video" | "audio";
 
 /** Telegram Bot API hard limit for downloading files (cloud Bot API). */
 export const TG_DOWNLOAD_LIMIT_BYTES = 20 * 1024 * 1024;
@@ -134,6 +136,155 @@ export function getActiveSlot(userId: bigint): ActiveUploadSlot | undefined {
 
 export function clearActiveSlot(userId: bigint): void {
   activeSlots.delete(userId);
+}
+
+/**
+ * Returns the media types a slot can accept based on its `mode`.
+ * `reference_element` accepts both photos (1-4) and a single video.
+ */
+export function getSlotMediaTypes(slot: MediaInputSlot): readonly SlotMediaType[] {
+  switch (slot.mode) {
+    case "reference_video":
+    case "motion_video":
+    case "first_clip":
+      return ["video"];
+    case "reference_audio":
+    case "driving_audio":
+      return ["audio"];
+    case "reference_element":
+      return ["image", "video"];
+    default:
+      return ["image"];
+  }
+}
+
+/**
+ * Picks the next slot to auto-fill given current state and the media type
+ * being uploaded. Iterates `slots` in definition order and returns the first
+ * one that:
+ *  - accepts `mediaType`,
+ *  - has remaining capacity (`maxImages ?? 1`),
+ *  - is not from a different exclusiveGroup than already-filled slots.
+ *
+ * Returns `null` when nothing fits — caller treats this as overflow.
+ */
+export function pickAutoSlot(
+  slots: readonly MediaInputSlot[],
+  filledInputs: Record<string, string[]>,
+  mediaType: SlotMediaType,
+): MediaInputSlot | null {
+  const filledGroups = new Set<string>();
+  for (const slot of slots) {
+    if (slot.exclusiveGroup && filledInputs[slot.slotKey]?.length) {
+      filledGroups.add(slot.exclusiveGroup);
+    }
+  }
+
+  for (const slot of slots) {
+    if (!getSlotMediaTypes(slot).includes(mediaType)) continue;
+    if (slot.exclusiveGroup && filledGroups.size > 0 && !filledGroups.has(slot.exclusiveGroup))
+      continue;
+    const used = filledInputs[slot.slotKey]?.length ?? 0;
+    const max = slot.maxImages ?? 1;
+    if (used >= max) continue;
+    return slot;
+  }
+  return null;
+}
+
+/**
+ * Builds the human-readable per-slot capacity breakdown shown in the
+ * "too many media" overflow reply. Slots from the same exclusiveGroup are
+ * shown only once (the first one in definition order) — the user picks one
+ * group anyway, so listing both halves of an "either/or" set is noise.
+ *
+ * Format examples:
+ *   • Первый кадр
+ *   • Референс × 3
+ */
+export function formatSlotBreakdown(
+  slots: readonly MediaInputSlot[],
+  t: Translations,
+): { totalMax: number; lines: string[] } {
+  const seenGroups = new Set<string>();
+  const lines: string[] = [];
+  let totalMax = 0;
+  for (const slot of slots) {
+    if (slot.exclusiveGroup) {
+      if (seenGroups.has(slot.exclusiveGroup)) continue;
+      seenGroups.add(slot.exclusiveGroup);
+    }
+    const max = slot.maxImages ?? 1;
+    totalMax += max;
+    const label = t.mediaInput[slot.labelKey as keyof typeof t.mediaInput] ?? slot.labelKey;
+    lines.push(max > 1 ? `• ${String(label)} × ${max}` : `• ${String(label)}`);
+  }
+  return { totalMax, lines };
+}
+
+/**
+ * Per-(user, media-group) accumulator used by the auto-slot distribution
+ * path: each photo in a group fires its own handler call, but we only want
+ * to send ONE reply at the end (after debounceSlotReply settles). The
+ * accumulator collects overflow count + earliest seen caption across all
+ * siblings, then the debounce callback consumes and acts on it.
+ */
+interface DistributionState {
+  overflowCount: number;
+  caption?: string;
+  modelId: string;
+  section: Section;
+}
+const distributionStates = new Map<string, DistributionState>();
+
+function distributionKey(userId: bigint, mediaGroupId: string | undefined): string {
+  return `${userId}__${mediaGroupId ?? "single"}`;
+}
+
+export function trackDistribution(
+  userId: bigint,
+  mediaGroupId: string | undefined,
+  patch: { overflow: boolean; caption?: string; modelId: string; section: Section },
+): void {
+  const key = distributionKey(userId, mediaGroupId);
+  const prev = distributionStates.get(key);
+  const next: DistributionState = prev
+    ? {
+        overflowCount: prev.overflowCount + (patch.overflow ? 1 : 0),
+        caption: prev.caption ?? patch.caption,
+        modelId: prev.modelId,
+        section: prev.section,
+      }
+    : {
+        overflowCount: patch.overflow ? 1 : 0,
+        caption: patch.caption,
+        modelId: patch.modelId,
+        section: patch.section,
+      };
+  distributionStates.set(key, next);
+}
+
+export function consumeDistribution(
+  userId: bigint,
+  mediaGroupId: string | undefined,
+): DistributionState | undefined {
+  const key = distributionKey(userId, mediaGroupId);
+  const value = distributionStates.get(key);
+  distributionStates.delete(key);
+  return value;
+}
+
+/**
+ * Builds the overflow reply body. Caller composes it into the slot status
+ * message (so the user sees the breakdown alongside the current slot menu).
+ */
+export function buildOverflowMessage(model: AIModel, t: Translations): string {
+  if (!model.mediaInputs?.length) return "";
+  const { totalMax, lines } = formatSlotBreakdown(model.mediaInputs, t);
+  return t.mediaInput.tooManyMedia
+    .replace("{modelName}", model.name)
+    .replace("{totalMax}", String(totalMax))
+    .replace("{breakdown}", lines.join("\n"));
 }
 
 /**

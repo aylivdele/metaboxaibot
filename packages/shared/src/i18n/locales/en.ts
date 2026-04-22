@@ -464,6 +464,8 @@ export default {
     uploadPromptElement:
       'Send 1–4 photos or 1 video for "{slot}". First photo = frontal view; the rest (up to 3) = reference views.',
     imageSaved: "✅ {slot}: image {n}/{max} saved.",
+    tooManyMedia:
+      "{modelName} accepts at most {totalMax} files:\n{breakdown}\n\nExtra files were skipped.",
     imageSavedSingle: "✅ {slot} uploaded.",
     slotRequired: '⚠️ "{slot}" is required. Please upload an image first.',
     replace: "🔄 Replace",
