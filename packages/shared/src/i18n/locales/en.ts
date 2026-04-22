@@ -470,7 +470,7 @@ export default {
     tooManyMedia:
       "{modelName} accepts at most {totalMax} files:\n{breakdown}\n\nExtra files were skipped.",
     imageSavedSingle: "✅ {slot} uploaded.",
-    slotRequired: '⚠️ "{slot}" is required. Please upload an image first.',
+    slotRequired: '⚠️ "{slot}" is required.',
     replace: "🔄 Replace",
     remove: "Remove",
     optional: "(optional)",

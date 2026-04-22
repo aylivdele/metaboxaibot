@@ -465,7 +465,7 @@ export default {
     tooManyMedia:
       "{modelName} принимает максимум {totalMax} файлов, из них:\n{breakdown}\n\nЛишние файлы пропущены.",
     imageSavedSingle: "✅ {slot} загружен.",
-    slotRequired: "⚠️ «{slot}» обязательно. Отправьте изображение.",
+    slotRequired: "⚠️ «{slot}» обязательно.",
     replace: "🔄 Заменить",
     remove: "Удалить",
     optional: "(необязательно)",
