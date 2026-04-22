@@ -330,6 +330,8 @@ export interface CatalogResponse {
   subscriptions: CatalogSubscription[];
   tokenPackages: CatalogTokenPackage[];
   canPayByCard: boolean;
+  /** true если у юзера есть платная активная подписка (триал — false). */
+  hasPaidSubscription: boolean;
   usdtRubRate: number;
   metaboxUrl: string;
 }

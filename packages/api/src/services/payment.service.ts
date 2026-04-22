@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { config, PLANS } from "@metabox/shared";
 import { recordSale } from "./metabox-bridge.service.js";
-import { checkSubscription } from "./token.service.js";
+import { checkPaidSubscription } from "./token.service.js";
 import { add } from "date-fns";
 
 export interface SaleUserInfo {
@@ -204,8 +204,8 @@ export const paymentService = {
         },
       });
     } else {
-      // Token package — requires active subscription
-      await checkSubscription(userId);
+      // Token package — requires ACTIVE PAID subscription (trial не проходит).
+      await checkPaidSubscription(userId);
 
       await db.$transaction([
         db.user.update({
