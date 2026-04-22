@@ -13,9 +13,10 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     name: "🍌 Nano Banana",
     section: "design",
     description:
-      "Генерирует реалистичные фото и позволяет менять детали прямо словами: «убери фон», «добавь шляпу», «сделай вечер». Версия 2 добавляет поиск в интернете и усиленное мышление для более точного следования промпту.",
+      "Генерирует реалистичные фото и позволяет менять детали прямо словами: «убери фон», «добавь шляпу», «сделай вечер». Версия 2 — расширенный набор соотношений сторон и больше референсов.",
     defaultModelId: "nano-banana-2",
     members: [
+      { modelId: "nano-banana-1", versionLabel: "1", variantLabel: "Standard" },
       { modelId: "nano-banana-pro", versionLabel: "1", variantLabel: "Pro" },
       { modelId: "nano-banana-2", versionLabel: "2", variantLabel: "Standard" },
     ],

@@ -8,16 +8,12 @@ const T2I_ENDPOINTS: Record<string, string> = {
   flux: "fal-ai/flux-2",
   "flux-pro": "fal-ai/flux-2-pro",
   "stable-diffusion": "fal-ai/stable-diffusion-v3-medium",
-  "nano-banana-pro": "fal-ai/nano-banana-pro",
-  "nano-banana-2": "fal-ai/nano-banana-2",
   "seedream-5": "fal-ai/bytedance/seedream/v5/lite/text-to-image",
   "seedream-4.5": "fal-ai/bytedance/seedream/v4.5/text-to-image",
 };
 
 /** Image-to-image (edit) endpoint. Falls back to the T2I endpoint when absent. */
 const EDIT_ENDPOINTS: Record<string, string> = {
-  "nano-banana-pro": "fal-ai/nano-banana-pro/edit",
-  "nano-banana-2": "fal-ai/nano-banana-2/edit",
   "seedream-5": "fal-ai/bytedance/seedream/v5/lite/edit",
   "seedream-4.5": "fal-ai/bytedance/seedream/v4.5/edit",
   "stable-diffusion": "fal-ai/stable-diffusion-v3-medium/image-to-image",
@@ -29,19 +25,12 @@ const EDIT_ENDPOINTS: Record<string, string> = {
  * Models that accept a raw `aspect_ratio` string (e.g. "16:9") instead of
  * the standard FAL `image_size` enum (e.g. "landscape_16_9").
  */
-const ASPECT_RATIO_MODELS = new Set(["nano-banana-pro", "nano-banana-2"]);
+const ASPECT_RATIO_MODELS = new Set<string>();
 
 /**
  * Edit endpoints for these models expect `image_urls` (array) instead of `image_url` (string).
  */
-const IMAGE_URLS_ARRAY_MODELS = new Set([
-  "nano-banana-pro",
-  "nano-banana-2",
-  "flux",
-  "flux-pro",
-  "seedream-4.5",
-  "seedream-5",
-]);
+const IMAGE_URLS_ARRAY_MODELS = new Set(["flux", "flux-pro", "seedream-4.5", "seedream-5"]);
 
 /** Separator used to pack endpoint+requestId into a single opaque string. */
 const SEP = "||";

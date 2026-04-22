@@ -175,7 +175,12 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
   "nano-banana-2": {
     name: "🍌 Nano Banana 2",
     description:
-      "Generates and edits realistic photos from text commands. Standard — cheaper than PRO, supports web search and enhanced thinking mode for complex prompts.",
+      "Generates and edits realistic photos from text commands. Standard — cheaper than PRO, supports more references and an extended set of aspect ratios.",
+  },
+  "nano-banana-1": {
+    name: "🍌 Nano Banana",
+    description:
+      "Base version: generates and edits photos from text. Cheaper than PRO and v2, but without resolution choice and advanced settings.",
   },
   midjourney: {
     name: "🎨 MidJourney v7",

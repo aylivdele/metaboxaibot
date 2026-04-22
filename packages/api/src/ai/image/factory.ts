@@ -43,7 +43,7 @@ export function createImageAdapter(modelId: string, ctx?: AdapterContext): Image
       // apiKey — apiSecret берётся из env (отдельный секрет, не часть пула).
       return new HiggsFieldSoulImageAdapter(apiKey, undefined, fetchFn);
     case "kie":
-      return new KieImageAdapter(apiKey, fetchFn);
+      return new KieImageAdapter(modelId, apiKey, fetchFn);
     default:
       throw new Error(`No image adapter for provider: ${model.provider} (model: ${modelId})`);
   }

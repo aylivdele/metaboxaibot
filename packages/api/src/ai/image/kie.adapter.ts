@@ -1,5 +1,5 @@
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
-import { config } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { uploadFileUrl } from "../../utils/kie-upload.js";
 
@@ -24,32 +24,45 @@ interface KieTaskResponse {
   };
 }
 
-const T2I_ENDPOINTS = {
-  "grok-imagine-image": "grok-imagine/text-to-image",
-};
+/** Grok Imagine: separate t2i / i2i endpoints. */
+const GROK_T2I = "grok-imagine/text-to-image";
+const GROK_I2I = "grok-imagine/image-to-image";
 
-const I2I_ENDPOINTS = {
-  "grok-imagine-image": "grok-imagine/image-to-image",
+/**
+ * Nano Banana family: single endpoint per model that accepts optional
+ * `image_input` array for i2i. The `nano-banana-edit` variant requires
+ * images, but we expose pro/2 which gracefully handle both modes.
+ */
+const NANO_BANANA_MODEL_NAMES: Record<string, string> = {
+  "nano-banana-pro": "nano-banana-pro",
+  "nano-banana-2": "nano-banana-2",
 };
 
 /**
- * KIE adapter for Grok Imagine image generation.
+ * KIE adapter for image generation.
  *
  * Endpoints:
  *  - POST /api/v1/jobs/createTask   — submit generation task
  *  - GET  /api/v1/jobs/recordInfo?taskId=X — poll task status
  *
- * Supports text-to-image and image-to-image (via image_urls).
- * Input images are re-uploaded through KIE's file upload API.
+ * Supports:
+ *  - Grok Imagine (t2i / i2i)
+ *  - Nano Banana Pro / Nano Banana 2 (t2i + optional i2i via image_input)
+ *
+ * Input images are re-uploaded through KIE's file upload API to ensure
+ * KIE can fetch them (presigned S3/Telegram URLs may be blocked or expire).
  */
 export class KieImageAdapter implements ImageAdapter {
-  readonly modelId = "grok-imagine-image";
   readonly isAsync = true;
 
   private readonly apiKeyOverride: string | undefined;
   private readonly fetchFn: typeof globalThis.fetch | undefined;
 
-  constructor(apiKey?: string, fetchFn?: typeof globalThis.fetch) {
+  constructor(
+    readonly modelId: string,
+    apiKey?: string,
+    fetchFn?: typeof globalThis.fetch,
+  ) {
     this.apiKeyOverride = apiKey;
     this.fetchFn = fetchFn;
   }
@@ -70,36 +83,84 @@ export class KieImageAdapter implements ImageAdapter {
   async submit(input: ImageInput): Promise<string> {
     const ms = input.modelSettings ?? {};
     const mi = input.mediaInputs ?? {};
-
     const editImages = mi.edit ?? [];
     const imageUrls = editImages.length > 0 ? editImages : input.imageUrl ? [input.imageUrl] : [];
-    const isI2I = imageUrls.length > 0;
 
-    const inputPayload: Record<string, unknown> = {
-      prompt: input.prompt,
-      nsfw_checker: ms.nsfw_checker !== undefined ? ms.nsfw_checker : false,
-    };
+    const nanoBananaModel = NANO_BANANA_MODEL_NAMES[this.modelId];
 
-    // aspect_ratio
-    const aspectRatio = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "1:1";
-    inputPayload.aspect_ratio = aspectRatio;
+    let body: { model: string; input: Record<string, unknown> };
 
-    // enable_pro (quality mode)
-    const enablePro = (ms.enable_pro as boolean | undefined) ?? false;
-    inputPayload.enable_pro = enablePro;
+    if (this.modelId === "nano-banana-1") {
+      // ── Google Nano Banana v1: t2i / i2i via separate endpoints ────────────
+      const isI2I = imageUrls.length > 0;
+      const inputPayload: Record<string, unknown> = {
+        prompt: input.prompt,
+      };
 
-    // i2i: re-upload images through KIE file upload API
-    if (isI2I) {
-      const uploadedUrls = await Promise.all(
-        imageUrls.map((url) => uploadFileUrl(this.apiKey, url)),
-      );
-      inputPayload.image_urls = uploadedUrls;
+      const imageSize = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "1:1";
+      inputPayload.image_size = imageSize;
+
+      const rawFormat = (ms.output_format as string | undefined) ?? "png";
+      inputPayload.output_format = rawFormat === "jpg" ? "jpeg" : rawFormat;
+
+      if (isI2I) {
+        const uploaded = await Promise.all(
+          imageUrls.slice(0, 10).map((url) => uploadFileUrl(this.apiKey, url)),
+        );
+        inputPayload.image_urls = uploaded;
+      }
+
+      body = {
+        model: isI2I ? "google/nano-banana-edit" : "google/nano-banana",
+        input: inputPayload,
+      };
+    } else if (nanoBananaModel) {
+      // ── Nano Banana Pro / Nano Banana 2 ────────────────────────────────────
+      const inputPayload: Record<string, unknown> = {
+        prompt: input.prompt,
+      };
+
+      const aspectRatio = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "1:1";
+      inputPayload.aspect_ratio = aspectRatio;
+
+      const resolution = (ms.resolution as string | undefined) ?? "1K";
+      inputPayload.resolution = resolution;
+
+      // KIE accepts only png/jpg; map jpeg → jpg for compatibility with shared settings.
+      const rawFormat = (ms.output_format as string | undefined) ?? "png";
+      const outputFormat = rawFormat === "jpeg" ? "jpg" : rawFormat;
+      inputPayload.output_format = outputFormat;
+
+      if (imageUrls.length > 0) {
+        const maxImages = this.modelId === "nano-banana-2" ? 14 : 8;
+        const uploaded = await Promise.all(
+          imageUrls.slice(0, maxImages).map((url) => uploadFileUrl(this.apiKey, url)),
+        );
+        inputPayload.image_input = uploaded;
+      }
+
+      body = { model: nanoBananaModel, input: inputPayload };
+    } else if (this.modelId === "grok-imagine-image") {
+      // ── Grok Imagine ───────────────────────────────────────────────────────
+      const isI2I = imageUrls.length > 0;
+      const inputPayload: Record<string, unknown> = {
+        prompt: input.prompt,
+        nsfw_checker: ms.nsfw_checker !== undefined ? ms.nsfw_checker : false,
+      };
+      inputPayload.aspect_ratio =
+        (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "1:1";
+      inputPayload.enable_pro = (ms.enable_pro as boolean | undefined) ?? false;
+
+      if (isI2I) {
+        inputPayload.image_urls = await Promise.all(
+          imageUrls.map((url) => uploadFileUrl(this.apiKey, url)),
+        );
+      }
+
+      body = { model: isI2I ? GROK_I2I : GROK_T2I, input: inputPayload };
+    } else {
+      throw new Error(`KIE image: unknown model ${this.modelId}`);
     }
-
-    const body = {
-      model: isI2I ? I2I_ENDPOINTS[this.modelId] : T2I_ENDPOINTS[this.modelId],
-      input: inputPayload,
-    };
 
     const resp = await fetchWithLog(
       `${KIE_BASE}/api/v1/jobs/createTask`,
@@ -140,9 +201,21 @@ export class KieImageAdapter implements ImageAdapter {
     const task = data.data;
 
     if (task.state === "fail") {
-      throw new Error(
-        `KIE Grok Imagine image generation failed: ${task.failCode ?? ""} ${task.failMsg ?? "unknown error"}`,
-      );
+      const failMsg = task.failMsg ?? "unknown error";
+      const failCode = task.failCode;
+      const isCopyright = failCode === "501" || /copyright/i.test(failMsg);
+      const isPolicy = /sensitive|restricted|policy|prohibited|nsfw|violat/i.test(failMsg);
+      if (isCopyright)
+        throw new UserFacingError(
+          `KIE ${this.modelId} generation failed: ${failCode ?? ""} ${failMsg}`,
+          { key: "copyrightViolation" },
+        );
+      if (isPolicy)
+        throw new UserFacingError(
+          `KIE ${this.modelId} generation failed: ${failCode ?? ""} ${failMsg}`,
+          { key: "contentPolicyViolation" },
+        );
+      throw new Error(`KIE ${this.modelId} generation failed: ${failCode ?? ""} ${failMsg}`);
     }
     if (task.state !== "success") return null;
 
@@ -153,7 +226,7 @@ export class KieImageAdapter implements ImageAdapter {
 
     return urls.map((url, i) => ({
       url,
-      filename: `grok-imagine-${i}.jpg`,
+      filename: `${this.modelId}-${i}.jpg`,
     }));
   }
 }
