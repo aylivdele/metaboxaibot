@@ -17,6 +17,7 @@ import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { transcribeAndReply } from "../utils/voice-transcribe.js";
 import { uploadBuffer, buildS3Key } from "@metabox/api/services/s3";
+import { acquireLock, releaseLock } from "../utils/dedup.js";
 
 // ── Sub-section entry points ──────────────────────────────────────────────────
 
@@ -83,6 +84,9 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
 
   const file = ctx.message?.voice ?? ctx.message?.audio;
   if (!file) return;
+
+  const lockKey = `dedup:voice:${ctx.user.id}:${file.file_id}`;
+  if (!(await acquireLock(lockKey, 120))) return;
 
   const pendingMsg = await ctx.reply(ctx.t.audio.voiceCloneProcessing);
 
@@ -175,6 +179,7 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     await ctx.reply(ctx.t.audio.voiceCloneSuccess.replace("{name}", name));
   } catch (err) {
+    await releaseLock(lockKey);
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     logger.error(err, "Voice clone error");
     await ctx.reply(ctx.t.audio.voiceCloneFailed);

@@ -82,6 +82,7 @@ import { userStateService } from "@metabox/api/services";
 import { getT, config } from "@metabox/shared";
 import { rateLimitMiddleware } from "./middlewares/rate-limit.middleware.js";
 import { logger } from "./logger.js";
+import { acquireLock } from "./utils/dedup.js";
 
 export function createBot(token: string): Bot<BotContext> {
   const bot = new Bot<BotContext>(token);
@@ -91,6 +92,24 @@ export function createBot(token: string): Bot<BotContext> {
   //    serialized per chat). Without this, two photos from a media group race
   //    each other in addMediaInput's read-modify-write and one gets overwritten.
   bot.use(sequentialize((ctx) => ctx.chat?.id.toString()));
+
+  // ── Dedup: skip updates Telegram re-delivers after a bot restart ─────────
+  // Stores update_id in Redis for 5 min. If the same update_id arrives again
+  // (Telegram re-delivery) we drop it silently before any processing occurs.
+  // Fails open: if Redis is unavailable we let the update through rather than
+  // blocking all traffic.
+  bot.use(async (ctx, next) => {
+    const key = `dedup:upd:${ctx.update.update_id}`;
+    try {
+      if (!(await acquireLock(key, 300))) {
+        logger.warn({ updateId: ctx.update.update_id }, "duplicate update_id, skipping re-delivery");
+        return;
+      }
+    } catch (err) {
+      logger.error({ err, updateId: ctx.update.update_id }, "dedup: Redis unavailable, passing through");
+    }
+    return next();
+  });
 
   // ── Raw update logger — every incoming update at debug level ────────────
   bot.use(async (ctx, next) => {
