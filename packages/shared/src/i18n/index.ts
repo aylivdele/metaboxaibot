@@ -284,6 +284,7 @@ export interface Translations {
     sunoPromptTooLong: string;
     // Higgsfield
     higgsfieldTooManyMotions: string;
+    alreadyGenerating: string;
   };
   common: {
     backToMain: string;

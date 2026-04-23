@@ -1,6 +1,7 @@
 import type { BotContext } from "../types/context.js";
 import {
   videoGenerationService,
+  generationService,
   userStateService,
   // userUploadsService,
   userAvatarService,
@@ -534,9 +535,25 @@ export async function handleVideoMediaInputDone(ctx: BotContext): Promise<void> 
 /** Callback for mi_generate:video — start generation without a text prompt (promptOptional models). */
 export async function handleVideoGenerateNoPrompt(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
+  const chatId = ctx.chat?.id;
+  const messageId = ctx.callbackQuery?.message?.message_id;
+  const sourceMessageId = chatId && messageId ? `${chatId}:${messageId}` : undefined;
+
+  if (sourceMessageId) {
+    try {
+      const acquired = await acquireLock(`dedup:gen:btn:${ctx.user.id}:${sourceMessageId}`, 120);
+      if (!acquired) {
+        await ctx.answerCallbackQuery({ text: ctx.t.errors.alreadyGenerating });
+        return;
+      }
+    } catch {
+      // fail-open: proceed if Redis unavailable
+    }
+  }
+
   await ctx.answerCallbackQuery();
   await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
-  await executeVideoPrompt(ctx, "");
+  await executeVideoPrompt(ctx, "", sourceMessageId);
 }
 
 /** Callback for mi_remove:video:{slotKey} — clear a filled slot. */
@@ -581,10 +598,19 @@ export async function handleVideoMediaInputRemove(ctx: BotContext): Promise<void
  * Executes a text prompt in the active video session.
  * Used by handleVideoMessage (text) and the voice-prompt callback.
  */
-export async function executeVideoPrompt(ctx: BotContext, prompt: string): Promise<void> {
+export async function executeVideoPrompt(
+  ctx: BotContext,
+  prompt: string,
+  sourceMessageId?: string,
+): Promise<void> {
   if (!ctx.user) return;
   const chatId = ctx.chat?.id;
   if (!chatId) return;
+
+  if (sourceMessageId) {
+    const active = await generationService.hasActiveJobForSource(ctx.user.id, sourceMessageId);
+    if (active) return;
+  }
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.videoModelId ?? "kling";
@@ -692,6 +718,7 @@ export async function executeVideoPrompt(ctx: BotContext, prompt: string): Promi
               ...(effectiveVoiceS3Key ? { voice_s3key: effectiveVoiceS3Key, voice_url: "" } : {}),
             }
           : undefined,
+      sourceMessageId,
     });
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);

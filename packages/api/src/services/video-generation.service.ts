@@ -26,6 +26,8 @@ export interface SubmitVideoParams {
   duration?: number;
   /** One-shot overrides merged on top of saved modelSettings (e.g. driver_url from uploaded video). */
   extraModelSettings?: Record<string, unknown>;
+  /** "{chatId}:{messageId}" of the inline button that triggered this job. Used for dedup. */
+  sourceMessageId?: string;
 }
 
 export interface SubmitVideoResult {
@@ -131,6 +133,7 @@ export const videoGenerationService = {
             : {}),
         },
         status: "pending",
+        ...(params.sourceMessageId ? { sourceMessageId: params.sourceMessageId } : {}),
       },
     });
 

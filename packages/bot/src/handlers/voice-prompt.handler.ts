@@ -3,6 +3,7 @@ import { executeGptPrompt } from "../scenes/gpt.js";
 import { executeDesignPrompt } from "../scenes/design.js";
 import { executeVideoPrompt } from "../scenes/video.js";
 import { executeAudioPrompt } from "../scenes/audio.js";
+import { acquireLock } from "../utils/dedup.js";
 import { logger } from "../logger.js";
 import type { BotContext } from "../types/context.js";
 
@@ -11,8 +12,6 @@ import type { BotContext } from "../types/context.js";
  * Callback data format: `vp:{section}:{id}`
  */
 export async function handleVoicePromptCallback(ctx: BotContext): Promise<void> {
-  await ctx.answerCallbackQuery();
-
   if (!ctx.user) return;
   const data = ctx.callbackQuery?.data;
   if (!data) return;
@@ -22,6 +21,18 @@ export async function handleVoicePromptCallback(ctx: BotContext): Promise<void> 
 
   const section = parts[1];
   const id = parts[2];
+
+  try {
+    const acquired = await acquireLock(`dedup:gen:vp:${ctx.user.id}:${id}`, 120);
+    if (!acquired) {
+      await ctx.answerCallbackQuery({ text: ctx.t.errors.alreadyGenerating });
+      return;
+    }
+  } catch {
+    // fail-open: proceed if Redis unavailable
+  }
+
+  await ctx.answerCallbackQuery();
 
   const text = getStoredTranscription(ctx.user.id, id);
   if (!text) {

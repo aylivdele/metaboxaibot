@@ -24,6 +24,7 @@ import {
 import { InlineKeyboard } from "grammy";
 import { logger } from "../logger.js";
 import { transcribeAndReply } from "../utils/voice-transcribe.js";
+import { acquireLock } from "../utils/dedup.js";
 import {
   setActiveSlot,
   getActiveSlot,
@@ -363,6 +364,22 @@ export async function handleDesignMediaInputDone(ctx: BotContext): Promise<void>
  */
 export async function handleDesignGenerateNoPrompt(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
+  const chatId = ctx.chat?.id;
+  const messageId = ctx.callbackQuery?.message?.message_id;
+  const sourceMessageId = chatId && messageId ? `${chatId}:${messageId}` : undefined;
+
+  if (sourceMessageId) {
+    try {
+      const acquired = await acquireLock(`dedup:gen:btn:${ctx.user.id}:${sourceMessageId}`, 120);
+      if (!acquired) {
+        await ctx.answerCallbackQuery({ text: ctx.t.errors.alreadyGenerating });
+        return;
+      }
+    } catch {
+      // fail-open: proceed if Redis unavailable
+    }
+  }
+
   await ctx.answerCallbackQuery();
   await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
 
@@ -372,7 +389,7 @@ export async function handleDesignGenerateNoPrompt(ctx: BotContext): Promise<voi
   const firstFilled = Object.values(filled).find((v) => v?.length);
 
   if (!firstFilled?.length) {
-    await executeDesignPrompt(ctx, "");
+    await executeDesignPrompt(ctx, "", sourceMessageId);
     return;
   }
 
@@ -394,7 +411,7 @@ export async function handleDesignGenerateNoPrompt(ctx: BotContext): Promise<voi
     return;
   }
   await ctx.api.deleteMessage(ctx.chat!.id, pendingMsg.message_id).catch(() => void 0);
-  await executeDesignPrompt(ctx, description);
+  await executeDesignPrompt(ctx, description, sourceMessageId);
 }
 
 /** Callback for mi_remove:design:{slotKey} — clear a filled slot. */
@@ -415,10 +432,19 @@ export async function handleDesignMediaInputRemove(ctx: BotContext): Promise<voi
  * Executes a text prompt in the active design session.
  * Used by handleDesignMessage (text) and the voice-prompt callback.
  */
-export async function executeDesignPrompt(ctx: BotContext, prompt: string): Promise<void> {
+export async function executeDesignPrompt(
+  ctx: BotContext,
+  prompt: string,
+  sourceMessageId?: string,
+): Promise<void> {
   if (!ctx.user) return;
   const chatId = ctx.chat?.id;
   if (!chatId) return;
+
+  if (sourceMessageId) {
+    const active = await generationService.hasActiveJobForSource(ctx.user.id, sourceMessageId);
+    if (active) return;
+  }
 
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.designModelId ?? "dall-e-3";
@@ -494,6 +520,7 @@ export async function executeDesignPrompt(ctx: BotContext, prompt: string): Prom
       dialogId,
       sendOriginalLabel: ctx.t.common.sendOriginal,
       aspectRatio,
+      sourceMessageId,
     });
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
