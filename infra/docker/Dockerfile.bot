@@ -40,5 +40,11 @@ COPY --from=builder /app/packages/bot/dist            ./packages/bot/dist
 COPY --from=builder /app/packages/bot/package.json    ./packages/bot/
 COPY --from=builder /app/packages/bot/node_modules    ./packages/bot/node_modules
 COPY --from=builder /app/node_modules                 ./node_modules
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/package.json ./package.json
+COPY infra/docker/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
+ENTRYPOINT ["./entrypoint.sh"]
 CMD ["node", "packages/bot/dist/index.js"]

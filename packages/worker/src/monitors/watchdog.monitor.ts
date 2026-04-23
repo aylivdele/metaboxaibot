@@ -95,7 +95,7 @@ export async function runWatchdog(): Promise<void> {
     select: { id: true, userId: true, section: true, modelId: true },
   });
 
-  let killedJobs = 0;
+  const killedJobIds: string[] = [];
   await Promise.allSettled(
     deadJobs.map(async (job) => {
       const queue = getGenerationQueue(job.section);
@@ -108,7 +108,7 @@ export async function runWatchdog(): Promise<void> {
         where: { id: job.id },
         data: { status: "failed", error: "watchdog: orphaned >24h" },
       });
-      killedJobs += 1;
+      killedJobIds.push(job.id);
 
       const lang = await getUserLang(job.userId);
       const t = getT(lang);
@@ -172,7 +172,7 @@ export async function runWatchdog(): Promise<void> {
     select: { id: true, userId: true, provider: true },
   });
 
-  let killedAvatars = 0;
+  const killedAvatarIds: string[] = [];
   await Promise.allSettled(
     deadAvatars.map(async (avatar) => {
       const existing = await getAvatarQueue().getJob(avatar.id);
@@ -182,7 +182,7 @@ export async function runWatchdog(): Promise<void> {
         where: { id: avatar.id },
         data: { status: "failed" },
       });
-      killedAvatars += 1;
+      killedAvatarIds.push(avatar.id);
 
       const lang = await getUserLang(avatar.userId);
       const t = getT(lang);
@@ -197,12 +197,16 @@ export async function runWatchdog(): Promise<void> {
   );
 
   // ── Summary ────────────────────────────────────────────────────────────────
-  if (killedJobs > 0 || killedAvatars > 0) {
-    await notifyTechError(
-      new Error(
-        `Watchdog hard-failed ${killedJobs} generation job(s) and ${killedAvatars} avatar(s) (orphaned past timeout)`,
-      ),
-      { section: "watchdog" },
-    ).catch(() => void 0);
+  if (killedJobIds.length > 0 || killedAvatarIds.length > 0) {
+    const lines: string[] = [
+      `Watchdog hard-failed ${killedJobIds.length} generation job(s) and ${killedAvatarIds.length} avatar(s) (orphaned past timeout)`,
+    ];
+    if (killedJobIds.length > 0) {
+      lines.push(`Generation jobs: ${killedJobIds.join(", ")}`);
+    }
+    if (killedAvatarIds.length > 0) {
+      lines.push(`Avatars: ${killedAvatarIds.join(", ")}`);
+    }
+    await notifyTechError(new Error(lines.join("\n")), { section: "watchdog" }).catch(() => void 0);
   }
 }

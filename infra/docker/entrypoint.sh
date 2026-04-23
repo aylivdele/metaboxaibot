@@ -1,6 +1,16 @@
 #!/bin/sh
 set -e
 
+# Generic entrypoint shared by api / worker / bot containers. Applies pending
+# Prisma migrations (idempotent — Prisma uses an advisory lock so parallel
+# starts on multiple containers don't race), then exec's into the service
+# command passed via Dockerfile CMD.
+#
+# Why each container migrates: containers may start in parallel (compose
+# `depends_on` without healthcheck doesn't wait for app readiness, just
+# container start). If only api migrates, worker/bot can boot first and
+# their generated Prisma client expects columns that don't yet exist in DB.
+
 if [ -d "prisma/migrations" ] && [ "$(ls -A prisma/migrations)" ]; then
   echo "Applying pending migrations..."
   if ! npx prisma migrate deploy 2>&1 | tee /tmp/migrate_out.txt; then
@@ -31,5 +41,5 @@ else
   npx prisma db push --accept-data-loss
 fi
 
-echo "Starting API server..."
-exec node packages/api/dist/index.js
+echo "Starting service: $*"
+exec "$@"
