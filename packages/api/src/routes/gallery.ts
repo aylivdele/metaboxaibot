@@ -231,7 +231,12 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     const botUrl = `https://api.telegram.org/bot${config.bot.token}`;
     const isImageJob = job.section === "image";
 
-    type InlineButton = { text: string; callback_data?: string; url?: string };
+    type InlineButton = {
+      text: string;
+      callback_data?: string;
+      url?: string;
+      web_app?: { url: string };
+    };
 
     /**
      * Refine ("🔄 Доработать") — image-only, identical to worker payload.
@@ -323,12 +328,19 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         for (let i = 0; i < buttons.length; i += chunkSize) {
           rows.push(buttons.slice(i, i + chunkSize));
         }
+        // Drop the "⬇️ Скачать" line from the legend when no output produced
+        // a download button — happens whenever every photo fits under 50 MB
+        // (the common case), so we don't tease a button the user can't see.
+        const hasDownloadButton = buttons.some((b) => b.url || b.web_app);
+        const hintText = hasDownloadButton
+          ? t.design.batchActions
+          : t.design.batchActionsNoDownload;
         await fetch(`${botUrl}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: userId.toString(),
-            text: t.design.batchActions,
+            text: hintText,
             reply_markup: { inline_keyboard: rows },
           }),
         });

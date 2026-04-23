@@ -478,7 +478,16 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         for (let i = 0; i < buttons.length; i += chunkSize) {
           rows.push(buttons.slice(i, i + chunkSize));
         }
-        await telegram.sendMessage(telegramChatId, t.design.batchActions, {
+        // Drop the "⬇️ Скачать" line from the legend when no output produced
+        // a download button — happens whenever every photo fits under 50 MB
+        // (the common case), so we don't tease a button the user can't see.
+        const hasDownloadButton = buttons.some(
+          (b) => "url" in b || ("web_app" in b && b.web_app !== undefined),
+        );
+        const hintText = hasDownloadButton
+          ? t.design.batchActions
+          : t.design.batchActionsNoDownload;
+        await telegram.sendMessage(telegramChatId, hintText, {
           reply_markup: { inline_keyboard: rows },
         });
       }

@@ -76,6 +76,7 @@ export interface Translations {
     refSelected: string;
     refine: string;
     batchActions: string;
+    batchActionsNoDownload: string;
     chooseModel: string;
   };
   audio: {
