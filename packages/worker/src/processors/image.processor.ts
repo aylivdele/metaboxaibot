@@ -1,5 +1,6 @@
-import { UnrecoverableError } from "bullmq";
+import { UnrecoverableError, DelayedError } from "bullmq";
 import type { Job } from "bullmq";
+import { delayJob } from "../utils/delay-job.js";
 import { resolveUserFacingMessage, shouldNotifyOps } from "../utils/user-facing-error.js";
 import { getIntervalForElapsed } from "../utils/poll-schedule.js";
 import { Api } from "grammy";
@@ -92,7 +93,7 @@ async function uploadImageToS3(
   return { s3Key, thumbnailS3Key, buffer: imageBuffer };
 }
 
-export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
+export async function processImageJob(job: Job<ImageJobData>, token?: string): Promise<void> {
   const {
     dbJobId,
     userId: userIdStr,
@@ -303,18 +304,18 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
           });
         }
 
-        await getImageQueue().add(
-          "poll",
+        logger.info({ dbJobId, providerJobId }, "Image poll scheduled");
+        await delayJob(
+          job,
           {
             ...job.data,
             stage: "poll",
             pollStartedAt: Date.now(),
             lastIntervalMs: INITIAL_POLL_INTERVAL_MS,
           },
-          { delay: INITIAL_POLL_INTERVAL_MS, attempts: 1, removeOnComplete: true },
+          INITIAL_POLL_INTERVAL_MS,
+          token,
         );
-        logger.info({ dbJobId, providerJobId }, "Image poll scheduled");
-        return;
       }
     } else {
       // ── Stage 2: poll ──────────────────────────────────────────────────
@@ -356,12 +357,13 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
             .catch(() => void 0);
         }
 
-        await getImageQueue().add(
-          "poll",
+        await delayJob(
+          job,
           { ...job.data, stage: "poll", lastIntervalMs: interval },
-          { delay: interval, attempts: 1, removeOnComplete: true },
+          interval,
+          token,
         );
-        return;
+        return; // unreachable — restores TS narrowing for pollResult
       }
 
       const imageResults: ImageResult[] = Array.isArray(pollResult) ? pollResult : [pollResult];
@@ -529,6 +531,7 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Image job completed");
   } catch (err) {
+    if (err instanceof DelayedError) throw err;
     if (isRateLimitDeferredError(err)) {
       logger.info({ dbJobId, modelId, delayMs: err.delayMs }, "Image job deferred by throttle");
       return;

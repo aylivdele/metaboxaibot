@@ -126,7 +126,12 @@ export const generationService = {
         aspectRatio: effectiveAspectRatio,
         modelSettings,
       },
-      { attempts: 3, backoff: { type: "exponential", delay: 5000 } },
+      {
+        jobId: job.id,
+        removeOnComplete: true,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5000 },
+      },
     );
 
     return { dbJobId: job.id };

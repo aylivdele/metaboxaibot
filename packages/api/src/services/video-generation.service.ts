@@ -154,7 +154,12 @@ export const videoGenerationService = {
         duration: effectiveDuration,
         modelSettings,
       },
-      { attempts: 3, backoff: { type: "exponential", delay: 10000 } },
+      {
+        jobId: job.id,
+        removeOnComplete: true,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 10000 },
+      },
     );
 
     return { dbJobId: job.id, isPending: true };

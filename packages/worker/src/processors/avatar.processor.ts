@@ -1,4 +1,5 @@
-import type { Job } from "bullmq";
+import { DelayedError, type Job } from "bullmq";
+import { delayJob } from "../utils/delay-job.js";
 import { Api } from "grammy";
 import type { AvatarJobData } from "@metabox/api/queues";
 import { getAvatarQueue } from "@metabox/api/queues";
@@ -40,7 +41,7 @@ function buildSoulAdapter(acquired: AcquiredKey): HiggsFieldSoulAdapter {
   return new HiggsFieldSoulAdapter(acquired.apiKey, fetchFn);
 }
 
-export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
+export async function processAvatarJob(job: Job<AvatarJobData>, token?: string): Promise<void> {
   const {
     userAvatarId,
     userId: userIdStr,
@@ -70,16 +71,12 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
           acquired = await acquireKey("higgsfield_soul");
         } catch (e) {
           if (isPoolExhaustedError(e)) {
-            await getAvatarQueue().add("create", job.data, {
-              delay: e.retryAfterMs,
-              attempts: 1,
-              removeOnComplete: true,
-            });
+            await job.moveToDelayed(Date.now() + e.retryAfterMs, token);
             logger.info(
               { userAvatarId, retryAfterMs: e.retryAfterMs },
               "Soul create deferred: pool exhausted",
             );
-            return;
+            throw new DelayedError();
           }
           throw e;
         }
@@ -102,18 +99,13 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
           providerKeyId: acquired.keyId,
         });
 
-        // Schedule first poll
-        await getAvatarQueue().add(
-          "poll",
-          { ...job.data, action: "poll", pollAttempt: 0 },
-          { delay: POLL_DELAY_MS },
-        );
-
         logger.info(
           { userAvatarId, externalId, keyId: acquired.keyId },
           "Soul creation submitted, poll scheduled",
         );
+        await delayJob(job, { ...job.data, action: "poll", pollAttempt: 0 }, POLL_DELAY_MS, token);
       } catch (err) {
+        if (err instanceof DelayedError) throw err;
         if (
           await deferIfTransientNetworkError({
             err,
@@ -203,13 +195,15 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
           return;
         }
 
-        await getAvatarQueue().add(
-          "poll",
-          { ...job.data, action: "poll", pollAttempt: nextAttempt },
-          { delay: POLL_DELAY_MS },
-        );
         logger.info({ userAvatarId, nextAttempt }, "Soul still processing, rescheduled");
+        await delayJob(
+          job,
+          { ...job.data, action: "poll", pollAttempt: nextAttempt },
+          POLL_DELAY_MS,
+          token,
+        );
       } catch (err) {
+        if (err instanceof DelayedError) throw err;
         if (
           await deferIfTransientNetworkError({
             err,
@@ -230,13 +224,12 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         });
         const nextAttempt = pollAttempt + 1;
         if (nextAttempt < MAX_POLL_ATTEMPTS) {
-          await getAvatarQueue()
-            .add(
-              "poll",
-              { ...job.data, action: "poll", pollAttempt: nextAttempt },
-              { delay: POLL_DELAY_MS },
-            )
-            .catch(() => void 0);
+          await delayJob(
+            job,
+            { ...job.data, action: "poll", pollAttempt: nextAttempt },
+            POLL_DELAY_MS,
+            token,
+          );
         }
       }
     }
@@ -266,16 +259,12 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         acquired = await acquireKey(provider);
       } catch (e) {
         if (isPoolExhaustedError(e)) {
-          await getAvatarQueue().add("create", job.data, {
-            delay: e.retryAfterMs,
-            attempts: 1,
-            removeOnComplete: true,
-          });
+          await job.moveToDelayed(Date.now() + e.retryAfterMs, token);
           logger.info(
             { userAvatarId, retryAfterMs: e.retryAfterMs },
             "Avatar create deferred: pool exhausted",
           );
-          return;
+          throw new DelayedError();
         }
         throw e;
       }
@@ -314,18 +303,13 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         providerKeyId: acquired.keyId,
       });
 
-      // Schedule first poll after 5 minutes
-      await getAvatarQueue().add(
-        "poll",
-        { ...job.data, action: "poll", pollAttempt: 0 },
-        { delay: POLL_DELAY_MS },
-      );
-
       logger.info(
         { userAvatarId, externalId, keyId: acquired.keyId },
         "Avatar creation submitted, poll scheduled",
       );
+      await delayJob(job, { ...job.data, action: "poll", pollAttempt: 0 }, POLL_DELAY_MS, token);
     } catch (err) {
+      if (err instanceof DelayedError) throw err;
       if (isRateLimitDeferredError(err)) {
         logger.info(
           { userAvatarId, provider, delayMs: err.delayMs },
@@ -419,14 +403,15 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
         return;
       }
 
-      await getAvatarQueue().add(
-        "poll",
-        { ...job.data, action: "poll", pollAttempt: nextAttempt },
-        { delay: POLL_DELAY_MS },
-      );
-
       logger.info({ userAvatarId, nextAttempt }, "Avatar still processing, rescheduled");
+      await delayJob(
+        job,
+        { ...job.data, action: "poll", pollAttempt: nextAttempt },
+        POLL_DELAY_MS,
+        token,
+      );
     } catch (err) {
+      if (err instanceof DelayedError) throw err;
       if (
         await deferIfTransientNetworkError({
           err,
@@ -448,13 +433,12 @@ export async function processAvatarJob(job: Job<AvatarJobData>): Promise<void> {
       // Re-schedule on error (non-fatal) if under limit
       const nextAttempt = pollAttempt + 1;
       if (nextAttempt < MAX_POLL_ATTEMPTS) {
-        await getAvatarQueue()
-          .add(
-            "poll",
-            { ...job.data, action: "poll", pollAttempt: nextAttempt },
-            { delay: POLL_DELAY_MS },
-          )
-          .catch(() => void 0);
+        await delayJob(
+          job,
+          { ...job.data, action: "poll", pollAttempt: nextAttempt },
+          POLL_DELAY_MS,
+          token,
+        );
       }
     }
   }

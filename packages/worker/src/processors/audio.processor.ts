@@ -1,4 +1,5 @@
-import { UnrecoverableError, type Job } from "bullmq";
+import { UnrecoverableError, DelayedError, type Job } from "bullmq";
+import { delayJob } from "../utils/delay-job.js";
 import { Api, InputFile } from "grammy";
 import type { AudioJobData } from "@metabox/api/queues";
 import { getAudioQueue } from "@metabox/api/queues";
@@ -51,7 +52,7 @@ async function sendAudio(
   }
 }
 
-export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
+export async function processAudioJob(job: Job<AudioJobData>, token?: string): Promise<void> {
   const {
     dbJobId,
     userId: userIdStr,
@@ -202,18 +203,18 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
           });
         }
 
-        await getAudioQueue().add(
-          "poll",
+        logger.info({ dbJobId, providerJobId }, "Audio poll scheduled");
+        await delayJob(
+          job,
           {
             ...job.data,
             stage: "poll",
             pollStartedAt: Date.now(),
             lastIntervalMs: INITIAL_POLL_INTERVAL_MS,
           },
-          { delay: INITIAL_POLL_INTERVAL_MS, attempts: 1, removeOnComplete: true },
+          INITIAL_POLL_INTERVAL_MS,
+          token,
         );
-        logger.info({ dbJobId, providerJobId }, "Audio poll scheduled");
-        return;
       }
     } else {
       // ── Stage 2: poll ──────────────────────────────────────────────────
@@ -253,12 +254,12 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
             .catch(() => void 0);
         }
 
-        await getAudioQueue().add(
-          "poll",
+        await delayJob(
+          job,
           { ...job.data, stage: "poll", lastIntervalMs: interval },
-          { delay: interval, attempts: 1, removeOnComplete: true },
+          interval,
+          token,
         );
-        return;
       }
     }
 
@@ -305,6 +306,7 @@ export async function processAudioJob(job: Job<AudioJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Audio job completed");
   } catch (err) {
+    if (err instanceof DelayedError) throw err;
     if (isRateLimitDeferredError(err)) {
       logger.info({ dbJobId, modelId, delayMs: err.delayMs }, "Audio job deferred by throttle");
       return;
