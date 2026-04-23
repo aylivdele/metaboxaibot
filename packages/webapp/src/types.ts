@@ -287,22 +287,33 @@ export interface Message {
   createdAt: string;
 }
 
-export interface GalleryItem {
+export interface GalleryOutput {
   id: string;
-  section: string;
-  modelId: string;
-  prompt: string;
   s3Key: string | null;
   outputUrl: string | null;
   /** Resolved full-res URL — /download/:token when S3 key available, else outputUrl. */
   previewUrl: string | null;
   /** Thumbnail WebP (400px wide) — available for images only, null otherwise. */
   thumbnailUrl: string | null;
+}
+
+export interface GalleryJob {
+  id: string;
+  section: string;
+  modelId: string;
+  /** Display name from AI_MODELS, falls back to modelId. */
+  modelName: string;
+  prompt: string;
+  /** Per-model settings used at generation time (Record<string, unknown>). */
+  modelSettings: Record<string, unknown>;
+  /** Internal tokens debited. Stringified Decimal — null for old jobs / recovery fast-path. */
+  tokensSpent: string | null;
   completedAt: string | null;
+  outputs: GalleryOutput[];
 }
 
 export interface GalleryResponse {
-  items: GalleryItem[];
+  items: GalleryJob[];
   total: number;
   page: number;
   limit: number;

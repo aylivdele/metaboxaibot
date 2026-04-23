@@ -2132,6 +2132,193 @@ textarea::placeholder {
   box-shadow: none;
 }
 
+/* ── Gallery: multi-output cards, modal ───────────────────────────────────── */
+.gallery-card__cost {
+  font-size: 11px;
+  color: var(--text-hint);
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.gallery-card__model-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.gallery-card__outputs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+.gallery-card__outputs--single {
+  grid-template-columns: 1fr;
+}
+.gallery-card__outputs--three {
+  grid-template-columns: repeat(2, 1fr);
+}
+.gallery-card__output-tile {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  cursor: pointer;
+}
+.gallery-card__outputs--single .gallery-card__output-tile {
+  cursor: default;
+}
+.gallery-card__output-tile img,
+.gallery-card__output-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.gallery-card__output-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.gallery-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.gallery-card__actions .gallery-card__btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
+}
+.gallery-card__btn--secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+/* Details modal */
+.gallery-modal {
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.gallery-modal__section {
+  margin-bottom: 14px;
+}
+.gallery-modal__label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-hint);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+.gallery-modal__prompt {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md, 10px);
+  padding: 10px 12px;
+}
+.gallery-modal__settings {
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md, 10px);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gallery-modal__setting-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.gallery-modal__setting-key {
+  color: var(--text-hint);
+  flex-shrink: 0;
+}
+.gallery-modal__setting-val {
+  text-align: right;
+  word-break: break-word;
+}
+.gallery-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.gallery-modal__actions .gallery-card__btn {
+  margin-top: 0;
+}
+.gallery-modal__error {
+  font-size: 12px;
+  color: var(--danger);
+  margin-top: 6px;
+}
+
+.gallery-modal__download {
+  position: relative;
+}
+.gallery-modal__download-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+.gallery-modal__download-caret {
+  font-size: 10px;
+  opacity: 0.85;
+}
+.gallery-modal__download-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  background: var(--bg-card);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.18));
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 5;
+  padding: 4px 0;
+}
+.gallery-modal__download-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-weight: 500;
+}
+.gallery-modal__download-item:hover {
+  background: var(--bg-secondary);
+}
+.gallery-modal__download-item:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 /* ── Pagination ─────────────────────────────────────────────────────────────── */
 .pagination {
   display: flex;

@@ -327,11 +327,21 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
 
       const model = AI_MODELS[modelId];
       if (model) {
-        deductResult = await deductTokens(
-          BigInt(userIdStr),
-          calculateCost(model, 0, 0, undefined, undefined, modelSettings, undefined, prompt.length),
-          modelId,
+        const internalCost = calculateCost(
+          model,
+          0,
+          0,
+          undefined,
+          undefined,
+          modelSettings,
+          undefined,
+          prompt.length,
         );
+        deductResult = await deductTokens(BigInt(userIdStr), internalCost, modelId);
+        await db.generationJob.update({
+          where: { id: dbJobId },
+          data: { tokensSpent: internalCost },
+        });
       }
     }
 

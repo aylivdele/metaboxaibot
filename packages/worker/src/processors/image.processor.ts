@@ -245,6 +245,10 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             });
 
       deductResult = await deductTokens(BigInt(userIdStr), internalCost, modelId);
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { tokensSpent: internalCost },
+      });
       return true;
     };
 

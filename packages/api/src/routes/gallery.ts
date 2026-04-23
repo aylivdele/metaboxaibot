@@ -3,7 +3,7 @@ import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
 import { getFileUrl, deleteFile } from "../services/s3.service.js";
 import { generateDownloadToken } from "../utils/download-token.js";
-import { config, getT } from "@metabox/shared";
+import { AI_MODELS, config, getT } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
@@ -76,7 +76,8 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * GET /gallery?section=image|audio|video&page=1&limit=20
    * Returns the current user's completed generation jobs, newest first.
-   * Each output within a batch is returned as a separate gallery item.
+   * Outputs of a single job are grouped under one entry so the UI can render
+   * a multi-image card per request.
    */
   fastify.get<{
     Querystring: { section?: string; page?: string; limit?: string };
@@ -104,6 +105,8 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           section: true,
           modelId: true,
           prompt: true,
+          inputData: true,
+          tokensSpent: true,
           completedAt: true,
           outputs: {
             orderBy: { index: "asc" },
@@ -120,31 +123,41 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     ]);
 
     const base = config.api.publicUrl;
-    const items = rawJobs.flatMap((job) =>
-      job.outputs.map((output) => {
+    const items = rawJobs.map((job) => {
+      const model = AI_MODELS[job.modelId];
+      const inputData = (job.inputData ?? {}) as Record<string, unknown>;
+      const modelSettings = (inputData.modelSettings as Record<string, unknown> | undefined) ?? {};
+
+      const outputs = job.outputs.map((output) => {
         const previewUrl =
-          job.section !== "design"
-            ? null
-            : output.s3Key && base
-              ? `${base}/download/${generateDownloadToken(output.s3Key, userId)}`
-              : output.outputUrl;
+          job.section !== "design" && output.s3Key && base
+            ? `${base}/download/${generateDownloadToken(output.s3Key, userId)}`
+            : output.outputUrl;
         const thumbnailUrl =
           output.thumbnailS3Key && base
             ? `${base}/download/${generateDownloadToken(output.thumbnailS3Key, userId)}`
             : null;
         return {
           id: output.id,
-          section: job.section,
-          modelId: job.modelId,
-          prompt: job.prompt,
           s3Key: output.s3Key,
           outputUrl: output.outputUrl,
           previewUrl,
           thumbnailUrl,
-          completedAt: job.completedAt,
         };
-      }),
-    );
+      });
+
+      return {
+        id: job.id,
+        section: job.section,
+        modelId: job.modelId,
+        modelName: model?.name ?? job.modelId,
+        prompt: job.prompt,
+        modelSettings,
+        tokensSpent: job.tokensSpent ? job.tokensSpent.toString() : null,
+        completedAt: job.completedAt,
+        outputs,
+      };
+    });
 
     return { items, total, page: parseInt(page, 10), limit: take };
   });
@@ -302,32 +315,65 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
-   * DELETE /gallery/:id
-   * Removes a gallery output along with its S3 artifacts.
-   * If the parent job has no remaining outputs, the job is also deleted.
+   * GET /gallery/outputs/:id/original-url
+   * Returns a presigned S3 URL with attachment-disposition so the browser
+   * downloads the original file instead of opening it inline. Falls back
+   * to the provider URL when the file is not in S3.
    */
-  fastify.delete<{ Params: { id: string } }>("/gallery/:id", async (request, reply) => {
+  fastify.get<{ Params: { id: string } }>(
+    "/gallery/outputs/:id/original-url",
+    async (request, reply) => {
+      const userId = (request as AuthRequest).userId;
+      const { id } = request.params;
+
+      const output = await db.generationJobOutput.findUnique({
+        where: { id },
+        include: { job: { select: { userId: true } } },
+      });
+
+      if (!output) return reply.code(404).send({ error: "Not found" });
+      if (output.job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+
+      let url: string | null = null;
+      if (output.s3Key) {
+        const filename = output.s3Key.split("/").pop() ?? "file";
+        url = await getFileUrl(output.s3Key, filename);
+      }
+      if (!url) url = output.outputUrl;
+
+      if (!url) return reply.code(422).send({ error: "File not available" });
+      return { url };
+    },
+  );
+
+  /**
+   * DELETE /gallery/jobs/:id
+   * Removes the entire generation job — all its outputs and S3 artifacts.
+   */
+  fastify.delete<{ Params: { id: string } }>("/gallery/jobs/:id", async (request, reply) => {
     const userId = (request as AuthRequest).userId;
     const { id } = request.params;
 
-    const output = await db.generationJobOutput.findUnique({
+    const job = await db.generationJob.findUnique({
       where: { id },
-      include: { job: { select: { userId: true } } },
+      select: {
+        userId: true,
+        outputs: { select: { s3Key: true, thumbnailS3Key: true } },
+      },
     });
 
-    if (!output) return reply.code(404).send({ error: "Not found" });
-    if (output.job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+    if (!job) return reply.code(404).send({ error: "Not found" });
+    if (job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
 
-    if (output.s3Key) await deleteFile(output.s3Key);
-    if (output.thumbnailS3Key) await deleteFile(output.thumbnailS3Key);
+    await Promise.all(
+      job.outputs.flatMap((o) => [
+        o.s3Key ? deleteFile(o.s3Key) : Promise.resolve(),
+        o.thumbnailS3Key ? deleteFile(o.thumbnailS3Key) : Promise.resolve(),
+      ]),
+    );
 
-    await db.generationJobOutput.delete({ where: { id } });
-
-    // Clean up orphaned job
-    const remaining = await db.generationJobOutput.count({ where: { jobId: output.jobId } });
-    if (remaining === 0) {
-      await db.generationJob.delete({ where: { id: output.jobId } });
-    }
+    // outputs cascade-delete via the FK on GenerationJobOutput
+    await db.generationJob.delete({ where: { id } });
 
     return { success: true };
   });

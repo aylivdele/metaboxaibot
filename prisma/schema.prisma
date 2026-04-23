@@ -194,6 +194,7 @@ model GenerationJob {
   providerKeyId    String? // ProviderKey.id выбранный на submit; null = был использован env-fallback
   sourceMessageId  String? // "{chatId}:{messageId}" of the inline button that triggered this job
   pollStartedAt    DateTime? // момент перехода в poll-стадию — фиксируется при записи providerJobId, чтобы 24ч-таймаут корректно работал после recovery
+  tokensSpent      Decimal?  @db.Decimal(12, 4) // сколько внутренних токенов списано за эту джобу (для отображения в галерее); null = неизвестно (старые джобы или recovery fast-path)
   error            String?
 
   createdAt   DateTime  @default(now())

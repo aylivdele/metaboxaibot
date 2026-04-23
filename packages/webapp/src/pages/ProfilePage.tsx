@@ -4,7 +4,8 @@ import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { TranslationKey } from "../i18n.js";
 // import { BannerSlider } from "../components/BannerSlider.js";
-import type { UserProfile, GalleryItem } from "../types.js";
+import type { UserProfile, GalleryJob, GalleryOutput } from "../types.js";
+import { openExternalLink } from "../utils/telegram.js";
 
 export type ProfileTab = "overview" | "gallery" | "account";
 
@@ -221,11 +222,12 @@ type Section = (typeof SECTIONS)[number];
 function GalleryTab() {
   const { t, locale } = useI18n();
   const [section, setSection] = useState<Section>("image");
-  const [items, setItems] = useState<GalleryItem[]>([]);
+  const [items, setItems] = useState<GalleryJob[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detailsJob, setDetailsJob] = useState<GalleryJob | null>(null);
   const LIMIT = 20;
 
   const sectionLabels: Record<Section, string> = {
@@ -256,13 +258,13 @@ function GalleryTab() {
     setPage(1);
   };
 
-  const handleSend = useCallback(async (id: string) => {
-    await api.gallery.download(id);
+  const handleSend = useCallback(async (outputId: string) => {
+    await api.gallery.download(outputId);
   }, []);
 
-  const handleDelete = useCallback(async (id: string) => {
-    await api.gallery.delete(id);
-    setItems((prev) => prev.filter((it) => it.id !== id));
+  const handleDelete = useCallback(async (jobId: string) => {
+    await api.gallery.deleteJob(jobId);
+    setItems((prev) => prev.filter((j) => j.id !== jobId));
     setTotal((prev) => Math.max(0, prev - 1));
   }, []);
 
@@ -291,8 +293,14 @@ function GalleryTab() {
 
       {!loading && items.length > 0 && (
         <div className={`gallery-grid${section === "image" ? " gallery-grid--2col" : ""}`}>
-          {items.map((item) => (
-            <GalleryCard key={item.id} item={item} onSend={handleSend} onDelete={handleDelete} />
+          {items.map((job) => (
+            <GalleryCard
+              key={job.id}
+              job={job}
+              onSend={handleSend}
+              onDelete={handleDelete}
+              onOpenDetails={setDetailsJob}
+            />
           ))}
         </div>
       )}
@@ -318,8 +326,22 @@ function GalleryTab() {
           </button>
         </div>
       )}
+
+      {detailsJob &&
+        createPortal(
+          <GalleryDetailsModal job={detailsJob} onClose={() => setDetailsJob(null)} />,
+          document.body,
+        )}
     </>
   );
+}
+
+function formatGalleryTokens(raw: string | null): string | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  // Up to 2 decimals, trim trailing zeros so whole numbers show as "5", not "5.00".
+  return n.toFixed(2).replace(/\.?0+$/, "");
 }
 
 /**
@@ -408,29 +430,40 @@ function AudioPlayButton({
 }
 
 function GalleryCard({
-  item,
+  job,
   onSend,
   onDelete,
+  onOpenDetails,
 }: {
-  item: GalleryItem;
-  onSend: (id: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  job: GalleryJob;
+  onSend: (outputId: string) => Promise<void>;
+  onDelete: (jobId: string) => Promise<void>;
+  onOpenDetails: (job: GalleryJob) => void;
 }) {
   const { t, locale } = useI18n();
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [imgError, setImgError] = useState(false);
+  const [imgErrors, setImgErrors] = useState<Record<string, true>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [activeOutputIdx, setActiveOutputIdx] = useState(0);
+
+  const isImage = job.section === "image";
+  const isVideo = job.section === "video";
+  const isAudio = job.section === "audio";
+
+  const outputs = job.outputs;
+  const activeOutput: GalleryOutput | undefined = outputs[activeOutputIdx] ?? outputs[0];
 
   const handleSend = async () => {
+    if (!activeOutput) return;
     setLoading(true);
     setError(null);
     try {
-      await onSend(item.id);
+      await onSend(activeOutput.id);
       setSent(true);
       setTimeout(() => setSent(false), 3000);
     } catch (err) {
@@ -440,19 +473,11 @@ function GalleryCard({
     }
   };
 
-  const isImage = item.section === "image";
-  const isVideo = item.section === "video";
-  const isAudio = item.section === "audio";
-  // Image preview: prefer the server-resolved thumbnail (fast, small WebP),
-  // then any full previewUrl the backend bothered to sign, then the raw
-  // provider outputUrl as last resort.
-  const imagePreviewUrl = item.thumbnailUrl ?? item.previewUrl ?? item.outputUrl;
-
   const openVideo = async () => {
-    if (videoLoading || videoUrl) return;
+    if (videoLoading || videoUrl || !activeOutput) return;
     setVideoLoading(true);
     try {
-      const res = await api.gallery.previewUrl(item.id);
+      const res = await api.gallery.previewUrl(activeOutput.id);
       setVideoUrl(res.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -462,20 +487,25 @@ function GalleryCard({
   };
 
   const resolveAudioUrl = async () => {
-    const res = await api.gallery.previewUrl(item.id);
+    if (!activeOutput) throw new Error("No output");
+    const res = await api.gallery.previewUrl(activeOutput.id);
     return res.url;
   };
 
   const handleConfirmDelete = async () => {
     setDeleting(true);
     try {
-      await onDelete(item.id);
+      await onDelete(job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setDeleting(false);
       setConfirmDelete(false);
     }
   };
+
+  const tokens = formatGalleryTokens(job.tokensSpent);
+  const tokensLabel = tokens ? `${tokens} ${t("gallery.costTokens")}` : t("gallery.costUnknown");
+  const collageOutputs = outputs.slice(0, 4);
 
   return (
     <div className="gallery-card">
@@ -488,60 +518,112 @@ function GalleryCard({
       >
         ×
       </button>
-      {isImage && imagePreviewUrl && !imgError && (
-        <div className="gallery-card__preview">
-          <img
-            src={imagePreviewUrl}
-            alt={item.prompt}
-            loading="lazy"
-            onError={() => setImgError(true)}
-          />
+
+      {isImage && outputs.length > 1 ? (
+        <div
+          className={`gallery-card__outputs${
+            collageOutputs.length === 3 ? " gallery-card__outputs--three" : ""
+          }`}
+        >
+          {collageOutputs.map((out, i) => {
+            const showOverlay = i === 3 && outputs.length > 4;
+            const errored = imgErrors[out.id];
+            const src = out.thumbnailUrl ?? out.previewUrl ?? out.outputUrl ?? "";
+            return (
+              <div
+                key={out.id}
+                className="gallery-card__output-tile"
+                onClick={() => setActiveOutputIdx(i)}
+              >
+                {!errored && src && (
+                  <img
+                    src={src}
+                    alt=""
+                    loading="lazy"
+                    onError={() => setImgErrors((p) => ({ ...p, [out.id]: true }))}
+                  />
+                )}
+                {showOverlay && (
+                  <div className="gallery-card__output-overlay">
+                    {t("gallery.morePhotos").replace("{n}", String(outputs.length - 4))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-      )}
-      {isVideo && (
+      ) : isImage && activeOutput ? (
+        <div className="gallery-card__preview">
+          {!imgErrors[activeOutput.id] && (
+            <img
+              src={
+                activeOutput.thumbnailUrl ?? activeOutput.previewUrl ?? activeOutput.outputUrl ?? ""
+              }
+              alt={job.prompt}
+              loading="lazy"
+              onError={() => setImgErrors((p) => ({ ...p, [activeOutput.id]: true }))}
+            />
+          )}
+        </div>
+      ) : isVideo ? (
         <div
           className="gallery-card__preview gallery-card__preview--video"
           onClick={openVideo}
           role="button"
           tabIndex={0}
         >
-          {item.thumbnailUrl && !imgError ? (
+          {activeOutput?.thumbnailUrl && !imgErrors[activeOutput.id] ? (
             <img
-              src={item.thumbnailUrl}
-              alt={item.prompt}
+              src={activeOutput.thumbnailUrl}
+              alt={job.prompt}
               loading="lazy"
-              onError={() => setImgError(true)}
+              onError={() => setImgErrors((p) => ({ ...p, [activeOutput.id]: true }))}
             />
           ) : (
             <div className="gallery-card__placeholder">🎬</div>
           )}
           <div className="gallery-card__video-overlay">{videoLoading ? "⏳" : "▶"}</div>
         </div>
-      )}
-      {isAudio && (
+      ) : isAudio ? (
         <div className="gallery-card__preview gallery-card__preview--audio">
           <AudioPlayButton resolveUrl={resolveAudioUrl} title={t("uploads.play")} />
         </div>
-      )}
+      ) : null}
+
       <div className="gallery-card__body">
         <div className="gallery-card__meta">
-          <span className="gallery-card__model">{item.modelId}</span>
-          {item.completedAt && (
+          <div className="gallery-card__model-row">
+            <span className="gallery-card__model" title={job.modelName}>
+              {job.modelName}
+            </span>
+            <span className="gallery-card__cost">{tokensLabel}</span>
+          </div>
+          {job.completedAt && (
             <span className="gallery-card__date">
-              {new Date(item.completedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
+              {new Date(job.completedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
             </span>
           )}
         </div>
-        <p className="gallery-card__prompt">{item.prompt}</p>
+        <p className="gallery-card__prompt">{job.prompt}</p>
         {error && <p className="gallery-card__error">{error}</p>}
-        <button
-          className={`gallery-card__btn${sent ? " gallery-card__btn--sent" : ""}`}
-          onClick={handleSend}
-          disabled={loading || sent}
-        >
-          {loading ? "…" : sent ? t("gallery.sent") : t("gallery.download")}
-        </button>
+        <div className="gallery-card__actions">
+          <button
+            className={`gallery-card__btn${sent ? " gallery-card__btn--sent" : ""}`}
+            onClick={handleSend}
+            disabled={loading || sent || !activeOutput}
+          >
+            {loading ? "…" : sent ? t("gallery.sent") : t("gallery.download")}
+          </button>
+          <button
+            type="button"
+            className="gallery-card__btn gallery-card__btn--secondary"
+            onClick={() => onOpenDetails(job)}
+          >
+            {t("gallery.details")}
+          </button>
+        </div>
       </div>
+
       {confirmDelete &&
         createPortal(
           <div className="modal-overlay" onClick={() => !deleting && setConfirmDelete(false)}>
@@ -587,6 +669,169 @@ function GalleryCard({
           </div>,
           document.body,
         )}
+    </div>
+  );
+}
+
+function GalleryDetailsModal({ job, onClose }: { job: GalleryJob; onClose: () => void }) {
+  const { t } = useI18n();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const downloadRef = useRef<HTMLDivElement | null>(null);
+
+  const settingsEntries = Object.entries(job.modelSettings ?? {}).filter(
+    ([, v]) => v !== null && v !== undefined && v !== "",
+  );
+
+  // Close the dropdown when the user clicks outside it.
+  useEffect(() => {
+    if (!downloadOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!downloadRef.current?.contains(e.target as Node)) setDownloadOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [downloadOpen]);
+
+  const downloadOutput = async (outputId: string) => {
+    setDownloadingId(outputId);
+    setError(null);
+    try {
+      const { url } = await api.gallery.originalUrl(outputId);
+      openExternalLink(url);
+      setDownloadOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const outputLabelKey = (() => {
+    if (job.section === "video") return "gallery.outputLabel.video" as const;
+    if (job.section === "audio") return "gallery.outputLabel.audio" as const;
+    return "gallery.outputLabel.image" as const;
+  })();
+
+  const handleApplySettings = async () => {
+    setApplying(true);
+    setError(null);
+    try {
+      await api.modelSettings.set(job.modelId, job.modelSettings ?? {});
+      setApplied(true);
+      setTimeout(() => setApplied(false), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const handleCopyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(job.prompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card gallery-modal" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="modal-close" onClick={onClose} aria-label="close">
+          ×
+        </button>
+        <h3 className="modal-title">{job.modelName}</h3>
+
+        <div className="gallery-modal__section">
+          <div className="gallery-modal__label">{t("gallery.prompt")}</div>
+          <div className="gallery-modal__prompt">{job.prompt}</div>
+        </div>
+
+        <div className="gallery-modal__section">
+          <div className="gallery-modal__label">{t("gallery.settings")}</div>
+          {settingsEntries.length === 0 ? (
+            <div className="gallery-modal__settings">{t("gallery.noSettings")}</div>
+          ) : (
+            <div className="gallery-modal__settings">
+              {settingsEntries.map(([key, value]) => (
+                <div key={key} className="gallery-modal__setting-row">
+                  <span className="gallery-modal__setting-key">{key}</span>
+                  <span className="gallery-modal__setting-val">
+                    {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {error && <div className="gallery-modal__error">❌ {error}</div>}
+
+        <div className="gallery-modal__actions">
+          {job.outputs.length <= 1 ? (
+            <button
+              type="button"
+              className="gallery-card__btn"
+              onClick={() => job.outputs[0] && downloadOutput(job.outputs[0].id)}
+              disabled={downloadingId !== null || job.outputs.length === 0}
+            >
+              {downloadingId ? "…" : t("gallery.downloadOriginal")}
+            </button>
+          ) : (
+            <div className="gallery-modal__download" ref={downloadRef}>
+              <button
+                type="button"
+                className="gallery-card__btn gallery-modal__download-toggle"
+                onClick={() => setDownloadOpen((v) => !v)}
+                disabled={downloadingId !== null}
+              >
+                <span>{downloadingId ? "…" : t("gallery.downloadOriginal")}</span>
+                <span className="gallery-modal__download-caret">▾</span>
+              </button>
+              {downloadOpen && (
+                <div className="gallery-modal__download-menu" role="listbox">
+                  {job.outputs.map((out, i) => (
+                    <button
+                      key={out.id}
+                      type="button"
+                      className="gallery-modal__download-item"
+                      onClick={() => downloadOutput(out.id)}
+                      disabled={downloadingId !== null}
+                      role="option"
+                    >
+                      {t(outputLabelKey).replace("{n}", String(i + 1))}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <button
+            type="button"
+            className={`gallery-card__btn${applied ? " gallery-card__btn--sent" : ""}`}
+            onClick={handleApplySettings}
+            disabled={applying || applied}
+          >
+            {applying ? "…" : applied ? t("gallery.applied") : t("gallery.applySettings")}
+          </button>
+          <button
+            type="button"
+            className={`gallery-card__btn gallery-card__btn--secondary${
+              copied ? " gallery-card__btn--sent" : ""
+            }`}
+            onClick={handleCopyPrompt}
+          >
+            {copied ? t("gallery.copied") : t("gallery.copyPrompt")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

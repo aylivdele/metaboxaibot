@@ -386,21 +386,22 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
           : undefined;
         const refVideos = (mediaInputs as Record<string, string[]> | undefined)?.ref_videos ?? [];
         const hasVideoInputs = refVideos.length > 0;
-        deductResult = await deductTokens(
-          BigInt(userIdStr),
-          calculateCost(
-            model,
-            0,
-            0,
-            undefined,
-            videoTokens,
-            modelSettings,
-            effectiveDuration,
-            undefined,
-            { hasVideoInputs },
-          ),
-          modelId,
+        const internalCost = calculateCost(
+          model,
+          0,
+          0,
+          undefined,
+          videoTokens,
+          modelSettings,
+          effectiveDuration,
+          undefined,
+          { hasVideoInputs },
         );
+        deductResult = await deductTokens(BigInt(userIdStr), internalCost, modelId);
+        await db.generationJob.update({
+          where: { id: dbJobId },
+          data: { tokensSpent: internalCost },
+        });
       }
     }
 

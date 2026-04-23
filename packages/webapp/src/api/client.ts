@@ -237,10 +237,13 @@ export const api = {
       if (params.limit) qs.set("limit", String(params.limit));
       return request<GalleryResponse>(`/gallery?${qs.toString()}`);
     },
-    download: (id: string) =>
-      request<{ success: boolean }>(`/gallery/${id}/download`, { method: "POST" }),
-    previewUrl: (id: string) => request<{ url: string }>(`/gallery/${id}/preview-url`),
-    delete: (id: string) => request<{ success: boolean }>(`/gallery/${id}`, { method: "DELETE" }),
+    download: (outputId: string) =>
+      request<{ success: boolean }>(`/gallery/${outputId}/download`, { method: "POST" }),
+    previewUrl: (outputId: string) => request<{ url: string }>(`/gallery/${outputId}/preview-url`),
+    originalUrl: (outputId: string) =>
+      request<{ url: string }>(`/gallery/outputs/${outputId}/original-url`),
+    deleteJob: (jobId: string) =>
+      request<{ success: boolean }>(`/gallery/jobs/${jobId}`, { method: "DELETE" }),
   },
 
   imageSettings: {
