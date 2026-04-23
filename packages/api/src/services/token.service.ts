@@ -139,6 +139,11 @@ export async function checkPaidSubscription(userId: bigint): Promise<void> {
 interface ResolvedRates {
   baseRequest: number;
   inputCostPerMToken: number;
+  /**
+   * Discounted rate for tokens served from the provider's prompt cache.
+   * `undefined` → cached tokens billed at the regular `inputCostPerMToken` rate.
+   */
+  cachedInputCostPerMToken?: number;
   outputCostPerMToken: number;
   costPerSecond?: number;
   costPerMVideoToken?: number;
@@ -156,6 +161,7 @@ function resolveRates(
 ): ResolvedRates {
   let baseRequest = model.costUsdPerRequest;
   let inputCostPerMToken = model.inputCostUsdPerMToken;
+  let cachedInputCostPerMToken = model.cachedInputCostUsdPerMToken;
   let outputCostPerMToken = model.outputCostUsdPerMToken;
   let costPerSecond = model.costUsdPerSecond;
   let costPerMVideoToken = model.costUsdPerMVideoToken;
@@ -165,6 +171,9 @@ function resolveRates(
   if (model.contextPricingTiers && inputTokens > model.contextPricingTiers.thresholdTokens) {
     inputCostPerMToken *= model.contextPricingTiers.inputMultiplier;
     outputCostPerMToken *= model.contextPricingTiers.outputMultiplier;
+    if (cachedInputCostPerMToken !== undefined) {
+      cachedInputCostPerMToken *= model.contextPricingTiers.inputMultiplier;
+    }
   }
 
   // Setting-based cost overrides
@@ -187,6 +196,7 @@ function resolveRates(
   return {
     baseRequest,
     inputCostPerMToken,
+    cachedInputCostPerMToken,
     outputCostPerMToken,
     costPerSecond,
     costPerMVideoToken,
@@ -320,10 +330,25 @@ function computeAddonUsd(
 
 /**
  * Compute LLM per-token USD cost.
+ *
+ * `cachedInputTokens` (subset of `inputTokens`) is billed at the model's
+ * `cachedInputCostUsdPerMToken` if defined. When the model has no cached
+ * rate, cached tokens fall through to the regular input rate (no discount).
  */
-function computeLlmUsd(rates: ResolvedRates, inputTokens: number, outputTokens: number): number {
+function computeLlmUsd(
+  rates: ResolvedRates,
+  inputTokens: number,
+  outputTokens: number,
+  cachedInputTokens: number,
+): number {
+  const cached = Math.min(Math.max(cachedInputTokens, 0), inputTokens);
+  const billedFresh = inputTokens - cached;
+  const cachedRate = rates.cachedInputCostPerMToken ?? rates.inputCostPerMToken;
   return (
-    (inputTokens * rates.inputCostPerMToken + outputTokens * rates.outputCostPerMToken) / 1_000_000
+    (billedFresh * rates.inputCostPerMToken +
+      cached * cachedRate +
+      outputTokens * rates.outputCostPerMToken) /
+    1_000_000
   );
 }
 
@@ -358,6 +383,12 @@ export function calculateCost(
     inputImagesMegapixels?: number[];
     hasInputImage?: boolean;
     hasVideoInputs?: boolean;
+    /**
+     * Subset of `inputTokens` served from the provider's prompt cache —
+     * billed at `cachedInputCostUsdPerMToken` if set on the model, otherwise
+     * at the regular input rate.
+     */
+    cachedInputTokens?: number;
   },
 ): number {
   const rates = resolveRates(model, inputTokens, modelSettings);
@@ -373,7 +404,7 @@ export function calculateCost(
     hasVideoInputs: extra?.hasVideoInputs,
   });
   const addonUsd = computeAddonUsd(model, modelSettings);
-  const llmUsd = computeLlmUsd(rates, inputTokens, outputTokens);
+  const llmUsd = computeLlmUsd(rates, inputTokens, outputTokens, extra?.cachedInputTokens ?? 0);
   return usdToTokens(mediaUsd + addonUsd + llmUsd);
 }
 

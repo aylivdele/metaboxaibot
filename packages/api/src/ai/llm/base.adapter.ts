@@ -77,6 +77,14 @@ export interface StreamResult {
   newResponseId?: string;
   /** Raw provider input token count (API tokens, not internal credits). */
   inputTokensUsed?: number;
+  /**
+   * Subset of `inputTokensUsed` that the provider served from its prompt
+   * cache (OpenAI: `usage.input_tokens_details.cached_tokens`, Anthropic:
+   * `cache_read_input_tokens`, Gemini: cached-context tokens). Billed at
+   * `cachedInputCostUsdPerMToken` if the model defines it; otherwise rolled
+   * into the regular input bucket.
+   */
+  cachedInputTokensUsed?: number;
   /** Raw provider output token count (API tokens, not internal credits). */
   outputTokensUsed?: number;
   /**

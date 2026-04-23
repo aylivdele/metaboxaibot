@@ -223,6 +223,13 @@ export interface AIModel {
    */
   inputCostUsdPerMToken: number;
   /**
+   * USD per 1 million CACHED INPUT tokens. Set when the provider bills cached
+   * context (e.g. OpenAI Responses API with `previous_response_id`) at a
+   * discounted rate. When unset, cached tokens are billed at the full
+   * `inputCostUsdPerMToken` rate (no provider-side discount available).
+   */
+  cachedInputCostUsdPerMToken?: number;
+  /**
    * USD per 1 million OUTPUT tokens (LLM models only, 0 for media).
    */
   outputCostUsdPerMToken: number;

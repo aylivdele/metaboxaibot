@@ -284,6 +284,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     provider: "openai",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 2.5, // >272k tokens: ×2 = $5/M
+    cachedInputCostUsdPerMToken: 0.25, // OpenAI prompt cache: 90% off для gpt-5.4
     outputCostUsdPerMToken: 15, // >272k tokens: ×1.5 = $22.5/M
     contextPricingTiers: { thresholdTokens: 272_000, inputMultiplier: 2, outputMultiplier: 1.5 },
     supportsImages: true,
@@ -338,6 +339,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     provider: "openai",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0.05,
+    cachedInputCostUsdPerMToken: 0.02, // OpenAI prompt cache: 90% off
     outputCostUsdPerMToken: 0.4,
     supportsImages: false,
     supportsVoice: false,
@@ -356,6 +358,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     provider: "openai",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 1.1,
+    cachedInputCostUsdPerMToken: 0.275, // OpenAI prompt cache: 75% off
     outputCostUsdPerMToken: 4.4,
     supportsImages: true,
     supportsVoice: false,
@@ -391,6 +394,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     provider: "openai",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 1.1,
+    cachedInputCostUsdPerMToken: 0.55, // OpenAI prompt cache: 50% off (o3 family)
     outputCostUsdPerMToken: 4.4,
     supportsImages: false,
     supportsVoice: false,

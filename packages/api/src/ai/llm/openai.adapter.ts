@@ -73,6 +73,9 @@ export class OpenAIAdapter extends BaseLLMAdapter {
       ...this.buildParams(input),
     });
     const usage = response.usage;
+    // tokensUsed here is a raw token count for the LLMOutput contract
+    // (legacy non-stream path — chat.service uses chatStream end-result for
+    // exact billing, including cached-token discount).
     return {
       text: response.output_text,
       tokensUsed: usage ? usage.input_tokens + usage.output_tokens : 0,
@@ -100,6 +103,7 @@ export class OpenAIAdapter extends BaseLLMAdapter {
 
     let newResponseId: string | undefined;
     let inputTokensUsed = 0;
+    let cachedInputTokensUsed = 0;
     let outputTokensUsed = 0;
 
     for await (const event of stream) {
@@ -110,12 +114,20 @@ export class OpenAIAdapter extends BaseLLMAdapter {
         const usage = event.response.usage;
         if (usage) {
           inputTokensUsed = usage.input_tokens;
+          // OpenAI Responses API exposes prompt-cache hits via
+          // input_tokens_details.cached_tokens — billed at the model's
+          // cachedInputCostUsdPerMToken (set in shared/constants/models)
+          // when the provider has a discounted rate. Falls through to the
+          // regular input rate when the field is unset on the model.
+          cachedInputTokensUsed =
+            (usage as { input_tokens_details?: { cached_tokens?: number } }).input_tokens_details
+              ?.cached_tokens ?? 0;
           outputTokensUsed = usage.output_tokens;
         }
       }
     }
 
-    return { newResponseId, inputTokensUsed, outputTokensUsed };
+    return { newResponseId, inputTokensUsed, cachedInputTokensUsed, outputTokensUsed };
   }
 
   private buildInput(input: LLMInput): string | OpenAI.Responses.ResponseInput {

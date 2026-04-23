@@ -235,6 +235,7 @@ export const chatService = {
     // The retry happens BEFORE any chunks are yielded to the user.
     const chunks: string[] = [];
     let inputTokensUsed: number | undefined;
+    let cachedInputTokensUsed: number | undefined;
     let outputTokensUsed: number | undefined;
     let providerUsdCost: number | undefined;
 
@@ -253,6 +254,7 @@ export const chatService = {
             });
           }
           inputTokensUsed = result?.inputTokensUsed;
+          cachedInputTokensUsed = result?.cachedInputTokensUsed;
           outputTokensUsed = result?.outputTokensUsed;
           providerUsdCost = result?.providerUsdCost;
           return;
@@ -323,7 +325,19 @@ export const chatService = {
       providerUsdCost !== undefined
         ? providerUsdCost
         : model && inputTokensUsed !== undefined && outputTokensUsed !== undefined
-          ? calculateCost(model, inputTokensUsed, outputTokensUsed, undefined, undefined, ms)
+          ? calculateCost(
+              model,
+              inputTokensUsed,
+              outputTokensUsed,
+              undefined,
+              undefined,
+              ms,
+              undefined,
+              undefined,
+              {
+                cachedInputTokens: cachedInputTokensUsed,
+              },
+            )
           : estimateTokens(content, responseText);
 
     // Save assistant message

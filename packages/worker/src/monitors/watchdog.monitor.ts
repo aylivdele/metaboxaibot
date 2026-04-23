@@ -1,9 +1,6 @@
-import { Api } from "grammy";
 import { db } from "@metabox/api/db";
 import { getImageQueue, getVideoQueue, getAudioQueue, getAvatarQueue } from "@metabox/api/queues";
 import type { Queue } from "bullmq";
-import { config, AI_MODELS, getT } from "@metabox/shared";
-import type { Language } from "@metabox/shared";
 import { logger } from "../logger.js";
 import { notifyTechError } from "../utils/notify-error.js";
 import { requeueGenerationJob, requeueAvatarPoll } from "../utils/requeue-job.js";
@@ -14,19 +11,11 @@ const REQUEUE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h
 /** Re-enqueue avatar polls stuck under 6h. */
 const AVATAR_REQUEUE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6h
 
-const telegram = new Api(config.bot.token);
-
 function getGenerationQueue(section: string): Queue | null {
   if (section === "image") return getImageQueue();
   if (section === "video") return getVideoQueue();
   if (section === "audio") return getAudioQueue();
   return null;
-}
-
-async function getUserLang(userId: bigint): Promise<Language> {
-  return db.user
-    .findUnique({ where: { id: userId }, select: { language: true } })
-    .then((u) => (u?.language ?? "ru") as Language);
 }
 
 /**
@@ -110,16 +99,6 @@ export async function runWatchdog(): Promise<void> {
       });
       killedJobIds.push(job.id);
 
-      const lang = await getUserLang(job.userId);
-      const t = getT(lang);
-      const modelName = AI_MODELS[job.modelId]?.name ?? job.modelId;
-      await telegram
-        .sendMessage(
-          Number(job.userId),
-          t.errors.generationTimedOut24h.replace("{modelName}", modelName),
-        )
-        .catch(() => void 0);
-
       logger.warn(
         { dbJobId: job.id, section: job.section, modelId: job.modelId },
         "Watchdog: hard-failed orphaned generation job (>24h)",
@@ -183,11 +162,6 @@ export async function runWatchdog(): Promise<void> {
         data: { status: "failed" },
       });
       killedAvatarIds.push(avatar.id);
-
-      const lang = await getUserLang(avatar.userId);
-      const t = getT(lang);
-      const msg = avatar.provider === "higgsfield_soul" ? t.video.soulFailed : t.video.avatarFailed;
-      await telegram.sendMessage(Number(avatar.userId), msg).catch(() => void 0);
 
       logger.warn(
         { userAvatarId: avatar.id, provider: avatar.provider },
