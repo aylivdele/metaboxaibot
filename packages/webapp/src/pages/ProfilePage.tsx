@@ -831,6 +831,8 @@ function GalleryDetailsModal({ job, onClose }: { job: GalleryJob; onClose: () =>
             {copied ? t("gallery.copied") : t("gallery.copyPrompt")}
           </button>
         </div>
+
+        <div className="gallery-modal__retention-note">{t("gallery.retentionNote")}</div>
       </div>
     </div>
   );

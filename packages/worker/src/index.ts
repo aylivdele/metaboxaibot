@@ -12,6 +12,7 @@ import { processAvatarJob } from "./processors/avatar.processor.js";
 import { checkProviderBalances } from "./monitors/balance.monitor.js";
 import { sendUsageReport, msUntilNextMidnightMsk } from "./monitors/usage-report.monitor.js";
 import { runWatchdog } from "./monitors/watchdog.monitor.js";
+import { runCleanupOldJobs } from "./monitors/cleanup-old-jobs.monitor.js";
 import { reconcileOrphanedJobs } from "./reconcile.js";
 import { logger } from "./logger.js";
 
@@ -88,6 +89,21 @@ const scheduleWatchdog = (): void => {
 };
 scheduleWatchdog();
 
+// ── Cleanup: purge generation jobs older than 60 days (daily, no overlap) ───
+// Run once on startup so a long-stopped worker drains the backlog immediately,
+// then every 24 h via self-rescheduling setTimeout (mirrors watchdog pattern).
+const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+let cleanupTimer: ReturnType<typeof setTimeout>;
+const scheduleCleanup = (): void => {
+  cleanupTimer = setTimeout(() => {
+    runCleanupOldJobs()
+      .catch((err) => logger.error({ err }, "Cleanup-old-jobs error"))
+      .finally(() => scheduleCleanup());
+  }, CLEANUP_INTERVAL_MS);
+};
+runCleanupOldJobs().catch((err) => logger.error({ err }, "Cleanup-old-jobs error"));
+scheduleCleanup();
+
 // ── Balance monitor ───────────────────────────────────────────────────────────
 if (config.alerts.chatId) {
   const intervalMs = config.alerts.intervalHours * 60 * 60 * 1000;
@@ -117,6 +133,7 @@ if (config.alerts.chatId) {
 
   process.on("SIGTERM", async () => {
     clearTimeout(watchdogTimer);
+    clearTimeout(cleanupTimer);
     clearInterval(balanceTimer);
     if (usageReportTimer) clearInterval(usageReportTimer);
     await Promise.all([
@@ -130,6 +147,7 @@ if (config.alerts.chatId) {
 } else {
   process.on("SIGTERM", async () => {
     clearTimeout(watchdogTimer);
+    clearTimeout(cleanupTimer);
     await Promise.all([
       imageWorker.close(),
       videoWorker.close(),

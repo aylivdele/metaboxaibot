@@ -2319,6 +2319,15 @@ textarea::placeholder {
   pointer-events: none;
 }
 
+.gallery-modal__retention-note {
+  font-size: 11px;
+  color: var(--text-hint);
+  line-height: 1.4;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+}
+
 /* ── Pagination ─────────────────────────────────────────────────────────────── */
 .pagination {
   display: flex;
