@@ -375,6 +375,7 @@ export default {
     // Higgsfield
     higgsfieldTooManyMotions:
       "❌ Выбрано слишком много пресетов движений. Максимум — {max}. Уберите лишние в настройках и попробуйте снова.",
+    alreadyGenerating: "⏳ Генерация уже запущена.",
   },
   common: {
     backToMain: "🏠 В главное меню",

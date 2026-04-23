@@ -381,6 +381,7 @@ export default {
     // Higgsfield
     higgsfieldTooManyMotions:
       "❌ Too many motion presets selected. The maximum is {max}. Remove extras in settings and try again.",
+    alreadyGenerating: "⏳ Generation already started.",
   },
   common: {
     backToMain: "🏠 Back to Main Menu",

@@ -19,6 +19,8 @@ export interface SubmitImageParams {
   sendOriginalLabel?: string;
   /** Aspect ratio chosen by user, e.g. "16:9", "1:1". */
   aspectRatio?: string;
+  /** "{chatId}:{messageId}" of the inline button that triggered this job. Used for dedup. */
+  sourceMessageId?: string;
 }
 
 export interface SubmitImageResult {
@@ -26,6 +28,14 @@ export interface SubmitImageResult {
 }
 
 export const generationService = {
+  async hasActiveJobForSource(userId: bigint, sourceMessageId: string): Promise<boolean> {
+    const existing = await db.generationJob.findFirst({
+      where: { userId, sourceMessageId, status: { in: ["pending", "processing"] } },
+      select: { id: true },
+    });
+    return existing !== null;
+  },
+
   /**
    * Fetch a generation output by ID (for refine / download buttons).
    * Also supports legacy jobId lookup (old buttons sent before migration).
@@ -95,6 +105,7 @@ export const generationService = {
             : {}),
         },
         status: "pending",
+        ...(params.sourceMessageId ? { sourceMessageId: params.sourceMessageId } : {}),
       },
     });
 
