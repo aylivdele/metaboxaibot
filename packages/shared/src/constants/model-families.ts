@@ -22,6 +22,19 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     ],
   },
 
+  "gpt-image": {
+    id: "gpt-image",
+    name: "🖼️ GPT Image",
+    section: "design",
+    description:
+      "Линейка генерации изображений от OpenAI. Версия 1.5 — точное следование промпту и хороший рендер текста; 2 — новейшая, ещё лучше с текстом и деталями.",
+    defaultModelId: "gpt-image-2",
+    members: [
+      { modelId: "gpt-image-1.5", versionLabel: "1.5", variantLabel: "Standard" },
+      { modelId: "gpt-image-2", versionLabel: "2", variantLabel: "Standard" },
+    ],
+  },
+
   ideogram: {
     id: "ideogram",
     name: "✍️ Ideogram",

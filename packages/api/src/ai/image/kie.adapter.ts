@@ -141,6 +141,31 @@ export class KieImageAdapter implements ImageAdapter {
       }
 
       body = { model: nanoBananaModel, input: inputPayload };
+    } else if (this.modelId === "gpt-image-2") {
+      // ── GPT Image 2 via KIE: t2i / i2i via separate endpoints ──────────────
+      // Временно проксируем gpt-image-2 через KIE, чтобы не зависеть от прямого
+      // OpenAI Images API. Реализация на OpenAI сохранена закомментированной в
+      // packages/shared/.../design.models.ts — для отката достаточно вернуть
+      // provider:"openai" и снять комменты.
+      const isI2I = imageUrls.length > 0;
+      const inputPayload: Record<string, unknown> = {
+        prompt: input.prompt,
+        nsfw_checker: ms.nsfw_checker !== undefined ? ms.nsfw_checker : false,
+      };
+      inputPayload.aspect_ratio =
+        (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "auto";
+
+      if (isI2I) {
+        const uploaded = await Promise.all(
+          imageUrls.slice(0, 16).map((url) => uploadFileUrl(this.apiKey, url)),
+        );
+        inputPayload.input_urls = uploaded;
+      }
+
+      body = {
+        model: isI2I ? "gpt-image-2-image-to-image" : "gpt-image-2-text-to-image",
+        input: inputPayload,
+      };
     } else if (this.modelId === "grok-imagine-image") {
       // ── Grok Imagine ───────────────────────────────────────────────────────
       const isI2I = imageUrls.length > 0;
