@@ -41,8 +41,12 @@ function getGenerationQueue(section: string): Queue | null {
  * Re-enqueues a GenerationJob stuck in pending/processing (e.g. after Redis data loss).
  * Uses jobId = dbJobId so BullMQ native dedup silently skips if the job is already
  * in the queue (active/waiting/delayed) — safe to call on every startup and from watchdog.
+ *
+ * `delayMs` (optional): postpone the job by this many milliseconds. Use a small
+ * random jitter from reconcile to avoid hammering providers with N parallel
+ * submissions after long downtime.
  */
-export async function requeueGenerationJob(job: GenerationJobRow): Promise<void> {
+export async function requeueGenerationJob(job: GenerationJobRow, delayMs?: number): Promise<void> {
   const queue = getGenerationQueue(job.section);
   if (!queue) {
     logger.warn({ dbJobId: job.id, section: job.section }, "requeue: unknown section, skipping");
@@ -71,6 +75,7 @@ export async function requeueGenerationJob(job: GenerationJobRow): Promise<void>
     removeOnComplete: true,
     attempts: 3,
     backoff: { type: "exponential" as const, delay: backoffDelay },
+    ...(delayMs !== undefined ? { delay: delayMs } : {}),
   };
 
   if (job.section === "image") {
@@ -158,7 +163,10 @@ export async function requeueAvatarPoll(avatar: UserAvatarRow): Promise<void> {
     {
       jobId: avatar.id,
       removeOnComplete: true,
-      attempts: 1,
+      // Transient network blip к провайдеру не должен убивать recovery —
+      // даём BullMQ-уровневые retries как у generation-jobs.
+      attempts: 3,
+      backoff: { type: "exponential" as const, delay: 5000 },
     },
   );
 }

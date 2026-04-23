@@ -57,15 +57,18 @@ export async function reconcileOrphanedJobs(): Promise<void> {
 
   if (stuckJobs.length === 0 && stuckAvatars.length === 0) return;
 
+  // Random jitter 0–60s — после долгого простоя сотни pending-rows иначе
+  // одновременно ударят в провайдеров и словят rate-limit.
   const jobResults = await Promise.allSettled(
-    stuckJobs.map((job) =>
-      requeueGenerationJob(job).then(() => {
+    stuckJobs.map((job) => {
+      const jitterMs = Math.floor(Math.random() * 60_000);
+      return requeueGenerationJob(job, jitterMs).then(() => {
         logger.info(
-          { dbJobId: job.id, section: job.section, modelId: job.modelId },
+          { dbJobId: job.id, section: job.section, modelId: job.modelId, jitterMs },
           "Reconcile: re-enqueued generation job",
         );
-      }),
-    ),
+      });
+    }),
   );
 
   const avatarResults = await Promise.allSettled(
