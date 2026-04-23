@@ -116,7 +116,7 @@ if (config.alerts.chatId) {
   scheduleUsageReport();
 
   process.on("SIGTERM", async () => {
-    clearInterval(watchdogTimer);
+    clearTimeout(watchdogTimer);
     clearInterval(balanceTimer);
     if (usageReportTimer) clearInterval(usageReportTimer);
     await Promise.all([
@@ -129,7 +129,7 @@ if (config.alerts.chatId) {
   });
 } else {
   process.on("SIGTERM", async () => {
-    clearInterval(watchdogTimer);
+    clearTimeout(watchdogTimer);
     await Promise.all([
       imageWorker.close(),
       videoWorker.close(),
