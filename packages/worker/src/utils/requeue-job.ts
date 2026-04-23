@@ -18,6 +18,7 @@ export type GenerationJobRow = {
   prompt: string;
   inputData: Prisma.JsonValue | null;
   providerJobId: string | null;
+  pollStartedAt: Date | null;
   dialogId: string;
 };
 
@@ -61,6 +62,9 @@ export async function requeueGenerationJob(job: GenerationJobRow): Promise<void>
   const telegramChatId = Number(job.userId);
   const stage = job.providerJobId ? "poll" : "generate";
   const backoffDelay = job.section === "video" ? 10000 : 5000;
+  // Восстанавливаем оригинальный момент старта polling — иначе после Redis
+  // wipe 24ч-таймаут стартует с нуля и legitimate-зависший провайдер живёт ещё сутки.
+  const pollStartedAt = job.pollStartedAt?.getTime() ?? Date.now();
 
   const opts = {
     jobId: job.id,
@@ -83,7 +87,7 @@ export async function requeueGenerationJob(job: GenerationJobRow): Promise<void>
         dialogId: job.dialogId,
         modelSettings: inputData.modelSettings,
         stage,
-        ...(stage === "poll" ? { pollStartedAt: Date.now() } : {}),
+        ...(stage === "poll" ? { pollStartedAt } : {}),
       },
       opts,
     );
@@ -103,7 +107,7 @@ export async function requeueGenerationJob(job: GenerationJobRow): Promise<void>
         telegramChatId,
         modelSettings: inputData.modelSettings ?? {},
         stage,
-        ...(stage === "poll" ? { pollStartedAt: Date.now() } : {}),
+        ...(stage === "poll" ? { pollStartedAt } : {}),
       },
       opts,
     );

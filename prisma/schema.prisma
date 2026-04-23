@@ -193,6 +193,7 @@ model GenerationJob {
   providerJobId    String? // external provider task ID — persisted after submit for poll resume on restart
   providerKeyId    String? // ProviderKey.id выбранный на submit; null = был использован env-fallback
   sourceMessageId  String? // "{chatId}:{messageId}" of the inline button that triggered this job
+  pollStartedAt    DateTime? // момент перехода в poll-стадию — фиксируется при записи providerJobId, чтобы 24ч-таймаут корректно работал после recovery
   error            String?
 
   createdAt   DateTime  @default(now())

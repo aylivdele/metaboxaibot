@@ -198,7 +198,13 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
         logger.info({ dbJobId, modelId, providerJobId }, "Submitted video generation task");
         await db.generationJob.update({
           where: { id: dbJobId },
-          data: { providerJobId, providerKeyId: acquired.keyId },
+          data: {
+            providerJobId,
+            providerKeyId: acquired.keyId,
+            // Фиксируем момент перехода в poll-стадию: после Redis wipe
+            // recovery восстановит таймер с этой точки, а не с нуля.
+            pollStartedAt: new Date(),
+          },
         });
       }
 

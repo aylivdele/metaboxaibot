@@ -31,6 +31,7 @@ export async function reconcileOrphanedJobs(): Promise<void> {
         prompt: true,
         inputData: true,
         providerJobId: true,
+        pollStartedAt: true,
         dialogId: true,
       },
     }),

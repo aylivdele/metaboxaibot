@@ -300,7 +300,13 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
           });
           await db.generationJob.update({
             where: { id: dbJobId },
-            data: { providerJobId, providerKeyId: acquired.keyId },
+            data: {
+              providerJobId,
+              providerKeyId: acquired.keyId,
+              // Фиксируем момент перехода в poll-стадию: после Redis wipe
+              // recovery восстановит таймер с этой точки, а не с нуля.
+              pollStartedAt: new Date(),
+            },
           });
         }
 

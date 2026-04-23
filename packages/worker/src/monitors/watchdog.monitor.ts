@@ -63,6 +63,7 @@ export async function runWatchdog(): Promise<void> {
       prompt: true,
       inputData: true,
       providerJobId: true,
+      pollStartedAt: true,
       dialogId: true,
     },
   });
