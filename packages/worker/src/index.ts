@@ -11,6 +11,8 @@ import { processAudioJob } from "./processors/audio.processor.js";
 import { processAvatarJob } from "./processors/avatar.processor.js";
 import { checkProviderBalances } from "./monitors/balance.monitor.js";
 import { sendUsageReport, msUntilNextMidnightMsk } from "./monitors/usage-report.monitor.js";
+import { runWatchdog } from "./monitors/watchdog.monitor.js";
+import { reconcileOrphanedJobs } from "./reconcile.js";
 import { logger } from "./logger.js";
 
 const connection = new Redis(config.redis.url, {
@@ -71,6 +73,21 @@ avatarWorker.on("failed", (job, err) => {
 
 logger.info("Worker started — listening on image, video, audio and avatar queues");
 
+// ── Reconcile orphaned jobs on startup ────────────────────────────────────────
+reconcileOrphanedJobs().catch((err) => logger.error({ err }, "Reconcile error"));
+
+// ── Watchdog: re-enqueue stuck jobs every 10 min (no overlap) ────────────────
+const WATCHDOG_INTERVAL_MS = 10 * 60 * 1000;
+let watchdogTimer: ReturnType<typeof setTimeout>;
+const scheduleWatchdog = (): void => {
+  watchdogTimer = setTimeout(() => {
+    runWatchdog()
+      .catch((err) => logger.error({ err }, "Watchdog error"))
+      .finally(() => scheduleWatchdog());
+  }, WATCHDOG_INTERVAL_MS);
+};
+scheduleWatchdog();
+
 // ── Balance monitor ───────────────────────────────────────────────────────────
 if (config.alerts.chatId) {
   const intervalMs = config.alerts.intervalHours * 60 * 60 * 1000;
@@ -99,6 +116,7 @@ if (config.alerts.chatId) {
   scheduleUsageReport();
 
   process.on("SIGTERM", async () => {
+    clearInterval(watchdogTimer);
     clearInterval(balanceTimer);
     if (usageReportTimer) clearInterval(usageReportTimer);
     await Promise.all([
@@ -111,6 +129,7 @@ if (config.alerts.chatId) {
   });
 } else {
   process.on("SIGTERM", async () => {
+    clearInterval(watchdogTimer);
     await Promise.all([
       imageWorker.close(),
       videoWorker.close(),

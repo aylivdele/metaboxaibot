@@ -1,5 +1,6 @@
-import { UnrecoverableError } from "bullmq";
+import { UnrecoverableError, DelayedError } from "bullmq";
 import type { Job } from "bullmq";
+import { delayJob } from "../utils/delay-job.js";
 import { resolveUserFacingMessage, shouldNotifyOps } from "../utils/user-facing-error.js";
 import { isHeyGenProviderUnavailable } from "@metabox/api/utils/heygen-error";
 import { getIntervalForElapsed } from "../utils/poll-schedule.js";
@@ -53,7 +54,7 @@ const INITIAL_POLL_INTERVAL_MS = 5000;
 
 const telegram = new Api(config.bot.token);
 
-export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
+export async function processVideoJob(job: Job<VideoJobData>, token?: string): Promise<void> {
   const {
     dbJobId,
     userId: userIdStr,
@@ -201,18 +202,19 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
         });
       }
 
-      await getVideoQueue().add(
-        "poll",
+      logger.info({ dbJobId, providerJobId }, "Video poll scheduled");
+      await delayJob(
+        job,
         {
           ...job.data,
           stage: "poll",
           pollStartedAt: Date.now(),
           lastIntervalMs: INITIAL_POLL_INTERVAL_MS,
         },
-        { delay: INITIAL_POLL_INTERVAL_MS, attempts: 1, removeOnComplete: true },
+        INITIAL_POLL_INTERVAL_MS,
+        token,
       );
-      logger.info({ dbJobId, providerJobId }, "Video poll scheduled");
-      return;
+      return; // unreachable — restores TS narrowing for s3Key/outputUrl/outputId
     } else {
       // ── Stage 2: poll ──────────────────────────────────────────────────
       const providerJobId = existingJob?.providerJobId;
@@ -250,12 +252,13 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
             .catch(() => void 0);
         }
 
-        await getVideoQueue().add(
-          "poll",
+        await delayJob(
+          job,
           { ...job.data, stage: "poll", lastIntervalMs: interval },
-          { delay: interval, attempts: 1, removeOnComplete: true },
+          interval,
+          token,
         );
-        return;
+        return; // unreachable — restores TS narrowing for videoResult
       }
 
       // videoResult present → finalize inline.
@@ -423,6 +426,7 @@ export async function processVideoJob(job: Job<VideoJobData>): Promise<void> {
 
     logger.info({ dbJobId }, "Video job completed");
   } catch (err) {
+    if (err instanceof DelayedError) throw err;
     if (isRateLimitDeferredError(err)) {
       logger.info({ dbJobId, modelId, delayMs: err.delayMs }, "Video job deferred by throttle");
       return;

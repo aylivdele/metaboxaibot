@@ -1320,14 +1320,18 @@ export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
     previewUrl,
   });
 
-  await getAvatarQueue().add("create", {
-    userAvatarId: avatar.id,
-    userId: userId.toString(),
-    provider: "heygen",
-    action: "create",
-    s3Key: uploadedKey,
-    telegramChatId: chatId,
-  });
+  await getAvatarQueue().add(
+    "create",
+    {
+      userAvatarId: avatar.id,
+      userId: userId.toString(),
+      provider: "heygen",
+      action: "create",
+      s3Key: uploadedKey,
+      telegramChatId: chatId,
+    },
+    { jobId: avatar.id, removeOnComplete: true },
+  );
 
   // Show the section reply keyboard immediately; ready message arrives async from worker.
   const webappUrl = config.bot.webappUrl;
@@ -1681,15 +1685,19 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
     });
 
     // Enqueue avatar creation job
-    await getAvatarQueue().add("create", {
-      userAvatarId: avatar.id,
-      userId: userId.toString(),
-      provider: "higgsfield_soul",
-      action: "create",
-      telegramChatId: ctx.chat?.id ?? Number(userId),
-      s3Keys,
-      characterName: ctx.t.video.myAvatarDefaultName,
-    });
+    await getAvatarQueue().add(
+      "create",
+      {
+        userAvatarId: avatar.id,
+        userId: userId.toString(),
+        provider: "higgsfield_soul",
+        action: "create",
+        telegramChatId: ctx.chat?.id ?? Number(userId),
+        s3Keys,
+        characterName: ctx.t.video.myAvatarDefaultName,
+      },
+      { jobId: avatar.id, removeOnComplete: true },
+    );
 
     // Restore FSM to DESIGN_ACTIVE
     await userStateService.setState(userId, "DESIGN_ACTIVE", "design");
