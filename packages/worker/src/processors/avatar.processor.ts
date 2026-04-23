@@ -12,11 +12,7 @@ import { config, getT } from "@metabox/shared";
 import type { Language } from "@metabox/shared";
 import { db } from "@metabox/api/db";
 import { notifyTechError } from "../utils/notify-error.js";
-import {
-  submitWithThrottle,
-  isRateLimitDeferredError,
-  isRateLimitLongWindowError,
-} from "../utils/submit-with-throttle.js";
+import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
 import { resolveUserFacingMessage } from "../utils/user-facing-error.js";
 import { acquireKey, acquireById } from "@metabox/api/services/key-pool";
@@ -106,17 +102,8 @@ export async function processAvatarJob(job: Job<AvatarJobData>, token?: string):
         await delayJob(job, { ...job.data, action: "poll", pollAttempt: 0 }, POLL_DELAY_MS, token);
       } catch (err) {
         if (err instanceof DelayedError) throw err;
-        if (
-          await deferIfTransientNetworkError({
-            err,
-            job,
-            queue: getAvatarQueue(),
-            section: "avatar",
-            jobName: "create",
-          })
-        ) {
-          return;
-        }
+        // Throws DelayedError if rescheduled; returns silently otherwise → fall through.
+        await deferIfTransientNetworkError({ err, job, token, section: "avatar" });
         logger.error({ userAvatarId, err }, "Soul creation failed");
         await userAvatarService.updateStatus(userAvatarId, { status: "failed" });
         await notifyTechError(err, { jobId: userAvatarId, section: "avatar", modelId: provider });
@@ -204,17 +191,8 @@ export async function processAvatarJob(job: Job<AvatarJobData>, token?: string):
         );
       } catch (err) {
         if (err instanceof DelayedError) throw err;
-        if (
-          await deferIfTransientNetworkError({
-            err,
-            job,
-            queue: getAvatarQueue(),
-            section: "avatar",
-            jobName: "poll",
-          })
-        ) {
-          return;
-        }
+        // Throws DelayedError if rescheduled; returns silently otherwise → fall through.
+        await deferIfTransientNetworkError({ err, job, token, section: "avatar" });
         logger.error({ userAvatarId, err }, "Soul poll error");
         await notifyTechError(err, {
           jobId: userAvatarId,
@@ -310,13 +288,6 @@ export async function processAvatarJob(job: Job<AvatarJobData>, token?: string):
       await delayJob(job, { ...job.data, action: "poll", pollAttempt: 0 }, POLL_DELAY_MS, token);
     } catch (err) {
       if (err instanceof DelayedError) throw err;
-      if (isRateLimitDeferredError(err)) {
-        logger.info(
-          { userAvatarId, provider, delayMs: err.delayMs },
-          "Avatar create deferred by throttle",
-        );
-        return;
-      }
       const userLang = (await db.user
         .findUnique({ where: { id: BigInt(userIdStr) }, select: { language: true } })
         .then((u) => u?.language ?? "en")) as Language;
@@ -326,17 +297,8 @@ export async function processAvatarJob(job: Job<AvatarJobData>, token?: string):
         await telegram.sendMessage(telegramChatId, t.video.avatarFailed).catch(() => void 0);
         return;
       }
-      if (
-        await deferIfTransientNetworkError({
-          err,
-          job,
-          queue: getAvatarQueue(),
-          section: "avatar",
-          jobName: "create",
-        })
-      ) {
-        return;
-      }
+      // Throws DelayedError if rescheduled; returns silently otherwise → fall through.
+      await deferIfTransientNetworkError({ err, job, token, section: "avatar" });
       logger.error({ userAvatarId, err }, "Avatar creation failed");
       await userAvatarService.updateStatus(userAvatarId, { status: "failed" });
       await notifyTechError(err, { jobId: userAvatarId, section: "avatar", modelId: provider });
@@ -412,17 +374,8 @@ export async function processAvatarJob(job: Job<AvatarJobData>, token?: string):
       );
     } catch (err) {
       if (err instanceof DelayedError) throw err;
-      if (
-        await deferIfTransientNetworkError({
-          err,
-          job,
-          queue: getAvatarQueue(),
-          section: "avatar",
-          jobName: "poll",
-        })
-      ) {
-        return;
-      }
+      // Throws DelayedError if rescheduled; returns silently otherwise → fall through.
+      await deferIfTransientNetworkError({ err, job, token, section: "avatar" });
       logger.error({ userAvatarId, err }, "Avatar poll error");
       await notifyTechError(err, {
         jobId: userAvatarId,

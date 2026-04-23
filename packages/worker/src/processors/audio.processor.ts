@@ -13,11 +13,7 @@ import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
 import { resolveUserFacingMessage, shouldNotifyOps } from "../utils/user-facing-error.js";
 import { getIntervalForElapsed } from "../utils/poll-schedule.js";
-import {
-  submitWithThrottle,
-  isRateLimitDeferredError,
-  isRateLimitLongWindowError,
-} from "../utils/submit-with-throttle.js";
+import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import {
   acquireForSubmit,
   acquireForPoll,
@@ -27,6 +23,7 @@ import { resolveKeyProvider } from "@metabox/api/ai/key-provider";
 import { resolveVoiceForTTS } from "@metabox/api/services/user-voice";
 import type { AcquiredKey } from "@metabox/api/services/key-pool";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
+import { isUniqueViolation } from "../utils/prisma-errors.js";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
 
@@ -94,7 +91,21 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
     const existingOutput = existingJob?.outputs?.[0];
 
     if (existingOutput) {
-      logger.info({ dbJobId }, "Generation already done, skipping to send");
+      // Crash-recovery fast path. Atomic transition: only one runner wins.
+      // count=1 → resumed mid-finalize, deliver result + close row (no deduct).
+      // count=0 → already finished, skip to avoid duplicate send.
+      const updated = await db.generationJob.updateMany({
+        where: { id: dbJobId, status: { in: ["pending", "processing"] } },
+        data: { status: "done", completedAt: new Date() },
+      });
+      if (updated.count === 0) {
+        logger.info({ dbJobId }, "Generation already done, skipping duplicate send");
+        return;
+      }
+      logger.warn(
+        { dbJobId },
+        "Resumed mid-finalize generation: re-sending result to user (tokens NOT deducted — cost context lost)",
+      );
       const ext = existingOutput.s3Key?.split(".").pop() ?? "mp3";
       const resolvedUrl = existingOutput.s3Key
         ? ((await getFileUrl(existingOutput.s3Key).catch(() => null)) ??
@@ -140,12 +151,14 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
             acquired: stickyVoice.acquired,
             modelId,
             job,
+            token,
             queue: getAudioQueue(),
           })
         : await acquireForSubmit({
             provider: keyProvider,
             modelId,
             job,
+            token,
             queue: getAudioQueue(),
           });
       const adapter = createAudioAdapter(modelId, acquired);
@@ -163,6 +176,7 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
           provider: modelMeta?.provider,
           section: "audio",
           job,
+          token,
           queue: getAudioQueue(),
           keyId: acquired.keyId,
           submit: () =>
@@ -187,6 +201,7 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
             provider: modelMeta?.provider,
             section: "audio",
             job,
+            token,
             queue: getAudioQueue(),
             keyId: acquired.keyId,
             submit: () =>
@@ -284,13 +299,31 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
             : Promise.resolve(null)
       ).catch(() => null);
 
-      await db.generationJobOutput.create({
-        data: { jobId: dbJobId, index: 0, outputUrl: audioResult.url ?? null, s3Key },
-      });
-      await db.generationJob.update({
-        where: { id: dbJobId },
+      try {
+        await db.generationJobOutput.create({
+          data: { jobId: dbJobId, index: 0, outputUrl: audioResult.url ?? null, s3Key },
+        });
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          // Stalled-redelivery race: another runner wrote outputs first. Bail.
+          logger.info(
+            { dbJobId },
+            "Audio finalize: duplicate output detected — another runner is finalizing",
+          );
+          return;
+        }
+        throw err;
+      }
+      // Atomic transition: only one runner wins. Loser bails to avoid
+      // double-deduct + duplicate user-send (stalled-redelivery race).
+      const updated = await db.generationJob.updateMany({
+        where: { id: dbJobId, status: { in: ["pending", "processing"] } },
         data: { status: "done", completedAt: new Date() },
       });
+      if (updated.count === 0) {
+        logger.info({ dbJobId }, "Audio finalize: job already done by another runner");
+        return;
+      }
 
       const model = AI_MODELS[modelId];
       if (model) {
@@ -313,10 +346,6 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
     logger.info({ dbJobId }, "Audio job completed");
   } catch (err) {
     if (err instanceof DelayedError) throw err;
-    if (isRateLimitDeferredError(err)) {
-      logger.info({ dbJobId, modelId, delayMs: err.delayMs }, "Audio job deferred by throttle");
-      return;
-    }
     if (isRateLimitLongWindowError(err)) {
       const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);
       await db.generationJob.update({
@@ -326,16 +355,9 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
       await telegram.sendMessage(telegramChatId, msg).catch(() => void 0);
       throw new UnrecoverableError(msg);
     }
-    if (
-      await deferIfTransientNetworkError({
-        err,
-        job,
-        queue: getAudioQueue(),
-        section: "audio",
-      })
-    ) {
-      return;
-    }
+    // Throws DelayedError if rescheduled (propagates → BullMQ delays job).
+    // Returns silently otherwise → fall through to user-facing failure handling.
+    await deferIfTransientNetworkError({ err, job, token, section: "audio" });
     const providerMsg = resolveUserFacingMessage(err, t);
     if (providerMsg !== null) {
       logger.warn({ dbJobId, err }, "Audio job rejected: user-facing error");

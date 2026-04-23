@@ -1330,7 +1330,14 @@ export async function handleAvatarPhotoCapture(ctx: BotContext): Promise<void> {
       s3Key: uploadedKey,
       telegramChatId: chatId,
     },
-    { jobId: avatar.id, removeOnComplete: true },
+    {
+      jobId: avatar.id,
+      removeOnComplete: true,
+      // Симметрично generation-jobs: transient blip к провайдеру не должен убить
+      // создание аватара после первого же сбоя.
+      attempts: 3,
+      backoff: { type: "exponential", delay: 5000 },
+    },
   );
 
   // Show the section reply keyboard immediately; ready message arrives async from worker.
@@ -1696,7 +1703,14 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
         s3Keys,
         characterName: ctx.t.video.myAvatarDefaultName,
       },
-      { jobId: avatar.id, removeOnComplete: true },
+      {
+        jobId: avatar.id,
+        removeOnComplete: true,
+        // Симметрично generation-jobs: transient blip к провайдеру не должен
+        // убить создание аватара после первого же сбоя.
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5000 },
+      },
     );
 
     // Restore FSM to DESIGN_ACTIVE

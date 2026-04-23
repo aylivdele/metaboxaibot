@@ -220,6 +220,7 @@ model GenerationJobOutput {
 
   job GenerationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
+  @@unique([jobId, index]) // защита от дубликата при stalled-redelivery race в finalize
   @@index([jobId])
   @@map("generation_job_outputs")
 }

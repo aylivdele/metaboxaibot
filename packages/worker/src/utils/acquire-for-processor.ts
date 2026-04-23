@@ -1,7 +1,8 @@
 /**
  * Обёртка над KeyPool.acquireKey/acquireById для BullMQ-процессоров.
- * Если пул исчерпан — ре-енкьюит job с delay = retryAfterMs и кидает
- * RateLimitDeferredError, чтобы процессор вышел чисто (не помечал job failed).
+ * Если пул исчерпан — defers SAME job через `moveToDelayed` (jobId сохраняется,
+ * recovery-дедуп продолжает работать) и кидает `DelayedError`, чтобы процессор
+ * вышел чисто (BullMQ положит job в delayed-set без mark failed).
  */
 
 import type { Job, Queue } from "bullmq";
@@ -9,7 +10,7 @@ import { acquireKey, acquireById } from "@metabox/api/services/key-pool";
 import type { AcquiredKey } from "@metabox/api/services/key-pool";
 import { isPoolExhaustedError } from "@metabox/api/utils/pool-exhausted-error";
 import { checkKeyThrottle } from "@metabox/api/services/throttle";
-import { RateLimitDeferredError } from "./submit-with-throttle.js";
+import { delayJob } from "./delay-job.js";
 import { logger } from "../logger.js";
 
 const MIN_DEFER_MS = 1_000;
@@ -23,13 +24,22 @@ interface AcquireOpts<D> {
   provider: string;
   modelId: string;
   job: Job<D>;
-  queue: Queue;
+  /**
+   * BullMQ worker token for the current job. Required for `moveToDelayed`.
+   * Forward from the second arg of the processor function.
+   */
+  token?: string;
+  /**
+   * Kept in the API for symmetry with other helpers; not used directly anymore
+   * (deferral is via `job.moveToDelayed`).
+   */
+  queue?: Queue;
   jobName?: string;
 }
 
 /**
- * Выбрать ключ для submit-стадии. При `PoolExhaustedError` — ре-енкьюит job
- * и бросает `RateLimitDeferredError` (процессор поймает и выйдет чисто).
+ * Выбрать ключ для submit-стадии. При `PoolExhaustedError` — defers job
+ * через `moveToDelayed` и бросает `DelayedError` (процессор поймает и выйдет чисто).
  */
 export async function acquireForSubmit<D extends object>(
   opts: AcquireOpts<D>,
@@ -43,12 +53,8 @@ export async function acquireForSubmit<D extends object>(
         { provider: opts.provider, modelId: opts.modelId, delay },
         "acquireForSubmit: pool exhausted, deferring job",
       );
-      await opts.queue.add(opts.jobName ?? "generate", opts.job.data, {
-        delay,
-        attempts: 1,
-        removeOnComplete: true,
-      });
-      throw new RateLimitDeferredError(opts.modelId, delay);
+      await delayJob(opts.job, opts.job.data as Record<string, unknown>, delay, opts.token);
+      throw new Error("unreachable: delayJob did not throw");
     }
     throw err;
   }
@@ -69,15 +75,20 @@ interface StickyOpts<D> {
   acquired: AcquiredKey;
   modelId: string;
   job: Job<D>;
-  queue: Queue;
+  /**
+   * BullMQ worker token for the current job. Required for `moveToDelayed`.
+   * Forward from the second arg of the processor function.
+   */
+  token?: string;
+  queue?: Queue;
   jobName?: string;
 }
 
 /**
  * Sticky-key submit. Ключ уже выбран ранее (например, привязан к конкретному
  * voice_id / talking_photo_id и не может быть подменён). Здесь мы только
- * проверяем per-key throttle: если активен — ре-енкьюим job и кидаем
- * RateLimitDeferredError. Иначе возвращаем тот же ключ как есть.
+ * проверяем per-key throttle: если активен — defers job через `moveToDelayed`
+ * и кидает `DelayedError`. Иначе возвращаем тот же ключ как есть.
  *
  * Для null-keyId (env-fallback) проверка пропускается — env-ключи throttling
  * не отслеживают (нет id).
@@ -93,12 +104,8 @@ export async function acquireForSubmitSticky<D extends object>(
         { keyId: opts.acquired.keyId, modelId: opts.modelId, delay, reason: t.reason },
         "acquireForSubmitSticky: key throttled, deferring job",
       );
-      await opts.queue.add(opts.jobName ?? "generate", opts.job.data, {
-        delay,
-        attempts: 1,
-        removeOnComplete: true,
-      });
-      throw new RateLimitDeferredError(opts.modelId, delay);
+      await delayJob(opts.job, opts.job.data as Record<string, unknown>, delay, opts.token);
+      throw new Error("unreachable: delayJob did not throw");
     }
   }
   return opts.acquired;

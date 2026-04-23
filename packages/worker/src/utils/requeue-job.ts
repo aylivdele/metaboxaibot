@@ -130,6 +130,7 @@ export async function requeueGenerationJob(job: GenerationJobRow, delayMs?: numb
         telegramChatId,
         modelSettings: inputData.modelSettings ?? {},
         stage,
+        ...(stage === "poll" ? { pollStartedAt } : {}),
       },
       opts,
     );

@@ -27,17 +27,14 @@ import {
   remuxToFaststart,
 } from "@metabox/api/services/s3";
 import { generateDownloadToken } from "@metabox/api/utils/download-token";
+import { isUniqueViolation } from "../utils/prisma-errors.js";
 import { InputFile } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
 import { parseMp4Info } from "@metabox/api/utils/mp4-duration";
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
-import {
-  submitWithThrottle,
-  isRateLimitDeferredError,
-  isRateLimitLongWindowError,
-} from "../utils/submit-with-throttle.js";
+import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import {
   acquireForSubmit,
   acquireForPoll,
@@ -102,7 +99,22 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
     let pollAdapter: ReturnType<typeof createVideoAdapter> | null = null;
 
     if (existingJob?.outputs?.length) {
-      logger.info({ dbJobId }, "Generation already done, skipping to send");
+      // Crash-recovery fast path. Atomic transition: only one runner wins.
+      // count=1 → we resumed mid-finalize, deliver result + close row (no
+      // deduct, cost context lost). count=0 → another runner already finished,
+      // skip to avoid duplicate send.
+      const updated = await db.generationJob.updateMany({
+        where: { id: dbJobId, status: { in: ["pending", "processing"] } },
+        data: { status: "done", completedAt: new Date() },
+      });
+      if (updated.count === 0) {
+        logger.info({ dbJobId }, "Generation already done, skipping duplicate send");
+        return;
+      }
+      logger.warn(
+        { dbJobId },
+        "Resumed mid-finalize generation: re-sending result to user (tokens NOT deducted — cost context lost)",
+      );
       outputUrl = existingJob.outputs[0].outputUrl ?? "";
       s3Key = existingJob.outputs[0].s3Key ?? null;
       outputId = existingJob.outputs[0].id;
@@ -168,12 +180,14 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
               acquired: stickyAvatar.acquired,
               modelId,
               job,
+              token,
               queue: getVideoQueue(),
             })
           : await acquireForSubmit({
               provider: keyProvider,
               modelId,
               job,
+              token,
               queue: getVideoQueue(),
             });
         const submitAdapter = createVideoAdapter(modelId, acquired);
@@ -182,6 +196,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
           provider: modelMeta?.provider,
           section: "video",
           job,
+          token,
           queue: getVideoQueue(),
           keyId: acquired.keyId,
           submit: () =>
@@ -314,14 +329,32 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
 
       outputUrl = videoResult.url;
 
-      const output = await db.generationJobOutput.create({
-        data: { jobId: dbJobId, index: 0, outputUrl, s3Key, thumbnailS3Key },
-      });
-      outputId = output.id;
-      await db.generationJob.update({
-        where: { id: dbJobId },
+      try {
+        const output = await db.generationJobOutput.create({
+          data: { jobId: dbJobId, index: 0, outputUrl, s3Key, thumbnailS3Key },
+        });
+        outputId = output.id;
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          // Stalled-redelivery race: another runner wrote outputs first. Bail.
+          logger.info(
+            { dbJobId },
+            "Video finalize: duplicate output detected — another runner is finalizing",
+          );
+          return;
+        }
+        throw err;
+      }
+      // Atomic transition: only one runner wins. Loser bails to avoid
+      // double-deduct + duplicate user-send (stalled-redelivery race).
+      const updated = await db.generationJob.updateMany({
+        where: { id: dbJobId, status: { in: ["pending", "processing"] } },
         data: { status: "done", completedAt: new Date() },
       });
+      if (updated.count === 0) {
+        logger.info({ dbJobId }, "Video finalize: job already done by another runner");
+        return;
+      }
 
       const model = AI_MODELS[modelId];
       if (model) {
@@ -433,10 +466,6 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
     logger.info({ dbJobId }, "Video job completed");
   } catch (err) {
     if (err instanceof DelayedError) throw err;
-    if (isRateLimitDeferredError(err)) {
-      logger.info({ dbJobId, modelId, delayMs: err.delayMs }, "Video job deferred by throttle");
-      return;
-    }
     if (isRateLimitLongWindowError(err)) {
       const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);
       await db.generationJob.update({
@@ -446,16 +475,9 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
       await telegram.sendMessage(telegramChatId, msg).catch(() => void 0);
       throw new UnrecoverableError(msg);
     }
-    if (
-      await deferIfTransientNetworkError({
-        err,
-        job,
-        queue: getVideoQueue(),
-        section: "video",
-      })
-    ) {
-      return;
-    }
+    // Throws DelayedError if rescheduled (propagates out → BullMQ moves job to delayed).
+    // Returns silently otherwise → fall through to user-facing failure handling.
+    await deferIfTransientNetworkError({ err, job, token, section: "video" });
     if (isHeyGenProviderUnavailable(err)) {
       const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);
       await db.generationJob.update({

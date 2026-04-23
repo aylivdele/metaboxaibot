@@ -27,16 +27,13 @@ import {
   compressForTelegramPhoto,
 } from "@metabox/api/services/s3";
 import { generateDownloadToken } from "@metabox/api/utils/download-token";
+import { isUniqueViolation } from "../utils/prisma-errors.js";
 import { InputFile } from "grammy";
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
 import type { DeductResult } from "@metabox/api/services";
 import { notifyTechError } from "../utils/notify-error.js";
-import {
-  submitWithThrottle,
-  isRateLimitDeferredError,
-  isRateLimitLongWindowError,
-} from "../utils/submit-with-throttle.js";
+import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import { acquireForSubmit, acquireForPoll } from "../utils/acquire-for-processor.js";
 import { resolveKeyProvider } from "@metabox/api/ai/key-provider";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
@@ -136,7 +133,12 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
     // Finalizes a set of generated image results: uploads to S3, creates
     // output records, marks the job done and deducts tokens. Shared between
     // the sync-adapter path (Stage 1) and the async-adapter poll path (Stage 2).
-    const finalizeResults = async (imageResults: ImageResult[]): Promise<void> => {
+    //
+    // Returns `true` if THIS run owns the finalization (status transitioned
+    // pending/processing → done). Returns `false` if another handler beat us
+    // to it (stalled-redelivery race) — caller should skip the user-facing
+    // send to avoid duplicate messages.
+    const finalizeResults = async (imageResults: ImageResult[]): Promise<boolean> => {
       for (let i = 0; i < imageResults.length; i++) {
         const ir = imageResults[i];
         const keySuffix = imageResults.length > 1 ? `${dbJobId}_${i + 1}` : dbJobId;
@@ -175,21 +177,41 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
           thumbnailS3Key = up.thumbnailS3Key;
         }
 
-        const output = await db.generationJobOutput.create({
-          data: { jobId: dbJobId, index: i, outputUrl: ir.url, s3Key, thumbnailS3Key },
-        });
-        outputRecords.push({ id: output.id, outputUrl: ir.url, s3Key });
+        try {
+          const output = await db.generationJobOutput.create({
+            data: { jobId: dbJobId, index: i, outputUrl: ir.url, s3Key, thumbnailS3Key },
+          });
+          outputRecords.push({ id: output.id, outputUrl: ir.url, s3Key });
+        } catch (err) {
+          if (isUniqueViolation(err)) {
+            // Stalled-redelivery race: another runner wrote outputs[i] first.
+            // They're ahead — bail without atomic update or deduct.
+            logger.info(
+              { dbJobId, index: i },
+              "finalizeResults: duplicate output detected — another runner is finalizing",
+            );
+            return false;
+          }
+          throw err;
+        }
       }
 
-      await db.generationJob.update({
-        where: { id: dbJobId },
+      // Atomic transition: only one runner wins. After Redis wipe + recovery,
+      // a stalled-redelivered handler may race here — the loser sees count=0
+      // and bails so we don't double-deduct or duplicate the user-send.
+      const updated = await db.generationJob.updateMany({
+        where: { id: dbJobId, status: { in: ["pending", "processing"] } },
         data: { status: "done", completedAt: new Date() },
       });
+      if (updated.count === 0) {
+        logger.info({ dbJobId }, "finalizeResults: job already done by another runner");
+        return false;
+      }
 
       // Billing — use first image for megapixel calculation.
       const firstResult = imageResults[0];
       const model = AI_MODELS[modelId];
-      if (!model) return;
+      if (!model) return true;
 
       const megapixels =
         model.costUsdPerMPixel && firstResult.width && firstResult.height
@@ -223,11 +245,27 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             });
 
       deductResult = await deductTokens(BigInt(userIdStr), internalCost, modelId);
+      return true;
     };
 
     if (existingJob?.outputs?.length) {
-      // Stage 3 already done — skip submit + poll (crash-recovery fast path)
-      logger.info({ dbJobId }, "Generation already done, skipping to send");
+      // Stage 3 already done — skip submit + poll (crash-recovery fast path).
+      // Atomic transition: if status is still pending/processing we won the race
+      // (handler crashed mid-finalize, this run delivers the result + closes
+      // the row). If count=0 the previous handler already finished — skip the
+      // duplicate user-send entirely.
+      const updated = await db.generationJob.updateMany({
+        where: { id: dbJobId, status: { in: ["pending", "processing"] } },
+        data: { status: "done", completedAt: new Date() },
+      });
+      if (updated.count === 0) {
+        logger.info({ dbJobId }, "Generation already done, skipping duplicate send");
+        return;
+      }
+      logger.warn(
+        { dbJobId },
+        "Resumed mid-finalize generation: re-sending result to user (tokens NOT deducted — cost context lost)",
+      );
       outputRecords = existingJob.outputs;
     } else if (stage === "generate") {
       // ── Stage 1: submit (or sync-generate) ─────────────────────────────
@@ -247,6 +285,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         provider: keyProvider,
         modelId,
         job,
+        token,
         queue: getImageQueue(),
       });
       const adapter = createImageAdapter(modelId, acquired);
@@ -258,6 +297,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
           provider: modelMeta?.provider,
           section: "image",
           job,
+          token,
           queue: getImageQueue(),
           keyId: acquired.keyId,
           submit: () =>
@@ -271,7 +311,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             }),
         });
         const imageResults: ImageResult[] = Array.isArray(genResult) ? genResult : [genResult];
-        await finalizeResults(imageResults);
+        if (!(await finalizeResults(imageResults))) return;
       } else {
         // Async adapter — submit then schedule poll.
         if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
@@ -286,6 +326,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             provider: modelMeta?.provider,
             section: "image",
             job,
+            token,
             queue: getImageQueue(),
             keyId: acquired.keyId,
             submit: () =>
@@ -373,7 +414,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
       }
 
       const imageResults: ImageResult[] = Array.isArray(pollResult) ? pollResult : [pollResult];
-      await finalizeResults(imageResults);
+      if (!(await finalizeResults(imageResults))) return;
     }
 
     // ── Stage 3: send to user ────────────────────────────────────────────
@@ -538,10 +579,6 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
     logger.info({ dbJobId }, "Image job completed");
   } catch (err) {
     if (err instanceof DelayedError) throw err;
-    if (isRateLimitDeferredError(err)) {
-      logger.info({ dbJobId, modelId, delayMs: err.delayMs }, "Image job deferred by throttle");
-      return;
-    }
     if (isRateLimitLongWindowError(err)) {
       const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);
       await db.generationJob.update({
@@ -551,16 +588,9 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
       await telegram.sendMessage(telegramChatId, msg).catch(() => void 0);
       throw new UnrecoverableError(msg);
     }
-    if (
-      await deferIfTransientNetworkError({
-        err,
-        job,
-        queue: getImageQueue(),
-        section: "image",
-      })
-    ) {
-      return;
-    }
+    // Throws DelayedError if rescheduled (re-thrown by next iteration of catch).
+    // Returns silently otherwise → fall through to user-facing failure handling.
+    await deferIfTransientNetworkError({ err, job, token, section: "image" });
     const userMsg = resolveUserFacingMessage(err, t);
     if (userMsg !== null) {
       logger.warn({ dbJobId, err }, "Image job rejected: user-facing error");
