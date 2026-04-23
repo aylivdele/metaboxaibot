@@ -476,6 +476,15 @@ function GalleryCard({
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imgErrors, setImgErrors] = useState<Record<string, true>>({});
+  // Track per-image load state so we can swap the shimmer skeleton out for
+  // the real <img> only once it has actually decoded. Cleared on error so
+  // the placeholder also disappears for broken thumbnails.
+  const [imgLoaded, setImgLoaded] = useState<Record<string, true>>({});
+  const markLoaded = (id: string) => setImgLoaded((p) => ({ ...p, [id]: true }));
+  const markErrored = (id: string) => {
+    setImgErrors((p) => ({ ...p, [id]: true }));
+    setImgLoaded((p) => ({ ...p, [id]: true }));
+  };
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -560,15 +569,18 @@ function GalleryCard({
           {collageOutputs.map((out, i) => {
             const showOverlay = i === 3 && outputs.length > 4;
             const errored = imgErrors[out.id];
+            const loaded = imgLoaded[out.id];
             const src = out.thumbnailUrl ?? out.previewUrl ?? out.outputUrl ?? "";
             return (
               <div key={out.id} className="gallery-card__output-tile">
+                {!loaded && src && <div className="gallery-skeleton" />}
                 {!errored && src && (
                   <img
                     src={src}
                     alt=""
                     loading="lazy"
-                    onError={() => setImgErrors((p) => ({ ...p, [out.id]: true }))}
+                    onLoad={() => markLoaded(out.id)}
+                    onError={() => markErrored(out.id)}
                   />
                 )}
                 {showOverlay && (
@@ -582,6 +594,7 @@ function GalleryCard({
         </div>
       ) : isImage && previewOutput ? (
         <div className="gallery-card__preview">
+          {!imgLoaded[previewOutput.id] && <div className="gallery-skeleton" />}
           {!imgErrors[previewOutput.id] && (
             <img
               src={
@@ -592,7 +605,8 @@ function GalleryCard({
               }
               alt={job.prompt}
               loading="lazy"
-              onError={() => setImgErrors((p) => ({ ...p, [previewOutput.id]: true }))}
+              onLoad={() => markLoaded(previewOutput.id)}
+              onError={() => markErrored(previewOutput.id)}
             />
           )}
         </div>
@@ -603,12 +617,16 @@ function GalleryCard({
           role="button"
           tabIndex={0}
         >
+          {previewOutput?.thumbnailUrl && !imgLoaded[previewOutput.id] && (
+            <div className="gallery-skeleton" />
+          )}
           {previewOutput?.thumbnailUrl && !imgErrors[previewOutput.id] ? (
             <img
               src={previewOutput.thumbnailUrl}
               alt={job.prompt}
               loading="lazy"
-              onError={() => setImgErrors((p) => ({ ...p, [previewOutput.id]: true }))}
+              onLoad={() => markLoaded(previewOutput.id)}
+              onError={() => markErrored(previewOutput.id)}
             />
           ) : (
             <div className="gallery-card__placeholder">🎬</div>
