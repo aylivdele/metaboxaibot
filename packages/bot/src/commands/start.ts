@@ -353,7 +353,9 @@ export async function handleStart(ctx: BotContext): Promise<void> {
     }
   }
   const landingUrl = config.metabox.landingUrl;
-  const welcomeBilingual = `${getT("ru").start.welcome.replace("{landingUrl}", landingUrl)}\n\n${getT("en").start.welcome.replace("{landingUrl}", landingUrl)}`;
+  // Шаблон welcome содержит {landingUrl} многократно (по ссылке на каждый
+  // документ) — нужен replaceAll, иначе остаются битые href.
+  const welcomeBilingual = `${getT("ru").start.welcome.replaceAll("{landingUrl}", landingUrl)}\n\n${getT("en").start.welcome.replaceAll("{landingUrl}", landingUrl)}`;
   await ctx.reply(welcomeBilingual, {
     reply_markup: buildLanguageKeyboard(),
     parse_mode: "HTML",
