@@ -7,6 +7,7 @@ import { TariffsPage } from "./pages/TariffsPage.js";
 import { ReferralPage } from "./pages/ReferralPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
 import { LinkMetaboxPage } from "./pages/LinkMetaboxPage.js";
+import { DownloadRedirectPage } from "./pages/DownloadRedirectPage.js";
 import { I18nProvider, useI18n } from "./i18n.js";
 import { AiboxLogo } from "./components/AiboxLogo.js";
 import { api } from "./api/client.js";
@@ -174,6 +175,19 @@ function AppContent() {
 }
 
 export function App() {
+  // Bridge route: Telegram inline `web_app:` buttons land here so the
+  // mini-app can call `Telegram.WebApp.openLink(...)` (the only way to
+  // trigger a real download from inside the WebView). Short-circuits the
+  // normal app shell (no auth, no nav, no API calls).
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("page") === "download") {
+    return (
+      <I18nProvider>
+        <DownloadRedirectPage token={params.get("token") ?? ""} />
+      </I18nProvider>
+    );
+  }
+
   return (
     <I18nProvider>
       <AppContent />

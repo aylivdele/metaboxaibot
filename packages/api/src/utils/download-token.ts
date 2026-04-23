@@ -13,6 +13,11 @@
 import { createHmac } from "node:crypto";
 import { config } from "@metabox/shared";
 
+/** Telegram inline-button shape we need locally — keeps this util free of grammy types. */
+export type DownloadInlineButton =
+  | { text: string; url: string }
+  | { text: string; web_app: { url: string } };
+
 const TOKEN_TTL_SEC = 86_400; // 24 hours
 
 interface TokenPayload {
@@ -66,4 +71,29 @@ export function verifyDownloadToken(token: string): TokenPayload {
   if (Math.floor(Date.now() / 1000) > payload.e) throw new Error("Download token expired");
 
   return payload;
+}
+
+/**
+ * Builds the inline button used to deliver an S3 file to a user from a
+ * Telegram message. Prefers `web_app:` (opens our mini-app bridge page,
+ * which calls Telegram.WebApp.openLink to fire the system browser — the
+ * only way to trigger a real download from Telegram's WebView). Falls
+ * back to plain `url:` when WEBAPP_URL isn't configured (e.g. dev) so
+ * the button still works, just without the WebView workaround.
+ */
+export function buildDownloadButton(
+  text: string,
+  s3Key: string,
+  userId: bigint | string,
+): DownloadInlineButton {
+  const token = generateDownloadToken(s3Key, userId);
+  if (config.bot.webappUrl) {
+    return { text, web_app: { url: `${config.bot.webappUrl}?page=download&token=${token}` } };
+  }
+  if (config.api.publicUrl) {
+    return { text, url: `${config.api.publicUrl}/download/${token}` };
+  }
+  // Should never happen in production; both are configured. Keeps the
+  // return type honest so callers don't have to handle `null`.
+  return { text, url: `/download/${token}` };
 }

@@ -26,7 +26,7 @@ import {
   generateVideoJpegThumbnail,
   remuxToFaststart,
 } from "@metabox/api/services/s3";
-import { generateDownloadToken } from "@metabox/api/utils/download-token";
+import { buildDownloadButton } from "@metabox/api/utils/download-token";
 import { isUniqueViolation } from "../utils/prisma-errors.js";
 import { InputFile } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
@@ -417,13 +417,8 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
     const tooLargeForTelegram = videoBuf.byteLength > VIDEO_MAX_BYTES;
 
     const actionRow: InlineKeyboardButton[] | null = tooLargeForTelegram
-      ? s3Key && config.api.publicUrl
-        ? [
-            {
-              text: t.common.downloadFile,
-              url: `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userIdStr)}`,
-            },
-          ]
+      ? s3Key
+        ? [buildDownloadButton(t.common.downloadFile, s3Key, userIdStr)]
         : null
       : sendOriginalLabel
         ? [{ text: sendOriginalLabel, callback_data: `orig_${outputId}` }]

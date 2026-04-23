@@ -2,7 +2,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
 import { getFileUrl, deleteFile } from "../services/s3.service.js";
-import { generateDownloadToken } from "../utils/download-token.js";
+import { buildDownloadButton, generateDownloadToken } from "../utils/download-token.js";
 import { AI_MODELS, config, getT } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
@@ -259,11 +259,8 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           callback_data: `orig_${out.id}`,
         };
       }
-      if (out.s3Key && config.api.publicUrl) {
-        return {
-          text: multi ? `${n}. ⬇️` : t.common.downloadFile,
-          url: `${config.api.publicUrl}/download/${generateDownloadToken(out.s3Key, userId)}`,
-        };
+      if (out.s3Key) {
+        return buildDownloadButton(multi ? `${n}. ⬇️` : t.common.downloadFile, out.s3Key, userId);
       }
       return null;
     };
@@ -358,19 +355,11 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       const inlineRows = [refineRow, actionRow].filter((r): r is InlineButton[] => r !== null);
       const replyMarkup = inlineRows.length ? { inline_keyboard: inlineRows } : undefined;
 
-      const downloadMarkup =
-        out.s3Key && config.api.publicUrl
-          ? {
-              inline_keyboard: [
-                [
-                  {
-                    text: t.common.downloadFile,
-                    url: `${config.api.publicUrl}/download/${generateDownloadToken(out.s3Key, userId)}`,
-                  },
-                ],
-              ],
-            }
-          : undefined;
+      const downloadMarkup = out.s3Key
+        ? {
+            inline_keyboard: [[buildDownloadButton(t.common.downloadFile, out.s3Key, userId)]],
+          }
+        : undefined;
 
       const tooLargeForDocument = out.size !== null && out.size > MEDIA_URL_MAX_BYTES;
       const tooLargeForSectionMethod =

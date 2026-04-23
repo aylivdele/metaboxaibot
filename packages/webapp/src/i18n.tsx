@@ -213,6 +213,12 @@ const translations = {
     "gallery.outputLabel.audio": "Audio {n}",
     "gallery.retentionNote":
       "* generations are stored for 60 days and are automatically removed after that.",
+
+    // Download bridge page
+    "download.opening": "Opening file in browser…",
+    "download.openedInBrowser": "File opened in your browser. You can close this window.",
+    "download.fallbackLink": "Open manually",
+    "download.invalidToken": "Invalid or expired download link.",
     "gallery.applySettings": "Apply settings",
     "gallery.applied": "✓ Applied",
     "gallery.copyPrompt": "Copy prompt",
@@ -566,6 +572,12 @@ const translations = {
     "gallery.outputLabel.audio": "Аудио {n}",
     "gallery.retentionNote":
       "* генерация хранится 60 дней и будет автоматически удалена по истечении времени",
+
+    // Download bridge page
+    "download.opening": "Открываем файл в браузере…",
+    "download.openedInBrowser": "Файл открыт в браузере. Это окно можно закрыть.",
+    "download.fallbackLink": "Открыть вручную",
+    "download.invalidToken": "Ссылка на скачивание недействительна или устарела.",
     "gallery.applySettings": "Применить настройки",
     "gallery.applied": "✓ Применено",
     "gallery.copyPrompt": "Скопировать промпт",

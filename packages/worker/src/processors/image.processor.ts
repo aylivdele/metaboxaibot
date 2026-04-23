@@ -26,7 +26,7 @@ import {
   measureImageMegapixels,
   compressForTelegramPhoto,
 } from "@metabox/api/services/s3";
-import { generateDownloadToken } from "@metabox/api/utils/download-token";
+import { buildDownloadButton } from "@metabox/api/utils/download-token";
 import { isUniqueViolation } from "../utils/prisma-errors.js";
 import { InputFile } from "grammy";
 import { logger } from "../logger.js";
@@ -466,11 +466,8 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
           buttons.push({ text: `${n}. 🔄`, callback_data: `design_ref_${rec.id}` });
           if (byteSizes[i] <= TELEGRAM_DOC_MAX_BYTES) {
             buttons.push({ text: `${n}. 📎`, callback_data: `orig_${rec.id}` });
-          } else if (rec.s3Key && config.api.publicUrl) {
-            buttons.push({
-              text: `${n}. ⬇️`,
-              url: `${config.api.publicUrl}/download/${generateDownloadToken(rec.s3Key, userIdStr)}`,
-            });
+          } else if (rec.s3Key) {
+            buttons.push(buildDownloadButton(`${n}. ⬇️`, rec.s3Key, userIdStr));
           }
         }
         // Layout: <3 pairs → 1 per row, even → 2 per row, odd → 3 per row
@@ -556,13 +553,8 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
     const actionRow: InlineKeyboardButton[] | null =
       info.byteSize <= TELEGRAM_DOC_MAX_BYTES
         ? [{ text: t.common.sendOriginal, callback_data: `orig_${outputId}` }]
-        : s3Key && config.api.publicUrl
-          ? [
-              {
-                text: t.common.downloadFile,
-                url: `${config.api.publicUrl}/download/${generateDownloadToken(s3Key, userIdStr)}`,
-              },
-            ]
+        : s3Key
+          ? [buildDownloadButton(t.common.downloadFile, s3Key, userIdStr)]
           : null;
     const rows = [refineRow, actionRow].filter(Boolean) as InlineKeyboardButton[][];
     const replyMarkup = rows.length ? { inline_keyboard: rows } : undefined;
