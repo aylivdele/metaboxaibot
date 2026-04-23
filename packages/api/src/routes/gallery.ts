@@ -163,40 +163,40 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
-   * POST /gallery/:id/download
-   * Sends the file to the user's Telegram chat.
-   * :id is a GenerationJobOutput ID.
+   * POST /gallery/jobs/:id/send
+   * Re-delivers all outputs of a generation job to the user's Telegram chat,
+   * mirroring the worker's "job completed" payload:
+   *   • Image batches (>1 output): one sendMediaGroup with caption on the first
+   *     item, followed by a single sendMessage with per-output inline buttons.
+   *   • Single output (any section) and non-image batches: per-output flow with
+   *     section-appropriate send method + per-output button.
+   *
+   * Per-output button selection (matches worker `image.processor.ts`):
+   *   • size ≤ 50 MB or unknown → callback `orig_<outputId>` ("📎 Отправить оригинал")
+   *   • size > 50 MB           → URL `/download/<token>` ("⬇️ Скачать")
+   * Files > 20 MB without an S3 key are unreachable and skipped silently.
    */
-  fastify.post<{ Params: { id: string } }>("/gallery/:id/download", async (request, reply) => {
+  fastify.post<{ Params: { id: string } }>("/gallery/jobs/:id/send", async (request, reply) => {
     const userId = (request as AuthRequest).userId;
     const { id } = request.params;
 
-    const output = await db.generationJobOutput.findUnique({
+    const job = await db.generationJob.findUnique({
       where: { id },
-      include: {
-        job: { select: { userId: true, section: true, modelId: true, prompt: true } },
+      select: {
+        userId: true,
+        section: true,
+        modelId: true,
+        prompt: true,
+        outputs: {
+          orderBy: { index: "asc" },
+          select: { id: true, s3Key: true, outputUrl: true },
+        },
       },
     });
 
-    if (!output) return reply.code(404).send({ error: "Not found" });
-    if (output.job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
-
-    // Resolve file URL: prefer S3, fall back to provider URL
-    let fileUrl: string | null = null;
-
-    if (output.s3Key) {
-      fileUrl = await getFileUrl(output.s3Key);
-    }
-
-    if (!fileUrl && output.outputUrl) {
-      fileUrl = output.outputUrl;
-    }
-
-    if (!fileUrl) {
-      return reply.code(422).send({ error: "File not available" });
-    }
-
-    const caption = `${output.job.modelId}: ${output.job.prompt.slice(0, 200)}`;
+    if (!job) return reply.code(404).send({ error: "Not found" });
+    if (job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+    if (job.outputs.length === 0) return reply.code(422).send({ error: "No outputs" });
 
     const user = await db.user.findUnique({
       where: { id: userId },
@@ -204,83 +204,176 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     });
     const t = getT((user?.language ?? "ru") as Parameters<typeof getT>[0]);
 
-    const downloadMarkup =
-      output.s3Key && config.api.publicUrl
-        ? {
-            inline_keyboard: [
-              [
-                {
-                  text: t.common.downloadFile,
-                  url: `${config.api.publicUrl}/download/${generateDownloadToken(output.s3Key, userId)}`,
-                },
-              ],
-            ],
-          }
-        : undefined;
+    // Telegram bot multipart-upload ceiling — what the bot's `orig_` handler
+    // can re-deliver as a document. Above this we have to fall back to a
+    // browser download link.
+    const TELEGRAM_DOC_MAX_BYTES = 50 * 1024 * 1024;
 
-    // Three-tier delivery, matching generation-result button logic:
-    //  1. Fits in section's compressed send method (5 MB photo / 20 MB av) →
-    //     send via sendPhoto/sendVideo/sendAudio + "Send original" callback button
-    //     (lets the user fetch the uncompressed file via the bot's orig_ handler).
-    //  2. Larger than section limit but ≤ 20 MB (sendDocument by URL limit) →
-    //     send as document directly. No buttons — this *is* the original.
-    //  3. Larger than sendDocument's URL limit → only a text message + "Download"
-    //     link button, with a "file too large" warning.
-    const fileSize = await probeFileSize(fileUrl);
-    const sectionMethod = sectionToMethod(output.job.section);
-    const sectionLimit = sectionMethod === "sendPhoto" ? PHOTO_URL_MAX_BYTES : MEDIA_URL_MAX_BYTES;
-    const sendOriginalMarkup = {
-      inline_keyboard: [[{ text: t.common.sendOriginal, callback_data: `orig_${output.id}` }]],
+    type ResolvedOutput = {
+      id: string;
+      s3Key: string | null;
+      url: string;
+      size: number | null;
     };
 
-    const tooLargeForDocument = fileSize !== null && fileSize > MEDIA_URL_MAX_BYTES;
-    const tooLargeForSectionMethod =
-      fileSize !== null && fileSize > sectionLimit && fileSize <= MEDIA_URL_MAX_BYTES;
-
-    if (tooLargeForDocument) {
-      // Branch 3: send only a text + download link
-      await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: userId.toString(),
-          text: `${caption}\n\n${t.errors.fileTooLargeForTelegram}`,
-          ...(downloadMarkup ? { reply_markup: downloadMarkup } : {}),
-        }),
-      });
-      return { success: true };
+    const resolved: ResolvedOutput[] = [];
+    for (const out of job.outputs) {
+      let url: string | null = null;
+      if (out.s3Key) url = await getFileUrl(out.s3Key);
+      if (!url) url = out.outputUrl;
+      if (!url) continue;
+      const size = await probeFileSize(url);
+      resolved.push({ id: out.id, s3Key: out.s3Key, url, size });
     }
+    if (resolved.length === 0) return reply.code(422).send({ error: "No deliverable outputs" });
 
-    try {
-      if (tooLargeForSectionMethod) {
-        // Branch 2: uncompressed document, no buttons (file is already the original)
-        await sendFileToUser(userId, "sendDocument", fileUrl, caption);
-      } else {
-        // Branch 1 (or unknown size — optimistically try section method,
-        // catch-block handles too-large rejection from Telegram)
-        await sendFileToUser(userId, sectionMethod, fileUrl, caption, sendOriginalMarkup);
+    const caption = `${job.modelId}: ${job.prompt.slice(0, 200)}`;
+    const botUrl = `https://api.telegram.org/bot${config.bot.token}`;
+
+    type InlineButton = { text: string; callback_data?: string; url?: string };
+
+    const buildPerOutputButton = (out: ResolvedOutput, n: number): InlineButton | null => {
+      if (out.size === null || out.size <= TELEGRAM_DOC_MAX_BYTES) {
+        return { text: `${n}. 📎`, callback_data: `orig_${out.id}` };
       }
-    } catch (err) {
-      // If Telegram rejected the file (e.g. too large for the chosen method),
-      // fall back to a text + download link.
-      const isTooLarge =
-        err instanceof Error &&
-        (err.message.includes("Request Entity Too Large") ||
-          err.message.includes("file is too big") ||
-          err.message.includes("wrong file identifier"));
+      if (out.s3Key && config.api.publicUrl) {
+        return {
+          text: `${n}. ⬇️`,
+          url: `${config.api.publicUrl}/download/${generateDownloadToken(out.s3Key, userId)}`,
+        };
+      }
+      return null;
+    };
 
-      if (isTooLarge) {
-        await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
+    // ── Image batch: media group + per-output button row ───────────────────
+    if (job.section === "image" && resolved.length > 1) {
+      const mediaGroup = resolved.map((out, i) => ({
+        type: "photo" as const,
+        media: out.url,
+        ...(i === 0 ? { caption } : {}),
+      }));
+
+      let groupOk = false;
+      try {
+        const res = await fetch(`${botUrl}/sendMediaGroup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: userId.toString(), media: mediaGroup }),
+        });
+        groupOk = res.ok;
+      } catch {
+        // network error — fall through to per-output retry below
+      }
+
+      if (!groupOk) {
+        // Telegram rejected the group (likely a photo > 5 MB URL limit). Fall
+        // back to sending each one individually as a document so the user
+        // still gets every file. Caption goes only on the first message.
+        // Per-output failures are swallowed so one bad file doesn't block the
+        // rest of the batch — the follow-up button row gives the user another
+        // way to fetch them.
+        for (let i = 0; i < resolved.length; i++) {
+          const out = resolved[i];
+          await sendFileToUser(userId, "sendDocument", out.url, i === 0 ? caption : "").catch(
+            () => void 0,
+          );
+        }
+      }
+
+      const buttons = resolved
+        .map((out, i) => buildPerOutputButton(out, i + 1))
+        .filter((b): b is InlineButton => b !== null);
+
+      if (buttons.length > 0) {
+        // Layout matches worker: ≤3 outputs → 1 button per row, more → 2 per row.
+        const perRow = resolved.length <= 3 ? 1 : 2;
+        const rows: InlineButton[][] = [];
+        for (let i = 0; i < buttons.length; i += perRow) {
+          rows.push(buttons.slice(i, i + perRow));
+        }
+        await fetch(`${botUrl}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: userId.toString(),
-            text: `${caption}\n\n${t.errors.fileTooLargeForTelegram}`,
+            text: t.design.batchActions,
+            reply_markup: { inline_keyboard: rows },
+          }),
+        });
+      }
+
+      return { success: true };
+    }
+
+    // ── Single output OR non-image batch (rare) ─────────────────────────────
+    // Per-output flow with two-button selection on the file message itself.
+    for (let i = 0; i < resolved.length; i++) {
+      const out = resolved[i];
+      const isFirst = i === 0;
+      const sectionMethod = sectionToMethod(job.section);
+      const sectionLimit =
+        sectionMethod === "sendPhoto" ? PHOTO_URL_MAX_BYTES : MEDIA_URL_MAX_BYTES;
+      const button = buildPerOutputButton(out, i + 1);
+      const replyMarkup = button ? { inline_keyboard: [[button]] } : undefined;
+      const downloadMarkup =
+        out.s3Key && config.api.publicUrl
+          ? {
+              inline_keyboard: [
+                [
+                  {
+                    text: t.common.downloadFile,
+                    url: `${config.api.publicUrl}/download/${generateDownloadToken(out.s3Key, userId)}`,
+                  },
+                ],
+              ],
+            }
+          : undefined;
+
+      const tooLargeForDocument = out.size !== null && out.size > MEDIA_URL_MAX_BYTES;
+      const tooLargeForSectionMethod =
+        out.size !== null && out.size > sectionLimit && out.size <= MEDIA_URL_MAX_BYTES;
+
+      if (tooLargeForDocument) {
+        await fetch(`${botUrl}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: userId.toString(),
+            text: `${isFirst ? caption : ""}\n\n${t.errors.fileTooLargeForTelegram}`,
             ...(downloadMarkup ? { reply_markup: downloadMarkup } : {}),
           }),
         });
-      } else {
-        throw err;
+        continue;
+      }
+
+      try {
+        if (tooLargeForSectionMethod) {
+          // Document by URL fits; no per-output button needed — file is already
+          // the uncompressed original.
+          await sendFileToUser(userId, "sendDocument", out.url, isFirst ? caption : "");
+        } else {
+          await sendFileToUser(userId, sectionMethod, out.url, isFirst ? caption : "", replyMarkup);
+        }
+      } catch (err) {
+        const isTooLarge =
+          err instanceof Error &&
+          (err.message.includes("Request Entity Too Large") ||
+            err.message.includes("file is too big") ||
+            err.message.includes("wrong file identifier"));
+
+        if (isTooLarge) {
+          await fetch(`${botUrl}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: userId.toString(),
+              text: `${isFirst ? caption : ""}\n\n${t.errors.fileTooLargeForTelegram}`,
+              ...(downloadMarkup ? { reply_markup: downloadMarkup } : {}),
+            }),
+          });
+        } else {
+          throw err;
+        }
       }
     }
 

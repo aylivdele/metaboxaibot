@@ -4,8 +4,9 @@ import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { TranslationKey } from "../i18n.js";
 // import { BannerSlider } from "../components/BannerSlider.js";
-import type { UserProfile, GalleryJob, GalleryOutput } from "../types.js";
+import type { UserProfile, GalleryJob, GalleryOutput, Model, ModelSettingDef } from "../types.js";
 import { openExternalLink } from "../utils/telegram.js";
+import { SETTING_TRANSLATIONS } from "@metabox/shared-browser";
 
 export type ProfileTab = "overview" | "gallery" | "account";
 
@@ -228,6 +229,10 @@ function GalleryTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailsJob, setDetailsJob] = useState<GalleryJob | null>(null);
+  // modelId → Model — used by the details modal to render setting labels and
+  // option labels (settings page-style) instead of raw key/value strings.
+  // Cached per section visit; refreshed when the active section chip changes.
+  const [modelsById, setModelsById] = useState<Record<string, Model>>({});
   const LIMIT = 20;
 
   const sectionLabels: Record<Section, string> = {
@@ -253,13 +258,31 @@ function GalleryTab() {
     load(section, page);
   }, [section, page, load]);
 
+  // Fetch model definitions once per section change. Failure is silent — the
+  // modal falls back to raw key/value rendering when models are missing.
+  useEffect(() => {
+    let cancelled = false;
+    api.models
+      .list(section)
+      .then((list) => {
+        if (cancelled) return;
+        const map: Record<string, Model> = {};
+        for (const m of list) map[m.id] = m;
+        setModelsById((prev) => ({ ...prev, ...map }));
+      })
+      .catch(() => void 0);
+    return () => {
+      cancelled = true;
+    };
+  }, [section]);
+
   const handleSectionChange = (sec: Section) => {
     setSection(sec);
     setPage(1);
   };
 
-  const handleSend = useCallback(async (outputId: string) => {
-    await api.gallery.download(outputId);
+  const handleSend = useCallback(async (jobId: string) => {
+    await api.gallery.sendJob(jobId);
   }, []);
 
   const handleDelete = useCallback(async (jobId: string) => {
@@ -329,7 +352,11 @@ function GalleryTab() {
 
       {detailsJob &&
         createPortal(
-          <GalleryDetailsModal job={detailsJob} onClose={() => setDetailsJob(null)} />,
+          <GalleryDetailsModal
+            job={detailsJob}
+            model={modelsById[detailsJob.modelId] ?? null}
+            onClose={() => setDetailsJob(null)}
+          />,
           document.body,
         )}
     </>
@@ -436,7 +463,7 @@ function GalleryCard({
   onOpenDetails,
 }: {
   job: GalleryJob;
-  onSend: (outputId: string) => Promise<void>;
+  onSend: (jobId: string) => Promise<void>;
   onDelete: (jobId: string) => Promise<void>;
   onOpenDetails: (job: GalleryJob) => void;
 }) {
@@ -449,21 +476,22 @@ function GalleryCard({
   const [deleting, setDeleting] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
-  const [activeOutputIdx, setActiveOutputIdx] = useState(0);
 
   const isImage = job.section === "image";
   const isVideo = job.section === "video";
   const isAudio = job.section === "audio";
 
   const outputs = job.outputs;
-  const activeOutput: GalleryOutput | undefined = outputs[activeOutputIdx] ?? outputs[0];
+  // Preview-only "active" output: video poster + audio play button operate on
+  // a single output. For batches the first output is shown; tap-to-switch on
+  // tiles is not exposed here since "Send to chat" now ships the whole job.
+  const previewOutput: GalleryOutput | undefined = outputs[0];
 
   const handleSend = async () => {
-    if (!activeOutput) return;
     setLoading(true);
     setError(null);
     try {
-      await onSend(activeOutput.id);
+      await onSend(job.id);
       setSent(true);
       setTimeout(() => setSent(false), 3000);
     } catch (err) {
@@ -474,10 +502,10 @@ function GalleryCard({
   };
 
   const openVideo = async () => {
-    if (videoLoading || videoUrl || !activeOutput) return;
+    if (videoLoading || videoUrl || !previewOutput) return;
     setVideoLoading(true);
     try {
-      const res = await api.gallery.previewUrl(activeOutput.id);
+      const res = await api.gallery.previewUrl(previewOutput.id);
       setVideoUrl(res.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -487,8 +515,8 @@ function GalleryCard({
   };
 
   const resolveAudioUrl = async () => {
-    if (!activeOutput) throw new Error("No output");
-    const res = await api.gallery.previewUrl(activeOutput.id);
+    if (!previewOutput) throw new Error("No output");
+    const res = await api.gallery.previewUrl(previewOutput.id);
     return res.url;
   };
 
@@ -530,11 +558,7 @@ function GalleryCard({
             const errored = imgErrors[out.id];
             const src = out.thumbnailUrl ?? out.previewUrl ?? out.outputUrl ?? "";
             return (
-              <div
-                key={out.id}
-                className="gallery-card__output-tile"
-                onClick={() => setActiveOutputIdx(i)}
-              >
+              <div key={out.id} className="gallery-card__output-tile">
                 {!errored && src && (
                   <img
                     src={src}
@@ -552,16 +576,19 @@ function GalleryCard({
             );
           })}
         </div>
-      ) : isImage && activeOutput ? (
+      ) : isImage && previewOutput ? (
         <div className="gallery-card__preview">
-          {!imgErrors[activeOutput.id] && (
+          {!imgErrors[previewOutput.id] && (
             <img
               src={
-                activeOutput.thumbnailUrl ?? activeOutput.previewUrl ?? activeOutput.outputUrl ?? ""
+                previewOutput.thumbnailUrl ??
+                previewOutput.previewUrl ??
+                previewOutput.outputUrl ??
+                ""
               }
               alt={job.prompt}
               loading="lazy"
-              onError={() => setImgErrors((p) => ({ ...p, [activeOutput.id]: true }))}
+              onError={() => setImgErrors((p) => ({ ...p, [previewOutput.id]: true }))}
             />
           )}
         </div>
@@ -572,12 +599,12 @@ function GalleryCard({
           role="button"
           tabIndex={0}
         >
-          {activeOutput?.thumbnailUrl && !imgErrors[activeOutput.id] ? (
+          {previewOutput?.thumbnailUrl && !imgErrors[previewOutput.id] ? (
             <img
-              src={activeOutput.thumbnailUrl}
+              src={previewOutput.thumbnailUrl}
               alt={job.prompt}
               loading="lazy"
-              onError={() => setImgErrors((p) => ({ ...p, [activeOutput.id]: true }))}
+              onError={() => setImgErrors((p) => ({ ...p, [previewOutput.id]: true }))}
             />
           ) : (
             <div className="gallery-card__placeholder">🎬</div>
@@ -610,7 +637,7 @@ function GalleryCard({
           <button
             className={`gallery-card__btn${sent ? " gallery-card__btn--sent" : ""}`}
             onClick={handleSend}
-            disabled={loading || sent || !activeOutput}
+            disabled={loading || sent || outputs.length === 0}
           >
             {loading ? "…" : sent ? t("gallery.sent") : t("gallery.download")}
           </button>
@@ -673,8 +700,16 @@ function GalleryCard({
   );
 }
 
-function GalleryDetailsModal({ job, onClose }: { job: GalleryJob; onClose: () => void }) {
-  const { t } = useI18n();
+function GalleryDetailsModal({
+  job,
+  model,
+  onClose,
+}: {
+  job: GalleryJob;
+  model: Model | null;
+  onClose: () => void;
+}) {
+  const { t, locale } = useI18n();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -683,9 +718,40 @@ function GalleryDetailsModal({ job, onClose }: { job: GalleryJob; onClose: () =>
   const [error, setError] = useState<string | null>(null);
   const downloadRef = useRef<HTMLDivElement | null>(null);
 
-  const settingsEntries = Object.entries(job.modelSettings ?? {}).filter(
-    ([, v]) => v !== null && v !== undefined && v !== "",
-  );
+  // Resolve human-readable label for a setting key + its value, mirroring the
+  // mapping used on the model settings page (SettingsPanel.tsx). Falls back
+  // to the raw key/value when the model definition or translation is missing
+  // (e.g. setting was removed since the job ran).
+  const settingLocale = SETTING_TRANSLATIONS[locale] ?? SETTING_TRANSLATIONS["en"] ?? {};
+  const settingDefByKey: Record<string, ModelSettingDef> = {};
+  if (model) {
+    for (const def of model.settings) settingDefByKey[def.key] = def;
+  }
+
+  const formatValue = (def: ModelSettingDef | undefined, value: unknown): string => {
+    if (Array.isArray(value)) return value.map((v) => formatValue(def, v)).join(", ");
+    if (
+      def?.options &&
+      (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+    ) {
+      const opt = def.options.find((o) => o.value === value);
+      if (opt) {
+        const settingT = settingLocale[def.key];
+        return settingT?.options?.[String(opt.value)] ?? opt.label;
+      }
+    }
+    if (typeof value === "boolean") return value ? "✓" : "—";
+    if (typeof value === "object" && value !== null) return JSON.stringify(value);
+    return String(value);
+  };
+
+  const settingsEntries = Object.entries(job.modelSettings ?? {})
+    .filter(([, v]) => v !== null && v !== undefined && v !== "")
+    .map(([key, value]) => {
+      const def = settingDefByKey[key];
+      const label = settingLocale[key]?.label ?? def?.label ?? key;
+      return { key, label, value: formatValue(def, value) };
+    });
 
   // Close the dropdown when the user clicks outside it.
   useEffect(() => {
@@ -760,12 +826,10 @@ function GalleryDetailsModal({ job, onClose }: { job: GalleryJob; onClose: () =>
             <div className="gallery-modal__settings">{t("gallery.noSettings")}</div>
           ) : (
             <div className="gallery-modal__settings">
-              {settingsEntries.map(([key, value]) => (
-                <div key={key} className="gallery-modal__setting-row">
-                  <span className="gallery-modal__setting-key">{key}</span>
-                  <span className="gallery-modal__setting-val">
-                    {typeof value === "object" ? JSON.stringify(value) : String(value)}
-                  </span>
+              {settingsEntries.map((entry) => (
+                <div key={entry.key} className="gallery-modal__setting-row">
+                  <span className="gallery-modal__setting-key">{entry.label}</span>
+                  <span className="gallery-modal__setting-val">{entry.value}</span>
                 </div>
               ))}
             </div>
