@@ -229,24 +229,47 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
 
     const caption = `${job.modelId}: ${job.prompt.slice(0, 200)}`;
     const botUrl = `https://api.telegram.org/bot${config.bot.token}`;
+    const isImageJob = job.section === "image";
 
     type InlineButton = { text: string; callback_data?: string; url?: string };
 
-    const buildPerOutputButton = (out: ResolvedOutput, n: number): InlineButton | null => {
+    /**
+     * Refine ("🔄 Доработать") — image-only, identical to worker payload.
+     * Multi-output cards prefix the label with the index so the user can
+     * tell which photo a button belongs to in a batch.
+     */
+    const buildRefineButton = (out: ResolvedOutput, n: number, multi: boolean): InlineButton => ({
+      text: multi ? `${n}. 🔄` : t.design.refine,
+      callback_data: `design_ref_${out.id}`,
+    });
+
+    /**
+     * Action button — orig (callback) when bot can re-upload as document
+     * (≤ 50 MB or unknown size), otherwise a direct download URL when the
+     * file lives in S3, otherwise null (no way to deliver).
+     */
+    const buildActionButton = (
+      out: ResolvedOutput,
+      n: number,
+      multi: boolean,
+    ): InlineButton | null => {
       if (out.size === null || out.size <= TELEGRAM_DOC_MAX_BYTES) {
-        return { text: `${n}. 📎`, callback_data: `orig_${out.id}` };
+        return {
+          text: multi ? `${n}. 📎` : t.common.sendOriginal,
+          callback_data: `orig_${out.id}`,
+        };
       }
       if (out.s3Key && config.api.publicUrl) {
         return {
-          text: `${n}. ⬇️`,
+          text: multi ? `${n}. ⬇️` : t.common.downloadFile,
           url: `${config.api.publicUrl}/download/${generateDownloadToken(out.s3Key, userId)}`,
         };
       }
       return null;
     };
 
-    // ── Image batch: media group + per-output button row ───────────────────
-    if (job.section === "image" && resolved.length > 1) {
+    // ── Image batch: media group + refine+action pairs follow-up ───────────
+    if (isImageJob && resolved.length > 1) {
       const mediaGroup = resolved.map((out, i) => ({
         type: "photo" as const,
         media: out.url,
@@ -280,16 +303,28 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      const buttons = resolved
-        .map((out, i) => buildPerOutputButton(out, i + 1))
-        .filter((b): b is InlineButton => b !== null);
+      // Per-output: pair of {refine, action}. Mirrors the worker's batch
+      // payload (image.processor.ts) exactly so the user sees identical
+      // controls when re-sending an old generation.
+      const buttons: InlineButton[] = [];
+      for (let i = 0; i < resolved.length; i++) {
+        const out = resolved[i];
+        const n = i + 1;
+        buttons.push(buildRefineButton(out, n, true));
+        const action = buildActionButton(out, n, true);
+        if (action) buttons.push(action);
+      }
 
       if (buttons.length > 0) {
-        // Layout matches worker: ≤3 outputs → 1 button per row, more → 2 per row.
-        const perRow = resolved.length <= 3 ? 1 : 2;
+        // Worker layout: ≤3 outputs → 1 pair/row, even → 2 pairs/row, odd → 3
+        // pairs/row. Each pair is 2 buttons (refine + action), so chunkSize
+        // doubles the pairs-per-row count.
+        const totalPairs = resolved.length;
+        const pairsPerRow = totalPairs <= 3 ? 1 : totalPairs % 2 === 0 ? 2 : 3;
+        const chunkSize = 2 * pairsPerRow;
         const rows: InlineButton[][] = [];
-        for (let i = 0; i < buttons.length; i += perRow) {
-          rows.push(buttons.slice(i, i + perRow));
+        for (let i = 0; i < buttons.length; i += chunkSize) {
+          rows.push(buttons.slice(i, i + chunkSize));
         }
         await fetch(`${botUrl}/sendMessage`, {
           method: "POST",
@@ -306,15 +341,23 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // ── Single output OR non-image batch (rare) ─────────────────────────────
-    // Per-output flow with two-button selection on the file message itself.
+    // Per-output flow with refine + action stacked on the file message itself
+    // (refine is image-only; video/audio just get the action row).
     for (let i = 0; i < resolved.length; i++) {
       const out = resolved[i];
       const isFirst = i === 0;
       const sectionMethod = sectionToMethod(job.section);
       const sectionLimit =
         sectionMethod === "sendPhoto" ? PHOTO_URL_MAX_BYTES : MEDIA_URL_MAX_BYTES;
-      const button = buildPerOutputButton(out, i + 1);
-      const replyMarkup = button ? { inline_keyboard: [[button]] } : undefined;
+
+      const refineRow: InlineButton[] | null = isImageJob
+        ? [buildRefineButton(out, i + 1, false)]
+        : null;
+      const actionBtn = buildActionButton(out, i + 1, false);
+      const actionRow: InlineButton[] | null = actionBtn ? [actionBtn] : null;
+      const inlineRows = [refineRow, actionRow].filter((r): r is InlineButton[] => r !== null);
+      const replyMarkup = inlineRows.length ? { inline_keyboard: inlineRows } : undefined;
+
       const downloadMarkup =
         out.s3Key && config.api.publicUrl
           ? {
@@ -348,9 +391,15 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
 
       try {
         if (tooLargeForSectionMethod) {
-          // Document by URL fits; no per-output button needed — file is already
-          // the uncompressed original.
-          await sendFileToUser(userId, "sendDocument", out.url, isFirst ? caption : "");
+          // Document by URL fits; refine still works on a document for images,
+          // so attach the markup even in this branch.
+          await sendFileToUser(
+            userId,
+            "sendDocument",
+            out.url,
+            isFirst ? caption : "",
+            replyMarkup,
+          );
         } else {
           await sendFileToUser(userId, sectionMethod, out.url, isFirst ? caption : "", replyMarkup);
         }
