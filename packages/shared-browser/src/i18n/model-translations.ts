@@ -187,6 +187,11 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
     description:
       "Creates the most beautiful and stylish images. Best choice for art, illustrations and striking visuals.",
   },
+  "gpt-image-2": {
+    name: "🖼️ GPT Image 2",
+    description:
+      "Latest GPT Image. Sharper text rendering and tighter prompt adherence than 1.5, with lower cost on larger sizes.",
+  },
   "gpt-image-1.5": {
     name: "🖼️ GPT Image 1.5",
     description:

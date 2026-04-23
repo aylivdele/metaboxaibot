@@ -9,7 +9,12 @@ import { getImageQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createImageAdapter } from "@metabox/api/ai/image";
 import type { ImageResult } from "@metabox/api/ai/image";
-import { deductTokens, calculateCost, translatePromptIfNeeded } from "@metabox/api/services";
+import {
+  deductTokens,
+  calculateCost,
+  usdToTokens,
+  translatePromptIfNeeded,
+} from "@metabox/api/services";
 import {
   buildS3Key,
   buildThumbnailKey,
@@ -204,14 +209,19 @@ export async function processImageJob(job: Job<ImageJobData>): Promise<void> {
         inputImagesMegapixels = inputUrls.map(() => 1);
       }
 
-      deductResult = await deductTokens(
-        BigInt(userIdStr),
-        calculateCost(model, 0, 0, megapixels, undefined, modelSettings, undefined, undefined, {
-          hasInputImage,
-          inputImagesMegapixels,
-        }),
-        modelId,
-      );
+      // Adapter-supplied cost (e.g. gpt-image, which sums text + image input +
+      // output tokens from OpenAI usage) wins over the matrix lookup, since
+      // the matrix only covers per-image output cost.
+      const adapterUsdCost = firstResult.providerUsdCost;
+      const internalCost =
+        adapterUsdCost !== undefined
+          ? usdToTokens(adapterUsdCost)
+          : calculateCost(model, 0, 0, megapixels, undefined, modelSettings, undefined, undefined, {
+              hasInputImage,
+              inputImagesMegapixels,
+            });
+
+      deductResult = await deductTokens(BigInt(userIdStr), internalCost, modelId);
     };
 
     if (existingJob?.outputs?.length) {

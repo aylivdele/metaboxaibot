@@ -84,6 +84,8 @@ const translations = {
     "manage.price.perMPixel": "/MP",
     "manage.price.perSec": "/sec",
     "manage.price.perKChar": "/1K chars",
+    "manage.price.gptImageNote":
+      "* approximate price. Actual cost depends on input and output data and is known after generation.",
     "manage.dialog.history": "Dialog history",
 
     // Tariffs
@@ -417,6 +419,8 @@ const translations = {
     "manage.price.perMPixel": "/мегапиксель",
     "manage.price.perSec": "/сек",
     "manage.price.perKChar": "/1К симв.",
+    "manage.price.gptImageNote":
+      "* примерная цена. Фактическая цена расчитывается на основании входных и выходных данных и будет известна после генерации.",
     "manage.dialog.history": "История диалога",
 
     // Tariffs

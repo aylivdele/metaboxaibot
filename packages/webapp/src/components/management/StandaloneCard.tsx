@@ -112,6 +112,9 @@ export function StandaloneCard({
         )}
       </div>
       {cost && <div className="family-card__cost">{cost}</div>}
+      {cost && model.id.startsWith("gpt-image") && (
+        <div className="family-card__cost-note">{t("manage.price.gptImageNote")}</div>
+      )}
       {savedId === model.id && (
         <div className="model-settings-saved">{t("imageSettings.saved")}</div>
       )}

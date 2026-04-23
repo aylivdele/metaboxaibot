@@ -197,6 +197,9 @@ export function FamilyCard({
       </div>
 
       {cost && <div className="family-card__cost">{cost}</div>}
+      {cost && selected.id.startsWith("gpt-image") && (
+        <div className="family-card__cost-note">{t("manage.price.gptImageNote")}</div>
+      )}
       {savedId === selected.id && (
         <div className="model-settings-saved">{t("imageSettings.saved")}</div>
       )}

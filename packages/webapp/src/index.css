@@ -2591,6 +2591,14 @@ textarea::placeholder {
   color: var(--text-secondary);
 }
 
+.family-card__cost-note {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  opacity: 0.75;
+}
+
 .family-section-divider {
   font-size: 12px;
   font-weight: 600;

@@ -3,12 +3,16 @@ import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config, UserFacingError } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
 
-/** Per-million-token USD rates for gpt-image-1.5. */
+/** Per-million-token USD rates. Text/image-input rates match across versions;
+ *  image-output rate differs (1.5 → $32/M, 2 → $30/M). */
 const RATE_TEXT_INPUT = 5 / 1_000_000;
 const RATE_TEXT_INPUT_CACHED = 1.25 / 1_000_000;
 const RATE_IMAGE_INPUT = 8 / 1_000_000;
 const RATE_IMAGE_INPUT_CACHED = 2 / 1_000_000;
-const RATE_IMAGE_OUTPUT = 32 / 1_000_000;
+const RATE_IMAGE_OUTPUT_BY_MODEL: Record<string, number> = {
+  "gpt-image-1.5": 32 / 1_000_000,
+  "gpt-image-2": 30 / 1_000_000,
+};
 
 /** Fallback image-output token counts per quality × size (used when `usage` absent). */
 const OUTPUT_TOKENS_FALLBACK: Record<string, Record<string, number>> = {
@@ -32,6 +36,7 @@ interface GptImageUsage {
 function computeCostFromUsage(
   usage: GptImageUsage | undefined,
   outputImageTokensEstimate: number,
+  rateImageOutput: number,
 ): number | null {
   if (!usage) return null;
   const details = usage.input_tokens_details ?? {};
@@ -41,16 +46,16 @@ function computeCostFromUsage(
   const cachedText = details.cached_text_tokens ?? details.cached_tokens ?? 0;
   const billedTextIn = Math.max(0, textIn - cachedText);
   const billedImageIn = Math.max(0, imageIn - cachedImage);
-  // OpenAI's `output_tokens` for image endpoints counts image-output tokens
-  // (billed at $32/M). Text-output reasoning tokens aren't separately reported
-  // for images.generate/edit — treat the whole output_tokens bucket as image output.
+  // OpenAI's `output_tokens` for image endpoints counts image-output tokens.
+  // Text-output reasoning tokens aren't separately reported for
+  // images.generate/edit — treat the whole output_tokens bucket as image output.
   const imageOut = usage.output_tokens ?? outputImageTokensEstimate;
   return (
     billedTextIn * RATE_TEXT_INPUT +
     cachedText * RATE_TEXT_INPUT_CACHED +
     billedImageIn * RATE_IMAGE_INPUT +
     cachedImage * RATE_IMAGE_INPUT_CACHED +
-    imageOut * RATE_IMAGE_OUTPUT
+    imageOut * rateImageOutput
   );
 }
 
@@ -59,12 +64,20 @@ function computeCostFromUsage(
  * Returns raw base64 data (no public URL) so generation.service uploads to S3.
  */
 export class GptImageAdapter implements ImageAdapter {
-  readonly modelId = "gpt-image-1.5";
+  readonly modelId: string;
   readonly isAsync = false;
 
   private client: OpenAI;
+  private rateImageOutput: number;
 
-  constructor(apiKey = config.ai.openai, fetchFn?: typeof globalThis.fetch) {
+  constructor(
+    modelId: string = "gpt-image-1.5",
+    apiKey = config.ai.openai,
+    fetchFn?: typeof globalThis.fetch,
+  ) {
+    this.modelId = modelId;
+    this.rateImageOutput =
+      RATE_IMAGE_OUTPUT_BY_MODEL[modelId] ?? RATE_IMAGE_OUTPUT_BY_MODEL["gpt-image-1.5"];
     this.client = new OpenAI({
       apiKey,
       ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
@@ -82,7 +95,7 @@ export class GptImageAdapter implements ImageAdapter {
     const background = ms.background as string | undefined;
     const moderation = ms.moderation as string | undefined;
 
-    logCall("gpt-image-1.5", imageUrl ? "edit" : "generate", {
+    logCall(this.modelId, imageUrl ? "edit" : "generate", {
       quality,
       size,
       output_format: outputFormat,
@@ -90,9 +103,12 @@ export class GptImageAdapter implements ImageAdapter {
     });
 
     const baseParams = {
-      model: "gpt-image-1.5" as const,
+      model: this.modelId,
       prompt: input.prompt,
       n: 1 as const,
+      // gpt-image-2 accepts arbitrary resolutions within the documented constraints
+      // (multiple of 16, ratio ≤ 3:1, total px 655 360 – 8 294 400). We rely on
+      // model-config validation upstream and pass the raw string through.
       size: size as "1024x1024" | "1024x1536" | "1536x1024",
       quality: quality as "low" | "medium" | "high",
       output_format: outputFormat as "png" | "jpeg" | "webp",
@@ -163,10 +179,10 @@ export class GptImageAdapter implements ImageAdapter {
     const ext = outputFormat === "jpeg" ? "jpg" : outputFormat;
     const outputTokensEstimate =
       OUTPUT_TOKENS_FALLBACK[quality]?.[size] ?? OUTPUT_TOKENS_FALLBACK.medium["1024x1024"];
-    const costFromUsage = computeCostFromUsage(usage, outputTokensEstimate);
+    const costFromUsage = computeCostFromUsage(usage, outputTokensEstimate, this.rateImageOutput);
     // Fallback: estimate using only image-output tokens + a small prompt allowance.
     const providerUsdCost =
-      costFromUsage ?? outputTokensEstimate * RATE_IMAGE_OUTPUT + 200 * RATE_TEXT_INPUT;
+      costFromUsage ?? outputTokensEstimate * this.rateImageOutput + 200 * RATE_TEXT_INPUT;
 
     return {
       url: `data:image/${ext};base64,${b64}`,

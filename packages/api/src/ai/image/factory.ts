@@ -25,7 +25,9 @@ export function createImageAdapter(modelId: string, ctx?: AdapterContext): Image
 
   switch (model.provider) {
     case "openai":
-      if (modelId === "gpt-image-1.5") return new GptImageAdapter(apiKey, fetchFn);
+      if (modelId === "gpt-image-1.5" || modelId === "gpt-image-2") {
+        return new GptImageAdapter(modelId, apiKey, fetchFn);
+      }
       return new DalleAdapter(apiKey, fetchFn);
     case "fal":
       return new FalAdapter(modelId, apiKey, fetchFn);
