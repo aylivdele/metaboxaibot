@@ -1,7 +1,7 @@
 export default {
   start: {
     welcome:
-      '🔶 Finally! We\'ve been waiting. This is Metabox — all the best AI tools, one click away. By continuing, you agree to our <a href="{landingUrl}/documents/terms_of_use_en.html">Terms of Use</a> (lawyers made us write this). Pick your language:',
+      '🔶 Finally! We\'ve been waiting. This is Metabox — all the best AI tools, one click away.\n\nBy continuing, you agree to the following documents (lawyers made us write this):\n• <a href="{landingUrl}/documents/offer_en.html">Public offer</a>\n• <a href="{landingUrl}/documents/terms_of_use_en.html">Terms of use</a>\n• <a href="{landingUrl}/documents/privacy_en.html">Privacy policy</a>\n• <a href="{landingUrl}/documents/risk_warning_en.html">Risk warning</a>\n• <a href="{landingUrl}/documents/consent_processing_en.html">Consent to personal data processing</a>\n• <a href="{landingUrl}/documents/consent_distribution_en.html">Consent to personal data distribution</a>\n• Consent to receive informational mailings\n\nPick your language:',
     tokensGranted:
       '⚡ 7.50 tokens have been credited for you to explore the bot. To learn more about your account and plans, click the "Profile" button below.',
     yourBalance:
