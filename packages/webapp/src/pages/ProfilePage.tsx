@@ -260,10 +260,14 @@ function GalleryTab() {
 
   // Fetch model definitions once per section change. Failure is silent — the
   // modal falls back to raw key/value rendering when models are missing.
+  // Note: gallery jobs use section "image" in the DB but the corresponding
+  // model definitions live under section "design" (legacy naming). Map the
+  // chip section to the API section so the dropdown actually returns models.
   useEffect(() => {
     let cancelled = false;
+    const apiSection = section === "image" ? "design" : section;
     api.models
-      .list(section)
+      .list(apiSection)
       .then((list) => {
         if (cancelled) return;
         const map: Record<string, Model> = {};
@@ -700,6 +704,46 @@ function GalleryCard({
   );
 }
 
+// ── Setting display helpers ──────────────────────────────────────────────────
+
+/** Picker companion fields — internal IDs/URLs without a user-visible meaning. */
+const ALWAYS_HIDDEN_SETTING_KEYS = new Set([
+  "voice_url",
+  "voice_s3key",
+  "voice_provider",
+  "talking_photo_id",
+  "avatar_photo_url",
+  "avatar_photo_s3key",
+  "image_asset_id", // surfaced via the avatar-picker fallback below
+]);
+
+const OPENAI_VOICE_NAMES: Record<string, string> = {
+  alloy: "Alloy",
+  ash: "Ash",
+  coral: "Coral",
+  echo: "Echo",
+  fable: "Fable",
+  nova: "Nova",
+  onyx: "Onyx",
+  sage: "Sage",
+  shimmer: "Shimmer",
+};
+
+interface PickerCatalogs {
+  heygenVoices?: Map<string, string>;
+  didVoices?: Map<string, string>;
+  elevenlabsVoices?: Map<string, string>;
+  /** elevenlabs cloned voices keyed by externalId. */
+  userVoices?: Map<string, string>;
+  heygenAvatars?: Map<string, string>;
+  /** HeyGen-uploaded photos keyed by externalId (matches image_asset_id). */
+  userAvatarsHeygen?: Map<string, string>;
+  /** HiggsField souls keyed by externalId (matches custom_reference_id). */
+  userAvatarsHiggsfield?: Map<string, string>;
+  motions?: Map<string, string>;
+  soulStyles?: Map<string, string>;
+}
+
 function GalleryDetailsModal({
   job,
   model,
@@ -716,17 +760,137 @@ function GalleryDetailsModal({
   const [applied, setApplied] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [catalogs, setCatalogs] = useState<PickerCatalogs>({});
+  const [catalogsLoaded, setCatalogsLoaded] = useState(false);
   const downloadRef = useRef<HTMLDivElement | null>(null);
 
-  // Resolve human-readable label for a setting key + its value, mirroring the
-  // mapping used on the model settings page (SettingsPanel.tsx). Falls back
-  // to the raw key/value when the model definition or translation is missing
-  // (e.g. setting was removed since the job ran).
+  // Fetch picker catalogs (voices/avatars/motions/styles) needed to resolve
+  // ID-shaped setting values into friendly names. Only the catalogs the
+  // model actually uses are fetched, in parallel. Failures are silent — the
+  // affected entries fall through to "—" or stay hidden.
+  useEffect(() => {
+    if (!model) {
+      setCatalogsLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    const types = new Set(model.settings.map((s) => s.type));
+    const next: PickerCatalogs = {};
+    const tasks: Promise<unknown>[] = [];
+
+    const add = <T,>(p: Promise<T>, set: (data: T) => void) => {
+      tasks.push(p.then((data) => !cancelled && set(data)).catch(() => void 0));
+    };
+
+    if (types.has("voice-picker")) {
+      add(api.heygenVoices.list(), (data) => {
+        next.heygenVoices = new Map(data.map((v) => [v.voice_id, v.name]));
+      });
+    }
+    if (types.has("did-voice-picker")) {
+      add(api.didVoices.list(), (data) => {
+        next.didVoices = new Map(data.map((v) => [v.id, v.name]));
+      });
+    }
+    if (types.has("elevenlabs-voice-picker")) {
+      add(api.elevenlabsVoices.list(), (data) => {
+        next.elevenlabsVoices = new Map(data.map((v) => [v.voice_id, v.name]));
+      });
+    }
+    if (
+      types.has("voice-picker") ||
+      types.has("did-voice-picker") ||
+      types.has("elevenlabs-voice-picker")
+    ) {
+      add(api.userVoices.list("elevenlabs"), (data) => {
+        next.userVoices = new Map(
+          data.map((v) => [v.externalId ?? v.id, v.name] as [string, string]),
+        );
+      });
+    }
+    if (types.has("avatar-picker")) {
+      add(api.heygenAvatars.list({}), (data) => {
+        next.heygenAvatars = new Map(data.items.map((a) => [a.avatar_id, a.avatar_name]));
+      });
+      add(api.userAvatars.list("heygen"), (data) => {
+        next.userAvatarsHeygen = new Map(
+          data.map((a) => [a.externalId ?? a.id, a.name] as [string, string]),
+        );
+      });
+    }
+    if (types.has("motion-picker")) {
+      add(api.higgsfieldMotions.list(), (data) => {
+        next.motions = new Map(data.map((m) => [m.id, m.name]));
+      });
+    }
+    if (types.has("soul-picker")) {
+      add(api.userAvatars.list("higgsfield_soul"), (data) => {
+        next.userAvatarsHiggsfield = new Map(
+          data.map((a) => [a.externalId ?? a.id, a.name] as [string, string]),
+        );
+      });
+    }
+    if (types.has("soul-style-picker")) {
+      add(api.soulStyles.list(), (data) => {
+        next.soulStyles = new Map(data.map((s) => [s.id, s.name]));
+      });
+    }
+
+    Promise.all(tasks).finally(() => {
+      if (cancelled) return;
+      setCatalogs(next);
+      setCatalogsLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [model]);
+
+  // Build human-readable settings entries. Picker IDs are looked up in
+  // `catalogs`; failures and never-useful companion keys are dropped from the
+  // list entirely so the user only sees meaningful rows.
   const settingLocale = SETTING_TRANSLATIONS[locale] ?? SETTING_TRANSLATIONS["en"] ?? {};
-  const settingDefByKey: Record<string, ModelSettingDef> = {};
-  if (model) {
-    for (const def of model.settings) settingDefByKey[def.key] = def;
-  }
+  const rawSettings = job.modelSettings ?? {};
+
+  const resolvePickerValue = (def: ModelSettingDef, value: unknown): string | null => {
+    if (def.type === "motion-picker") {
+      if (!Array.isArray(value) || value.length === 0) return null;
+      return (
+        value
+          .map((m) => {
+            const entry = m as { id?: string; strength?: number };
+            const name = (entry.id && catalogs.motions?.get(entry.id)) ?? entry.id ?? "";
+            if (!name) return null;
+            return entry.strength !== undefined ? `${name} (${entry.strength})` : name;
+          })
+          .filter((s): s is string => !!s)
+          .join(", ") || null
+      );
+    }
+    if (typeof value !== "string" || !value) return null;
+    if (def.type === "voice-picker") {
+      return catalogs.heygenVoices?.get(value) ?? catalogs.userVoices?.get(value) ?? null;
+    }
+    if (def.type === "did-voice-picker") {
+      return catalogs.didVoices?.get(value) ?? catalogs.userVoices?.get(value) ?? null;
+    }
+    if (def.type === "elevenlabs-voice-picker") {
+      return catalogs.elevenlabsVoices?.get(value) ?? catalogs.userVoices?.get(value) ?? null;
+    }
+    if (def.type === "openai-voice-picker") {
+      return OPENAI_VOICE_NAMES[value] ?? value;
+    }
+    if (def.type === "avatar-picker") {
+      return catalogs.heygenAvatars?.get(value) ?? catalogs.userAvatarsHeygen?.get(value) ?? null;
+    }
+    if (def.type === "soul-picker") {
+      return catalogs.userAvatarsHiggsfield?.get(value) ?? null;
+    }
+    if (def.type === "soul-style-picker") {
+      return catalogs.soulStyles?.get(value) ?? null;
+    }
+    return null;
+  };
 
   const formatValue = (def: ModelSettingDef | undefined, value: unknown): string => {
     if (Array.isArray(value)) return value.map((v) => formatValue(def, v)).join(", ");
@@ -745,13 +909,64 @@ function GalleryDetailsModal({
     return String(value);
   };
 
-  const settingsEntries = Object.entries(job.modelSettings ?? {})
-    .filter(([, v]) => v !== null && v !== undefined && v !== "")
-    .map(([key, value]) => {
-      const def = settingDefByKey[key];
-      const label = settingLocale[key]?.label ?? def?.label ?? key;
-      return { key, label, value: formatValue(def, value) };
-    });
+  type Entry = { key: string; label: string; value: string };
+  const entries: Entry[] = [];
+  const seenKeys = new Set<string>();
+
+  // Pass 1: walk the model's setting defs in their declared order so the
+  // displayed list mirrors the order on the settings page.
+  for (const def of model?.settings ?? []) {
+    seenKeys.add(def.key);
+
+    let raw: unknown = rawSettings[def.key];
+    // Avatar-picker stores either avatar_id (official) or image_asset_id
+    // (uploaded photo) — fall back to the latter so the row is not lost.
+    if (def.type === "avatar-picker") {
+      seenKeys.add("image_asset_id");
+      if ((raw === "" || raw === null || raw === undefined) && rawSettings.image_asset_id) {
+        raw = rawSettings.image_asset_id;
+      }
+    }
+
+    if (raw === null || raw === undefined || raw === "") continue;
+    if (Array.isArray(raw) && raw.length === 0) continue;
+
+    const isPicker =
+      def.type === "voice-picker" ||
+      def.type === "did-voice-picker" ||
+      def.type === "elevenlabs-voice-picker" ||
+      def.type === "openai-voice-picker" ||
+      def.type === "avatar-picker" ||
+      def.type === "motion-picker" ||
+      def.type === "soul-picker" ||
+      def.type === "soul-style-picker";
+
+    const label = settingLocale[def.key]?.label ?? def.label;
+    let valueStr: string | null;
+    if (isPicker) {
+      // Picker still loading? show a placeholder so the row reserves space.
+      if (!catalogsLoaded) valueStr = "…";
+      else valueStr = resolvePickerValue(def, raw);
+    } else {
+      valueStr = formatValue(def, raw);
+    }
+    if (valueStr === null || valueStr === "") continue;
+    entries.push({ key: def.key, label, value: valueStr });
+  }
+
+  // Pass 2: any keys present in modelSettings but missing from the current
+  // model definition (setting may have been removed since). Show with a
+  // best-effort label, but skip the always-hidden technical companion keys.
+  for (const [key, value] of Object.entries(rawSettings)) {
+    if (seenKeys.has(key)) continue;
+    if (ALWAYS_HIDDEN_SETTING_KEYS.has(key)) continue;
+    if (value === null || value === undefined || value === "") continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    const label = settingLocale[key]?.label ?? key;
+    entries.push({ key, label, value: formatValue(undefined, value) });
+  }
+
+  const settingsEntries = entries;
 
   // Close the dropdown when the user clicks outside it.
   useEffect(() => {
