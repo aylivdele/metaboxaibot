@@ -61,10 +61,10 @@ export default {
     noActiveDialog: "💬 You need to create a dialog and choose a model first.",
     createDialog: "➕ Create dialog",
     backToMain: "🏠 Main Menu",
-    dialogSelected: "✅ <b>Dialog:</b> {title}\n    <b>Model:</b> {model}",
+    dialogSelected: "✅ <b>Dialog:</b> {title}\n{modelIcon}<b>Model:</b> {modelName}",
     dialogHint: {
       prompt:
-        "✦ <b>Type⌨️/record🎙️ your prompt right here in the chat. You'll get the result here too</b>",
+        "✦ <b>Type ⌨️ / record 🎙️ your prompt right here in the chat. You'll get the result here too</b>",
       attach: "✦ You can attach images, files (PDF, DOCX, XLSX, etc.).",
       thinkingWarning:
         "✦ If thinking mode is enabled, the response may take up to 10 minutes depending on dialog size and thinking depth.",

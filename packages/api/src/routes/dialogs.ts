@@ -181,7 +181,10 @@ async function sendDialogSelectedNotification(
     userStateService.get(userId),
   ]);
   const t = getT((user?.language ?? "en") as Language);
-  const modelName = AI_MODELS[modelId]?.name ?? modelId;
+  const modelFull = AI_MODELS[modelId]?.name ?? modelId;
+  const spaceIdx = modelFull.indexOf(" ");
+  const modelIcon = spaceIdx > 0 ? modelFull.slice(0, spaceIdx + 1) : "";
+  const modelNameOnly = spaceIdx > 0 ? modelFull.slice(spaceIdx + 1) : modelFull;
   const dialogLabel = title ?? modelId;
 
   const alreadyInGpt = botState?.section === "gpt";
@@ -211,7 +214,8 @@ async function sendDialogSelectedNotification(
     const model = AI_MODELS[modelId];
     const confirmText = t.gpt.dialogSelected
       .replace("{title}", dialogLabel)
-      .replace("{model}", modelName);
+      .replace("{modelIcon}", modelIcon)
+      .replace("{modelName}", modelNameOnly);
 
     const hint = buildDialogHint(t, model);
     const fullText = hint
@@ -224,6 +228,7 @@ async function sendDialogSelectedNotification(
       body: JSON.stringify({
         chat_id: String(userId),
         text: fullText,
+        parse_mode: "HTML",
         reply_markup: {
           keyboard: [[newDialogBtn], [managementBtn], [{ text: t.common.backToMain }]],
           resize_keyboard: true,
@@ -238,7 +243,8 @@ async function sendDialogSelectedNotification(
   const model = AI_MODELS[modelId];
   const confirmText = t.gpt.dialogSelected
     .replace("{title}", dialogLabel)
-    .replace("{model}", modelName);
+    .replace("{modelIcon}", modelIcon)
+    .replace("{modelName}", modelNameOnly);
 
   const hint = buildDialogHint(t, model);
   const fullText = hint ? `${confirmText}\n\n${hint}` : confirmText;
