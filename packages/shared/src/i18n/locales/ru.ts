@@ -423,7 +423,7 @@ export default {
     firstFrame: "Первый кадр",
     lastFrame: "Последний кадр",
     reference: "Референс",
-    edit: "Исходное изображение",
+    edit: "исходного изображения",
     multiple_edit: "Референсы",
     styleReference: "Стилевой референс",
     refElement1: "Элемент 1",
@@ -460,15 +460,15 @@ export default {
     motionElementHint:
       "Необязательный элемент для привязки лица. Загрузите фото лица для улучшения сохранения идентичности персонажа в генерируемом видео. Поддерживается только 1 элемент. Используйте в промпте как @Element1. Привязка элемента работает только при настройке 'Ориентация персонажа' = 'По видео'.",
     uploadPromptVideo: "Отправьте видео для «{slot}».",
-    uploadPrompt: "Отправьте фото для «{slot}».",
-    uploadPromptMulti: "Отправьте до {max} фото для «{slot}».",
+    uploadPrompt: "Отправьте фото для {slot}.",
+    uploadPromptMulti: "Отправьте до {max} фото для {slot}.",
     uploadPromptElement:
       "Отправьте 1–4 фото или 1 видео для «{slot}». Первое фото — главный вид, остальные (до 3) — референсы с других ракурсов.",
     imageSaved: "✅ {slot}: изображение {n}/{max} сохранено.",
     tooManyMedia:
       "{modelName} принимает максимум {totalMax} файлов, из них:\n{breakdown}\n\nЛишние файлы пропущены.",
     imageSavedSingle: "✅ {slot} загружен.",
-    slotRequired: "⚠️ «{slot}» обязательно.",
+    slotRequired: "⚠️ Обязательно: {slot}.",
     replace: "🔄 Заменить",
     remove: "Удалить",
     optional: "(необязательно)",
