@@ -96,3 +96,37 @@ export async function transcodeToMp3(input: Buffer, inputFormat?: string): Promi
 export async function transcodeOggToMp3(input: Buffer): Promise<Buffer> {
   return transcodeToMp3(input);
 }
+
+/**
+ * Returns the duration in seconds of an audio buffer using ffprobe.
+ * Auto-detects format (mp3/ogg/m4a/wav/webm/…). Returns `null` on failure
+ * (corrupt file, unsupported format, ffprobe not available) — callers must
+ * decide whether to fall back to a default duration or reject the request.
+ *
+ * Used for pre-flight cost estimation when the output length depends on
+ * the input audio (e.g. HeyGen lip-sync, where billing is per second of
+ * the resulting video — which equals the audio length).
+ */
+export async function probeAudioDurationSec(input: Buffer): Promise<number | null> {
+  const tempPath = join(tmpdir(), `metabox-probe-${randomBytes(12).toString("hex")}`);
+  await fs.writeFile(tempPath, input);
+  try {
+    return await new Promise<number | null>((resolve) => {
+      ffmpeg.ffprobe(tempPath, (err, data) => {
+        if (err) {
+          logger.warn({ err: err.message, bytes: input.byteLength }, "ffprobe failed");
+          resolve(null);
+          return;
+        }
+        const seconds = data?.format?.duration;
+        if (typeof seconds !== "number" || !isFinite(seconds) || seconds <= 0) {
+          resolve(null);
+          return;
+        }
+        resolve(seconds);
+      });
+    });
+  } finally {
+    await fs.unlink(tempPath).catch(() => {});
+  }
+}

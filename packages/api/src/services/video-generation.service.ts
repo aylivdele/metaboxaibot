@@ -3,6 +3,15 @@ import { getVideoQueue } from "../queues/video.queue.js";
 import { AI_MODELS, ONE_SHOT_SETTING_KEYS } from "@metabox/shared";
 import { checkBalance, calculateCost, computeVideoTokens } from "./token.service.js";
 import { userStateService } from "./user-state.service.js";
+import { createVideoAdapter } from "../ai/video/factory.js";
+import { getFileUrl } from "./s3.service.js";
+import { probeAudioDurationSec } from "../utils/audio-transcode.js";
+import { logger } from "../logger.js";
+import type {
+  VideoInput,
+  VideoValidationContext,
+  VideoValidationError,
+} from "../ai/video/base.adapter.js";
 
 /** Drop one-shot upload fields (avatar_photo_*, voice_*, …) from the history
  * snapshot so `inputData.modelSettings` stays clean of per-generation noise. */
@@ -14,12 +23,42 @@ function stripOneShotKeys(settings: Record<string, unknown>): Record<string, unk
   }
   return out;
 }
-import { createVideoAdapter } from "../ai/video/factory.js";
-import type {
-  VideoInput,
-  VideoValidationContext,
-  VideoValidationError,
-} from "../ai/video/base.adapter.js";
+
+/**
+ * For HeyGen lip-sync (audio_asset_id flow) the output video length equals
+ * the input audio length, and HeyGen bills per second. Without measuring
+ * the audio up-front a user could submit a 10-minute file with a balance
+ * sufficient for 5 seconds — generation succeeds, balance goes negative.
+ *
+ * Returns the audio duration in seconds, or `null` when no input audio is
+ * present / probing fails (caller falls back to the model default).
+ */
+async function probeHeygenAudioDuration(
+  modelSettings: Record<string, unknown>,
+  mediaInputs: Record<string, string[]> | undefined,
+): Promise<number | null> {
+  // Source priority matches video.processor.ts/heygen.adapter.ts: explicit
+  // voice asset (s3 first, then provider URL) → media input slots.
+  const s3Key = (modelSettings.voice_s3key as string | undefined)?.trim();
+  const explicitUrl = (modelSettings.voice_url as string | undefined)?.trim();
+  const mediaUrl = mediaInputs?.driving_audio?.[0] ?? mediaInputs?.reference_audios?.[0] ?? null;
+
+  let url: string | null = null;
+  if (s3Key) url = await getFileUrl(s3Key).catch(() => null);
+  if (!url && explicitUrl) url = explicitUrl;
+  if (!url && mediaUrl) url = mediaUrl;
+  if (!url) return null;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    return await probeAudioDurationSec(buf);
+  } catch (err) {
+    logger.warn({ err }, "probeHeygenAudioDuration: failed to fetch/probe input audio");
+    return null;
+  }
+}
 
 export interface SubmitVideoParams {
   userId: bigint;
@@ -99,12 +138,44 @@ export const videoGenerationService = {
     const modelSettings = { ...(allModelSettings[modelId] ?? {}), ...extraModelSettings };
     // Prefer values from modelSettings (set via webapp) over legacy params
     const effectiveAspectRatio = (modelSettings.aspect_ratio as string | undefined) ?? aspectRatio;
-    const effectiveDuration =
+    let effectiveDuration =
       (modelSettings.duration as number | undefined) ??
       duration ??
       model.durationRange?.min ??
       model.supportedDurations?.[0] ??
       5;
+
+    // HeyGen output length is data-driven (lip-sync = input audio length;
+    // TTS = how long it takes to read the script). Both billed per second
+    // via `costUsdPerSecond`. Without measuring up-front a user could
+    // submit a 10-minute audio or a 5000-character script with a balance
+    // sufficient for 5 seconds and still get the generation through.
+    if (modelId === "heygen") {
+      const audioSec = await probeHeygenAudioDuration(modelSettings, params.mediaInputs);
+      if (audioSec !== null) {
+        // Lip-sync path — exact length is known.
+        effectiveDuration = Math.ceil(audioSec);
+        logger.info(
+          { modelId, audioSec, effectiveDuration },
+          "HeyGen pre-flight: using probed audio duration for cost estimate",
+        );
+      } else if (prompt) {
+        // TTS path — no input audio, HeyGen will read `prompt` aloud. We
+        // don't know the exact synthesis length, but a conservative
+        // characters-per-second estimate keeps the balance check honest.
+        // ~14 ch/s ≈ 150 wpm (typical TTS speed for both EN and RU). Slow
+        // voice settings will produce *longer* output → using 14 here
+        // under-estimates slightly; clamp to floor 5s so very short
+        // prompts still hit a sane minimum charge.
+        const TTS_CHARS_PER_SEC = 14;
+        const estimatedSec = Math.max(5, Math.ceil(prompt.length / TTS_CHARS_PER_SEC));
+        effectiveDuration = estimatedSec;
+        logger.info(
+          { modelId, promptChars: prompt.length, effectiveDuration },
+          "HeyGen pre-flight: using TTS-from-prompt duration estimate",
+        );
+      }
+    }
 
     const estimatedVideoTokens = model.costUsdPerMVideoToken
       ? computeVideoTokens(
