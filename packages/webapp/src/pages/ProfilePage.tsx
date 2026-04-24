@@ -1041,7 +1041,23 @@ function GalleryDetailsModal({
     setApplying(true);
     setError(null);
     try {
-      await api.modelSettings.set(job.modelId, job.modelSettings ?? {});
+      // Build the object to persist: start from the current model's defaults,
+      // layer the generation's recorded settings on top, then drop one-shot
+      // upload fields (voice/photo URLs etc.) that shouldn't carry over. The
+      // backend `replace: true` then overwrites the saved per-model config
+      // wholesale, so stale keys the user had before don't survive the apply.
+      const fullSettings: Record<string, unknown> = {};
+      if (model) {
+        for (const def of model.settings) {
+          if (def.default !== null && def.default !== undefined)
+            fullSettings[def.key] = def.default;
+        }
+      }
+      for (const [k, v] of Object.entries(job.modelSettings ?? {})) {
+        if (ALWAYS_HIDDEN_SETTING_KEYS.has(k)) continue;
+        fullSettings[k] = v;
+      }
+      await api.modelSettings.set(job.modelId, fullSettings, { replace: true });
       setApplied(true);
       setTimeout(() => setApplied(false), 2500);
     } catch (err) {

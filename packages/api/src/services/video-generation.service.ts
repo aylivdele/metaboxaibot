@@ -1,8 +1,19 @@
 import { db } from "../db.js";
 import { getVideoQueue } from "../queues/video.queue.js";
-import { AI_MODELS } from "@metabox/shared";
+import { AI_MODELS, ONE_SHOT_SETTING_KEYS } from "@metabox/shared";
 import { checkBalance, calculateCost, computeVideoTokens } from "./token.service.js";
 import { userStateService } from "./user-state.service.js";
+
+/** Drop one-shot upload fields (avatar_photo_*, voice_*, …) from the history
+ * snapshot so `inputData.modelSettings` stays clean of per-generation noise. */
+function stripOneShotKeys(settings: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(settings)) {
+    if (ONE_SHOT_SETTING_KEYS.has(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
 import { createVideoAdapter } from "../ai/video/factory.js";
 import type {
   VideoInput,
@@ -128,9 +139,14 @@ export const videoGenerationService = {
         inputData: {
           ...(imageUrl ? { imageUrl } : {}),
           ...(params.mediaInputs ? { mediaInputs: params.mediaInputs } : {}),
-          ...(Object.keys(modelSettings).length > 0
-            ? { modelSettings: JSON.parse(JSON.stringify(modelSettings)) }
-            : {}),
+          ...(() => {
+            const historySettings = stripOneShotKeys(
+              modelSettings as unknown as Record<string, unknown>,
+            );
+            return Object.keys(historySettings).length > 0
+              ? { modelSettings: JSON.parse(JSON.stringify(historySettings)) }
+              : {};
+          })(),
         },
         status: "pending",
         ...(params.sourceMessageId ? { sourceMessageId: params.sourceMessageId } : {}),

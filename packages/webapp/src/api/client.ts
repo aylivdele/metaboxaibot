@@ -331,10 +331,10 @@ export const api = {
 
   modelSettings: {
     get: () => request<Record<string, Record<string, unknown>>>("/model-settings"),
-    set: (modelId: string, settings: Record<string, unknown>) =>
+    set: (modelId: string, settings: Record<string, unknown>, opts?: { replace?: boolean }) =>
       request<{ success: boolean }>("/model-settings", {
         method: "PATCH",
-        body: JSON.stringify({ modelId, settings }),
+        body: JSON.stringify({ modelId, settings, ...(opts?.replace ? { replace: true } : {}) }),
       }),
     getForDialog: (dialogId: string) =>
       request<Record<string, unknown>>(`/model-settings/dialog/${dialogId}`),

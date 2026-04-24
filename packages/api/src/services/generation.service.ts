@@ -1,8 +1,24 @@
 import { db } from "../db.js";
 import { getImageQueue } from "../queues/image.queue.js";
-import { AI_MODELS } from "@metabox/shared";
+import { AI_MODELS, ONE_SHOT_SETTING_KEYS } from "@metabox/shared";
 import { checkBalance, calculateCost } from "./token.service.js";
 import { userStateService } from "./user-state.service.js";
+
+/**
+ * Strip one-shot (per-generation) fields from a `modelSettings` snapshot
+ * before persisting it into `GenerationJob.inputData.modelSettings`. The
+ * runtime object passed to queue workers is left untouched — only the
+ * history copy is sanitised so stale upload URLs don't pollute the
+ * gallery's "Apply settings" flow.
+ */
+function stripOneShotKeys(settings: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(settings)) {
+    if (ONE_SHOT_SETTING_KEYS.has(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
 
 export interface SubmitImageParams {
   userId: bigint;
@@ -100,9 +116,17 @@ export const generationService = {
         inputData: {
           ...(negativePrompt ? { negativePrompt } : {}),
           ...(params.mediaInputs ? { mediaInputs: params.mediaInputs } : {}),
-          ...(Object.keys(modelSettings).length > 0
-            ? { modelSettings: modelSettings as Record<string, string | number | boolean | null> }
-            : {}),
+          ...(() => {
+            const historySettings = stripOneShotKeys(modelSettings as Record<string, unknown>);
+            return Object.keys(historySettings).length > 0
+              ? {
+                  modelSettings: historySettings as Record<
+                    string,
+                    string | number | boolean | null
+                  >,
+                }
+              : {};
+          })(),
         },
         status: "pending",
         ...(params.sourceMessageId ? { sourceMessageId: params.sourceMessageId } : {}),

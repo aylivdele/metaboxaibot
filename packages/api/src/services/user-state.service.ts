@@ -203,9 +203,29 @@ export const userStateService = {
     userId: bigint,
     modelId: string,
     settings: Record<string, unknown>,
+    opts?: { replace?: boolean },
   ): Promise<void> {
     const settingsJson = JSON.stringify(settings);
-    // Atomic jsonb merge: deep-merge settings into modelSettings[modelId]
+    if (opts?.replace) {
+      // Full replace: overwrite modelSettings[modelId] with the incoming
+      // object (keys not listed are dropped). Used by "Apply settings" from
+      // the gallery so stale per-key overrides don't leak through.
+      await db.$executeRaw`
+        INSERT INTO user_states ("userId", "state", "modelSettings", "updatedAt")
+        VALUES (
+          ${userId},
+          'IDLE',
+          jsonb_build_object(${modelId}::text, ${settingsJson}::jsonb),
+          NOW()
+        )
+        ON CONFLICT ("userId") DO UPDATE
+        SET "modelSettings" = COALESCE(user_states."modelSettings", '{}'::jsonb)
+          || jsonb_build_object(${modelId}::text, ${settingsJson}::jsonb),
+            "updatedAt" = NOW()
+      `;
+      return;
+    }
+    // Default: atomic jsonb merge — deep-merge into modelSettings[modelId]
     // without reading the current value first.
     await db.$executeRaw`
       INSERT INTO user_states ("userId", "state", "modelSettings", "updatedAt")
