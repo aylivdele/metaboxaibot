@@ -1,0 +1,35 @@
+# Never send local installs into the build context — pnpm uses symlinks into
+# ~/.pnpm-store that aren't reachable inside the container, so copying them in
+# overwrites the image's own `pnpm install` output with broken links and the
+# build fails with "Cannot find module .../typescript/bin/tsc" (or similar).
+node_modules
+**/node_modules
+
+# Previous build outputs — regenerated inside the image.
+dist
+**/dist
+packages/*/dist
+packages/*/.tsbuildinfo
+
+# Local-only state / logs / editor junk — irrelevant to the image.
+.git
+.gitignore
+.github
+.vscode
+.idea
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Env is injected via env_file / build-args, not baked into the image.
+.env
+.env.*
+!.env.example
+
+# Docker & infra — not needed at runtime (Dockerfiles are referenced directly).
+docker-compose*.yml
+infra/docker/Dockerfile*
+
+# OS
+.DS_Store
+Thumbs.db

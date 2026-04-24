@@ -48,6 +48,16 @@ export const config = {
   bot: {
     token: req("BOT_TOKEN"),
     webappUrl: opt("WEBAPP_URL"),
+    /**
+     * When true, route Bot API calls through Telegram's Test Data-Center
+     * (`/bot<TOKEN>/test/...`). Tokens issued by @BotFather inside the test
+     * environment only work against this endpoint — without the flag every
+     * call returns 401 Unauthorized.
+     *
+     * Set `TELEGRAM_TEST_ENV=1` (or `true`) in `.env` during local dev.
+     */
+    testEnvironment:
+      (opt("TELEGRAM_TEST_ENV") ?? "").toLowerCase() === "true" || opt("TELEGRAM_TEST_ENV") === "1",
   },
 
   /** Database & cache */

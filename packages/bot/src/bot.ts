@@ -86,7 +86,13 @@ import { logger } from "./logger.js";
 import { acquireLock } from "./utils/dedup.js";
 
 export function createBot(token: string): Bot<BotContext> {
-  const bot = new Bot<BotContext>(token);
+  // Route to Telegram's Test DC when the token comes from @BotFather in test
+  // env — otherwise every Bot API call returns 401 Unauthorized. Enabled via
+  // TELEGRAM_TEST_ENV=1 (see config.bot.testEnvironment).
+  const bot = new Bot<BotContext>(
+    token,
+    config.bot.testEnvironment ? { client: { environment: "test" } } : undefined,
+  );
 
   // ── Sequentialize updates per chat (must be the very first middleware so
   //    every downstream handler — auth, i18n, scenes, addMediaInput etc. — is
