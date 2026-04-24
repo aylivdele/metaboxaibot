@@ -640,20 +640,41 @@ function GalleryCard({
       ) : null}
 
       <div className="gallery-card__body">
-        <div className="gallery-card__meta">
-          <div className="gallery-card__model-row">
+        {isImage ? (
+          // Design cards run two-up in a grid, so the single-row meta strip
+          // overflows. Stack model / cost / date vertically and drop the
+          // prompt preview entirely — it's available in the details modal.
+          <div className="gallery-card__meta gallery-card__meta--stacked">
             <span className="gallery-card__model" title={job.modelName}>
               {job.modelName}
             </span>
             <span className="gallery-card__cost">{tokensLabel}</span>
+            {job.completedAt && (
+              <span className="gallery-card__date">
+                {new Date(job.completedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
+              </span>
+            )}
           </div>
-          {job.completedAt && (
-            <span className="gallery-card__date">
-              {new Date(job.completedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
-            </span>
-          )}
-        </div>
-        <p className="gallery-card__prompt">{job.prompt}</p>
+        ) : (
+          <>
+            <div className="gallery-card__meta">
+              <div className="gallery-card__model-row">
+                <span className="gallery-card__model" title={job.modelName}>
+                  {job.modelName}
+                </span>
+                <span className="gallery-card__cost">{tokensLabel}</span>
+              </div>
+              {job.completedAt && (
+                <span className="gallery-card__date">
+                  {new Date(job.completedAt).toLocaleDateString(
+                    locale === "ru" ? "ru-RU" : "en-US",
+                  )}
+                </span>
+              )}
+            </div>
+            <p className="gallery-card__prompt">{job.prompt}</p>
+          </>
+        )}
         {error && <p className="gallery-card__error">{error}</p>}
         <div className="gallery-card__actions">
           <button

@@ -2147,6 +2147,20 @@ textarea::placeholder {
   flex: 1;
 }
 
+/* Stacked meta — used by design cards which run 2-up in a grid and don't
+   have horizontal room for model / cost / date side by side. */
+.gallery-card__meta--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.gallery-card__meta--stacked .gallery-card__model {
+  max-width: 100%;
+}
+.gallery-card__meta--stacked .gallery-card__cost {
+  margin-left: 0;
+}
+
 .gallery-card__outputs {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
