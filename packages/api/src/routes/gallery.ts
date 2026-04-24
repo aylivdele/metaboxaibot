@@ -80,10 +80,10 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
    * a multi-image card per request.
    */
   fastify.get<{
-    Querystring: { section?: string; page?: string; limit?: string };
+    Querystring: { section?: string; page?: string; limit?: string; modelId?: string };
   }>("/gallery", async (request) => {
     const userId = (request as AuthRequest).userId;
-    const { section, page = "1", limit = "20" } = request.query;
+    const { section, page = "1", limit = "20", modelId } = request.query;
 
     const take = Math.min(parseInt(limit, 10) || 20, 100);
     const skip = (Math.max(parseInt(page, 10) || 1, 1) - 1) * take;
@@ -92,6 +92,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       userId,
       status: "done",
       ...(section ? { section } : {}),
+      ...(modelId ? { modelId } : {}),
     };
 
     const [rawJobs, total] = await Promise.all([
@@ -428,6 +429,31 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return { success: true };
+  });
+
+  /**
+   * GET /gallery/model-counts?section=image|audio|video
+   * Returns per-model generation counts for the current user in a section,
+   * ordered by count descending. Only models with at least one job are included.
+   */
+  fastify.get<{
+    Querystring: { section?: string };
+  }>("/gallery/model-counts", async (request) => {
+    const userId = (request as AuthRequest).userId;
+    const { section } = request.query;
+
+    const rows = await db.generationJob.groupBy({
+      by: ["modelId"],
+      where: {
+        userId,
+        status: "done",
+        ...(section ? { section } : {}),
+      },
+      _count: { id: true },
+      orderBy: { _count: { id: "desc" } },
+    });
+
+    return rows.map((r) => ({ modelId: r.modelId, count: r._count.id }));
   });
 
   /**

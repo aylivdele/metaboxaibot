@@ -7,6 +7,7 @@ import type { TranslationKey } from "../i18n.js";
 import type { UserProfile, GalleryJob, GalleryOutput, Model, ModelSettingDef } from "../types.js";
 import { openExternalLink } from "../utils/telegram.js";
 import { SETTING_TRANSLATIONS } from "@metabox/shared-browser";
+import { StyledSelect } from "../components/management/StyledSelect.js";
 
 export type ProfileTab = "overview" | "gallery" | "account";
 
@@ -38,7 +39,13 @@ const REASON_KEYS: Record<string, string> = {
   soul_creation: "profile.reason.soul_creation",
 };
 
-export function ProfilePage({ initialSection }: { initialSection?: ProfileTab }) {
+export function ProfilePage({
+  initialSection,
+  onGoToManagement,
+}: {
+  initialSection?: ProfileTab;
+  onGoToManagement?: (section: string, modelId: string) => void;
+}) {
   const { t } = useI18n();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,7 +99,7 @@ export function ProfilePage({ initialSection }: { initialSection?: ProfileTab })
       </div>
 
       {activeTab === "overview" && <OverviewTab profile={profile} />}
-      {activeTab === "gallery" && <GalleryTab />}
+      {activeTab === "gallery" && <GalleryTab onGoToManagement={onGoToManagement} />}
       {activeTab === "account" && <AccountTab profile={profile} />}
     </div>
   );
@@ -220,9 +227,14 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
 const SECTIONS = ["image", "audio", "video"] as const;
 type Section = (typeof SECTIONS)[number];
 
-function GalleryTab() {
+function GalleryTab({
+  onGoToManagement,
+}: {
+  onGoToManagement?: (section: string, modelId: string) => void;
+}) {
   const { t, locale } = useI18n();
   const [section, setSection] = useState<Section>("image");
+  const [modelFilter, setModelFilter] = useState<string | null>(null);
   const [items, setItems] = useState<GalleryJob[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -233,6 +245,7 @@ function GalleryTab() {
   // option labels (settings page-style) instead of raw key/value strings.
   // Cached per section visit; refreshed when the active section chip changes.
   const [modelsById, setModelsById] = useState<Record<string, Model>>({});
+  const [modelCounts, setModelCounts] = useState<Record<string, number>>({});
   const LIMIT = 20;
 
   const sectionLabels: Record<Section, string> = {
@@ -241,11 +254,11 @@ function GalleryTab() {
     video: locale === "ru" ? "🎬 Видео" : "🎬 Video",
   };
 
-  const load = useCallback((sec: Section, pg: number) => {
+  const load = useCallback((sec: Section, pg: number, mid: string | null) => {
     setLoading(true);
     setError(null);
     api.gallery
-      .list({ section: sec, page: pg, limit: LIMIT })
+      .list({ section: sec, page: pg, limit: LIMIT, modelId: mid ?? undefined })
       .then((res) => {
         setItems(res.items);
         setTotal(res.total);
@@ -255,26 +268,32 @@ function GalleryTab() {
   }, []);
 
   useEffect(() => {
-    load(section, page);
-  }, [section, page, load]);
+    load(section, page, modelFilter);
+  }, [section, page, modelFilter, load]);
 
-  // Fetch model definitions once per section change. Failure is silent — the
-  // modal falls back to raw key/value rendering when models are missing.
-  // Note: gallery jobs use section "image" in the DB but the corresponding
-  // model definitions live under section "design" (legacy naming). Map the
-  // chip section to the API section so the dropdown actually returns models.
+  // Fetch model definitions + per-model generation counts on section change.
+  // Failure is silent — the modal falls back to raw key/value rendering when
+  // models are missing, and the select shows unsorted models when counts fail.
+  // Note: gallery jobs use section "image" in the DB but model definitions
+  // live under section "design" (legacy naming).
   useEffect(() => {
     let cancelled = false;
     const apiSection = section === "image" ? "design" : section;
-    api.models
-      .list(apiSection)
-      .then((list) => {
+    Promise.allSettled([api.models.list(apiSection), api.gallery.modelCounts(section)]).then(
+      ([modelsResult, countsResult]) => {
         if (cancelled) return;
-        const map: Record<string, Model> = {};
-        for (const m of list) map[m.id] = m;
-        setModelsById((prev) => ({ ...prev, ...map }));
-      })
-      .catch(() => void 0);
+        if (modelsResult.status === "fulfilled") {
+          const modelMap: Record<string, Model> = {};
+          for (const m of modelsResult.value) modelMap[m.id] = m;
+          setModelsById((prev) => ({ ...prev, ...modelMap }));
+        }
+        if (countsResult.status === "fulfilled") {
+          const countMap: Record<string, number> = {};
+          for (const c of countsResult.value) countMap[c.modelId] = c.count;
+          setModelCounts((prev) => ({ ...prev, ...countMap }));
+        }
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -282,6 +301,12 @@ function GalleryTab() {
 
   const handleSectionChange = (sec: Section) => {
     setSection(sec);
+    setModelFilter(null);
+    setPage(1);
+  };
+
+  const handleModelFilterChange = (mid: string | null) => {
+    setModelFilter(mid);
     setPage(1);
   };
 
@@ -297,6 +322,11 @@ function GalleryTab() {
 
   const totalPages = Math.ceil(total / LIMIT);
 
+  const activeSectionKey = section === "image" ? "design" : section;
+  const sectionModels = Object.values(modelsById)
+    .filter((m) => m.section === activeSectionKey)
+    .sort((a, b) => (modelCounts[b.id] ?? 0) - (modelCounts[a.id] ?? 0));
+
   return (
     <>
       <div className="section-chips" style={{ marginTop: 8 }}>
@@ -311,11 +341,37 @@ function GalleryTab() {
         ))}
       </div>
 
+      {sectionModels.length > 0 && (
+        <StyledSelect
+          style={{ display: "inline-block" }}
+          value={modelFilter ?? ""}
+          onChange={(v) => handleModelFilterChange(v === "" ? null : v)}
+          options={[
+            { value: "", label: locale === "ru" ? "Все модели" : "All models" },
+            ...sectionModels.map((m) => ({ value: m.id, label: m.name })),
+          ]}
+        />
+      )}
+
       {loading && <div className="page-loading">{t("common.loading")}</div>}
       {error && <div className="page-error">{error}</div>}
 
-      {!loading && !error && items.length === 0 && (
+      {!loading && !error && items.length === 0 && modelFilter === null && (
         <div className="empty-state">{t("gallery.empty")}</div>
+      )}
+
+      {!loading && !error && items.length === 0 && modelFilter !== null && (
+        <div className="gallery-empty-model">
+          <p className="gallery-empty-model__text">{t("gallery.emptyModel")}</p>
+          {onGoToManagement && (
+            <button
+              className="btn btn--primary"
+              onClick={() => onGoToManagement(activeSectionKey, modelFilter)}
+            >
+              {t("gallery.tryModel")}
+            </button>
+          )}
+        </div>
       )}
 
       {!loading && items.length > 0 && (
