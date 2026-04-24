@@ -352,8 +352,8 @@ export interface Translations {
     motionImage: string;
     motionVideo: string;
     motionElement: string;
-    motionVideoHintVideo: string;
-    motionVideoHintImage: string;
+    motionImageSlotHint: string;
+    motionVideoSlotHint: string;
     motionElementHint: string;
     uploadPromptVideo: string;
     uploadPrompt: string;

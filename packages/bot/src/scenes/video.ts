@@ -447,37 +447,32 @@ async function sendVideoSlotUploadPrompt(
   const kb = new InlineKeyboard().text(ctx.t.mediaInput.cancel, `mi_cancel:video`);
   const isWan = modelId === "wan";
   const isKlingMotion = modelId === "kling-motion" || modelId === "kling-motion-pro";
-  let klingMotionHint: string | null = null;
-  if (isKlingMotion && slot.mode !== "reference_element") {
-    const allSettings = await userStateService.getModelSettings(ctx.user!.id);
-    const orientation = (allSettings[modelId]?.character_orientation as string | undefined) ?? "video";
-    klingMotionHint =
-      orientation === "image"
-        ? ctx.t.mediaInput.motionVideoHintImage
-        : ctx.t.mediaInput.motionVideoHintVideo;
-  }
   const hint =
     isKlingMotion && slot.mode === "reference_element"
       ? ctx.t.mediaInput.motionElementHint
-      : isKlingMotion
-        ? klingMotionHint
-        : slot.mode === "reference_element"
-          ? ctx.t.mediaInput.refElementHint
-          : slot.mode === "reference_image"
-            ? ctx.t.mediaInput.referenceImagesHint
-            : slot.mode === "reference_video"
-              ? ctx.t.mediaInput.referenceVideosHint
-              : slot.mode === "reference_audio"
-                ? ctx.t.mediaInput.referenceAudiosHint
-                : slot.mode === "driving_audio"
-                  ? ctx.t.mediaInput.drivingAudioHint
-                  : slot.mode === "first_clip"
-                    ? ctx.t.mediaInput.firstClipHint
-                    : isWan && slot.mode === "first_frame"
-                      ? ctx.t.mediaInput.firstFrameWanHint
-                      : isWan && slot.mode === "last_frame"
-                        ? ctx.t.mediaInput.lastFrameWanHint
-                        : null;
+      : isKlingMotion && slot.mode === "first_frame"
+        ? ctx.t.mediaInput.motionImageSlotHint
+        : isKlingMotion && slot.mode === "motion_video"
+          ? ctx.t.mediaInput.motionVideoSlotHint
+          : isKlingMotion
+            ? null
+            : slot.mode === "reference_element"
+              ? ctx.t.mediaInput.refElementHint
+              : slot.mode === "reference_image"
+                ? ctx.t.mediaInput.referenceImagesHint
+                : slot.mode === "reference_video"
+                  ? ctx.t.mediaInput.referenceVideosHint
+                  : slot.mode === "reference_audio"
+                    ? ctx.t.mediaInput.referenceAudiosHint
+                    : slot.mode === "driving_audio"
+                      ? ctx.t.mediaInput.drivingAudioHint
+                      : slot.mode === "first_clip"
+                        ? ctx.t.mediaInput.firstClipHint
+                        : isWan && slot.mode === "first_frame"
+                          ? ctx.t.mediaInput.firstFrameWanHint
+                          : isWan && slot.mode === "last_frame"
+                            ? ctx.t.mediaInput.lastFrameWanHint
+                            : null;
   if (hint) await ctx.reply(hint);
   await ctx.reply(msg, { reply_markup: kb });
 }
