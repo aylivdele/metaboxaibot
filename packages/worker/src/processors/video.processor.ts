@@ -44,6 +44,7 @@ import { resolveKeyProvider } from "@metabox/api/ai/key-provider";
 import { acquireById } from "@metabox/api/services/key-pool";
 import type { AcquiredKey } from "@metabox/api/services/key-pool";
 import { userAvatarService } from "@metabox/api/services/user-avatar";
+import { resolveVoiceForTTS } from "@metabox/api/services/user-voice";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
 import { UserFacingError } from "@metabox/shared";
 
@@ -190,6 +191,36 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
               token,
               queue: getVideoQueue(),
             });
+        // If voice_id is a local UserVoice.id (modern picker format) resolve
+        // it to the current ElevenLabs externalId here so the provider
+        // adapter (HeyGen / D-ID) receives a voice_id it can actually use.
+        // Records saved before this migration store the externalId directly
+        // — both shapes are accepted via the two-pass findFirst below.
+        let effectiveModelSettings = modelSettings;
+        const requestedVoice = (modelSettings?.voice_id as string | undefined)?.trim();
+        if (requestedVoice) {
+          const userVoice =
+            (await db.userVoice.findFirst({
+              where: { id: requestedVoice, provider: "elevenlabs" },
+              select: { id: true },
+            })) ??
+            (await db.userVoice.findFirst({
+              where: { provider: "elevenlabs", externalId: requestedVoice },
+              select: { id: true },
+            }));
+          if (userVoice) {
+            try {
+              const resolved = await resolveVoiceForTTS(userVoice.id);
+              effectiveModelSettings = { ...modelSettings, voice_id: resolved.voiceId };
+            } catch (err) {
+              logger.warn(
+                { userVoiceId: userVoice.id, err },
+                "Video submit: failed to resolve cloned voice, falling back to raw voice_id",
+              );
+            }
+          }
+        }
+
         const submitAdapter = createVideoAdapter(modelId, acquired);
         providerJobId = await submitWithThrottle({
           modelId,
@@ -206,7 +237,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
               mediaInputs,
               aspectRatio,
               duration,
-              modelSettings,
+              modelSettings: effectiveModelSettings,
               userId: BigInt(userIdStr),
             }),
         });

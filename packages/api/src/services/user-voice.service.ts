@@ -50,27 +50,28 @@ export async function resolveVoiceForTTS(userVoiceId: string): Promise<ResolvedV
       status: true,
     },
   });
-  if (!voice.externalId) {
-    throw new Error(`UserVoice ${userVoiceId} has no externalId`);
+
+  // 1. Если externalId ещё существует — проверяем, что voice живёт на его
+  //    ключе. При совпадении — fast-path, возвращаем как есть.
+  //
+  //    Если externalId пусто (голос выселен `evictOneElevenLabsVoice` когда
+  //    другой пользователь занял слот), пропускаем проверку и сразу уходим
+  //    в re-clone ветку ниже — resolve выдаст свежий externalId + ключ.
+  if (voice.externalId) {
+    const acquired = await acquireById(voice.providerKeyId, PROVIDER);
+    const exists = await voiceExistsOn(voice.externalId, acquired.apiKey);
+    if (exists) {
+      void db.userVoice
+        .update({ where: { id: voice.id }, data: { lastUsedAt: new Date() } })
+        .catch(() => void 0);
+      return { voiceId: voice.externalId, acquired, recloned: false };
+    }
   }
 
-  // 1. Берём ключ, на котором голос был создан. null → env-fallback.
-  const acquired = await acquireById(voice.providerKeyId, PROVIDER);
-
-  // 2. Проверяем, что voice_id ещё существует в этом аккаунте.
-  const exists = await voiceExistsOn(voice.externalId, acquired.apiKey);
-  if (exists) {
-    void db.userVoice
-      .update({ where: { id: voice.id }, data: { lastUsedAt: new Date() } })
-      .catch(() => void 0);
-    return { voiceId: voice.externalId, acquired, recloned: false };
-  }
-
-  // 3. Голос пропал — пересоздаём на свежем ключе из пула.
+  // 2. Голос пропал (либо externalId никогда не был, либо owning key потерял
+  //    slot) — пересоздаём на свежем ключе из пула.
   if (!voice.audioS3Key) {
-    throw new Error(
-      `ElevenLabs voice ${voice.externalId} is gone and no audioS3Key to recreate it`,
-    );
+    throw new Error(`ElevenLabs voice ${userVoiceId} is gone and no audioS3Key to recreate it`);
   }
   logger.warn(
     { userVoiceId: voice.id, oldExternalId: voice.externalId, oldKeyId: voice.providerKeyId },

@@ -129,16 +129,27 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
       );
 
       // Cloned-voice path: TTS на ElevenLabs с user-cloned voice. Voice_id живёт
-      // на конкретном ключе → нужен sticky key. Если voice пропал — resolveVoiceForTTS
-      // его пересоздаст и вернёт новый voice_id + ключ свежего создания.
+      // на конкретном ключе → нужен sticky key. Если voice пропал —
+      // resolveVoiceForTTS пересоздаст и вернёт новый voice_id + ключ свежего
+      // создания.
+      //
+      // Современный пикер шлёт `UserVoice.id` (стабильный local cuid).
+      // Старые записи в modelSettings могут хранить голый ElevenLabs
+      // externalId — пробуем и так, для backward-compat. Если совпадений нет
+      // ни по одному полю — это официальный EL-голос, проходит без sticky.
       let stickyVoice: { voiceId: string; acquired: AcquiredKey } | null = null;
       if (modelId === "tts-el" || modelId === "voice-clone") {
         const requestedVoice = (modelSettings?.voice_id as string | undefined) ?? voiceId ?? null;
         if (requestedVoice) {
-          const userVoice = await db.userVoice.findFirst({
-            where: { provider: "elevenlabs", externalId: requestedVoice },
-            select: { id: true },
-          });
+          const userVoice =
+            (await db.userVoice.findFirst({
+              where: { id: requestedVoice, provider: "elevenlabs" },
+              select: { id: true },
+            })) ??
+            (await db.userVoice.findFirst({
+              where: { provider: "elevenlabs", externalId: requestedVoice },
+              select: { id: true },
+            }));
           if (userVoice) {
             const resolved = await resolveVoiceForTTS(userVoice.id);
             stickyVoice = { voiceId: resolved.voiceId, acquired: resolved.acquired };

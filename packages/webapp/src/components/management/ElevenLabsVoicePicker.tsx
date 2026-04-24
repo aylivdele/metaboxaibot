@@ -45,7 +45,11 @@ export function ElevenLabsVoicePicker({ voiceId, onChange }: ElevenLabsVoicePick
   const selectCloned = (item: VoiceListItem) => {
     const voice = myVoices.find((v) => v.id === item.id);
     if (!voice) return;
-    onChange("voice_id", voice.externalId ?? "");
+    // For cloned voices we persist the stable local UserVoice.id — the worker
+    // resolves the current ElevenLabs externalId via `resolveVoiceForTTS`,
+    // which also handles eviction (re-clone) and key-binding. Official EL
+    // voice_ids are passed through in `selectOfficial`.
+    onChange("voice_id", voice.id);
   };
 
   const uniqueLanguages = Array.from(
@@ -83,7 +87,13 @@ export function ElevenLabsVoicePicker({ voiceId, onChange }: ElevenLabsVoicePick
       : undefined,
   }));
 
-  const mineSelectedId = myVoices.find((v) => v.externalId === voiceId)?.id ?? null;
+  // voice_id is the local UserVoice.id for cloned voices. Fall back to
+  // externalId for records saved before this migration (backward compat).
+  const mineSelectedId = voiceId
+    ? (myVoices.find((v) => v.id === voiceId)?.id ??
+      myVoices.find((v) => v.externalId === voiceId)?.id ??
+      null)
+    : null;
 
   return (
     <div className="voice-picker">
