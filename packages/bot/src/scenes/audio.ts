@@ -135,7 +135,7 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
         // ElevenLabs returns 400 with voice_limit_reached when the workspace slot limit is exceeded.
         // Эвиктим на ТОМ ЖЕ ключе — слот-лимит per-account.
         if (err instanceof Error && err.message.includes("voice_limit_reached")) {
-          const freed = await evictOneElevenLabsVoice(acquired.apiKey);
+          const freed = await evictOneElevenLabsVoice(acquired.apiKey, acquired.keyId);
           if (!freed) throw err;
           voiceId = await ElevenLabsAdapter.cloneVoice(
             audioBuffer,
@@ -191,22 +191,27 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
 }
 
 /**
- * Frees one custom voice slot on ElevenLabs by deleting the least-recently-used
- * cloned voice that is actually occupying a slot right now.
+ * Frees one custom voice slot on ElevenLabs by deleting an orphaned or
+ * least-recently-used cloned voice. Reconciles DB↔EL drift along the way:
  *
- * Strategy:
- * 1. List the real custom voices on ElevenLabs (source of truth for the slot count).
- * 2. Correlate with our DB's UserVoice records by externalId.
- * 3. Pick the LRU candidate among the DB-tracked ones (oldest lastUsedAt, then
- *    oldest createdAt). If none of the EL voices are tracked in our DB (drift),
- *    fall back to the oldest voice on ElevenLabs by created_at_unix.
- * 4. Delete it on ElevenLabs, verifying the HTTP response. Clear externalId in
- *    our DB if the voice was tracked — the audioS3Key is preserved so the voice
- *    can be recreated on next use via `ensureVoiceExists`.
+ *   1. List real custom voices on EL (source of truth for the slot count).
+ *      Premade voices don't count toward the limit, so we ignore them.
+ *   2. Reconcile DB → EL: any UserVoice with `externalId` pointing to a
+ *      voice that is no longer on EL (deleted via EL UI, evicted by another
+ *      worker / account, lost during partial sync) gets its externalId
+ *      cleared. The original audio in `audioS3Key` is preserved so the
+ *      voice can be re-cloned on next TTS use via `resolveVoiceForTTS`.
+ *   3. Pick a deletion target — prefer **untracked** EL voices first
+ *      (orphans from deleted DB users / direct EL UI / failed-write
+ *      partial state) since deleting them doesn't penalize any current
+ *      user. If none, fall back to the LRU among DB-tracked voices.
+ *   4. Delete from EL. `deleteVoice` returns true even on 404 so an
+ *      already-gone voice is treated as "slot already free". On a tracked
+ *      hit we clear the DB externalId.
  *
- * Returns true if a slot was freed, false otherwise.
+ * Returns true when at least one slot was freed (incl. drift cleanup).
  */
-async function evictOneElevenLabsVoice(apiKey: string): Promise<boolean> {
+async function evictOneElevenLabsVoice(apiKey: string, keyId: string | null): Promise<boolean> {
   let elVoices: Awaited<ReturnType<typeof ElevenLabsAdapter.listVoices>>;
   try {
     elVoices = await ElevenLabsAdapter.listVoices(apiKey);
@@ -217,41 +222,87 @@ async function evictOneElevenLabsVoice(apiKey: string): Promise<boolean> {
 
   // Only cloned/generated voices occupy the custom-voice limit (premade does not).
   const deletable = elVoices.filter((v) => v.category === "cloned" || v.category === "generated");
-  if (deletable.length === 0) {
-    logger.warn("Voice eviction: ElevenLabs returned no deletable voices");
-    return false;
+  const deletableIds = new Set(deletable.map((v) => v.voice_id));
+
+  // ── Step 2: reconcile DB → EL drift, scoped to THIS account ────────────
+  // EL voice_id lives per-account, so we can only judge "stale" for DB
+  // records whose `providerKeyId` matches the current key (or both are
+  // null = env-fallback path). Cross-account records (other pool keys)
+  // are left alone — they're valid on their own account.
+  const allDbTracked = await db.userVoice.findMany({
+    where: {
+      provider: "elevenlabs",
+      externalId: { not: null },
+      providerKeyId: keyId,
+    },
+    select: { id: true, externalId: true },
+  });
+  const staleDbIds = allDbTracked
+    .filter((r) => r.externalId && !deletableIds.has(r.externalId))
+    .map((r) => r.id);
+  if (staleDbIds.length > 0) {
+    await db.userVoice
+      .updateMany({
+        where: { id: { in: staleDbIds } },
+        data: { externalId: null },
+      })
+      .catch((e) =>
+        logger.error(
+          { err: e, count: staleDbIds.length },
+          "Voice eviction: stale-DB cleanup failed",
+        ),
+      );
+    logger.info(
+      { count: staleDbIds.length, keyId },
+      "Voice eviction: cleared stale DB externalIds",
+    );
   }
 
-  const deletableIds = deletable.map((v) => v.voice_id);
+  if (deletable.length === 0) {
+    logger.warn("Voice eviction: ElevenLabs returned no deletable voices");
+    // Still report success if drift cleanup happened — caller may now have
+    // room indirectly (their next clone will hit a slot freed elsewhere).
+    return staleDbIds.length > 0;
+  }
+
+  // ── Step 3: pick a target ──────────────────────────────────────────────
+  // Tracked records (voice still on EL AND in our DB), ordered for LRU pick.
   const trackedRecords = await db.userVoice.findMany({
-    where: { provider: "elevenlabs", externalId: { in: deletableIds } },
+    where: { provider: "elevenlabs", externalId: { in: [...deletableIds] } },
     orderBy: [{ lastUsedAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
     select: { id: true, externalId: true },
   });
+  const trackedExternalIds = new Set(
+    trackedRecords.map((r) => r.externalId).filter((id): id is string => !!id),
+  );
+  const untracked = deletable.filter((v) => !trackedExternalIds.has(v.voice_id));
 
   let targetExternalId: string | null = null;
   let targetDbId: string | null = null;
 
-  if (trackedRecords.length > 0) {
-    targetExternalId = trackedRecords[0].externalId;
-    targetDbId = trackedRecords[0].id;
-  } else {
-    // Drift: ElevenLabs slots are filled by voices we don't track. Evict the
-    // oldest one on ElevenLabs (by creation time) so we can keep going.
-    const oldest = [...deletable].sort(
+  if (untracked.length > 0) {
+    // Orphans — evict the oldest. No DB row to update.
+    const oldest = [...untracked].sort(
       (a, b) => (a.created_at_unix ?? 0) - (b.created_at_unix ?? 0),
     )[0];
     targetExternalId = oldest.voice_id;
-    logger.warn(
+    logger.info(
       { voiceId: targetExternalId, name: oldest.name },
-      "Voice eviction: no DB-tracked EL voices, falling back to oldest untracked",
+      "Voice eviction: deleting untracked orphan (drift cleanup)",
     );
+  } else if (trackedRecords.length > 0) {
+    targetExternalId = trackedRecords[0].externalId;
+    targetDbId = trackedRecords[0].id;
   }
 
-  if (!targetExternalId) return false;
+  if (!targetExternalId) return staleDbIds.length > 0;
 
+  // ── Step 4: delete on EL + sync DB ─────────────────────────────────────
   const deleted = await ElevenLabsAdapter.deleteVoice(targetExternalId, apiKey);
-  if (!deleted) return false;
+  if (!deleted) {
+    // Hard failure (network / 5xx). DB unchanged; caller can retry.
+    return staleDbIds.length > 0;
+  }
 
   if (targetDbId) {
     await db.userVoice
