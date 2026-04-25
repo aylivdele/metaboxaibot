@@ -21,7 +21,7 @@ export function msUntilNextMidnightMsk(): number {
 }
 
 export async function sendUsageReport(): Promise<void> {
-  const chatId = config.alerts.chatId;
+  const chatId = config.reports.chatId;
   if (!chatId) return;
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -82,7 +82,7 @@ export async function sendUsageReport(): Promise<void> {
   const telegram = new Api(config.bot.token);
   await telegram.sendMessage(chatId, text, {
     parse_mode: "Markdown",
-    message_thread_id: config.alerts.usageThreadId,
+    message_thread_id: config.reports.threadId,
   });
   logger.info({ models: rows.length, totalSpent }, "Usage report sent");
 }
