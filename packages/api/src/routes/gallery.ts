@@ -80,10 +80,16 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
    * a multi-image card per request.
    */
   fastify.get<{
-    Querystring: { section?: string; page?: string; limit?: string; modelId?: string };
+    Querystring: {
+      section?: string;
+      page?: string;
+      limit?: string;
+      modelId?: string;
+      folderId?: string;
+    };
   }>("/gallery", async (request) => {
     const userId = (request as AuthRequest).userId;
-    const { section, page = "1", limit = "20", modelId } = request.query;
+    const { section, page = "1", limit = "20", modelId, folderId } = request.query;
 
     const take = Math.min(parseInt(limit, 10) || 20, 100);
     const skip = (Math.max(parseInt(page, 10) || 1, 1) - 1) * take;
@@ -93,6 +99,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       status: "done",
       ...(section ? { section } : {}),
       ...(modelId ? { modelId } : {}),
+      ...(folderId ? { folderItems: { some: { folderId } } } : {}),
     };
 
     const [rawJobs, total] = await Promise.all([
@@ -109,6 +116,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           inputData: true,
           tokensSpent: true,
           completedAt: true,
+          folderItems: { select: { folderId: true } },
           outputs: {
             orderBy: { index: "asc" },
             select: {
@@ -156,6 +164,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         modelSettings,
         tokensSpent: job.tokensSpent ? job.tokensSpent.toString() : null,
         completedAt: job.completedAt,
+        folderIds: job.folderItems.map((fi) => fi.folderId),
         outputs,
       };
     });
@@ -546,4 +555,217 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
 
     return { success: true };
   });
+
+  // ── Gallery Folders ──────────────────────────────────────────────────────────
+
+  /**
+   * GET /gallery/folders
+   * Returns all folders for the current user sorted: pinned first, then by name.
+   * Includes item count per folder.
+   */
+  fastify.get("/gallery/folders", async (request) => {
+    const userId = (request as AuthRequest).userId;
+
+    const folders = await db.galleryFolder.findMany({
+      where: { userId },
+      include: { _count: { select: { items: true } } },
+      orderBy: [{ isPinned: "desc" }, { pinnedAt: "asc" }, { isDefault: "desc" }, { name: "asc" }],
+    });
+
+    return folders.map((f) => ({
+      id: f.id,
+      name: f.name,
+      isDefault: f.isDefault,
+      isPinned: f.isPinned,
+      pinnedAt: f.pinnedAt,
+      itemCount: f._count.items,
+      createdAt: f.createdAt,
+    }));
+  });
+
+  /**
+   * POST /gallery/folders
+   * Creates a new user folder.
+   */
+  fastify.post<{ Body: { name: string } }>("/gallery/folders", async (request, reply) => {
+    const userId = (request as AuthRequest).userId;
+    const { name } = request.body;
+
+    if (!name || !name.trim()) return reply.code(400).send({ error: "Name is required" });
+
+    const folder = await db.galleryFolder.create({
+      data: { userId, name: name.trim() },
+    });
+
+    return {
+      id: folder.id,
+      name: folder.name,
+      isDefault: false,
+      isPinned: false,
+      pinnedAt: null,
+      itemCount: 0,
+      createdAt: folder.createdAt,
+    };
+  });
+
+  /**
+   * PATCH /gallery/folders/:folderId
+   * Rename or pin/unpin a folder. Default folders cannot be renamed.
+   */
+  fastify.patch<{
+    Params: { folderId: string };
+    Body: { name?: string; isPinned?: boolean };
+  }>("/gallery/folders/:folderId", async (request, reply) => {
+    const userId = (request as AuthRequest).userId;
+    const { folderId } = request.params;
+    const { name, isPinned } = request.body;
+
+    const folder = await db.galleryFolder.findUnique({ where: { id: folderId } });
+    if (!folder) return reply.code(404).send({ error: "Not found" });
+    if (folder.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+    if (name !== undefined && folder.isDefault)
+      return reply.code(400).send({ error: "Cannot rename default folder" });
+    if (name !== undefined && !name.trim())
+      return reply.code(400).send({ error: "Name is required" });
+
+    const updated = await db.galleryFolder.update({
+      where: { id: folderId },
+      data: {
+        ...(name !== undefined ? { name: name.trim() } : {}),
+        ...(isPinned !== undefined ? { isPinned, pinnedAt: isPinned ? new Date() : null } : {}),
+      },
+      include: { _count: { select: { items: true } } },
+    });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      isDefault: updated.isDefault,
+      isPinned: updated.isPinned,
+      pinnedAt: updated.pinnedAt,
+      itemCount: updated._count.items,
+      createdAt: updated.createdAt,
+    };
+  });
+
+  /**
+   * DELETE /gallery/folders/:folderId
+   * Deletes a user folder. Default (Favorites) folders cannot be deleted.
+   */
+  fastify.delete<{ Params: { folderId: string } }>(
+    "/gallery/folders/:folderId",
+    async (request, reply) => {
+      const userId = (request as AuthRequest).userId;
+      const { folderId } = request.params;
+
+      const folder = await db.galleryFolder.findUnique({ where: { id: folderId } });
+      if (!folder) return reply.code(404).send({ error: "Not found" });
+      if (folder.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+      if (folder.isDefault) return reply.code(400).send({ error: "Cannot delete default folder" });
+
+      await db.galleryFolder.delete({ where: { id: folderId } });
+      return { success: true };
+    },
+  );
+
+  /**
+   * POST /gallery/folders/:folderId/items
+   * Adds a generation job to a folder.
+   */
+  fastify.post<{
+    Params: { folderId: string };
+    Body: { jobId: string };
+  }>("/gallery/folders/:folderId/items", async (request, reply) => {
+    const userId = (request as AuthRequest).userId;
+    const { folderId } = request.params;
+    const { jobId } = request.body;
+
+    const folder = await db.galleryFolder.findUnique({ where: { id: folderId } });
+    if (!folder) return reply.code(404).send({ error: "Not found" });
+    if (folder.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+
+    const job = await db.generationJob.findUnique({
+      where: { id: jobId },
+      select: { userId: true },
+    });
+    if (!job) return reply.code(404).send({ error: "Job not found" });
+    if (job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+
+    await db.galleryFolderItem.upsert({
+      where: { folderId_jobId: { folderId, jobId } },
+      create: { folderId, jobId },
+      update: {},
+    });
+
+    return { success: true };
+  });
+
+  /**
+   * DELETE /gallery/folders/:folderId/items/:jobId
+   * Removes a generation job from a folder.
+   */
+  fastify.delete<{ Params: { folderId: string; jobId: string } }>(
+    "/gallery/folders/:folderId/items/:jobId",
+    async (request, reply) => {
+      const userId = (request as AuthRequest).userId;
+      const { folderId, jobId } = request.params;
+
+      const folder = await db.galleryFolder.findUnique({ where: { id: folderId } });
+      if (!folder) return reply.code(404).send({ error: "Not found" });
+      if (folder.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+
+      await db.galleryFolderItem.deleteMany({ where: { folderId, jobId } });
+      return { success: true };
+    },
+  );
+
+  /**
+   * POST /gallery/favorites
+   * Ensures the Favorites folder exists for the user, then adds the job.
+   * Returns the Favorites folder id.
+   */
+  fastify.post<{ Body: { jobId: string } }>("/gallery/favorites", async (request, reply) => {
+    const userId = (request as AuthRequest).userId;
+    const { jobId } = request.body;
+
+    const job = await db.generationJob.findUnique({
+      where: { id: jobId },
+      select: { userId: true },
+    });
+    if (!job) return reply.code(404).send({ error: "Job not found" });
+    if (job.userId !== userId) return reply.code(403).send({ error: "Forbidden" });
+
+    let favorites = await db.galleryFolder.findFirst({ where: { userId, isDefault: true } });
+    if (!favorites) {
+      favorites = await db.galleryFolder.create({
+        data: { userId, name: "Избранное", isDefault: true },
+      });
+    }
+
+    await db.galleryFolderItem.upsert({
+      where: { folderId_jobId: { folderId: favorites.id, jobId } },
+      create: { folderId: favorites.id, jobId },
+      update: {},
+    });
+
+    return { folderId: favorites.id };
+  });
+
+  /**
+   * DELETE /gallery/favorites/:jobId
+   * Removes a job from the Favorites folder (if it exists).
+   */
+  fastify.delete<{ Params: { jobId: string } }>(
+    "/gallery/favorites/:jobId",
+    async (request, reply) => {
+      const userId = (request as AuthRequest).userId;
+      const { jobId } = request.params;
+
+      const favorites = await db.galleryFolder.findFirst({ where: { userId, isDefault: true } });
+      if (!favorites) return reply.code(404).send({ error: "No favorites folder" });
+
+      await db.galleryFolderItem.deleteMany({ where: { folderId: favorites.id, jobId } });
+      return { success: true };
+    },
+  );
 };
