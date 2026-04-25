@@ -1062,7 +1062,12 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       { hasVoiceFile: false },
     );
     if (validationError) {
-      await ctx.reply(applyValidationParams(ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string, validationError.params));
+      await ctx.reply(
+        applyValidationParams(
+          ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string,
+          validationError.params,
+        ),
+      );
       return;
     }
 
@@ -1528,7 +1533,12 @@ export async function handleVideoAvatarVoiceCallback(ctx: BotContext): Promise<v
     { hasVoiceFile: true },
   );
   if (validationError) {
-    await ctx.reply(applyValidationParams(ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string, validationError.params));
+    await ctx.reply(
+      applyValidationParams(
+        ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string,
+        validationError.params,
+      ),
+    );
     return;
   }
 

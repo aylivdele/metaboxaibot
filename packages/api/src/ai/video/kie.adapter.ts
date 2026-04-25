@@ -1,4 +1,9 @@
-import type { VideoAdapter, VideoInput, VideoValidationError, VideoResult } from "./base.adapter.js";
+import type {
+  VideoAdapter,
+  VideoInput,
+  VideoValidationError,
+  VideoResult,
+} from "./base.adapter.js";
 import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { uploadFileUrl } from "../../utils/kie-upload.js";
