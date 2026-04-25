@@ -61,10 +61,10 @@ export default {
     noActiveDialog: "💬 You need to create a dialog and choose a model first.",
     createDialog: "➕ Create dialog",
     backToMain: "🏠 Main Menu",
-    dialogSelected: "✅ <b>Dialog:</b> {title}\n    <b>Model:</b> {model}",
+    dialogSelected: "✅ <b>Dialog:</b> {title}\n{modelIcon}<b>Model:</b> {modelName}",
     dialogHint: {
       prompt:
-        "✦ <b>Type⌨️/record🎙️ your prompt right here in the chat. You'll get the result here too</b>",
+        "✦ <b>Type ⌨️ / record 🎙️ your prompt right here in the chat. You'll get the result here too</b>",
       attach: "✦ You can attach images, files (PDF, DOCX, XLSX, etc.).",
       thinkingWarning:
         "✦ If thinking mode is enabled, the response may take up to 10 minutes depending on dialog size and thinking depth.",
@@ -460,8 +460,10 @@ export default {
     motionImage: "Character Image",
     motionVideo: "Reference Video",
     motionElement: "Face Element",
-    motionVideoHint:
-      "Kling Motion — transfer movements from a reference video to any character image.\n\n📸 Character Image (required): character should have clear body proportions, no occlusion, and occupy more than 5% of the image area.\n\n🎬 Reference Video (required): video with movements to transfer. Should contain a realistic-style character with entire body or upper body visible, including head, without obstruction.\n• Orientation 'video' — max 30 s\n• Orientation 'image' — max 10 s\n\n👤 Face Element (optional): upload a face photo to enhance identity preservation. Reference as @Element1 in prompt. Only works with orientation 'video'.\n\n⚙️ Character orientation is configured in Management.",
+    motionImageSlotHint:
+      "Kling Motion — transfer movements from a reference video to any character image.\n\n📸 Character Image (required): character should have clear body proportions, no occlusion, and occupy more than 5% of the image area.\n\n👤 Face Element (optional): upload a face photo to enhance identity preservation. Reference as @Element1 in prompt.\n\n⚙️ Character orientation is configured in Management.",
+    motionVideoSlotHint:
+      "Kling Motion — transfer movements from a reference video to any character image.\n\n🎬 Reference Video (required): video with movements to transfer. Should contain a realistic-style character with entire body or upper body visible, including head, without obstruction. Max 30 s.\n\n⚙️ Character orientation is configured in Management.",
     motionElementHint:
       "Optional element for facial consistency binding. Upload a facial element to enhance identity preservation in the generated video. Only 1 element is supported. Reference in prompt as @Element1. Element binding is only supported when 'Character orientation' is 'video'.",
     uploadPromptVideo: 'Send a video for "{slot}".',
