@@ -127,9 +127,12 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
     // SSO redirect to shop subscriptions tab
     try {
       const { ssoUrl } = await api.profile.metaboxSso();
+      // encodeURIComponent чтобы query внутри redirect (?tab=subscriptions)
+      // не сливался с query самого ssoUrl и не парсился сервером криво.
+      const redirect = encodeURIComponent("/shop?tab=subscriptions");
       const shopUrl = ssoUrl.includes("?")
-        ? `${ssoUrl}&redirect=/shop?tab=subscriptions`
-        : `${ssoUrl}?redirect=/shop?tab=subscriptions`;
+        ? `${ssoUrl}&redirect=${redirect}`
+        : `${ssoUrl}?redirect=${redirect}`;
       const tg = getTgWebApp();
       if (tg?.openLink) tg.openLink(shopUrl);
       else window.open(shopUrl, "_blank");
