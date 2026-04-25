@@ -12,6 +12,15 @@ export type {
 export type { TransactionType, TransactionReason, TokenTransactionDto } from "./types/token.js";
 export type {
   AIModel,
+  MediaInputMode,
+  MediaInputSlot,
+  MediaInputConstraints,
+  ModelMode,
+  ModelFamily,
+  ModelFamilyMember,
+  ModelSettingDef,
+  ModelSettingOption,
+  ModelSettingType,
   ChatInput,
   ChatOutput,
   GenerationInput,
@@ -21,9 +30,18 @@ export type {
 // Constants
 export { SUPPORTED_LANGUAGES, LANGUAGE_LABELS, RTL_LANGUAGES } from "./constants/languages.js";
 export { AI_MODELS, MODELS_BY_SECTION } from "./constants/models.js";
+export {
+  MODEL_FAMILIES,
+  FAMILIES_BY_SECTION,
+  MODEL_TO_FAMILY,
+} from "./constants/model-families.js";
 export { BOT_STATES, SECTION_BY_STATE, WELCOME_BONUS_TOKENS } from "./constants/states.js";
 export { PLANS } from "./constants/plans.js";
 export type { Plan } from "./constants/plans.js";
+export { ONE_SHOT_SETTING_KEYS } from "./constants/model-settings-keys.js";
+
+// Errors
+export { UserFacingError, resolveUserFacingError } from "./errors.js";
 
 // Web token (URL-based auth for KeyboardButtonWebApp where initData is unavailable)
 export { generateWebToken, verifyWebToken } from "./webtoken.js";
@@ -32,6 +50,24 @@ export { generateWebToken, verifyWebToken } from "./webtoken.js";
 export { config } from "./config.js";
 export type { Config } from "./config.js";
 
+// Crypto: симметричное шифрование секретов (provider keys, proxy passwords)
+export { encryptSecret, decryptSecret, maskKey } from "./crypto/secret-vault.js";
+
+// Model modes: per-model operation modes (t2v / i2v / r2v) and slot filtering
+export {
+  getResolvedModes,
+  defaultModeId,
+  resolveActiveMode,
+  getActiveSlots,
+  isKnownModeId,
+} from "./utils/model-modes.js";
+
 // i18n
-export { getT, preloadLocales } from "./i18n/index.js";
+export { getT, preloadLocales, buildDialogHint, buildResultCaption } from "./i18n/index.js";
 export type { Translations } from "./i18n/index.js";
+export {
+  MODEL_TRANSLATIONS,
+  SETTING_TRANSLATIONS,
+  resolveModelDisplay,
+} from "@metabox/shared-browser";
+export type { ModelTranslation, SettingTranslation } from "@metabox/shared-browser";

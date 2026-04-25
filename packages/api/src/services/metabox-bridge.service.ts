@@ -54,6 +54,7 @@ export class MetaboxApiError extends Error {
     public readonly body: string,
     path: string,
     public readonly code?: string,
+    public readonly data?: Record<string, unknown>,
   ) {
     super(`Metabox internal API ${path} → ${status}: ${body}`);
   }
@@ -73,21 +74,25 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     const text = await res.text().catch(() => "");
     let message = text;
     let code: string | undefined;
+    let data: Record<string, unknown> | undefined;
     try {
-      const parsed = JSON.parse(text) as { error?: string; code?: string };
-      if (parsed.error) message = parsed.error;
-      if (parsed.code) code = parsed.code;
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      if (parsed.error) message = String(parsed.error);
+      if (parsed.code) code = String(parsed.code);
+      data = parsed;
     } catch {
       // keep raw text
     }
-    throw new MetaboxApiError(res.status, message, path, code);
+    throw new MetaboxApiError(res.status, message, path, code, data);
   }
   return res.json() as Promise<T>;
 }
 
 async function get<T>(path: string): Promise<T> {
-  const { url } = base();
-  const res = await fetch(`${url}/api${path}`);
+  const { url, key } = base();
+  const res = await fetch(`${url}/api${path}`, {
+    headers: { "X-Internal-Key": key },
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Metabox API GET ${path} → ${res.status}: ${text}`);
@@ -97,10 +102,17 @@ async function get<T>(path: string): Promise<T> {
 
 // ── API methods ───────────────────────────────────────────────────────────────
 
+export interface MergedAccountInfo {
+  userId: string;
+  tokensBalance: number;
+  subscriptionDays: number;
+}
+
 export interface RegisterFromBotResult {
   metaboxUserId: string;
   ssoToken: string;
   referralCode: string;
+  mergedFrom?: MergedAccountInfo;
 }
 
 /** Register a new Metabox user from the bot (email + password). */
@@ -126,6 +138,8 @@ export async function loginAndLink(params: {
   password: string;
   telegramId: bigint;
   telegramUsername: string | null;
+  firstName?: string;
+  lastName?: string;
   referrerTelegramId?: bigint | null;
   botHasPurchase: boolean;
   botCreatedAt: Date;
@@ -135,6 +149,8 @@ export async function loginAndLink(params: {
     password: params.password,
     telegramId: params.telegramId.toString(),
     telegramUsername: params.telegramUsername,
+    firstName: params.firstName,
+    lastName: params.lastName,
     referrerTelegramId: params.referrerTelegramId?.toString(),
     botHasPurchase: params.botHasPurchase,
     botCreatedAt: params.botCreatedAt.toISOString(),
@@ -147,6 +163,9 @@ export async function verifyLinkToken(
   token: string,
   telegramId: bigint,
   botInfo?: {
+    telegramUsername?: string;
+    firstName?: string;
+    lastName?: string;
     referrerTelegramId?: bigint | null;
     botHasPurchase: boolean;
     botCreatedAt: Date;
@@ -156,13 +175,36 @@ export async function verifyLinkToken(
   email: string;
   firstName: string;
   referralCode: string;
+  mergedFrom?: MergedAccountInfo;
 }> {
   return post("/verify-link-token", {
     token,
     telegramId: telegramId.toString(),
+    telegramUsername: botInfo?.telegramUsername,
+    firstName: botInfo?.firstName,
+    lastName: botInfo?.lastName,
     referrerTelegramId: botInfo?.referrerTelegramId?.toString(),
     botHasPurchase: botInfo?.botHasPurchase,
     botCreatedAt: botInfo?.botCreatedAt.toISOString(),
+  });
+}
+
+/** Confirm merge after mentor conflict resolution. */
+export async function confirmMerge(params: {
+  token: string;
+  telegramId: bigint;
+  chosenMentor: "site" | "bot";
+}): Promise<{
+  metaboxUserId: string;
+  email: string;
+  firstName: string;
+  referralCode: string;
+  mergedFrom?: MergedAccountInfo;
+}> {
+  return post("/confirm-merge", {
+    token: params.token,
+    telegramId: params.telegramId.toString(),
+    chosenMentor: params.chosenMentor,
   });
 }
 
@@ -171,17 +213,31 @@ export async function issueSsoTokenRemote(metaboxUserId: string): Promise<{ ssoT
   return post("/issue-sso-token", { metaboxUserId });
 }
 
-/** Notify Metabox of a token purchase made inside the bot (for MLM bonus calculation). */
+export interface RecordSaleResult {
+  ok: boolean;
+  userId?: string;
+  orderId?: string;
+}
+
+/** Notify Metabox of a purchase made inside the bot (for MLM bonus calculation + order tracking). */
 export async function recordSale(params: {
   telegramId: bigint;
-  productId?: string;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  productType: "product" | "subscription";
+  productId: string;
+  period?: "M1" | "M3" | "M6" | "M12";
   tokens: number;
   priceRub: number;
-  marginRub: number;
-}): Promise<void> {
-  await post("/record-sale", {
+  stars: number;
+  starRate: number;
+  referrerTelegramId?: bigint;
+}): Promise<RecordSaleResult> {
+  return post<RecordSaleResult>("/record-sale", {
     ...params,
     telegramId: params.telegramId.toString(),
+    referrerTelegramId: params.referrerTelegramId?.toString(),
   });
 }
 
@@ -199,6 +255,209 @@ export async function getAiBotProducts(): Promise<AiBotProduct[]> {
   return get<AiBotProduct[]>("/aibot/products");
 }
 
+/**
+ * Look up a Metabox user by Telegram ID.
+ * Returns null if no account is linked to that Telegram ID on the Metabox side.
+ */
+export async function lookupByTelegramId(
+  telegramId: bigint,
+): Promise<{ metaboxUserId: string; referralCode: string } | null> {
+  try {
+    return await post<{ metaboxUserId: string; referralCode: string }>("/lookup-telegram", {
+      telegramId: telegramId.toString(),
+    });
+  } catch (err) {
+    if (err instanceof MetaboxApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+// ── Unified catalog (subscriptions + token packages) ────────────────────────
+
+export interface CatalogSubscription {
+  id: string;
+  name: string;
+  tokens: number;
+  priceMonthly: string;
+  discount3m: string;
+  discount6m: string;
+  discount12m: string;
+}
+
+export interface CatalogProduct {
+  id: string;
+  name: string;
+  tokens: number;
+  priceRub: string;
+  badge: string | null;
+}
+
+export interface AiBotCatalog {
+  subscriptions: CatalogSubscription[];
+  tokenPackages: CatalogProduct[];
+}
+
+/** Fetch unified catalog of subscriptions + token packages from Metabox. */
+export async function getAiBotCatalog(): Promise<AiBotCatalog> {
+  return get<AiBotCatalog>("/aibot/catalog");
+}
+
+/** Fetch PAID token-pack orders that haven't been granted to the bot yet. */
+export async function getPendingTokenGrants(
+  telegramId: bigint,
+): Promise<Array<{ orderId: string; tokens: number; description: string }>> {
+  const data = await get<{
+    orders: Array<{ orderId: string; tokens: number; description: string }>;
+  }>(`/internal/pending-token-grants?telegramId=${telegramId.toString()}`);
+  return data.orders ?? [];
+}
+
+/** Mark a token-pack order as granted in the bot (sets tokensGrantedToBot = true on Metabox). */
+export async function markOrderGrantedOnMetabox(orderId: string): Promise<void> {
+  try {
+    await post("/mark-order-granted", { orderId });
+  } catch {
+    // Non-fatal
+  }
+}
+
+/**
+ * Notify Metabox that tokens for a given subscription have been granted in the bot.
+ * Sets AiBoxSubscription.tokensGrantedToBot = true on the Metabox side.
+ * Silently ignores errors — the bot's LocalSubscription is the authoritative source.
+ */
+export async function markTokensGrantedOnMetabox(subscriptionId: string): Promise<void> {
+  try {
+    await post("/mark-tokens-granted", { subscriptionId });
+  } catch {
+    // Non-fatal: bot-side idempotency via LocalSubscription.metaboxSubscriptionId is sufficient
+  }
+}
+
+/** Fetch subscription status for a user from Metabox. */
+export async function getSubscriptionStatus(telegramId: bigint): Promise<{
+  subscription: {
+    subscriptionId: string;
+    planName: string;
+    period: string;
+    daysLeft: number;
+    totalDays: number;
+    endDate: string;
+    tokensGranted: number;
+    tokensGrantedToBot: boolean;
+  } | null;
+}> {
+  return get(`/internal/subscription-status?telegramId=${telegramId.toString()}`);
+}
+
+// ── Web (ai.metabox.global) методы ──────────────────────────────────────────
+/**
+ * Все endpoints ниже — новые "мосты" на стороне meta-box под
+ * ai.metabox.global. Существующие (register-from-bot, login-and-link,
+ * validate-credentials, record-sale и др.) — не затронуты.
+ */
+
+export interface WebValidateResult {
+  metaboxUserId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  name: string | null;
+  /** true если на стороне meta-box у юзера есть telegramId (может быть привязан через сайт ранее). */
+  hasTelegramOnSite: boolean;
+}
+
+/** Валидация email + пароля для входа на ai.metabox.global. */
+export async function webValidateCredentials(params: {
+  email: string;
+  password: string;
+}): Promise<WebValidateResult> {
+  return post<WebValidateResult>("/web-validate-credentials", params);
+}
+
+export interface WebRegisterResult {
+  metaboxUserId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  referralCode: string;
+}
+
+/** Регистрация нового юзера с ai.metabox.global. Создаёт MetaBox User. */
+export async function webRegister(params: {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName?: string;
+  referralCode?: string;
+}): Promise<WebRegisterResult> {
+  return post<WebRegisterResult>("/web-register", params);
+}
+
+/** Запрос на восстановление пароля — meta-box создаёт PasswordResetToken и шлёт email. */
+export async function webRequestPasswordReset(params: {
+  email: string;
+  resetUrlBase: string; // например, https://stage.ai.metabox.global/reset-password?token=
+}): Promise<{ ok: true }> {
+  return post<{ ok: true }>("/web-password-reset-request", params);
+}
+
+/** Подтверждение сброса пароля по токену. */
+export async function webConfirmPasswordReset(params: {
+  token: string;
+  newPassword: string;
+}): Promise<{ ok: true }> {
+  return post<{ ok: true }>("/web-password-reset-confirm", params);
+}
+
+/** Смена пароля авторизованным юзером (знает старый). */
+export async function webChangePassword(params: {
+  metaboxUserId: string;
+  oldPassword: string;
+  newPassword: string;
+}): Promise<{ ok: true }> {
+  return post<{ ok: true }>("/web-change-password", params);
+}
+
+/** Профиль юзера из meta-box (для /auth/web-me). */
+export async function webGetProfile(params: { metaboxUserId: string }): Promise<{
+  metaboxUserId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  name: string | null;
+  telegramId: string | null;
+  telegramUsername: string | null;
+  referralCode: string | null;
+}> {
+  return post("/web-get-profile", params);
+}
+
+/** Get partner balance and referral count from Metabox. */
+export async function getPartnerBalance(telegramId: bigint): Promise<{
+  balance: number;
+  totalEarned: number;
+  totalWithdrawn: number;
+  userStatus: string;
+  referralCode: string | null;
+  referralCount: number;
+}> {
+  return get(`/internal/partner-balance?telegramId=${telegramId.toString()}`);
+}
+
+/** Create a subscription invoice on Metabox for a linked user. */
+export async function createSubscriptionInvoice(params: {
+  metaboxUserId: string;
+  planId: string;
+  period: string;
+  telegramId: bigint;
+}): Promise<{ paymentUrl: string; subscriptionId: string }> {
+  return post<{ paymentUrl: string; subscriptionId: string }>("/subscription-invoice", {
+    ...params,
+    telegramId: params.telegramId.toString(),
+  });
+}
+
 /** Ask Metabox to create an AiBotOrder + Lava invoice for a linked user. */
 export async function createAiBotInvoice(params: {
   metaboxUserId: string;
@@ -208,5 +467,47 @@ export async function createAiBotInvoice(params: {
   return post<{ paymentUrl: string; orderId: string }>("/aibot-invoice", {
     ...params,
     telegramId: params.telegramId.toString(),
+  });
+}
+
+/** Resolve a Metabox referralCode to a telegramId for bot referral linking. */
+export async function resolveReferralCode(
+  code: string,
+): Promise<{ userId: string; telegramId: string | null; name: string } | null> {
+  try {
+    return await get<{ userId: string; telegramId: string | null; name: string }>(
+      `/internal/resolve-referral?code=${encodeURIComponent(code)}`,
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Register a bot user on Metabox (creates stub account with tg_{id}@aibox.meta-box.ru).
+ * Called on /start in the bot. If user already exists — returns existing data.
+ */
+export async function registerBotUser(params: {
+  telegramId: bigint;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  referrerTelegramId?: bigint | null;
+  referrerUserId?: string;
+}): Promise<{
+  ok: boolean;
+  userId: string;
+  referralCode: string;
+  isNew: boolean;
+  isStub: boolean;
+  mentor?: { name: string; telegramUsername: string | null } | null;
+}> {
+  return post("/register-bot-user", {
+    telegramId: params.telegramId.toString(),
+    firstName: params.firstName,
+    lastName: params.lastName,
+    username: params.username,
+    referrerTelegramId: params.referrerTelegramId?.toString(),
+    referrerUserId: params.referrerUserId,
   });
 }

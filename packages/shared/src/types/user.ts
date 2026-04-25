@@ -15,6 +15,7 @@ export type Language =
   | "he";
 
 export type BotState =
+  | "AWAITING_LANGUAGE"
   | "IDLE"
   | "MAIN_MENU"
   | "GPT_SECTION"
@@ -24,7 +25,9 @@ export type BotState =
   | "AUDIO_SECTION"
   | "AUDIO_ACTIVE"
   | "VIDEO_SECTION"
-  | "VIDEO_ACTIVE";
+  | "VIDEO_ACTIVE"
+  | "HEYGEN_AVATAR_PHOTO"
+  | "HIGGSFIELD_SOUL_PHOTO";
 
 export type Section = "gpt" | "design" | "audio" | "video";
 

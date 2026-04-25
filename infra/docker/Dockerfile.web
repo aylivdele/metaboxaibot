@@ -1,0 +1,22 @@
+FROM node:20-alpine AS base
+RUN npm install -g pnpm
+WORKDIR /app
+
+FROM base AS deps
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/web/package.json             ./packages/web/
+COPY packages/shared-browser/package.json  ./packages/shared-browser/
+RUN pnpm install --frozen-lockfile
+
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/web/node_modules ./packages/web/node_modules
+COPY . .
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+RUN pnpm --filter @metabox/shared-browser build
+RUN pnpm --filter @metabox/web build
+
+# Final stage: just the built dist (used by CI to extract files)
+FROM scratch AS runner
+COPY --from=builder /app/packages/web/dist /app/packages/web/dist

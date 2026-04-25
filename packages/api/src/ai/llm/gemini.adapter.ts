@@ -1,37 +1,38 @@
-import { GoogleGenerativeAI, type Content } from "@google/generative-ai";
-import type {
-  LLMAdapter,
-  LLMInput,
-  LLMOutput,
-  MessageRecord,
-  StreamResult,
+import { GoogleGenAI, type Content, type GenerateContentResponse, type Part } from "@google/genai";
+import {
+  BaseLLMAdapter,
+  type LLMInput,
+  type LLMOutput,
+  type MessageRecord,
+  type StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog, logCall } from "../../utils/fetch.js";
 
 const MODEL_MAP: Record<string, string> = {
   "gemini-2-flash": "gemini-2.5-flash",
+  "gemini-2-flash-lite": "gemini-2.5-flash-lite",
   "gemini-2-pro": "gemini-2.5-pro",
-  "gemini-3-pro": "gemini-3.0-pro",
-  "gemini-3.1-pro": "gemini-3.1-pro",
+  "gemini-3-pro": "gemini-3-pro-preview",
+  "gemini-3.1-pro": "gemini-3.1-pro-preview",
 };
 
 /**
  * Google Gemini adapter (db_history strategy).
  * Sends last N messages from DB as chat history.
  */
-export class GeminiAdapter implements LLMAdapter {
+export class GeminiAdapter extends BaseLLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
+  protected readonly modelId: string;
 
-  private genai: GoogleGenerativeAI;
+  private ai: GoogleGenAI;
   private apiModel: string;
 
-  constructor(
-    private readonly modelId: string,
-    contextMaxMessages = 50,
-    apiKey = config.ai.google,
-  ) {
-    this.genai = new GoogleGenerativeAI(apiKey!);
+  constructor(modelId: string, contextMaxMessages = 50, apiKey = config.ai.google) {
+    super();
+    this.modelId = modelId;
+    this.ai = new GoogleGenAI({ apiKey: apiKey! });
     this.apiModel = MODEL_MAP[modelId] ?? modelId;
     this.contextMaxMessages = contextMaxMessages;
   }
@@ -45,38 +46,61 @@ export class GeminiAdapter implements LLMAdapter {
   }
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
-    const model = this.genai.getGenerativeModel({
-      model: this.apiModel,
-      ...(input.systemPrompt ? { systemInstruction: input.systemPrompt } : {}),
-    });
-
+    input = this.truncateInput(input);
     const history: Content[] = (input.history ?? []).map((m: MessageRecord) => ({
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],
     }));
 
-    const chat = model.startChat({ history });
+    const chat = this.ai.chats.create({
+      model: this.apiModel,
+      history,
+      config: {
+        ...(input.systemPrompt ? { systemInstruction: input.systemPrompt } : {}),
+        ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+        ...(input.maxTokens !== undefined ? { maxOutputTokens: input.maxTokens } : {}),
+        ...(input.thinkingBudget !== undefined
+          ? { thinkingConfig: { thinkingBudget: input.thinkingBudget } }
+          : {}),
+      },
+    });
 
-    const userParts: Content["parts"] = input.imageUrl
+    const urls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
+
+    const userParts: Part[] = urls.length
       ? [
-          { text: input.prompt },
-          {
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: await fetchImageAsBase64(input.imageUrl),
-            },
-          },
+          ...(input.prompt ? [{ text: input.prompt }] : []),
+          ...(await Promise.all(
+            urls.map(async (url) => ({
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: await fetchImageAsBase64(url),
+              },
+            })),
+          )),
         ]
       : [{ text: input.prompt }];
 
-    const result = await chat.sendMessageStream(userParts);
-    for await (const chunk of result.stream) {
-      const text = chunk.text();
+    logCall(this.apiModel, "chatStream", {
+      systemPrompt: input.systemPrompt,
+      temperature: input.temperature,
+      maxTokens: input.maxTokens,
+      thinkingBudget: input.thinkingBudget,
+      historyLength: history.length,
+      imageCount: urls.length,
+    });
+
+    const stream = await chat.sendMessageStream({ message: userParts });
+
+    let lastChunk: GenerateContentResponse | undefined;
+
+    for await (const chunk of stream) {
+      lastChunk = chunk;
+      const text = chunk.text;
       if (text) yield text;
     }
 
-    const aggregated = await result.response;
-    const usage = aggregated.usageMetadata;
+    const usage = lastChunk?.usageMetadata;
     return {
       inputTokensUsed: usage?.promptTokenCount ?? 0,
       outputTokensUsed: usage?.candidatesTokenCount ?? 0,
@@ -85,7 +109,7 @@ export class GeminiAdapter implements LLMAdapter {
 }
 
 async function fetchImageAsBase64(url: string): Promise<string> {
-  const res = await fetch(url);
+  const res = await fetchWithLog(url);
   const buf = await res.arrayBuffer();
   return Buffer.from(buf).toString("base64");
 }

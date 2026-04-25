@@ -7,18 +7,21 @@ import { TariffsPage } from "./pages/TariffsPage.js";
 import { ReferralPage } from "./pages/ReferralPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
 import { LinkMetaboxPage } from "./pages/LinkMetaboxPage.js";
+import { DownloadRedirectPage } from "./pages/DownloadRedirectPage.js";
 import { I18nProvider, useI18n } from "./i18n.js";
+import { AiboxLogo } from "./components/AiboxLogo.js";
 import { api } from "./api/client.js";
 import type { Page, UserProfile } from "./types.js";
 
-function parseHash(): { page: Page; section?: string } {
+function parseHash(): { page: Page; section?: string; action?: string } {
   const validPages: Page[] = ["profile", "management", "tariffs", "referral", "admin"];
   // Prefer query params (?page=...) — avoids conflict with Telegram's #tgWebAppData hash injection
   const params = new URLSearchParams(window.location.search);
   const qPage = params.get("page");
   const qSection = params.get("section") ?? undefined;
+  const qAction = params.get("action") ?? undefined;
   if (qPage && validPages.includes(qPage as Page)) {
-    return { page: qPage as Page, section: qSection };
+    return { page: qPage as Page, section: qSection, action: qAction };
   }
   // Fallback: legacy hash routing (#page or #page/section)
   const [pagePart, sectionPart] = window.location.hash.slice(1).split("/");
@@ -50,6 +53,10 @@ function AppContent() {
   const initial = parseHash();
   const [page, setPage] = useState<Page>(initial.page);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [managementTarget, setManagementTarget] = useState<{
+    section: string;
+    modelId: string;
+  } | null>(null);
   const { ready, error, warning } = useTelegramInit();
   const { t } = useI18n();
 
@@ -61,21 +68,34 @@ function AppContent() {
 
   const isAdmin = profile?.role === "ADMIN" || profile?.role === "MODERATOR";
 
+  const navigate = (p: Page) => {
+    if (p === "management") setManagementTarget(null);
+    setPage(p);
+  };
+
+  const goToManagement = (section: string, modelId: string) => {
+    setManagementTarget({ section, modelId });
+    setPage("management");
+  };
+
   const handleLearning = async () => {
-    if (profile?.metaboxUserId) {
-      try {
+    // Refresh profile to check if metaboxUserId is still valid
+    try {
+      const fresh = await api.profile.get();
+      setProfile(fresh);
+      if (fresh?.metaboxUserId) {
         const { ssoUrl } = await api.profile.metaboxSso();
         const tg = (
           window as Window & { Telegram?: { WebApp?: { openLink?: (u: string) => void } } }
         ).Telegram?.WebApp;
         if (tg?.openLink) tg.openLink(ssoUrl);
         else window.open(ssoUrl, "_blank");
-      } catch {
-        setPage("linkMetabox");
+        return;
       }
-    } else {
-      setPage("linkMetabox");
+    } catch {
+      // SSO failed or profile refresh failed
     }
+    setPage("linkMetabox");
   };
 
   if (error) {
@@ -118,7 +138,7 @@ function AppContent() {
   return (
     <div className="app">
       <header className="app-header">
-        <span className="app-header__logo">✦ {t("app.name")}</span>
+        <AiboxLogo className="app-header__logo" />
         <div className="app-header__right">
           <LangPicker />
         </div>
@@ -132,10 +152,20 @@ function AppContent() {
                 ? (initial.section as ProfileTab)
                 : undefined
             }
+            onGoToManagement={goToManagement}
           />
         )}
-        {page === "management" && <ManagementPage initialSection={initial.section} />}
-        {page === "tariffs" && <TariffsPage />}
+        {page === "management" && (
+          <ManagementPage
+            initialSection={managementTarget?.section ?? initial.section}
+            initialModelId={managementTarget?.modelId}
+            initialAction={initial.action}
+            finishedOnboarding={profile?.finishedOnboarding ?? true}
+          />
+        )}
+        {page === "tariffs" && (
+          <TariffsPage profile={profile} onLinkMetabox={() => setPage("linkMetabox")} />
+        )}
         {page === "referral" && <ReferralPage onLinkMetabox={() => setPage("linkMetabox")} />}
         {page === "admin" && <AdminPage />}
         {page === "linkMetabox" && (
@@ -151,7 +181,7 @@ function AppContent() {
       {page !== "linkMetabox" && (
         <BottomNav
           current={page}
-          onChange={setPage}
+          onChange={navigate}
           showAdmin={isAdmin}
           onLearning={() => void handleLearning()}
         />
@@ -161,6 +191,19 @@ function AppContent() {
 }
 
 export function App() {
+  // Bridge route: Telegram inline `web_app:` buttons land here so the
+  // mini-app can call `Telegram.WebApp.openLink(...)` (the only way to
+  // trigger a real download from inside the WebView). Short-circuits the
+  // normal app shell (no auth, no nav, no API calls).
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("page") === "download") {
+    return (
+      <I18nProvider>
+        <DownloadRedirectPage token={params.get("token") ?? ""} />
+      </I18nProvider>
+    );
+  }
+
   return (
     <I18nProvider>
       <AppContent />

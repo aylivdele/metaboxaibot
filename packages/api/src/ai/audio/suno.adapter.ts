@@ -1,6 +1,7 @@
 import { fal } from "@fal-ai/client";
 import type { AudioAdapter, AudioInput, AudioResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 const SUNO_ENDPOINT = "fal-ai/suno-v4";
 
@@ -16,12 +17,18 @@ export class SunoAdapter implements AudioAdapter {
   }
 
   async submit(input: AudioInput): Promise<string> {
+    const ms = input.modelSettings ?? {};
+    const lyrics = (ms.lyrics as string | undefined) || undefined;
+    const sunoInput: Record<string, unknown> = {
+      prompt: input.prompt,
+      make_instrumental: (ms.make_instrumental as boolean | undefined) ?? false,
+      model_version: (ms.model_version as string | undefined) ?? "chirp-v4.5",
+      wait_audio: false,
+      ...(lyrics ? { lyric: lyrics } : {}),
+    };
+    logCall(SUNO_ENDPOINT, "submit", sunoInput);
     const { request_id } = await fal.queue.submit(SUNO_ENDPOINT, {
-      input: {
-        prompt: input.prompt,
-        make_instrumental: false,
-        wait_audio: false,
-      },
+      input: sunoInput as Parameters<typeof fal.queue.submit>[1]["input"],
     });
     return request_id;
   }

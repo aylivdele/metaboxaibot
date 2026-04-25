@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { setInitDataRaw, setWebToken, api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 
-type TelegramWebApp = { initData: string; ready?: () => void };
+type TelegramWebApp = {
+  initData: string;
+  ready?: () => void;
+  expand?: () => void;
+  disableVerticalSwipes?: () => void;
+};
 
 export interface TelegramInitState {
   ready: boolean;
@@ -37,6 +42,9 @@ export function useTelegramInit(): TelegramInitState {
 
   useEffect(() => {
     getTgWebApp()?.ready?.();
+
+    getTgWebApp()?.expand?.();
+    getTgWebApp()?.disableVerticalSwipes?.();
 
     if (import.meta.env.DEV) {
       setState({ ready: true, error: null, warning: null, userId: "dev", initDataRaw: null });

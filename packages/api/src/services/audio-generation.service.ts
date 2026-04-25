@@ -1,9 +1,19 @@
 import { db } from "../db.js";
-import { createAudioAdapter } from "../ai/audio/factory.js";
 import { getAudioQueue } from "../queues/audio.queue.js";
-import { AI_MODELS } from "@metabox/shared";
-import { checkBalance, deductTokens, calculateCost } from "./token.service.js";
-import { buildS3Key, uploadBuffer, uploadFromUrl } from "./s3.service.js";
+import { AI_MODELS, ONE_SHOT_SETTING_KEYS } from "@metabox/shared";
+import { checkBalance, calculateCost } from "./token.service.js";
+import { userStateService } from "./user-state.service.js";
+
+/** Drop one-shot upload fields (avatar_photo_*, voice_*, …) from the history
+ * snapshot so `inputData.modelSettings` stays clean of per-generation noise. */
+function stripOneShotKeys(settings: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(settings)) {
+    if (ONE_SHOT_SETTING_KEYS.has(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
 
 export interface SubmitAudioParams {
   userId: bigint;
@@ -16,11 +26,6 @@ export interface SubmitAudioParams {
 
 export interface SubmitAudioResult {
   dbJobId: string;
-  /** Populated for sync models (TTS). Use InputFile(audioBuffer) or audioUrl. */
-  audioBuffer?: Buffer;
-  audioUrl?: string;
-  audioExt?: string;
-  isPending: boolean;
 }
 
 export const audioGenerationService = {
@@ -30,7 +35,19 @@ export const audioGenerationService = {
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
 
-    await checkBalance(userId);
+    const allModelSettings = await userStateService.getModelSettings(userId);
+    const modelSettings = allModelSettings[modelId] ?? {};
+    const estimatedCost = calculateCost(
+      model,
+      0,
+      0,
+      undefined,
+      undefined,
+      modelSettings,
+      undefined,
+      prompt.length,
+    );
+    await checkBalance(userId, estimatedCost);
 
     const job = await db.generationJob.create({
       data: {
@@ -39,56 +56,20 @@ export const audioGenerationService = {
         section: "audio",
         modelId,
         prompt,
+        inputData: (() => {
+          const historySettings = stripOneShotKeys(
+            modelSettings as unknown as Record<string, unknown>,
+          );
+          return Object.keys(historySettings).length > 0
+            ? { modelSettings: JSON.parse(JSON.stringify(historySettings)) }
+            : undefined;
+        })(),
         status: "pending",
       },
     });
 
-    const adapter = createAudioAdapter(modelId);
-
-    if (!adapter.isAsync && adapter.generate) {
-      // ── Sync generation (TTS, ElevenLabs) ───────────────────────────────
-      try {
-        const result = await adapter.generate({ prompt, voiceId, sourceAudioUrl });
-
-        await db.generationJob.update({
-          where: { id: job.id },
-          data: { status: "done", outputUrl: result.url ?? null, completedAt: new Date() },
-        });
-
-        await deductTokens(userId, calculateCost(model), modelId);
-
-        // Upload to S3 in background
-        const audioKey = buildS3Key("audio", userId.toString(), job.id, result.ext ?? "mp3");
-        const uploadFn = result.buffer
-          ? uploadBuffer(audioKey, result.buffer, `audio/${result.ext ?? "mpeg"}`)
-          : result.url
-            ? uploadFromUrl(audioKey, result.url, `audio/${result.ext ?? "mpeg"}`)
-            : Promise.resolve(null);
-        uploadFn
-          .then((s3Key) => {
-            if (s3Key) {
-              return db.generationJob.update({ where: { id: job.id }, data: { s3Key } });
-            }
-          })
-          .catch(() => void 0);
-
-        return {
-          dbJobId: job.id,
-          audioBuffer: result.buffer,
-          audioUrl: result.url,
-          audioExt: result.ext,
-          isPending: false,
-        };
-      } catch (err) {
-        await db.generationJob.update({
-          where: { id: job.id },
-          data: { status: "failed", error: String(err) },
-        });
-        throw err;
-      }
-    }
-
-    // ── Async generation — enqueue for worker ─────────────────────────────
+    // Voice slot resolution для tts-el на cloned-voice выполняется в воркере
+    // через resolveVoiceForTTS — там же sticky-ключ + re-clone из audioS3Key.
     const queue = getAudioQueue();
     await queue.add(
       "generate",
@@ -100,10 +81,16 @@ export const audioGenerationService = {
         voiceId,
         sourceAudioUrl,
         telegramChatId,
+        modelSettings,
       },
-      { attempts: 3, backoff: { type: "exponential", delay: 5000 } },
+      {
+        jobId: job.id,
+        removeOnComplete: true,
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5000 },
+      },
     );
 
-    return { dbJobId: job.id, isPending: true };
+    return { dbJobId: job.id };
   },
 };

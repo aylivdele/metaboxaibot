@@ -1,0 +1,78 @@
+# Observability AGENT stack for the metaboxaibot prod server.
+#
+# Architecture: this server runs only the agents (promtail, node-exporter,
+# cAdvisor). Logs and metrics flow to the central Loki/Prometheus/Grafana
+# stack that lives on the metabox site stage server (re-using the same
+# Grafana for both projects):
+#
+#   ┌─────────────────────────┐         ┌──────────────────────────────┐
+#   │ metaboxaibot prod       │  push   │ stage server (metabox-site)  │
+#   │ ───────────────────     │  logs   │ ──────────────────────────   │
+#   │  promtail            ───┼────────►│ Loki (loki.stage.meta-box.ru)│
+#   │  node-exporter:9100  ◄──┤  scrape │ Prometheus                   │
+#   │  cadvisor:8080       ◄──┤  scrape │   (pulls metrics.aibox.metabox │
+#   │   (via host nginx +     │   .ru   │    .global/node, /cadvisor)  │
+#   │    HTTPS)               │         │ Grafana                      │
+#   └─────────────────────────┘         └──────────────────────────────┘
+#
+# Deploy:
+#   docker compose -f docker-compose.observability.yml up -d
+#
+# Prerequisites on this host (see infra/observability/README.md):
+#   1. Host nginx forwards `metrics.aibox.metabox.global/node` → 127.0.0.1:9100
+#      and `/cadvisor` → 127.0.0.1:8080. Use infra/nginx/nginx.metrics.conf.
+#   2. Add the new scrape jobs to central Prometheus on stage server
+#      (snippet in infra/observability/README.md).
+
+services:
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: metabox_promtail
+    restart: always
+    mem_limit: 128m
+    volumes:
+      # Live container logs come from Docker's json-file driver via the socket.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Promtail config — points at https://loki.stage.meta-box.ru and tags
+      # all entries with `server=aibot-prod`.
+      - ./infra/observability/promtail.yml:/etc/promtail/config.yml:ro
+      # `positions.yaml` tracks where in each docker-log promtail has read up
+      # to. Without a named volume for /tmp it would reset on every restart
+      # and re-ship all docker-logs from scratch.
+      - promtail-positions:/tmp
+    command: -config.file=/etc/promtail/config.yml
+
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: metabox_node_exporter
+    restart: always
+    mem_limit: 64m
+    pid: host
+    # Bind to 127.0.0.1 only — host nginx exposes it externally over HTTPS
+    # at metrics.aibox.metabox.global/node. Never open 9100 to the public.
+    ports:
+      - "127.0.0.1:9100:9100"
+    volumes:
+      - /:/host:ro,rslave
+    command: --path.rootfs=/host
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: metabox_cadvisor
+    restart: always
+    mem_limit: 128m
+    privileged: true
+    # Bind to 127.0.0.1 only — host nginx exposes it externally over HTTPS
+    # at metrics.aibox.metabox.global/cadvisor.
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    command:
+      - --docker_only=true
+
+volumes:
+  promtail-positions:

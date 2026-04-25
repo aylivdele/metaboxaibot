@@ -1,36 +1,36 @@
 import { fal } from "@fal-ai/client";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 /** Text-to-image endpoint for each model. */
 const T2I_ENDPOINTS: Record<string, string> = {
-  flux: "fal-ai/flux/dev",
-  "flux-pro": "fal-ai/flux-pro/v1.1",
-  "recraft-v3": "fal-ai/recraft-v3",
-  "recraft-v4": "fal-ai/recraft/v4/text-to-image",
-  "recraft-v4-pro": "fal-ai/recraft/v4/pro/text-to-image",
-  "recraft-v4-vector": "fal-ai/recraft/v4/text-to-vector",
-  "recraft-v4-pro-vector": "fal-ai/recraft/v4/pro/text-to-vector",
+  flux: "fal-ai/flux-2",
+  "flux-pro": "fal-ai/flux-2-pro",
   "stable-diffusion": "fal-ai/stable-diffusion-v3-medium",
-  "nano-banana-pro": "fal-ai/nano-banana-pro",
   "seedream-5": "fal-ai/bytedance/seedream/v5/lite/text-to-image",
   "seedream-4.5": "fal-ai/bytedance/seedream/v4.5/text-to-image",
-  "gpt-image-1.5": "fal-ai/gpt-image-1.5",
 };
-
-/** Models that output SVG instead of raster images. */
-const SVG_MODELS = new Set(["recraft-v4-vector", "recraft-v4-pro-vector"]);
 
 /** Image-to-image (edit) endpoint. Falls back to the T2I endpoint when absent. */
 const EDIT_ENDPOINTS: Record<string, string> = {
-  "nano-banana-pro": "fal-ai/nano-banana-pro/edit",
   "seedream-5": "fal-ai/bytedance/seedream/v5/lite/edit",
   "seedream-4.5": "fal-ai/bytedance/seedream/v4.5/edit",
-  "gpt-image-1.5": "fal-ai/gpt-image-1.5/edit",
   "stable-diffusion": "fal-ai/stable-diffusion-v3-medium/image-to-image",
-  "recraft-v3": "fal-ai/recraft/v3/image-to-image",
-  // flux, flux-pro pass image_url to the same endpoint
+  flux: "fal-ai/flux-2/edit",
+  "flux-pro": "fal-ai/flux-2-pro/edit",
 };
+
+/**
+ * Models that accept a raw `aspect_ratio` string (e.g. "16:9") instead of
+ * the standard FAL `image_size` enum (e.g. "landscape_16_9").
+ */
+const ASPECT_RATIO_MODELS = new Set<string>();
+
+/**
+ * Edit endpoints for these models expect `image_urls` (array) instead of `image_url` (string).
+ */
+const IMAGE_URLS_ARRAY_MODELS = new Set(["flux", "flux-pro", "seedream-4.5", "seedream-5"]);
 
 /** Separator used to pack endpoint+requestId into a single opaque string. */
 const SEP = "||";
@@ -45,30 +45,61 @@ const SEP = "||";
 export class FalAdapter implements ImageAdapter {
   readonly isAsync = true;
 
+  // FAL SDK не позволяет per-instance подменять fetch (singleton config),
+  // поэтому прокси на MVP не поддерживается — fetchFn принимается ради
+  // совместимости с factory, но игнорируется.
   constructor(
     readonly modelId: string,
     apiKey = config.ai.fal,
+    _fetchFn?: typeof globalThis.fetch,
   ) {
     fal.config({ credentials: apiKey });
   }
 
-  private selectEndpoint(imageUrl: string | undefined): string {
-    if (imageUrl && EDIT_ENDPOINTS[this.modelId]) {
+  private selectEndpoint(input: ImageInput): string {
+    const hasEditMedia = !!(input.mediaInputs?.edit?.length || input.imageUrl);
+    if (hasEditMedia && EDIT_ENDPOINTS[this.modelId]) {
       return EDIT_ENDPOINTS[this.modelId];
     }
     return T2I_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`;
   }
 
   async submit(input: ImageInput): Promise<string> {
-    const endpoint = this.selectEndpoint(input.imageUrl);
-    const { request_id } = await fal.queue.submit(endpoint, {
-      input: {
-        prompt: input.prompt,
-        negative_prompt: input.negativePrompt,
-        image_size: this.resolveSize(input),
-        ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
-      },
-    });
+    const editUrls = input.mediaInputs?.edit ?? (input.imageUrl ? [input.imageUrl] : []);
+    const imageUrl = editUrls[0];
+    const endpoint = this.selectEndpoint(input);
+    const ms = input.modelSettings ?? {};
+    const msExtras: Record<string, unknown> = {};
+    if (ms.num_inference_steps !== undefined) msExtras.num_inference_steps = ms.num_inference_steps;
+    if (ms.guidance_scale !== undefined) msExtras.guidance_scale = ms.guidance_scale;
+    if (ms.seed != null) msExtras.seed = ms.seed;
+    if (ms.output_format) msExtras.output_format = ms.output_format;
+    if (ms.style) msExtras.style = ms.style;
+    if (ms.style_type) msExtras.style_type = ms.style_type;
+    if (ms.magic_prompt_option) msExtras.magic_prompt_option = ms.magic_prompt_option;
+    if (ms.resolution) msExtras.resolution = ms.resolution;
+    if (ms.enable_web_search != null) msExtras.enable_web_search = ms.enable_web_search;
+    if (ms.thinking_level) msExtras.thinking_level = ms.thinking_level;
+    if (ms.acceleration) msExtras.acceleration = ms.acceleration;
+    if (ms.enable_prompt_expansion != null)
+      msExtras.enable_prompt_expansion = ms.enable_prompt_expansion;
+
+    const useAspectRatio = ASPECT_RATIO_MODELS.has(this.modelId);
+    const falInput = {
+      prompt: input.prompt,
+      negative_prompt: (ms.negative_prompt as string | undefined) || input.negativePrompt,
+      ...(useAspectRatio
+        ? { aspect_ratio: input.aspectRatio ?? "1:1" }
+        : { image_size: this.resolveSize(input) }),
+      ...(imageUrl
+        ? IMAGE_URLS_ARRAY_MODELS.has(this.modelId)
+          ? { image_urls: editUrls }
+          : { image_url: imageUrl }
+        : {}),
+      ...msExtras,
+    };
+    logCall(endpoint, "submit", falInput as Record<string, unknown>);
+    const { request_id } = await fal.queue.submit(endpoint, { input: falInput });
     // Encode endpoint in the returned ID so poll() uses the correct route.
     return `${endpoint}${SEP}${request_id}`;
   }
@@ -87,14 +118,24 @@ export class FalAdapter implements ImageAdapter {
 
     const result = await fal.queue.result(endpoint, { requestId });
     const images = (
-      result.data as { images?: Array<{ url: string; width?: number; height?: number }> }
+      result.data as {
+        images?: Array<{
+          url: string;
+          width?: number;
+          height?: number;
+          content_type?: string;
+          file_name?: string;
+        }>;
+      }
     ).images;
     const img = images?.[0];
     if (!img?.url) throw new Error("FAL returned no image URL");
-    const ext = SVG_MODELS.has(this.modelId) ? "svg" : "png";
+    const contentType = img.content_type ?? "image/png";
+    const ext = contentType.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
     return {
       url: img.url,
-      filename: `${this.modelId}.${ext}`,
+      filename: img.file_name ?? `${this.modelId}.${ext}`,
+      contentType,
       width: img.width,
       height: img.height,
     };

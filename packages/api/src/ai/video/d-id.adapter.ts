@@ -1,5 +1,7 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { getFileUrl } from "../../services/s3.service.js";
+import { fetchWithLog } from "../../utils/fetch.js";
 
 const DID_API = "https://api.d-id.com";
 
@@ -20,14 +22,17 @@ export class DIDAdapter implements VideoAdapter {
   private readonly apiKey: string;
   /** Default presenter image used when no sourceImage is provided */
   private readonly defaultPresenterUrl: string;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
 
   constructor(
     apiKey = config.ai.did ?? "",
     defaultPresenterUrl = config.ai.didPresenterUrl ??
       "https://d-id-public-bucket.s3.amazonaws.com/alice.jpg",
+    fetchFn?: typeof globalThis.fetch,
   ) {
     this.apiKey = apiKey;
     this.defaultPresenterUrl = defaultPresenterUrl;
+    this.fetchFn = fetchFn;
   }
 
   private headers() {
@@ -40,24 +45,49 @@ export class DIDAdapter implements VideoAdapter {
   }
 
   async submit(input: VideoInput): Promise<string> {
-    const body = {
+    const sentiment = (input.modelSettings?.sentiment as string | undefined) ?? "neutral";
+    const emotionIntensity =
+      input.modelSettings?.emotion_intensity != null
+        ? Number(input.modelSettings.emotion_intensity)
+        : 0.7;
+    // const driverUrl = input.modelSettings?.driver_url as string | undefined;
+
+    const voiceS3Key = input.modelSettings?.voice_s3key as string | undefined;
+    const voiceUrlStored = input.modelSettings?.voice_url as string | undefined;
+    let voiceUrl: string | undefined = voiceUrlStored || undefined;
+    if (voiceS3Key) {
+      voiceUrl = (await getFileUrl(voiceS3Key).catch(() => null)) ?? voiceUrl;
+    }
+    const voiceId = (input.modelSettings?.voice_id as string | undefined) || "en-US-JennyNeural";
+    const voiceProvider =
+      (input.modelSettings?.voice_provider as string | undefined) || "microsoft";
+
+    const script: Record<string, unknown> = voiceUrl
+      ? { type: "audio", audio_url: voiceUrl }
+      : { type: "text", input: input.prompt, provider: { type: voiceProvider, voice_id: voiceId } };
+
+    const body: Record<string, unknown> = {
       source_url: input.imageUrl ?? this.defaultPresenterUrl,
-      script: {
-        type: "text",
-        input: input.prompt,
-        provider: {
-          type: "microsoft",
-          voice_id: "en-US-JennyNeural",
-        },
+      script,
+      config: {
+        fluent: true,
+        pad_audio: 0,
+        ...(sentiment !== "neutral" && {
+          expressions: [{ start_frame: 0, expression: sentiment, intensity: emotionIntensity }],
+        }),
       },
-      config: { fluent: true, pad_audio: 0 },
+      // ...(driverUrl ? { driver_url: driverUrl } : {}),
     };
 
-    const res = await fetch(`${DID_API}/talks`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-    });
+    const res = await fetchWithLog(
+      `${DID_API}/talks`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();
@@ -69,9 +99,13 @@ export class DIDAdapter implements VideoAdapter {
   }
 
   async poll(talkId: string): Promise<VideoResult | null> {
-    const res = await fetch(`${DID_API}/talks/${talkId}`, {
-      headers: this.headers(),
-    });
+    const res = await fetchWithLog(
+      `${DID_API}/talks/${talkId}`,
+      {
+        headers: this.headers(),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();

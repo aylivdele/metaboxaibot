@@ -1,12 +1,13 @@
-import OpenAI from "openai";
-import type {
-  LLMAdapter,
-  LLMInput,
-  LLMOutput,
-  MessageRecord,
-  StreamResult,
+import OpenAI, { type ClientOptions as OpenAIClientOptions } from "openai";
+import {
+  BaseLLMAdapter,
+  type LLMInput,
+  type LLMOutput,
+  type MessageRecord,
+  type StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 const MODEL_MAP: Record<string, string> = {
   "qwen-max": "qwen-max",
@@ -19,21 +20,27 @@ const MODEL_MAP: Record<string, string> = {
  * Alibaba Qwen adapter (db_history strategy).
  * Uses OpenAI-compatible API via DashScope.
  */
-export class QwenAdapter implements LLMAdapter {
+export class QwenAdapter extends BaseLLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
+  protected readonly modelId: string;
 
   private client: OpenAI;
   private apiModel: string;
 
   constructor(
-    private readonly model: string,
+    model: string,
     contextMaxMessages = 40,
     apiKey = config.ai.qwen,
+    fetchFn?: typeof globalThis.fetch,
   ) {
+    super();
+    if (!apiKey) throw new Error("[QwenAdapter] QWEN_API_KEY is not set");
+    this.modelId = model;
     this.client = new OpenAI({
       apiKey,
-      baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
     });
     this.apiModel = MODEL_MAP[model] ?? model;
     this.contextMaxMessages = contextMaxMessages;
@@ -48,7 +55,9 @@ export class QwenAdapter implements LLMAdapter {
   }
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
+    input = this.truncateInput(input);
     const messages: OpenAI.ChatCompletionMessageParam[] = [
+      ...(input.systemPrompt ? [{ role: "system" as const, content: input.systemPrompt }] : []),
       ...(input.history ?? []).map((m: MessageRecord) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
@@ -56,11 +65,26 @@ export class QwenAdapter implements LLMAdapter {
       { role: "user", content: input.prompt },
     ];
 
-    const stream = await this.client.chat.completions.create({
+    logCall(this.apiModel, "chatStream", {
+      temperature: input.temperature,
+      max_tokens: input.maxTokens,
+      messages_count: messages.length,
+      enable_thinking: input.enableThinking,
+    });
+    const stream = await (
+      this.client.chat.completions.create as (
+        p: unknown,
+      ) => Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>>
+    )({
       model: this.apiModel,
       messages,
       stream: true,
       stream_options: { include_usage: true },
+      ...(input.temperature !== undefined
+        ? { temperature: parseFloat(String(input.temperature)) }
+        : {}),
+      ...(input.maxTokens !== undefined ? { max_tokens: input.maxTokens } : {}),
+      ...(input.enableThinking !== undefined ? { enable_thinking: input.enableThinking } : {}),
     });
 
     let inputTokensUsed = 0;

@@ -1,0 +1,142 @@
+services:
+  # ── Infrastructure (no profile → always up with `docker compose up`) ─────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: metabox_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: metabox
+      POSTGRES_PASSWORD: metabox_password
+      POSTGRES_DB: metabox_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metabox -d metabox_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: metabox_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend (profile `app`) — api + worker + bot ────────────────────────────
+  # Start with: `docker compose --profile app up --build`
+  # Requires a populated .env at project root (BOT_TOKEN, AI keys, etc.).
+  # DATABASE_URL / REDIS_URL in .env are IGNORED here — overridden to point at
+  # the compose service names below so containers reach the linked services.
+
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: metabox_api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://metabox:metabox_password@postgres:5432/metabox_db
+      REDIS_URL: redis://redis:6379
+      API_PORT: "3001"
+      # URL the browser/Telegram clients use to reach this container from the
+      # host — keep in sync with the webapp VITE_API_BASE_URL below.
+      API_PUBLIC_URL: http://localhost:3001
+      WEBAPP_URL: https://127.0.0.1:5174
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: metabox_worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://metabox:metabox_password@postgres:5432/metabox_db
+      REDIS_URL: redis://redis:6379
+      WEBAPP_URL: https://127.0.0.1:5174
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  bot:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.bot
+    container_name: metabox_bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://metabox:metabox_password@postgres:5432/metabox_db
+      REDIS_URL: redis://redis:6379
+      API_PUBLIC_URL: http://api:3001
+      WEBAPP_URL: https://127.0.0.1:5174
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  # ── SPAs (profile `ui`) — webapp + web served via nginx ─────────────────────
+  # Start with: `docker compose --profile app --profile ui up --build`
+  # These are Vite production builds — if you want HMR, run `pnpm dev` in the
+  # package directly instead of using this profile.
+
+  webapp:
+    profiles: ["ui"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.webapp.dev
+      args:
+        VITE_API_BASE_URL: http://localhost:3001
+        VITE_BOT_USERNAME: ${VITE_BOT_USERNAME:-}
+        VITE_LEARNING_URL: ${VITE_LEARNING_URL:-}
+        VITE_METABOX_LANDING_URL: ${VITE_METABOX_LANDING_URL:-}
+    container_name: metabox_webapp
+    restart: unless-stopped
+    ports:
+      - "5174:80"
+
+  web:
+    profiles: ["ui"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.web.dev
+      args:
+        VITE_API_BASE_URL: http://localhost:3001
+    container_name: metabox_web
+    restart: unless-stopped
+    ports:
+      - "5173:5174"
+
+volumes:
+  postgres_data:
+  redis_data:

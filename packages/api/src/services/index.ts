@@ -1,7 +1,12 @@
-export { chatService } from "./chat.service.js";
+export {
+  chatService,
+  DocumentNotSupportedError,
+  DocumentExtractFailedError,
+  ContextOverflowError,
+} from "./chat.service.js";
 export type { SendMessageParams, SendMessageResult } from "./chat.service.js";
 export { dialogService } from "./dialog.service.js";
-export type { CreateDialogParams } from "./dialog.service.js";
+export type { CreateDialogParams, StoredAttachment } from "./dialog.service.js";
 export { generationService } from "./generation.service.js";
 export type { SubmitImageParams, SubmitImageResult } from "./generation.service.js";
 export { userStateService } from "./user-state.service.js";
@@ -9,9 +14,26 @@ export { videoGenerationService } from "./video-generation.service.js";
 export type { SubmitVideoParams, SubmitVideoResult } from "./video-generation.service.js";
 export { audioGenerationService } from "./audio-generation.service.js";
 export type { SubmitAudioParams, SubmitAudioResult } from "./audio-generation.service.js";
-export { paymentService } from "./payment.service.js";
-export { deductTokens, checkBalance, calculateCost } from "./token.service.js";
-export { s3Service, getFileUrl } from "./s3.service.js";
+export { paymentService, expireSubscription, grantMetaboxSubscription } from "./payment.service.js";
+export type { SaleUserInfo } from "./payment.service.js";
+export {
+  deductTokens,
+  checkBalance,
+  checkSubscription,
+  checkPaidSubscription,
+  calculateCost,
+  computeVideoTokens,
+  usdToTokens,
+} from "./token.service.js";
+export type { DeductResult } from "./token.service.js";
+export {
+  s3Service,
+  getFileUrl,
+  uploadBuffer,
+  measureImageMegapixels,
+  probeImageMetadata,
+} from "./s3.service.js";
+export type { ImageProbeInfo } from "./s3.service.js";
 export {
   verifyLinkToken,
   issueSsoToken,
@@ -21,5 +43,45 @@ export {
   issueSsoTokenRemote,
   getAiBotProducts,
   createAiBotInvoice,
+  lookupByTelegramId,
+  getAiBotCatalog,
+  createSubscriptionInvoice,
+  resolveReferralCode,
+  registerBotUser,
+  confirmMerge,
+  MetaboxApiError,
+  getSubscriptionStatus,
+  markTokensGrantedOnMetabox,
+  getPendingTokenGrants,
+  markOrderGrantedOnMetabox,
 } from "./metabox-bridge.service.js";
-export type { AiBotProduct } from "./metabox-bridge.service.js";
+export type {
+  AiBotProduct,
+  AiBotCatalog,
+  CatalogSubscription,
+  CatalogProduct,
+  RecordSaleResult,
+  MergedAccountInfo,
+} from "./metabox-bridge.service.js";
+export { getRate, calcStars, updateRate, STAR_PRICE_USD } from "./exchange-rate.service.js";
+export { userUploadsService } from "./user-uploads.service.js";
+export { userAvatarService } from "./user-avatar.service.js";
+export { resolveVoiceForTTS } from "./user-voice.service.js";
+export type { ResolvedVoice } from "./user-voice.service.js";
+export { translatePromptIfNeeded } from "./prompt-translate.service.js";
+export { describeImageForPrompt } from "./image-describe.service.js";
+
+// ── Web (ai.metabox.global) ─────────────────────────────────────────────
+export { consumeLinkTelegramState, markLinkTelegramLinked } from "./web-session.service.js";
+
+// ── Пул API-ключей с прокси и балансировкой ─────────────────────────────
+export {
+  acquireKey,
+  acquireById,
+  markRateLimited,
+  recordSuccess,
+  recordError,
+  getKeyStats,
+  invalidatePoolCache,
+} from "./key-pool.service.js";
+export type { AcquiredKey, ProxyConfig } from "./key-pool.service.js";

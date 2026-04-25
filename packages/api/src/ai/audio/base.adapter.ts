@@ -5,6 +5,8 @@ export interface AudioInput {
   voiceId?: string;
   /** Optional: source audio URL for voice cloning */
   sourceAudioUrl?: string;
+  /** User-configured model settings (voice, speed, stability, etc.). Each adapter picks what it supports. */
+  modelSettings?: Record<string, unknown>;
 }
 
 export interface AudioResult {

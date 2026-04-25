@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
-import { createHash, randomBytes } from "crypto";
 import {
   issueSsoToken,
   issueSsoTokenRemote,
@@ -17,9 +16,6 @@ type AuthRequest = FastifyRequest & {
     firstName: string | null;
     lastName: string | null;
     language: string;
-    email: string | null;
-    emailVerified: boolean;
-    passwordHash: string | null;
     isNew: boolean;
     isBlocked: boolean;
     referredById: bigint | null;
@@ -30,23 +26,6 @@ type AuthRequest = FastifyRequest & {
   };
 };
 
-function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString("hex");
-  const hash = createHash("sha256")
-    .update(salt + password)
-    .digest("hex");
-  return `${salt}:${hash}`;
-}
-
-function verifyPassword(password: string, storedHash: string): boolean {
-  const [salt, hash] = storedHash.split(":");
-  if (!salt || !hash) return false;
-  const expected = createHash("sha256")
-    .update(salt + password)
-    .digest("hex");
-  return expected === hash;
-}
-
 export const profileRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", telegramAuthHook);
 
@@ -54,79 +33,113 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get("/profile", async (request) => {
     const { userId } = request as AuthRequest;
 
-    const [user, transactions, referralCount] = await Promise.all([
+    const [user, transactions] = await Promise.all([
       db.user.findUnique({ where: { id: userId } }),
       db.tokenTransaction.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
-      db.user.count({ where: { referredById: userId } }),
     ]);
 
+    // Referral count from Metabox (includes site referrals, not just bot)
+    let referralCount = 0;
+    try {
+      const { getPartnerBalance } = await import("../services/metabox-bridge.service.js");
+      const partnerData = await getPartnerBalance(userId);
+      referralCount = partnerData?.referralCount ?? 0;
+    } catch {
+      // Fallback to local count
+      referralCount = await db.user.count({ where: { referredById: userId } });
+    }
+
     if (!user) throw new Error("User not found");
+
+    // Subscription info from LocalSubscription (single source of truth)
+    let subscription: {
+      planName: string;
+      period: string;
+      daysLeft: number;
+      totalDays: number;
+      endDate: string;
+    } | null = null;
+
+    const localSub = await db.localSubscription.findUnique({ where: { userId } });
+    if (localSub && localSub.isActive && localSub.endDate > new Date()) {
+      const daysLeft = Math.max(0, Math.ceil((localSub.endDate.getTime() - Date.now()) / 86400000));
+      const totalDays = Math.max(
+        1,
+        Math.ceil((localSub.endDate.getTime() - localSub.startDate.getTime()) / 86400000),
+      );
+      subscription = {
+        planName: localSub.planName,
+        period: localSub.period,
+        daysLeft,
+        totalDays,
+        endDate: localSub.endDate.toISOString(),
+      };
+    }
 
     return {
       id: user.id.toString(),
       username: user.username ?? null,
       firstName: user.firstName ?? null,
+      lastName: user.lastName ?? null,
       language: user.language,
       role: user.role,
-      email: user.email ?? null,
-      emailVerified: user.emailVerified,
       metaboxUserId: user.metaboxUserId ?? null,
       metaboxReferralCode: user.metaboxReferralCode ?? null,
-      tokenBalance: user.tokenBalance.toString(),
+      finishedOnboarding: user.finishedOnboarding,
+      tokenBalance: (Number(user.tokenBalance) + Number(user.subscriptionTokenBalance)).toString(),
+      purchasedTokenBalance: Number(user.tokenBalance).toString(),
+      subscriptionTokenBalance: Number(user.subscriptionTokenBalance).toString(),
       referralCount,
       createdAt: user.createdAt.toISOString(),
+      subscription,
       transactions: transactions.map((t) => ({
         id: t.id,
         amount: t.amount.toString(),
         type: t.type,
         reason: t.reason,
+        description: t.description ?? null,
         modelId: t.modelId ?? null,
         createdAt: t.createdAt.toISOString(),
       })),
     };
   });
 
-  /** PATCH /profile/settings — update email / password */
-  fastify.patch("/profile/settings", async (request, reply) => {
+  /** GET /profile/partner-balance — Metabox partner balance for "Партнёрка" tab */
+  fastify.get("/profile/partner-balance", async (request) => {
     const { userId } = request as AuthRequest;
-    const body = request.body as { email?: string; password?: string; oldPassword?: string };
-
-    const data: Record<string, unknown> = {};
-
-    if (body.email !== undefined) {
-      data.email = body.email;
-      data.emailVerified = false;
+    try {
+      const { url, key } = (() => {
+        const u = config.metabox.apiUrl;
+        const k = config.metabox.internalKey;
+        if (!u || !k) throw new Error("METABOX not configured");
+        return { url: u, key: k };
+      })();
+      const res = await fetch(
+        `${url}/api/internal/partner-balance?telegramId=${userId.toString()}`,
+        { headers: { "X-Internal-Key": key } },
+      );
+      if (!res.ok)
+        return {
+          balance: 0,
+          totalEarned: 0,
+          totalWithdrawn: 0,
+          userStatus: "REGISTERED",
+          referralCode: null,
+        };
+      return res.json();
+    } catch {
+      return {
+        balance: 0,
+        totalEarned: 0,
+        totalWithdrawn: 0,
+        userStatus: "REGISTERED",
+        referralCode: null,
+      };
     }
-
-    if (body.password) {
-      if (body.password.length < 6) {
-        throw new Error("Password must be at least 6 characters");
-      }
-      if (body.oldPassword !== undefined) {
-        const user = await db.user.findUnique({
-          where: { id: userId },
-          select: { passwordHash: true },
-        });
-        if (!user?.passwordHash || !verifyPassword(body.oldPassword, user.passwordHash)) {
-          return reply.code(400).send({ error: "Old password is incorrect" });
-        }
-      }
-      data.passwordHash = hashPassword(body.password);
-    }
-
-    const user = await db.user.update({
-      where: { id: userId },
-      data,
-    });
-
-    return {
-      email: user.email ?? null,
-      emailVerified: user.emailVerified,
-    };
   });
 
   /**
@@ -222,6 +235,8 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
         password,
         telegramId: userId,
         telegramUsername: user.username,
+        firstName: user.firstName ?? undefined,
+        lastName: user.lastName ?? undefined,
         referrerTelegramId: user.referredById,
         botHasPurchase: !!botPurchase,
         botCreatedAt: user.createdAt,
@@ -231,35 +246,19 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
         data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
       });
       const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
-      return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
+      return {
+        ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}`,
+        mergedFrom: result.mergedFrom ?? null,
+      };
     } catch (err) {
       if (err instanceof MetaboxApiError) {
-        return reply.code(err.status).send({ error: err.body, code: err.code });
+        // Parse JSON body for rich error info (e.g. TELEGRAM_LINKED with linkedTo)
+        const responseData = err.data ?? {};
+        return reply
+          .code(err.status)
+          .send({ ...responseData, code: err.code ?? responseData.code });
       }
       throw err;
     }
-  });
-
-  /** POST /profile/verify-email — send verification email */
-  fastify.post("/profile/verify-email", async (request) => {
-    const { userId } = request as AuthRequest;
-
-    const user = await db.user.findUnique({ where: { id: userId } });
-    if (!user?.email) {
-      throw new Error("No email set");
-    }
-
-    if (user.emailVerified) {
-      throw new Error("Email already verified");
-    }
-
-    // TODO: integrate real email service (SendGrid, AWS SES, etc.)
-    // For now, auto-verify for development
-    await db.user.update({
-      where: { id: userId },
-      data: { emailVerified: true },
-    });
-
-    return { success: true };
   });
 };

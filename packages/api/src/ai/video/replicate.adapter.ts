@@ -1,14 +1,16 @@
 import Replicate from "replicate";
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
+import { parseReplicatePredictionFailure } from "../../utils/replicate-error.js";
+import { resolveImageMimeType } from "../../utils/mime-detect.js";
 
 /**
  * Replicate-backed video adapter.
- * Used for: sora (OpenAI via Replicate), veo (Google via Replicate).
+ * Used for: sora (OpenAI via Replicate).
  */
 const REPLICATE_MODELS: Record<string, `${string}/${string}:${string}` | `${string}/${string}`> = {
-  sora: "openai/sora",
-  veo: "google/veo-2",
+  sora: "openai/sora-2",
 };
 
 export class ReplicateVideoAdapter implements VideoAdapter {
@@ -17,8 +19,12 @@ export class ReplicateVideoAdapter implements VideoAdapter {
   constructor(
     readonly modelId: string,
     apiToken = config.ai.replicate,
+    fetchFn?: typeof globalThis.fetch,
   ) {
-    this.client = new Replicate({ auth: apiToken });
+    this.client = new Replicate({
+      auth: apiToken,
+      ...(fetchFn ? { fetch: fetchFn } : {}),
+    });
   }
 
   private get model(): `${string}/${string}` | `${string}/${string}:${string}` {
@@ -26,14 +32,45 @@ export class ReplicateVideoAdapter implements VideoAdapter {
   }
 
   async submit(input: VideoInput): Promise<string> {
+    const ms = input.modelSettings ?? {};
+    const referenceUrl = input.mediaInputs?.reference?.[0] ?? input.imageUrl;
+
+    // Sora uses "seconds" (not "duration"), "input_reference" (not "image"),
+    // and native aspect_ratio values "portrait"/"landscape" from model settings.
+    const isSora = this.modelId === "sora";
+    const predInput: Record<string, unknown> = { prompt: input.prompt };
+
+    // Download image and pass as Blob — Replicate cannot fetch Telegram/S3 presigned URLs directly.
+    let imageBlob: Blob | undefined;
+    if (referenceUrl) {
+      const imgRes = await fetch(referenceUrl);
+      if (imgRes.ok) {
+        const imgBuf = await imgRes.arrayBuffer();
+        const mimeType = resolveImageMimeType(imgBuf, imgRes.headers.get("content-type"));
+        imageBlob = new Blob([imgBuf], { type: mimeType });
+      }
+    }
+
+    if (isSora) {
+      if (imageBlob) predInput.input_reference = imageBlob;
+      else if (referenceUrl) predInput.input_reference = referenceUrl;
+      if (input.duration) predInput.seconds = input.duration;
+      // aspect_ratio stored in modelSettings for Sora (portrait/landscape)
+      const ar = ms.aspect_ratio as string | undefined;
+      if (ar) predInput.aspect_ratio = ar;
+    } else {
+      if (ms.negative_prompt) predInput.negative_prompt = ms.negative_prompt;
+      if (ms.seed != null) predInput.seed = ms.seed;
+      if (imageBlob) predInput.image = imageBlob;
+      else if (referenceUrl) predInput.image = referenceUrl;
+      if (input.duration) predInput.duration = input.duration;
+      if (input.aspectRatio) predInput.aspect_ratio = input.aspectRatio;
+    }
+
+    logCall(String(this.model), "submit", predInput);
     const prediction = await this.client.predictions.create({
       model: this.model as `${string}/${string}`,
-      input: {
-        prompt: input.prompt,
-        ...(input.imageUrl ? { image: input.imageUrl } : {}),
-        ...(input.duration ? { duration: input.duration } : {}),
-        ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
-      },
+      input: predInput,
     });
     return prediction.id;
   }
@@ -42,7 +79,7 @@ export class ReplicateVideoAdapter implements VideoAdapter {
     const prediction = await this.client.predictions.get(predictionId);
 
     if (prediction.status === "failed") {
-      throw new Error(`Replicate ${this.modelId} failed: ${String(prediction.error)}`);
+      throw parseReplicatePredictionFailure(prediction.error, prediction.status);
     }
     if (prediction.status !== "succeeded") return null;
 

@@ -9,7 +9,8 @@
     "dev": "tsx watch src/index.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "seed:keys": "tsx scripts/seed-keys-from-env.ts"
   },
   "exports": {
     ".": {
@@ -43,6 +44,98 @@
     "./services/s3": {
       "types": "./src/services/s3.service.ts",
       "default": "./dist/services/s3.service.js"
+    },
+    "./utils/mp4-duration": {
+      "types": "./src/utils/mp4-duration.ts",
+      "default": "./dist/utils/mp4-duration.js"
+    },
+    "./utils/download-token": {
+      "types": "./src/utils/download-token.ts",
+      "default": "./dist/utils/download-token.js"
+    },
+    "./services/user-avatar": {
+      "types": "./src/services/user-avatar.service.ts",
+      "default": "./dist/services/user-avatar.service.js"
+    },
+    "./services/user-voice": {
+      "types": "./src/services/user-voice.service.ts",
+      "default": "./dist/services/user-voice.service.js"
+    },
+    "./ai/avatar/heygen": {
+      "types": "./src/ai/avatar/heygen.avatar.adapter.ts",
+      "default": "./dist/ai/avatar/heygen.avatar.adapter.js"
+    },
+    "./ai/avatar/higgsfield-soul": {
+      "types": "./src/ai/avatar/higgsfield.soul.adapter.ts",
+      "default": "./dist/ai/avatar/higgsfield.soul.adapter.js"
+    },
+    "./utils/fal-error": {
+      "types": "./src/utils/fal-error.ts",
+      "default": "./dist/utils/fal-error.js"
+    },
+    "./utils/heygen-error": {
+      "types": "./src/utils/heygen-error.ts",
+      "default": "./dist/utils/heygen-error.js"
+    },
+    "./utils/luma-error": {
+      "types": "./src/utils/luma-error.ts",
+      "default": "./dist/utils/luma-error.js"
+    },
+    "./utils/minimax-error": {
+      "types": "./src/utils/minimax-error.ts",
+      "default": "./dist/utils/minimax-error.js"
+    },
+    "./utils/runway-error": {
+      "types": "./src/utils/runway-error.ts",
+      "default": "./dist/utils/runway-error.js"
+    },
+    "./utils/replicate-error": {
+      "types": "./src/utils/replicate-error.ts",
+      "default": "./dist/utils/replicate-error.js"
+    },
+    "./utils/rate-limit-error": {
+      "types": "./src/utils/rate-limit-error.ts",
+      "default": "./dist/utils/rate-limit-error.js"
+    },
+    "./utils/fetch": {
+      "types": "./src/utils/fetch.ts",
+      "default": "./dist/utils/fetch.js"
+    },
+    "./utils/mime-detect": {
+      "types": "./src/utils/mime-detect.ts",
+      "default": "./dist/utils/mime-detect.js"
+    },
+    "./services/throttle": {
+      "types": "./src/services/throttle.service.ts",
+      "default": "./dist/services/throttle.service.js"
+    },
+    "./services/key-pool": {
+      "types": "./src/services/key-pool.service.ts",
+      "default": "./dist/services/key-pool.service.js"
+    },
+    "./utils/pool-exhausted-error": {
+      "types": "./src/utils/pool-exhausted-error.ts",
+      "default": "./dist/utils/pool-exhausted-error.js"
+    },
+    "./ai/with-pool": {
+      "types": "./src/ai/with-pool.ts",
+      "default": "./dist/ai/with-pool.js"
+    },
+    "./ai/key-provider": {
+      "types": "./src/ai/key-provider.ts",
+      "default": "./dist/ai/key-provider.js"
+    },
+    "./ai/proxy-fetch": {
+      "types": "./src/ai/transport/proxy-fetch.ts",
+      "default": "./dist/ai/transport/proxy-fetch.js"
+    },
+    "./services/transcription": {
+      "types": "./src/services/transcription.service.ts",
+      "default": "./dist/services/transcription.service.js"
+    },
+    "./redis": {
+      "types": "./src/redis.ts",
+      "default": "./dist/redis.js"
     }
   },
   "dependencies": {
@@ -50,6 +143,7 @@
     "@aws-sdk/client-s3": "^3.1011.0",
     "@aws-sdk/s3-request-presigner": "^3.1011.0",
     "@fal-ai/client": "^1.5.0",
+    "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^10.0.2",
     "@fastify/helmet": "^13.0.1",
     "@fastify/multipart": "^9.0.3",
@@ -57,23 +151,33 @@
     "@fastify/static": "^8.1.0",
     "@fastify/swagger": "^9.7.0",
     "@fastify/swagger-ui": "^5.2.5",
-    "@google/generative-ai": "^0.24.0",
+    "@google/genai": "^1.0.0",
     "@metabox/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
     "@sentry/node": "^10.43.0",
     "bullmq": "^5.56.0",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.5.0",
     "fastify": "^5.3.2",
+    "ffmpeg-static": "^5.2.0",
+    "fluent-ffmpeg": "^2.1.3",
     "ioredis": "^5.6.1",
+    "js-tiktoken": "^1.0.21",
+    "mammoth": "^1.12.0",
     "openai": "^4.90.0",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.20.0",
     "pino": "^9.7.0",
     "pino-pretty": "^13.0.0",
     "prom-client": "^15.1.3",
-    "replicate": "^1.0.1"
+    "replicate": "^1.0.1",
+    "sharp": "^0.34.5",
+    "undici": "^7.2.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/fluent-ffmpeg": "^2.1.27",
     "@types/node": "^22.15.29",
     "@types/pg": "^8.18.0",
     "tsx": "^4.19.4",

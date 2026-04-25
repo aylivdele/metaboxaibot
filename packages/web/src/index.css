@@ -1,0 +1,265 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   AI Box Web — Design tokens
+   Источник: packages/webapp (Telegram Mini App). Делаем как в miniapp,
+   чтобы обе UI-точки входа выглядели идентично.
+
+   Шрифты: Comfortaa (заголовки) + SF Pro Display / system (body)
+   Акцент: #4A8DF5 (синий, совпадает с metabox.global)
+   Фон:    #0d0d0f (монохромный тёмный)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Фон */
+  --bg: #0d0d0f;
+  --bg-secondary: #1a1a1f;
+  --bg-card: #141418;
+  --bg-elevated: #1e1e24;
+
+  /* Текст */
+  --text: #f0f0f5;
+  --text-secondary: #a0a0b0;
+  --text-hint: #606070;
+  --text-on-accent: #ffffff;
+
+  /* Акцент */
+  --accent: #4a8df5;
+  --accent-dark: #3a7de5;
+  --accent-light: #6ba3f7;
+  --accent-lighter: rgba(74, 141, 245, 0.12);
+  --accent-gradient: linear-gradient(135deg, #5a9df7 0%, #3a7de5 100%);
+
+  /* Статусы */
+  --danger: #ef5350;
+  --danger-bg: rgba(239, 83, 80, 0.12);
+  --success: #4caf50;
+  --success-bg: rgba(76, 175, 80, 0.12);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+
+  /* Поверхности */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.3);
+  --shadow-accent: 0 4px 20px rgba(74, 141, 245, 0.25);
+
+  /* Границы */
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  /* Радиусы */
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+
+  /* Layout */
+  --sidebar-w: 260px;
+  --sidebar-w-collapsed: 72px;
+  --topbar-h: 56px;
+  --mobile-nav-h: 72px;
+
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Шрифты */
+  --font-heading: "Comfortaa", "SF Pro Display", sans-serif;
+  --font-body: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Inter", sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+/* Отключаем дефолтные стили Tailwind на form-элементах — у нас свои */
+input,
+textarea,
+select {
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 10px 14px;
+  font-size: 16px; /* 16px предотвращает auto-zoom в iOS Safari */
+  outline: none;
+  width: 100%;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-lighter);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-hint);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-size: inherit;
+  color: inherit;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Scrollbar — тонкий синий */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* ── Компоненты-шорткаты (применяем через className в JSX) ──────────────────── */
+
+@layer components {
+  /* Карточка — базовая поверхность для панелей, элементов списка */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Primary CTA */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 h-12 rounded font-semibold transition-all;
+    background: var(--accent-gradient);
+    color: var(--text-on-accent);
+    box-shadow: var(--shadow-accent);
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  /* Secondary */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-5 h-12 rounded font-semibold transition-all;
+    background: var(--bg-elevated);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--bg-secondary);
+    border-color: var(--accent);
+  }
+
+  /* Ghost */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 h-10 rounded font-medium transition-all;
+    color: var(--text-secondary);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--bg-elevated);
+    color: var(--text);
+  }
+
+  /* Логотип-текст с градиентом */
+  .brand-text {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* ── Utilities ─────────────────────────────────────────────────────────────── */
+
+/* safe-area для iPhone / Android bottom nav */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+.pad-safe-bottom {
+  padding-bottom: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom, 0));
+}
+
+/* Анимация появления страницы */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.anim-page-in {
+  animation: page-in 250ms var(--ease);
+}
+
+/* Shimmer для скелетонов */
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 0%,
+    var(--bg-elevated) 50%,
+    var(--bg-secondary) 100%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.2s infinite linear;
+  border-radius: var(--radius-sm);
+}

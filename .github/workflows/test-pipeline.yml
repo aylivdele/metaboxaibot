@@ -52,6 +52,7 @@ jobs:
       bot: ${{ steps.filter.outputs.bot }}
       worker: ${{ steps.filter.outputs.worker }}
       webapp: ${{ steps.filter.outputs.webapp }}
+      web: ${{ steps.filter.outputs.web }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,6 +68,7 @@ jobs:
             echo "bot=true"    >> "$GITHUB_OUTPUT"
             echo "worker=true" >> "$GITHUB_OUTPUT"
             echo "webapp=true" >> "$GITHUB_OUTPUT"
+            echo "web=true"    >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -78,6 +80,7 @@ jobs:
             echo "bot=true"    >> "$GITHUB_OUTPUT"
             echo "worker=true" >> "$GITHUB_OUTPUT"
             echo "webapp=true" >> "$GITHUB_OUTPUT"
+            echo "web=true"    >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -87,10 +90,11 @@ jobs:
 
           match() { echo "$changed" | grep -qE "$1" && echo "true" || echo "false"; }
 
-          echo "api=$(match    '^(packages/api|packages/shared|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.api)')"    >> "$GITHUB_OUTPUT"
-          echo "bot=$(match    '^(packages/bot|packages/api|packages/shared|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.bot)')"    >> "$GITHUB_OUTPUT"
-          echo "worker=$(match '^(packages/worker|packages/api|packages/shared|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.worker)')" >> "$GITHUB_OUTPUT"
-          echo "webapp=$(match '^(packages/webapp|packages/shared|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.webapp)')"     >> "$GITHUB_OUTPUT"
+          echo "api=$(match    '^(packages/api|packages/shared|packages/shared-browser|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.api)')"    >> "$GITHUB_OUTPUT"
+          echo "bot=$(match    '^(packages/bot|packages/api|packages/shared|packages/shared-browser|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.bot)')"    >> "$GITHUB_OUTPUT"
+          echo "worker=$(match '^(packages/worker|packages/api|packages/shared|packages/shared-browser|prisma|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.worker)')" >> "$GITHUB_OUTPUT"
+          echo "webapp=$(match '^(packages/webapp|packages/shared|packages/shared-browser|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.webapp)')"     >> "$GITHUB_OUTPUT"
+          echo "web=$(match    '^(packages/web|packages/shared|packages/shared-browser|pnpm-lock\.yaml|package\.json|infra/docker/Dockerfile\.web)')"           >> "$GITHUB_OUTPUT"
 
   build-api:
     name: Build API
@@ -186,6 +190,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @metabox/shared-browser build
       - name: Build webapp
         run: pnpm --filter @metabox/webapp build
         env:
@@ -193,6 +198,7 @@ jobs:
           VITE_BOT_USERNAME: ${{ secrets.TEST_VITE_BOT_USERNAME }}
           VITE_LEARNING_URL: ${{ secrets.TEST_VITE_LEARNING_URL }}
           VITE_METABOX_LANDING_URL: ${{ secrets.TEST_VITE_METABOX_LANDING_URL }}
+          VITE_METABOX_APP_URL: ${{ secrets.TEST_VITE_METABOX_APP_URL }}
       - name: Clear webapp dir on test VPS
         uses: appleboy/ssh-action@v1
         with:
@@ -210,10 +216,45 @@ jobs:
           target: /var/www/metabox-ai-test
           strip_components: 3
 
+  build-web:
+    name: Build & deploy web app
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || github.event.inputs.force_all == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @metabox/shared-browser build
+      - name: Build web app
+        run: pnpm --filter @metabox/web build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.TEST_VITE_API_BASE_URL }}
+      - name: Clear web dir on test VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.TEST_VPS_HOST }}
+          username: ${{ secrets.TEST_VPS_USER }}
+          key: ${{ secrets.TEST_VPS_SSH_KEY }}
+          script: mkdir -p /var/www/metabox-web-test && rm -rf /var/www/metabox-web-test/*
+      - name: Upload web dist to test VPS
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.TEST_VPS_HOST }}
+          username: ${{ secrets.TEST_VPS_USER }}
+          key: ${{ secrets.TEST_VPS_SSH_KEY }}
+          source: "packages/web/dist/*"
+          target: /var/www/metabox-web-test
+          strip_components: 3
+
   deploy:
     name: Deploy to test VPS
     runs-on: ubuntu-latest
-    needs: [changes, build-api, build-bot, build-worker, build-webapp]
+    needs: [changes, build-api, build-bot, build-worker, build-webapp, build-web]
     permissions:
       contents: write
     if: |
@@ -232,11 +273,14 @@ jobs:
           GH_ACTOR: ${{ github.actor }}
           IMAGE_TAG: test-${{ github.sha }}
           GHCR_IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
+          BUILT_API: ${{ needs.build-api.result == 'success' && 'true' || 'false' }}
+          BUILT_BOT: ${{ needs.build-bot.result == 'success' && 'true' || 'false' }}
+          BUILT_WORKER: ${{ needs.build-worker.result == 'success' && 'true' || 'false' }}
         with:
           host: ${{ secrets.TEST_VPS_HOST }}
           username: ${{ secrets.TEST_VPS_USER }}
           key: ${{ secrets.TEST_VPS_SSH_KEY }}
-          envs: GHCR_TOKEN,GH_ACTOR,IMAGE_TAG,GHCR_IMAGE_PREFIX
+          envs: GHCR_TOKEN,GH_ACTOR,IMAGE_TAG,GHCR_IMAGE_PREFIX,BUILT_API,BUILT_BOT,BUILT_WORKER
           script: |
             set -e
             cd /opt/metaboxaibot-test
@@ -245,22 +289,41 @@ jobs:
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
 
             echo "Updating repo (compose file, nginx config)..."
-            git -c "url.https://x-access-token:${GHCR_TOKEN}@github.com/.insteadOf=https://github.com/" pull origin develop
+            git -c "url.https://x-access-token:${GHCR_TOKEN}@github.com/.insteadOf=https://github.com/" fetch origin develop
+            git reset --hard origin/develop
 
-            echo "Updating IMAGE_TAG and GHCR_IMAGE_PREFIX in .env..."
-            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env \
-              || echo "IMAGE_TAG=$IMAGE_TAG" >> .env
-            sed -i "s|^GHCR_IMAGE_PREFIX=.*|GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX|" .env \
-              || echo "GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX" >> .env
+            # Only update IMAGE_TAG if at least one service was rebuilt
+            if [ "$BUILT_API" = "true" ] || [ "$BUILT_BOT" = "true" ] || [ "$BUILT_WORKER" = "true" ]; then
+              echo "Updating IMAGE_TAG and GHCR_IMAGE_PREFIX in .env..."
+              sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env \
+                || echo "IMAGE_TAG=$IMAGE_TAG" >> .env
+              sed -i "s|^GHCR_IMAGE_PREFIX=.*|GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX|" .env \
+                || echo "GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX" >> .env
+            else
+              echo "No services rebuilt — keeping existing IMAGE_TAG"
+            fi
 
-            echo "Pulling new images..."
-            docker compose -f docker-compose.test.yml pull bot api worker
+            # Pull only services that were actually rebuilt
+            SERVICES=""
+            [ "$BUILT_API" = "true" ] && SERVICES="$SERVICES api"
+            [ "$BUILT_BOT" = "true" ] && SERVICES="$SERVICES bot"
+            [ "$BUILT_WORKER" = "true" ] && SERVICES="$SERVICES worker"
 
-            echo "Restarting services..."
-            docker compose -f docker-compose.test.yml up -d --no-build --remove-orphans
+            if [ -n "$SERVICES" ]; then
+              echo "Pulling new images:$SERVICES"
+              docker compose -f docker-compose.test.yml pull $SERVICES
+
+              echo "Restarting updated services:$SERVICES"
+              docker compose -f docker-compose.test.yml up -d --no-build $SERVICES
+            else
+              echo "No new images to pull — skipping restart"
+            fi
 
             echo "Pruning old images..."
             docker image prune -af
+
+            # Ensure nginx configs are symlinked
+            sudo ln -sf /opt/metaboxaibot-test/infra/nginx/nginx.web-test.conf /etc/nginx/sites-enabled/metabox-web-test 2>/dev/null || true
 
             sudo nginx -t && sudo nginx -s reload
 

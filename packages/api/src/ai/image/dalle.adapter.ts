@@ -1,6 +1,19 @@
-import OpenAI from "openai";
+import OpenAI, { type ClientOptions as OpenAIClientOptions } from "openai";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
-import { config } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
+
+const DALLE_SIZES: Record<string, "1024x1024" | "1792x1024" | "1024x1792"> = {
+  "1:1": "1024x1024",
+  "16:9": "1792x1024",
+  "9:16": "1024x1792",
+};
+
+/** USD cost table: quality × aspect_ratio */
+const DALLE_COST: Record<string, Record<string, number>> = {
+  standard: { "1024x1024": 0.04, "1792x1024": 0.08, "1024x1792": 0.08 },
+  hd: { "1024x1024": 0.08, "1792x1024": 0.12, "1024x1792": 0.12 },
+};
 
 /**
  * DALL-E adapter — synchronous, returns URL immediately.
@@ -12,41 +25,59 @@ export class DalleAdapter implements ImageAdapter {
   readonly isAsync = false;
 
   private client: OpenAI;
+  private fetchFn: typeof globalThis.fetch | undefined;
 
-  constructor(apiKey = config.ai.openai) {
-    this.client = new OpenAI({ apiKey });
+  constructor(apiKey = config.ai.openai, fetchFn?: typeof globalThis.fetch) {
+    this.client = new OpenAI({
+      apiKey,
+      ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
+    });
+    this.fetchFn = fetchFn;
   }
 
   async generate(input: ImageInput): Promise<ImageResult> {
     // img2img: use DALL-E 2 variations when a reference image URL is provided
-    if (input.imageUrl) {
-      return this.generateVariation(input.imageUrl);
+    const imageUrl = input.mediaInputs?.edit?.[0] ?? input.imageUrl;
+    if (imageUrl) {
+      return this.generateVariation(imageUrl);
     }
 
-    const DALLE_SIZES: Record<string, "1024x1024" | "1792x1024" | "1024x1792"> = {
-      "1:1": "1024x1024",
-      "16:9": "1792x1024",
-      "9:16": "1024x1792",
-    };
-    const size = DALLE_SIZES[input.aspectRatio ?? ""] ?? "1024x1024";
+    const ms = input.modelSettings ?? {};
+    const quality = (ms.quality as "standard" | "hd" | undefined) ?? "standard";
+    const aspectRatio = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "1:1";
+    const size = DALLE_SIZES[aspectRatio] ?? "1024x1024";
+    const providerUsdCost = DALLE_COST[quality]?.[size] ?? 0.04;
 
-    const response = await this.client.images.generate({
-      model: "dall-e-3",
-      prompt: input.prompt,
-      n: 1,
-      size,
-      quality: "standard",
-      response_format: "url",
-    });
+    let response;
+    try {
+      response = await this.client.images.generate({
+        model: "dall-e-3",
+        prompt: input.prompt,
+        n: 1,
+        size,
+        quality,
+        style: (ms.style as "vivid" | "natural" | undefined) ?? "vivid",
+        response_format: "url",
+      });
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        "code" in err &&
+        (err as { code?: string }).code === "content_policy_violation"
+      ) {
+        throw new UserFacingError(err.message, { key: "contentPolicyViolation" });
+      }
+      throw err;
+    }
 
     const url = response.data?.[0]?.url;
     if (!url) throw new Error("DALL-E returned no image URL");
-    return { url, filename: "dalle3.png" };
+    return { url, filename: "dalle3.png", providerUsdCost };
   }
 
   private async generateVariation(imageUrl: string): Promise<ImageResult> {
     // Download the reference image as a Buffer for the DALL-E 2 variations API
-    const resp = await fetch(imageUrl);
+    const resp = await fetchWithLog(imageUrl);
     if (!resp.ok) throw new Error(`Failed to fetch reference image: ${resp.status}`);
     const arrayBuffer = await resp.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);

@@ -48,6 +48,16 @@ export const config = {
   bot: {
     token: req("BOT_TOKEN"),
     webappUrl: opt("WEBAPP_URL"),
+    /**
+     * When true, route Bot API calls through Telegram's Test Data-Center
+     * (`/bot<TOKEN>/test/...`). Tokens issued by @BotFather inside the test
+     * environment only work against this endpoint — without the flag every
+     * call returns 401 Unauthorized.
+     *
+     * Set `TELEGRAM_TEST_ENV=1` (or `true`) in `.env` during local dev.
+     */
+    testEnvironment:
+      (opt("TELEGRAM_TEST_ENV") ?? "").toLowerCase() === "true" || opt("TELEGRAM_TEST_ENV") === "1",
   },
 
   /** Database & cache */
@@ -62,6 +72,13 @@ export const config = {
   api: {
     port: optInt("API_PORT", 3001),
     adminSecret: opt("ADMIN_SECRET"),
+    /** Public base URL for this API server, used to generate download links (e.g. https://api.meta-box.ru). */
+    publicUrl: opt("API_PUBLIC_URL"),
+    /**
+     * Master-секрет для шифрования значений в provider_keys / proxies (AES-256-GCM).
+     * Обязателен: без него нечем расшифровать сохранённые ключи провайдеров.
+     */
+    keyVaultMaster: req("KEY_VAULT_MASTER"),
   },
 
   /** Observability */
@@ -79,8 +96,8 @@ export const config = {
    * Override via BILLING_USD_PER_TOKEN / BILLING_TARGET_MARGIN env vars.
    */
   billing: {
-    usdPerToken: optFloat("BILLING_USD_PER_TOKEN", 0.043),
-    targetMargin: optFloat("BILLING_TARGET_MARGIN", 2.0),
+    usdPerToken: optFloat("BILLING_USD_PER_TOKEN", 0.02),
+    targetMargin: optFloat("BILLING_TARGET_MARGIN", 1.0),
   },
 
   /**
@@ -109,9 +126,10 @@ export const config = {
     chatId: opt("ALERT_CHAT_ID"),
     /** message_thread_id for supergroup topics (optional). */
     threadId: optInt("ALERT_THREAD_ID", 0) || undefined,
+    usageThreadId: optInt("USAGE_THREAD_ID", 0) || undefined,
     intervalHours: optFloat("ALERT_INTERVAL_HOURS", 12),
     falThresholdUsd: optFloat("ALERT_FAL_THRESHOLD_USD", 5),
-    elevenlabsThresholdChars: optInt("ALERT_ELEVENLABS_THRESHOLD_CHARS", 50_000),
+    elevenlabsThresholdChars: optInt("ALERT_ELEVENLABS_THRESHOLD_CHARS", 10_000),
   },
 
   /**
@@ -122,9 +140,30 @@ export const config = {
    */
   metabox: {
     apiUrl: opt("METABOX_API_URL"),
+    landingUrl: optDefault("METABOX_LANDING_URL", "https://meta-box.ru"),
     internalKey: opt("METABOX_INTERNAL_KEY"),
     ssoSecret: opt("METABOX_SSO_SECRET"),
   },
+
+  /**
+   * Web-версия AI Box (packages/web → ai.metabox.global).
+   * JWT_SECRET — секрет для подписи web access-токенов (HMAC-SHA256).
+   * Cookie параметры — домен и безопасность refresh-cookie.
+   */
+  web: {
+    jwtSecret: opt("WEB_JWT_SECRET"),
+    accessTtlSeconds: optInt("WEB_ACCESS_TTL_SEC", 15 * 60), // 15 минут
+    refreshTtlSeconds: optInt("WEB_REFRESH_TTL_SEC", 30 * 24 * 60 * 60), // 30 дней
+    /** Домен refresh-cookie (например, ".metabox.global" чтобы работало на поддоменах). */
+    cookieDomain: opt("WEB_COOKIE_DOMAIN"),
+    /** Secure cookie (true на https; в dev можно false). По умолчанию — true если NODE_ENV=production. */
+    cookieSecure: optDefault("WEB_COOKIE_SECURE", "") as "" | "true" | "false",
+    /** Базовый URL веб-фронта (для ссылок в email-ах восстановления пароля). */
+    frontUrl: opt("WEB_FRONT_URL"),
+  },
+
+  /** Support Telegram username (without @) */
+  supportTg: optDefault("SUPPORT_TG_USERNAME", "metaboxsupport"),
 
   /** AI providers (all optional — only needed for models you enable) */
   ai: {
@@ -145,6 +184,13 @@ export const config = {
     heygenAvatarId: opt("HEYGEN_AVATAR_ID"),
     did: opt("DID_API_KEY"),
     didPresenterUrl: opt("DID_PRESENTER_URL"),
+    higgsfieldApiKey: opt("HIGGSFIELD_API_KEY"),
+    higgsfieldApiSecret: opt("HIGGSFIELD_API_SECRET"),
+    alibaba: opt("ALIBABA_API_KEY"),
+    apipass: opt("APIPASS_API_KEY"),
+    recraft: opt("RECRAFT_API_KEY"),
+    minimax: opt("MINIMAX_API_KEY"),
+    kie: opt("KIE_API_KEY"),
   },
 } as const;
 

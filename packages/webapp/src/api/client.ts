@@ -7,6 +7,16 @@ import type {
   AdminUsersResponse,
   BannerSlide,
   GalleryResponse,
+  GalleryFolder,
+  CatalogResponse,
+  HeyGenVoice,
+  HeyGenAvatar,
+  HiggsFieldMotion,
+  SoulStyle,
+  DIDVoice,
+  UserAvatar,
+  ElevenLabsVoice,
+  UserVoice,
 } from "../types.js";
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001";
@@ -34,18 +44,33 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers["Authorization"] = `wtoken ${_webToken}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  const method = options.method ?? "GET";
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+      cache: "no-store",
+    });
+  } catch (networkErr) {
+    console.error(`[api] network error ${method} ${path}`, networkErr);
+    throw networkErr;
+  }
 
   if (!res.ok) {
-    const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
-      error?: string;
-      code?: string;
-    };
-    const error = new Error(err.error ?? `HTTP ${res.status}`) as Error & { code?: string };
+    const err = (await res.json().catch(() => ({ error: res.statusText }))) as Record<
+      string,
+      unknown
+    >;
+    const error = new Error((err.error as string) ?? `HTTP ${res.status}`) as Error &
+      Record<string, unknown>;
     if (err.code) error.code = err.code;
+    if (err.linkedTo) error.linkedTo = err.linkedTo;
+    if (err.siteMentor) error.siteMentor = err.siteMentor;
+    if (err.botMentor) error.botMentor = err.botMentor;
+    if (err.linkedEmail) error.linkedEmail = err.linkedEmail;
+    if (err.linkedUsername) error.linkedUsername = err.linkedUsername;
+    console.error(`[api] ${method} ${path} → ${res.status}`, err);
     throw error;
   }
 
@@ -60,14 +85,21 @@ async function uploadRequest<T>(path: string, body: FormData): Promise<T> {
     headers["Authorization"] = `wtoken ${_webToken}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers,
-    body,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers,
+      body,
+    });
+  } catch (networkErr) {
+    console.error(`[api] network error POST ${path}`, networkErr);
+    throw networkErr;
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
+    console.error(`[api] POST ${path} → ${res.status}`, err);
     throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
   }
 
@@ -90,13 +122,14 @@ export const api = {
 
   profile: {
     get: () => request<UserProfile>("/profile"),
-    updateSettings: (data: Record<string, string>) =>
-      request<{ email: string | null; emailVerified: boolean }>("/profile/settings", {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    sendVerification: () =>
-      request<{ success: boolean }>("/profile/verify-email", { method: "POST" }),
+    partnerBalance: () =>
+      request<{
+        balance: number;
+        totalEarned: number;
+        totalWithdrawn: number;
+        userStatus: string;
+        referralCode: string | null;
+      }>("/profile/partner-balance"),
     metaboxSso: () => request<{ ssoUrl: string }>("/profile/metabox-sso"),
     metaboxRegister: (
       email: string,
@@ -147,6 +180,16 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(body),
       }),
+    activate: (section: string, modelId: string) =>
+      request<{ success: boolean }>("/state/activate", {
+        method: "POST",
+        body: JSON.stringify({ section, modelId }),
+      }),
+    setSelectedMode: (modelId: string, modeId: string) =>
+      request<{ success: boolean }>("/state/selected-mode", {
+        method: "POST",
+        body: JSON.stringify({ modelId, modeId }),
+      }),
   },
 
   models: {
@@ -154,11 +197,20 @@ export const api = {
       request<Model[]>(section ? `/models?section=${section}` : "/models"),
   },
 
+  tariffs: {
+    catalog: () => request<CatalogResponse>("/tariffs/catalog"),
+  },
+
   payments: {
-    createInvoice: (planId: string) =>
+    createInvoice: (type: string, id: string, period?: string, name?: string) =>
       request<{ invoiceUrl: string }>("/payments/invoice", {
         method: "POST",
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ type, id, period, name }),
+      }),
+    createCardInvoice: (type: string, id: string, period?: string) =>
+      request<{ paymentUrl: string }>("/payments/card-invoice", {
+        method: "POST",
+        body: JSON.stringify({ type, id, period }),
       }),
   },
 
@@ -179,15 +231,65 @@ export const api = {
   },
 
   gallery: {
-    list: (params: { section?: string; page?: number; limit?: number }) => {
+    list: (params: {
+      section?: string;
+      page?: number;
+      limit?: number;
+      modelId?: string;
+      folderId?: string;
+    }) => {
       const qs = new URLSearchParams();
       if (params.section) qs.set("section", params.section);
       if (params.page) qs.set("page", String(params.page));
       if (params.limit) qs.set("limit", String(params.limit));
+      if (params.modelId) qs.set("modelId", params.modelId);
+      if (params.folderId) qs.set("folderId", params.folderId);
       return request<GalleryResponse>(`/gallery?${qs.toString()}`);
     },
-    download: (id: string) =>
-      request<{ success: boolean }>(`/gallery/${id}/download`, { method: "POST" }),
+    sendJob: (jobId: string) =>
+      request<{ success: boolean }>(`/gallery/jobs/${jobId}/send`, { method: "POST" }),
+    previewUrl: (outputId: string) => request<{ url: string }>(`/gallery/${outputId}/preview-url`),
+    originalUrl: (outputId: string) =>
+      request<{ url: string }>(`/gallery/outputs/${outputId}/original-url`),
+    deleteJob: (jobId: string) =>
+      request<{ success: boolean }>(`/gallery/jobs/${jobId}`, { method: "DELETE" }),
+    modelCounts: (section?: string) =>
+      request<{ modelId: string; count: number }[]>(
+        `/gallery/model-counts${section ? `?section=${encodeURIComponent(section)}` : ""}`,
+      ),
+    folders: {
+      list: () => request<GalleryFolder[]>("/gallery/folders"),
+      create: (name: string) =>
+        request<GalleryFolder>("/gallery/folders", {
+          method: "POST",
+          body: JSON.stringify({ name }),
+        }),
+      update: (folderId: string, patch: { name?: string; isPinned?: boolean }) =>
+        request<GalleryFolder>(`/gallery/folders/${folderId}`, {
+          method: "PATCH",
+          body: JSON.stringify(patch),
+        }),
+      delete: (folderId: string) =>
+        request<{ success: boolean }>(`/gallery/folders/${folderId}`, { method: "DELETE" }),
+      addItem: (folderId: string, jobId: string) =>
+        request<{ success: boolean }>(`/gallery/folders/${folderId}/items`, {
+          method: "POST",
+          body: JSON.stringify({ jobId }),
+        }),
+      removeItem: (folderId: string, jobId: string) =>
+        request<{ success: boolean }>(`/gallery/folders/${folderId}/items/${jobId}`, {
+          method: "DELETE",
+        }),
+    },
+    favorites: {
+      add: (jobId: string) =>
+        request<{ folderId: string }>("/gallery/favorites", {
+          method: "POST",
+          body: JSON.stringify({ jobId }),
+        }),
+      remove: (jobId: string) =>
+        request<{ success: boolean }>(`/gallery/favorites/${jobId}`, { method: "DELETE" }),
+    },
   },
 
   imageSettings: {
@@ -206,6 +308,86 @@ export const api = {
       request<{ success: boolean }>("/video-settings", {
         method: "PATCH",
         body: JSON.stringify({ modelId, ...patch }),
+      }),
+  },
+
+  heygenVoices: {
+    list: () => request<HeyGenVoice[]>("/heygen-voices"),
+  },
+
+  heygenAvatars: {
+    list: (params: { token?: string; limit?: number; gender?: string; search?: string } = {}) => {
+      const qs = new URLSearchParams();
+      if (params.token) qs.set("token", params.token);
+      if (params.limit) qs.set("limit", String(params.limit));
+      if (params.gender && params.gender !== "all") qs.set("gender", params.gender);
+      if (params.search) qs.set("search", params.search);
+      const query = qs.toString();
+      return request<{ items: HeyGenAvatar[]; has_more: boolean; next_token: string | null }>(
+        `/heygen-avatars${query ? `?${query}` : ""}`,
+      );
+    },
+  },
+
+  higgsfieldMotions: {
+    list: () => request<HiggsFieldMotion[]>("/higgsfield-motions"),
+  },
+
+  soulStyles: {
+    list: () => request<SoulStyle[]>("/soul-styles"),
+  },
+
+  didVoices: {
+    list: () => request<DIDVoice[]>("/d-id-voices"),
+  },
+
+  elevenlabsVoices: {
+    list: () => request<ElevenLabsVoice[]>("/elevenlabs-voices"),
+  },
+
+  userVoices: {
+    list: (provider?: string) =>
+      request<UserVoice[]>(provider ? `/user-voices?provider=${provider}` : "/user-voices"),
+    rename: (id: string, name: string) =>
+      request<UserVoice>(`/user-voices/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/user-voices/${id}`, { method: "DELETE" }),
+    previewUrl: (id: string) => request<{ url: string }>(`/user-voices/${id}/preview-url`),
+  },
+
+  userAvatars: {
+    list: (provider?: string) =>
+      request<UserAvatar[]>(provider ? `/user-avatars?provider=${provider}` : "/user-avatars"),
+    startCreation: (provider: string) =>
+      request<{ ok: boolean }>("/user-avatars/start-creation", {
+        method: "POST",
+        body: JSON.stringify({ provider }),
+      }),
+    rename: (id: string, name: string) =>
+      request<UserAvatar>(`/user-avatars/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/user-avatars/${id}`, { method: "DELETE" }),
+  },
+
+  modelSettings: {
+    get: () => request<Record<string, Record<string, unknown>>>("/model-settings"),
+    set: (modelId: string, settings: Record<string, unknown>, opts?: { replace?: boolean }) =>
+      request<{ success: boolean }>("/model-settings", {
+        method: "PATCH",
+        body: JSON.stringify({ modelId, settings, ...(opts?.replace ? { replace: true } : {}) }),
+      }),
+    getForDialog: (dialogId: string) =>
+      request<Record<string, unknown>>(`/model-settings/dialog/${dialogId}`),
+    setForDialog: (dialogId: string, settings: Record<string, unknown>) =>
+      request<{ success: boolean }>(`/model-settings/dialog/${dialogId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ settings }),
       }),
   },
 

@@ -1,6 +1,7 @@
 import type { BotState, Section } from "../types/user.js";
 
 export const BOT_STATES = {
+  AWAITING_LANGUAGE: "AWAITING_LANGUAGE",
   IDLE: "IDLE",
   MAIN_MENU: "MAIN_MENU",
   GPT_SECTION: "GPT_SECTION",
@@ -24,4 +25,4 @@ export const SECTION_BY_STATE: Partial<Record<BotState, Section>> = {
   VIDEO_ACTIVE: "video",
 };
 
-export const WELCOME_BONUS_TOKENS = 5.5;
+export const WELCOME_BONUS_TOKENS = 7.5;

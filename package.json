@@ -40,6 +40,7 @@
     "onlyBuiltDependencies": [
       "@prisma/engines",
       "esbuild",
+      "ffmpeg-static",
       "msgpackr-extract",
       "prisma"
     ]

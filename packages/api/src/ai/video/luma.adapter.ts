@@ -1,5 +1,7 @@
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
+import { parseLumaSubmitError, parseLumaPollFailure } from "../../utils/luma-error.js";
 
 const LUMA_API = "https://api.lumalabs.ai/dream-machine/v1";
 
@@ -10,16 +12,28 @@ interface LumaGeneration {
   failure_reason?: string;
 }
 
+/** Maps internal modelId → Luma API model name. */
+const LUMA_MODELS: Record<string, string> = {
+  "luma-ray2": "ray-2",
+};
+
 /**
- * Luma Dream Machine adapter (REST API).
+ * Luma Dream Machine adapter (REST API). Supports luma-ray2 (ray-2).
  */
 export class LumaAdapter implements VideoAdapter {
-  readonly modelId = "luma";
+  readonly modelId: string;
 
   private readonly apiKey: string;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
 
-  constructor(apiKey = config.ai.luma ?? "") {
+  constructor(
+    modelId = "luma-ray2",
+    apiKey = config.ai.luma ?? "",
+    fetchFn?: typeof globalThis.fetch,
+  ) {
+    this.modelId = modelId;
     this.apiKey = apiKey;
+    this.fetchFn = fetchFn;
   }
 
   private headers() {
@@ -31,26 +45,44 @@ export class LumaAdapter implements VideoAdapter {
   }
 
   async submit(input: VideoInput): Promise<string> {
+    const ms = input.modelSettings ?? {};
     const body: Record<string, unknown> = {
+      model: LUMA_MODELS[this.modelId] ?? "ray-2",
       prompt: input.prompt,
       aspect_ratio: input.aspectRatio ?? "16:9",
-      loop: false,
+      loop: ms.loop !== undefined ? Boolean(ms.loop) : false,
     };
 
-    if (input.imageUrl) {
-      body.keyframes = {
-        frame0: { type: "image", url: input.imageUrl },
-      };
-    }
+    if (ms.resolution) body.resolution = ms.resolution;
+    if (input.duration) body.duration = `${input.duration}s`;
 
-    const res = await fetch(`${LUMA_API}/generations`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify(body),
-    });
+    const firstFrame = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+    const lastFrame = input.mediaInputs?.last_frame?.[0];
+    const keyframes: Record<string, unknown> = {};
+    if (firstFrame) keyframes.frame0 = { type: "image", url: firstFrame };
+    if (lastFrame) keyframes.frame1 = { type: "image", url: lastFrame };
+    if (Object.keys(keyframes).length > 0) body.keyframes = keyframes;
+
+    const res = await fetchWithLog(
+      `${LUMA_API}/generations`,
+      {
+        method: "POST",
+        headers: this.headers(),
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();
+      let json: unknown;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = null;
+      }
+      const structured = parseLumaSubmitError(json);
+      if (structured) throw structured;
       throw new Error(`Luma submit failed: ${res.status} ${text}`);
     }
 
@@ -59,9 +91,13 @@ export class LumaAdapter implements VideoAdapter {
   }
 
   async poll(generationId: string): Promise<VideoResult | null> {
-    const res = await fetch(`${LUMA_API}/generations/${generationId}`, {
-      headers: this.headers(),
-    });
+    const res = await fetchWithLog(
+      `${LUMA_API}/generations/${generationId}`,
+      {
+        headers: this.headers(),
+      },
+      this.fetchFn,
+    );
 
     if (!res.ok) {
       const text = await res.text();
@@ -71,7 +107,7 @@ export class LumaAdapter implements VideoAdapter {
     const gen = (await res.json()) as LumaGeneration;
 
     if (gen.state === "failed") {
-      throw new Error(`Luma generation failed: ${gen.failure_reason ?? "unknown"}`);
+      throw parseLumaPollFailure(gen.failure_reason);
     }
     if (gen.state !== "completed") return null;
 

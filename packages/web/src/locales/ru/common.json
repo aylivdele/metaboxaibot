@@ -1,0 +1,31 @@
+{
+  "app": {
+    "name": "AI Box",
+    "loading": "Загрузка…"
+  },
+  "nav": {
+    "chat": "Чат",
+    "history": "История",
+    "plans": "Тарифы",
+    "tokens": "Токены",
+    "profile": "Профиль",
+    "logout": "Выйти"
+  },
+  "common": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "confirm": "Подтвердить",
+    "close": "Закрыть",
+    "back": "Назад",
+    "next": "Далее",
+    "error": "Что-то пошло не так",
+    "retry": "Повторить"
+  },
+  "telegramLink": {
+    "title": "Подключите Telegram-бот",
+    "openBot": "Открыть Telegram-бот",
+    "waiting": "Ожидаем подключение…"
+  }
+}

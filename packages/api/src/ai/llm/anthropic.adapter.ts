@@ -1,12 +1,13 @@
-import Anthropic from "@anthropic-ai/sdk";
-import type {
-  LLMAdapter,
-  LLMInput,
-  LLMOutput,
-  MessageRecord,
-  StreamResult,
+import Anthropic, { type ClientOptions as AnthropicClientOptions } from "@anthropic-ai/sdk";
+import {
+  BaseLLMAdapter,
+  type LLMInput,
+  type LLMOutput,
+  type MessageRecord,
+  type StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 const MODEL_MAP: Record<string, string> = {
   "claude-sonnet": "claude-sonnet-4-6",
@@ -20,19 +21,26 @@ const MODEL_MAP: Record<string, string> = {
  * Anthropic Claude adapter (db_history strategy).
  * Sends the last N messages from DB with each request.
  */
-export class AnthropicAdapter implements LLMAdapter {
+export class AnthropicAdapter extends BaseLLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
+  protected readonly modelId: string;
 
   private client: Anthropic;
   private apiModel: string;
 
   constructor(
-    private readonly modelId: string,
+    modelId: string,
     contextMaxMessages = 50,
     apiKey = config.ai.anthropic,
+    fetchFn?: typeof globalThis.fetch,
   ) {
-    this.client = new Anthropic({ apiKey });
+    super();
+    this.modelId = modelId;
+    this.client = new Anthropic({
+      apiKey,
+      ...(fetchFn ? { fetch: fetchFn as unknown as AnthropicClientOptions["fetch"] } : {}),
+    });
     this.apiModel = MODEL_MAP[modelId] ?? modelId;
     this.contextMaxMessages = contextMaxMessages;
   }
@@ -46,11 +54,28 @@ export class AnthropicAdapter implements LLMAdapter {
   }
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
+    input = this.truncateInput(input);
     const messages = this.buildMessages(input);
-    const stream = this.client.messages.stream({
+    logCall(this.apiModel, "chatStream", {
+      temperature: input.temperature,
+      max_tokens: input.maxTokens,
+      messages_count: messages.length,
+      extended_thinking: input.extendedThinking,
+    });
+    // Extended thinking requires a higher max_tokens budget (must exceed budget_tokens).
+    const maxTokens = input.extendedThinking
+      ? Math.max(input.maxTokens ?? 16000, 16000)
+      : (input.maxTokens ?? 4096);
+    const stream = (
+      this.client.messages.stream as (p: unknown) => ReturnType<typeof this.client.messages.stream>
+    )({
       model: this.apiModel,
-      max_tokens: 4096,
+      max_tokens: maxTokens,
+      ...(input.temperature !== undefined && !input.extendedThinking
+        ? { temperature: Math.min(input.temperature, 1) }
+        : {}),
       ...(input.systemPrompt ? { system: input.systemPrompt } : {}),
+      ...(input.extendedThinking ? { thinking: { type: "enabled", budget_tokens: 10000 } } : {}),
       messages,
     });
 
@@ -71,17 +96,46 @@ export class AnthropicAdapter implements LLMAdapter {
   }
 
   private buildMessages(input: LLMInput): Anthropic.MessageParam[] {
-    const history: Anthropic.MessageParam[] = (input.history ?? []).map((m: MessageRecord) => ({
-      role: m.role,
-      content: m.content,
-    }));
+    // Historical messages may carry attachments (PDFs) that need to be
+    // re-sent as `document` blocks on every request. User explicitly chose
+    // "resend every time" over "only current message" for quality.
+    const history: Anthropic.MessageParam[] = (input.history ?? []).map((m: MessageRecord) => {
+      const docs = (m.attachments ?? []).filter((a) => !!a.url);
+      if (docs.length === 0) return { role: m.role, content: m.content };
 
-    const userContent: Anthropic.MessageParam["content"] = input.imageUrl
-      ? [
-          { type: "image", source: { type: "url", url: input.imageUrl } },
-          { type: "text", text: input.prompt },
-        ]
-      : input.prompt;
+      const blocks: Anthropic.ContentBlockParam[] = [
+        ...docs.map(
+          (d) =>
+            ({
+              type: "document" as const,
+              source: { type: "url" as const, url: d.url! },
+            }) as Anthropic.ContentBlockParam,
+        ),
+        ...(m.content ? [{ type: "text" as const, text: m.content }] : []),
+      ];
+      return { role: m.role, content: blocks };
+    });
+
+    const urls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
+    const docs = (input.documentAttachments ?? []).filter((d) => !!d.url);
+
+    const userContent: Anthropic.MessageParam["content"] =
+      urls.length || docs.length
+        ? [
+            ...urls.map((url) => ({
+              type: "image" as const,
+              source: { type: "url" as const, url },
+            })),
+            ...docs.map(
+              (d) =>
+                ({
+                  type: "document" as const,
+                  source: { type: "url" as const, url: d.url! },
+                }) as Anthropic.ContentBlockParam,
+            ),
+            ...(input.prompt ? [{ type: "text" as const, text: input.prompt }] : []),
+          ]
+        : input.prompt;
 
     return [...history, { role: "user", content: userContent }];
   }

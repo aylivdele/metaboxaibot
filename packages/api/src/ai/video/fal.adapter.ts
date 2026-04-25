@@ -1,51 +1,184 @@
 import { fal } from "@fal-ai/client";
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
-/**
- * FAL.ai video adapter — used for Kling, MiniMax, Pika, Hailuo.
- */
+/** Text-to-video endpoint for each model. */
 const FAL_ENDPOINTS: Record<string, string> = {
-  kling: "fal-ai/kling-video/v2/standard/text-to-video",
-  minimax: "fal-ai/minimax/video-01-live",
-  pika: "fal-ai/pika-v2/text-to-video",
-  hailuo: "fal-ai/hailuo-ai/video-01",
-  wan: "fal-ai/wan/v2.1/text-to-video",
+  kling: "fal-ai/kling-video/v3/standard/text-to-video",
+  "kling-pro": "fal-ai/kling-video/v3/pro/text-to-video",
+  pika: "fal-ai/pika/v2.2/text-to-video",
+  seedance: "fal-ai/bytedance/seedance/v1.5/pro/text-to-video",
 };
 
+/** Image-to-video endpoint. Falls back to the T2V endpoint when absent. */
+const FAL_I2V_ENDPOINTS: Record<string, string> = {
+  kling: "fal-ai/kling-video/v3/standard/image-to-video",
+  "kling-pro": "fal-ai/kling-video/v3/pro/image-to-video",
+  seedance: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
+  pika: "fal-ai/pika/v2.2/image-to-video",
+};
+
+/** Kling Motion Control endpoints — dedicated, no T2V/I2V split. */
+const FAL_MOTION_ENDPOINTS: Record<string, string> = {
+  "kling-motion": "fal-ai/kling-video/v3/standard/motion-control",
+  "kling-motion-pro": "fal-ai/kling-video/v3/pro/motion-control",
+};
+
+/** Separator used to pack endpoint+requestId into a single opaque string. */
+const SEP = "||";
+
+function isVideoUrl(url: string): boolean {
+  return /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url);
+}
+
 export class FalVideoAdapter implements VideoAdapter {
+  // FAL SDK глобальный config — proxy на MVP не поддерживается, fetchFn игнорируется.
   constructor(
     readonly modelId: string,
     apiKey = config.ai.fal,
+    _fetchFn?: typeof globalThis.fetch,
   ) {
     fal.config({ credentials: apiKey });
   }
 
-  private get endpoint(): string {
-    return FAL_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`;
+  private selectEndpoint(input: VideoInput): string {
+    if (FAL_MOTION_ENDPOINTS[this.modelId]) {
+      return FAL_MOTION_ENDPOINTS[this.modelId];
+    }
+    if (!FAL_I2V_ENDPOINTS[this.modelId]) {
+      return FAL_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`;
+    }
+    const mi = input.mediaInputs ?? {};
+    const hasMedia =
+      !!mi.first_frame?.length ||
+      !!mi.last_frame?.length ||
+      !!input.imageUrl ||
+      Object.keys(mi).some((k) => k.startsWith("ref_element_") && mi[k]?.length);
+    return hasMedia
+      ? FAL_I2V_ENDPOINTS[this.modelId]
+      : (FAL_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`);
   }
 
   async submit(input: VideoInput): Promise<string> {
-    const { request_id } = await fal.queue.submit(this.endpoint, {
-      input: {
-        prompt: input.prompt,
-        ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
-        ...(input.duration ? { duration: input.duration } : {}),
-        ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
-      },
-    });
-    return request_id;
+    const imageUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+    const ms = input.modelSettings ?? {};
+    const msExtras: Record<string, unknown> = {};
+    if (ms.cfg_scale !== undefined) msExtras.cfg_scale = ms.cfg_scale;
+    if (ms.negative_prompt) msExtras.negative_prompt = ms.negative_prompt;
+    if (ms.generate_audio !== undefined) msExtras.generate_audio = ms.generate_audio;
+    if (ms.resolution) msExtras.resolution = ms.resolution;
+    if (ms.motion_strength !== undefined) msExtras.motion_strength = ms.motion_strength;
+    if (ms.seed != null) msExtras.seed = ms.seed;
+
+    // ── Kling Motion Control ─────────────────────────────────────────────────
+    if (FAL_MOTION_ENDPOINTS[this.modelId]) {
+      const motionImageUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+      const motionVideoUrl = input.mediaInputs?.motion_video?.[0];
+      const orientation = (ms.character_orientation as string) ?? "video";
+      const keepSound = ms.keep_original_sound !== undefined ? ms.keep_original_sound : true;
+
+      const motionInput: Record<string, unknown> = {
+        image_url: motionImageUrl,
+        video_url: motionVideoUrl,
+        character_orientation: orientation,
+        keep_original_sound: keepSound,
+      };
+      if (input.prompt) motionInput.prompt = input.prompt;
+
+      // Elements: only supported when character_orientation="video", max 1.
+      // KlingV3ImageElementInput uses frontal_image_url + reference_image_urls (same as i2v).
+      if (orientation === "video") {
+        const elemUrls = input.mediaInputs?.ref_element_1 ?? [];
+        if (elemUrls.length > 0) {
+          const [frontal, ...refs] = elemUrls;
+          if (frontal) {
+            motionInput.elements = [
+              {
+                frontal_image_url: frontal,
+                reference_image_urls: refs.length > 0 ? refs.slice(0, 3) : [frontal],
+              },
+            ];
+          }
+        }
+      }
+
+      const endpoint = FAL_MOTION_ENDPOINTS[this.modelId];
+      logCall(endpoint, "submit", motionInput);
+      const { request_id } = await fal.queue.submit(endpoint, { input: motionInput });
+      return `${endpoint}${SEP}${request_id}`;
+    }
+
+    const klingExtras: Record<string, unknown> = {};
+    if (this.modelId === "kling" || this.modelId === "kling-pro") {
+      const lastFrame = input.mediaInputs?.last_frame?.[0];
+      if (lastFrame) klingExtras.end_image_url = lastFrame;
+
+      const elements: Array<Record<string, unknown>> = [];
+      for (let i = 1; i <= 5; i++) {
+        const urls = input.mediaInputs?.[`ref_element_${i}`] ?? [];
+        if (urls.length === 0) continue;
+        const videoUrl = urls.find((u) => isVideoUrl(u));
+        if (videoUrl) {
+          elements.push({ video_url: videoUrl });
+          continue;
+        }
+        const [frontal, ...refs] = urls;
+        if (!frontal) continue;
+        elements.push({
+          frontal_image_url: frontal,
+          reference_image_urls: refs.length > 0 ? refs.slice(0, 3) : [frontal],
+        });
+      }
+      if (elements.length > 0) klingExtras.elements = elements;
+    }
+
+    // Seedance 1.5: last_frame → end_image_url (i2v).
+    const seedanceExtras: Record<string, unknown> = {};
+    if (this.modelId === "seedance") {
+      const lastFrame = input.mediaInputs?.last_frame?.[0];
+      if (lastFrame) seedanceExtras.end_image_url = lastFrame;
+    }
+
+    const endpoint = this.selectEndpoint(input);
+
+    const falInput = {
+      prompt: input.prompt,
+      ...(imageUrl ? { image_url: imageUrl } : {}),
+      ...(input.duration ? { duration: input.duration } : {}),
+      ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
+      ...msExtras,
+      ...klingExtras,
+      ...seedanceExtras,
+    };
+    logCall(endpoint, "submit", falInput);
+    const { request_id } = await fal.queue.submit(endpoint, { input: falInput });
+    return `${endpoint}${SEP}${request_id}`;
   }
 
-  async poll(requestId: string): Promise<VideoResult | null> {
-    const status = await fal.queue.status(this.endpoint, {
+  async poll(providerJobId: string): Promise<VideoResult | null> {
+    // Support legacy plain request_id format (pre-encoding) for backwards compat
+    let endpoint: string;
+    let requestId: string;
+    if (providerJobId.includes(SEP)) {
+      const sepIdx = providerJobId.lastIndexOf(SEP);
+      endpoint = providerJobId.slice(0, sepIdx);
+      requestId = providerJobId.slice(sepIdx + SEP.length);
+    } else {
+      endpoint = FAL_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`;
+      requestId = providerJobId;
+    }
+
+    logCall(this.modelId, "poll", { requestId, endpoint });
+
+    const status = await fal.queue.status(endpoint, {
       requestId,
       logs: false,
     });
 
     if (status.status !== "COMPLETED") return null;
 
-    const result = await fal.queue.result(this.endpoint, { requestId });
+    const result = await fal.queue.result(endpoint, { requestId });
     const data = result.data as { video?: { url: string }; video_url?: string };
     const url = data.video?.url ?? data.video_url;
     if (!url) throw new Error(`FAL video: no URL in result for ${this.modelId}`);

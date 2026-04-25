@@ -1,41 +1,43 @@
-import OpenAI from "openai";
-import type {
-  LLMAdapter,
-  LLMInput,
-  LLMOutput,
-  MessageRecord,
-  StreamResult,
+import OpenAI, { type ClientOptions as OpenAIClientOptions } from "openai";
+import {
+  BaseLLMAdapter,
+  type LLMInput,
+  type LLMOutput,
+  type MessageRecord,
+  type StreamResult,
 } from "./base.adapter.js";
 import { config } from "@metabox/shared";
+import { logCall } from "../../utils/fetch.js";
 
 const MODEL_MAP: Record<string, string> = {
-  "grok-3": "grok-3",
-  "grok-3-mini": "grok-3-mini",
-  "grok-4": "grok-4",
-  "grok-3-deep-search": "grok-3-deepsearch",
-  "grok-3-reasoner": "grok-3-reasoner",
-  "grok-3-image": "aurora",
+  "grok-4": "grok-4.20",
+  "grok-4-fast": "grok-4-1-fast",
 };
 
 /**
  * xAI Grok adapter (db_history strategy).
  * Uses OpenAI-compatible API via xAI.
  */
-export class GrokAdapter implements LLMAdapter {
+export class GrokAdapter extends BaseLLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
+  protected readonly modelId: string;
 
   private client: OpenAI;
   private apiModel: string;
 
   constructor(
-    private readonly modelId: string,
+    modelId: string,
     contextMaxMessages = 40,
     apiKey = config.ai.grok,
+    fetchFn?: typeof globalThis.fetch,
   ) {
+    super();
+    this.modelId = modelId;
     this.client = new OpenAI({
       apiKey,
       baseURL: "https://api.x.ai/v1",
+      ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
     });
     this.apiModel = MODEL_MAP[modelId] ?? modelId;
     this.contextMaxMessages = contextMaxMessages;
@@ -50,7 +52,9 @@ export class GrokAdapter implements LLMAdapter {
   }
 
   async *chatStream(input: LLMInput): AsyncGenerator<string, StreamResult, unknown> {
+    input = this.truncateInput(input);
     const messages: OpenAI.ChatCompletionMessageParam[] = [
+      ...(input.systemPrompt ? [{ role: "system" as const, content: input.systemPrompt }] : []),
       ...(input.history ?? []).map((m: MessageRecord) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
@@ -58,11 +62,24 @@ export class GrokAdapter implements LLMAdapter {
       { role: "user", content: input.prompt },
     ];
 
-    const stream = await this.client.chat.completions.create({
+    logCall(this.apiModel, "chatStream", {
+      temperature: input.temperature,
+      max_tokens: input.maxTokens,
+      messages_count: messages.length,
+      reasoning_effort: input.reasoningEffort,
+    });
+    const stream = await (
+      this.client.chat.completions.create as (
+        p: unknown,
+      ) => Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>>
+    )({
       model: this.apiModel,
       messages,
       stream: true,
       stream_options: { include_usage: true },
+      ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+      ...(input.maxTokens !== undefined ? { max_tokens: input.maxTokens } : {}),
+      ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
     });
 
     let inputTokensUsed = 0;

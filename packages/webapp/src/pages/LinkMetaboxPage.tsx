@@ -48,6 +48,10 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mergeBlockedModal, setMergeBlockedModal] = useState<{
+    siteMentor: { name: string; contact: string };
+    botMentor: { name: string; contact: string };
+  } | null>(null);
 
   const submit = async () => {
     if (!email.trim() || !password) return;
@@ -73,10 +77,40 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       openSso(result.ssoUrl);
       onSuccess?.();
       onBack();
-    } catch (err) {
-      const code = (err as Error & { code?: string }).code;
-      const key = code ? ERROR_MAP[code] : undefined;
-      setError(key ? t(key) : t("linkMetabox.error"));
+    } catch (err: any) {
+      const code = err?.code;
+      const supportTg = import.meta.env.VITE_SUPPORT_TG ?? "metaboxsupport";
+      if (code === "MERGE_BLOCKED") {
+        const sm = err?.siteMentor || {};
+        const bm = err?.botMentor || {};
+        setMergeBlockedModal({
+          siteMentor: { name: sm.name || "Неизвестен", contact: sm.contact || "" },
+          botMentor: { name: bm.name || "Неизвестен", contact: bm.contact || "" },
+        });
+      } else if (code === "MENTOR_CONFLICT") {
+        const sm = err?.siteMentor || {};
+        const bm = err?.botMentor || {};
+        const siteInfo = sm.contact ? `${sm.name} (${sm.contact})` : sm.name || "Неизвестен";
+        const botInfo = bm.contact ? `${bm.name} (${bm.contact})` : bm.name || "Неизвестен";
+        setError(
+          `Конфликт наставников. На сайте: ${siteInfo}, в боте: ${botInfo}. Для объединения перейдите по кнопке AI Box на сайте Metabox.`,
+        );
+      } else if (code === "TELEGRAM_MISMATCH" && err?.linkedTo) {
+        const lt = err.linkedTo;
+        const tgInfo = lt.telegramUsername ? `@${lt.telegramUsername}` : lt.telegramPhone || "";
+        setError(
+          `Этот аккаунт уже привязан к другому Telegram${tgInfo ? ` (${tgInfo})` : ""}. Войдите с того Telegram или обратитесь в поддержку @${supportTg}`,
+        );
+      } else if (code === "TELEGRAM_LINKED" && err?.linkedTo) {
+        const lt = err.linkedTo;
+        const tgInfo = lt.telegramUsername ? `@${lt.telegramUsername}` : lt.telegramPhone || "";
+        setError(
+          `На аккаунте ${lt.name || email}${tgInfo ? ` (${tgInfo})` : ""} уже привязан другой Telegram. Обратитесь в поддержку @${supportTg}`,
+        );
+      } else {
+        const key = code ? ERROR_MAP[code] : undefined;
+        setError(key ? t(key) : t("linkMetabox.error"));
+      }
     } finally {
       setLoading(false);
     }
@@ -155,6 +189,80 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
           <button className="secondary-btn" onClick={() => setMode("choose")} disabled={loading}>
             {t("common.back")}
           </button>
+        </div>
+      )}
+      {/* MERGE_BLOCKED modal */}
+      {mergeBlockedModal && (
+        <div className="modal-overlay" onClick={() => setMergeBlockedModal(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setMergeBlockedModal(null)}>
+              ✕
+            </button>
+            <h3 className="modal-title">⛔ Невозможно объединить аккаунты</h3>
+            <p className="modal-text">У вас разные наставники и на обоих аккаунтах есть покупки.</p>
+            <div className="modal-mentor">
+              <span className="modal-mentor-label">Наставник на сайте:</span>
+              <span className="modal-mentor-name">
+                <b>{mergeBlockedModal.siteMentor.name}</b>
+                {mergeBlockedModal.siteMentor.contact &&
+                  (mergeBlockedModal.siteMentor.contact.startsWith("@") ? (
+                    <>
+                      {" "}
+                      (
+                      <a
+                        href={`https://t.me/${mergeBlockedModal.siteMentor.contact.slice(1)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="modal-link"
+                      >
+                        {mergeBlockedModal.siteMentor.contact}
+                      </a>
+                      )
+                    </>
+                  ) : (
+                    <> ({mergeBlockedModal.siteMentor.contact})</>
+                  ))}
+              </span>
+            </div>
+            <div className="modal-mentor">
+              <span className="modal-mentor-label">Наставник в боте:</span>
+              <span className="modal-mentor-name">
+                <b>{mergeBlockedModal.botMentor.name}</b>
+                {mergeBlockedModal.botMentor.contact &&
+                  (mergeBlockedModal.botMentor.contact.startsWith("@") ? (
+                    <>
+                      {" "}
+                      (
+                      <a
+                        href={`https://t.me/${mergeBlockedModal.botMentor.contact.slice(1)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="modal-link"
+                      >
+                        {mergeBlockedModal.botMentor.contact}
+                      </a>
+                      )
+                    </>
+                  ) : (
+                    <> ({mergeBlockedModal.botMentor.contact})</>
+                  ))}
+              </span>
+            </div>
+            <p className="modal-support">
+              Если у вас есть вопросы — обратитесь в поддержку:{" "}
+              <a
+                href={`https://t.me/${import.meta.env.VITE_SUPPORT_TG ?? "metaboxsupport"}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="modal-link"
+              >
+                @{import.meta.env.VITE_SUPPORT_TG ?? "metaboxsupport"}
+              </a>
+            </p>
+            <button className="primary-btn" onClick={() => setMergeBlockedModal(null)}>
+              Понятно
+            </button>
+          </div>
         </div>
       )}
     </div>

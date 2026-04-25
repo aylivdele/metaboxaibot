@@ -1,0 +1,190 @@
+import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
+import { config } from "@metabox/shared";
+import { fetchWithLog } from "../../utils/fetch.js";
+
+const DASHSCOPE_BASE = "https://dashscope-intl.aliyuncs.com/api/v1";
+const SUBMIT_PATH = "/services/aigc/video-generation/video-synthesis";
+
+const T2V_MODEL = "wan2.7-t2v";
+const I2V_MODEL = "wan2.7-i2v";
+
+interface WanMediaAsset {
+  type: "first_frame" | "last_frame" | "driving_audio" | "first_clip";
+  url: string;
+}
+
+/**
+ * Valid media-type combinations accepted by wan2.7-i2v. Any other combination
+ * must be rejected before submit to avoid a 4xx from DashScope.
+ */
+const VALID_WAN_COMBINATIONS: ReadonlyArray<ReadonlySet<WanMediaAsset["type"]>> = [
+  new Set(["first_frame"]),
+  new Set(["first_frame", "driving_audio"]),
+  new Set(["first_frame", "last_frame"]),
+  new Set(["first_frame", "last_frame", "driving_audio"]),
+  new Set(["first_clip"]),
+  new Set(["first_clip", "last_frame"]),
+];
+
+function isValidWanCombination(types: WanMediaAsset["type"][]): boolean {
+  const set = new Set(types);
+  if (set.size !== types.length) return false; // duplicates not allowed
+  return VALID_WAN_COMBINATIONS.some((v) => v.size === set.size && [...set].every((t) => v.has(t)));
+}
+
+/**
+ * Size strings for text-to-video (T2V) — resolution tier × aspect ratio → "W*H".
+ * Image-to-video uses a plain "resolution" keyword (720P / 1080P) since
+ * the output aspect ratio is determined by the input image.
+ */
+const T2V_SIZE_MAP: Record<string, Record<string, string>> = {
+  "720P": {
+    "16:9": "1280*720",
+    "9:16": "720*1280",
+    "1:1": "960*960",
+    "4:3": "1088*832",
+    "3:4": "832*1088",
+  },
+  "1080P": {
+    "16:9": "1920*1080",
+    "9:16": "1080*1920",
+    "1:1": "1440*1440",
+    "4:3": "1632*1248",
+    "3:4": "1248*1632",
+  },
+};
+
+interface DashScopeSubmitResponse {
+  output: { task_id: string; task_status: string };
+  request_id?: string;
+  code?: string;
+  message?: string;
+}
+
+interface DashScopePollResponse {
+  output: {
+    task_status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | string;
+    video_url?: string;
+    message?: string;
+  };
+}
+
+/**
+ * Alibaba DashScope adapter for Wan 2.6 video generation.
+ * Automatically selects:
+ *   - wan2.6-t2v  when no image is attached (text-to-video)
+ *   - wan2.6-i2v  when an image is attached (image-to-video)
+ * Docs: https://www.alibabacloud.com/help/en/model-studio/developer-reference/wan2-6-api
+ */
+export class AlibabaVideoAdapter implements VideoAdapter {
+  private readonly apiKeyOverride: string | undefined;
+  private readonly fetchFn: typeof globalThis.fetch | undefined;
+
+  constructor(
+    readonly modelId: string,
+    apiKeyOverride?: string,
+    fetchFn?: typeof globalThis.fetch,
+  ) {
+    this.apiKeyOverride = apiKeyOverride;
+    this.fetchFn = fetchFn;
+  }
+
+  private get apiKey(): string {
+    const key = this.apiKeyOverride ?? config.ai.alibaba;
+    if (!key) throw new Error("ALIBABA_API_KEY not configured");
+    return key;
+  }
+
+  async submit(input: VideoInput): Promise<string> {
+    const ms = input.modelSettings ?? {};
+    const mi = input.mediaInputs ?? {};
+
+    const media: WanMediaAsset[] = [];
+    const firstFrame = mi.first_frame?.[0] ?? input.imageUrl;
+    if (firstFrame) media.push({ type: "first_frame", url: firstFrame });
+    const lastFrame = mi.last_frame?.[0];
+    if (lastFrame) media.push({ type: "last_frame", url: lastFrame });
+    const drivingAudio = mi.driving_audio?.[0];
+    if (drivingAudio) media.push({ type: "driving_audio", url: drivingAudio });
+    const firstClip = mi.first_clip?.[0];
+    if (firstClip) media.push({ type: "first_clip", url: firstClip });
+
+    const isI2V = media.length > 0;
+    if (isI2V && !isValidWanCombination(media.map((m) => m.type))) {
+      throw new Error(
+        `Wan 2.7: invalid media combination [${media.map((m) => m.type).join(", ")}]`,
+      );
+    }
+
+    const dashscopeModel = isI2V ? I2V_MODEL : T2V_MODEL;
+    const resolution = (ms.resolution as string | undefined) ?? "720P";
+    const duration = (ms.duration as number | undefined) ?? input.duration ?? 5;
+
+    const apiInput: Record<string, unknown> = { prompt: input.prompt };
+    if (isI2V) apiInput.media = media;
+    if (ms.negative_prompt) apiInput.negative_prompt = ms.negative_prompt;
+
+    const parameters: Record<string, unknown> = { duration };
+
+    if (isI2V) {
+      // wan2.7-i2v uses a resolution tier keyword; output aspect ratio is driven by input media.
+      parameters.resolution = resolution;
+    } else {
+      // T2V uses an exact pixel dimension string (resolution × aspect ratio)
+      const aspectRatio = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "16:9";
+      const size = T2V_SIZE_MAP[resolution]?.[aspectRatio] ?? T2V_SIZE_MAP["720P"]["16:9"];
+      parameters.size = size;
+    }
+
+    if (ms.prompt_extend !== undefined) parameters.prompt_extend = ms.prompt_extend;
+    if (ms.seed != null) parameters.seed = ms.seed;
+
+    const body = { model: dashscopeModel, input: apiInput, parameters };
+
+    const resp = await fetchWithLog(
+      `${DASHSCOPE_BASE}${SUBMIT_PATH}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+          "X-DashScope-Async": "enable",
+        },
+        body: JSON.stringify(body),
+      },
+      this.fetchFn,
+    );
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(`Alibaba DashScope error ${resp.status}: ${txt}`);
+    }
+
+    const data = (await resp.json()) as DashScopeSubmitResponse;
+    if (data.code) throw new Error(`Alibaba DashScope error: ${data.code} — ${data.message}`);
+    return data.output.task_id;
+  }
+
+  async poll(taskId: string): Promise<VideoResult | null> {
+    const resp = await fetchWithLog(
+      `${DASHSCOPE_BASE}/tasks/${taskId}`,
+      {
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+      },
+      this.fetchFn,
+    );
+
+    if (!resp.ok) throw new Error(`Alibaba poll error ${resp.status}`);
+
+    const data = (await resp.json()) as DashScopePollResponse;
+    const { task_status, video_url, message } = data.output;
+
+    if (task_status === "FAILED") {
+      throw new Error(`Alibaba Wan generation failed: ${message ?? "unknown error"}`);
+    }
+    if (task_status !== "SUCCEEDED") return null;
+    if (!video_url) throw new Error("Alibaba Wan: no video URL in result");
+
+    return { url: video_url, filename: "wan.mp4" };
+  }
+}
