@@ -8,10 +8,12 @@ type ManageTab = "gpt" | "design" | "video" | "audio" | "uploads";
 
 export function ManagementPage({
   initialSection,
+  initialModelId,
   initialAction,
   finishedOnboarding,
 }: {
   initialSection?: string;
+  initialModelId?: string;
   initialAction?: string;
   finishedOnboarding: boolean;
 }) {
@@ -62,10 +64,10 @@ export function ManagementPage({
       </div>
       <div className="manage-content">
         {tab === "gpt" && <GptManagementView initialAction={initialAction} />}
-        {tab === "design" && <MediaSettingsView section="design" />}
-        {tab === "video" && <MediaSettingsView section="video" />}
+        {tab === "design" && <MediaSettingsView section="design" initialModelId={initialModelId} />}
+        {tab === "video" && <MediaSettingsView section="video" initialModelId={initialModelId} />}
         {tab === "audio" && (
-          <MediaSettingsView section="audio" initialModelId={audioInitialModel} />
+          <MediaSettingsView section="audio" initialModelId={audioInitialModel ?? initialModelId} />
         )}
         {tab === "uploads" && <VoicesView onGoToVoiceClone={() => goToAudioModel("voice-clone")} />}
       </div>

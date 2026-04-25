@@ -230,6 +230,8 @@ const translations = {
     "gallery.costTokens": "tokens",
     "gallery.costUnknown": "—",
     "gallery.morePhotos": "+{n}",
+    "gallery.emptyModel": "You haven't generated anything with this AI yet",
+    "gallery.tryModel": "Try it",
 
     // Settings
     "settings.title": "Account Settings",
@@ -589,6 +591,8 @@ const translations = {
     "gallery.costTokens": "токенов",
     "gallery.costUnknown": "—",
     "gallery.morePhotos": "+{n}",
+    "gallery.emptyModel": "Вы ещё ничего не генерировали с этой нейросетью",
+    "gallery.tryModel": "Попробовать",
 
     // Settings
     "settings.title": "Настройки аккаунта",

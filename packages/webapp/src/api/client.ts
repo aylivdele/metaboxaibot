@@ -230,11 +230,12 @@ export const api = {
   },
 
   gallery: {
-    list: (params: { section?: string; page?: number; limit?: number }) => {
+    list: (params: { section?: string; page?: number; limit?: number; modelId?: string }) => {
       const qs = new URLSearchParams();
       if (params.section) qs.set("section", params.section);
       if (params.page) qs.set("page", String(params.page));
       if (params.limit) qs.set("limit", String(params.limit));
+      if (params.modelId) qs.set("modelId", params.modelId);
       return request<GalleryResponse>(`/gallery?${qs.toString()}`);
     },
     sendJob: (jobId: string) =>
@@ -244,6 +245,10 @@ export const api = {
       request<{ url: string }>(`/gallery/outputs/${outputId}/original-url`),
     deleteJob: (jobId: string) =>
       request<{ success: boolean }>(`/gallery/jobs/${jobId}`, { method: "DELETE" }),
+    modelCounts: (section?: string) =>
+      request<{ modelId: string; count: number }[]>(
+        `/gallery/model-counts${section ? `?section=${encodeURIComponent(section)}` : ""}`,
+      ),
   },
 
   imageSettings: {
