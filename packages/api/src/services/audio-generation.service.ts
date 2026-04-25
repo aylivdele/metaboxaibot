@@ -1,5 +1,4 @@
 import { db } from "../db.js";
-import { ElevenLabsAdapter } from "../ai/audio/factory.js";
 import { getAudioQueue } from "../queues/audio.queue.js";
 import { AI_MODELS, ONE_SHOT_SETTING_KEYS } from "@metabox/shared";
 import { checkBalance, calculateCost } from "./token.service.js";
@@ -69,28 +68,8 @@ export const audioGenerationService = {
       },
     });
 
-    // If tts-el is using a cloned voice, ensure the EL voice slot still exists
-    let resolvedModelSettings = modelSettings;
-    if (modelId === "tts-el") {
-      const selectedVoiceId = modelSettings.voice_id as string | undefined;
-      if (selectedVoiceId) {
-        const userVoice = await db.userVoice.findFirst({
-          where: { userId, externalId: selectedVoiceId, provider: "elevenlabs" },
-          select: { id: true, externalId: true, audioS3Key: true },
-        });
-        if (userVoice) {
-          const freshVoiceId = await ElevenLabsAdapter.ensureVoiceExists(
-            userVoice.id,
-            userVoice.externalId!,
-            userVoice.audioS3Key,
-          );
-          if (freshVoiceId !== selectedVoiceId) {
-            resolvedModelSettings = { ...modelSettings, voice_id: freshVoiceId };
-          }
-        }
-      }
-    }
-
+    // Voice slot resolution для tts-el на cloned-voice выполняется в воркере
+    // через resolveVoiceForTTS — там же sticky-ключ + re-clone из audioS3Key.
     const queue = getAudioQueue();
     await queue.add(
       "generate",
@@ -102,7 +81,7 @@ export const audioGenerationService = {
         voiceId,
         sourceAudioUrl,
         telegramChatId,
-        modelSettings: resolvedModelSettings,
+        modelSettings,
       },
       {
         jobId: job.id,

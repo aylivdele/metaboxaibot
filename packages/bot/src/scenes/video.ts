@@ -16,6 +16,8 @@ import { probeVideoMetadata } from "@metabox/api/utils/mp4-duration";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
+import { resolveVoiceForTTS } from "@metabox/api/services/user-voice";
+import { db } from "@metabox/api/db";
 import { getAvatarQueue } from "@metabox/api/queues";
 import {
   MODELS_BY_SECTION,
@@ -130,18 +132,39 @@ async function preGenerateELTts(
   if (rawVoiceOverride) return null; // raw audio takes priority
   if (videoModelSettings.voice_s3key as string | undefined) return null;
 
-  const voiceId = videoModelSettings.voice_id as string | undefined;
+  const requestedVoice = videoModelSettings.voice_id as string | undefined;
   const voiceProvider = videoModelSettings.voice_provider as string | undefined;
-  if (!voiceId || voiceProvider !== "elevenlabs") return null;
+  if (!requestedVoice || voiceProvider !== "elevenlabs") return null;
 
   const ttsModel = AI_MODELS["tts-el"];
   if (!ttsModel) return null;
+
+  // Resolve UserVoice cuid → ElevenLabs externalId + sticky API key.
+  // Pickers send `UserVoice.id` (local cuid). Legacy paths may send raw EL
+  // externalId — try both. Если ничего не нашли — это официальный EL-голос,
+  // используем env-fallback ключ.
+  let resolvedVoiceId = requestedVoice;
+  let stickyApiKey: string | undefined;
+  const userVoice =
+    (await db.userVoice.findFirst({
+      where: { id: requestedVoice, provider: "elevenlabs" },
+      select: { id: true },
+    })) ??
+    (await db.userVoice.findFirst({
+      where: { provider: "elevenlabs", externalId: requestedVoice },
+      select: { id: true },
+    }));
+  if (userVoice) {
+    const resolved = await resolveVoiceForTTS(userVoice.id);
+    resolvedVoiceId = resolved.voiceId;
+    stickyApiKey = resolved.acquired.apiKey;
+  }
 
   // Get user's tts-el settings (model_id, stability, etc.) and override voice_id
   const allSettings = await userStateService.getModelSettings(userId);
   const ttsSettings: Record<string, unknown> = {
     ...(allSettings["tts-el"] ?? {}),
-    voice_id: voiceId,
+    voice_id: resolvedVoiceId,
   };
 
   // Check balance for TTS before generating
@@ -157,8 +180,9 @@ async function preGenerateELTts(
   );
   await checkBalance(userId, ttsCost);
 
-  // Generate TTS
-  const adapter = new ElevenLabsAdapter("tts-el");
+  // Generate TTS using sticky key when voice is user-cloned (it lives only on
+  // that key's EL account); fallback to env key for official voices.
+  const adapter = new ElevenLabsAdapter("tts-el", stickyApiKey);
   const result = await adapter.generate({ prompt, modelSettings: ttsSettings });
   if (!result.buffer) return null;
 
