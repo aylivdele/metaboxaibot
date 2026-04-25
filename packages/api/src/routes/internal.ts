@@ -258,9 +258,7 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
     };
 
     if (!telegramId || typeof tokens !== "number" || tokens <= 0) {
-      return reply
-        .code(400)
-        .send({ error: "telegramId and positive tokens are required" });
+      return reply.code(400).send({ error: "telegramId and positive tokens are required" });
     }
 
     const userId = BigInt(telegramId);
