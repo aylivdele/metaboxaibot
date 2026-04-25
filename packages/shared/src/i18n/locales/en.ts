@@ -157,6 +157,8 @@ export default {
       "🖼 Attach a photo via the «First Frame» button below — the video will be built from it.\n✉️ Then send a text prompt describing the video you want.\nYou can also pick several motion presets in the ⚙ Management section.",
     higgsfieldRequiresImage:
       "❌ Higgsfield requires an image to generate video. Please send a photo first, then your text prompt.",
+    promptTooLong:
+      "❌ Prompt is too long — this model supports up to {limit} characters. Please shorten your text and try again.",
     runwayRequiresImage:
       "❌ Runway requires an image to generate video. Please send a photo first, then your text prompt.",
     heygenNeedsVoice:

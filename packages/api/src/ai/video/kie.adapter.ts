@@ -1,4 +1,9 @@
-import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
+import type {
+  VideoAdapter,
+  VideoInput,
+  VideoValidationError,
+  VideoResult,
+} from "./base.adapter.js";
 import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { uploadFileUrl } from "../../utils/kie-upload.js";
@@ -86,6 +91,20 @@ export class KieVideoAdapter implements VideoAdapter {
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
     };
+  }
+
+  private get promptMaxLength(): number {
+    if (this.modelId.startsWith("kling")) return 2500;
+    if (this.modelId.startsWith("grok-imagine")) return 5000;
+    return 20000;
+  }
+
+  validateRequest(input: VideoInput): VideoValidationError | null {
+    const limit = this.promptMaxLength;
+    if (input.prompt && input.prompt.length > limit) {
+      return { key: "promptTooLong", params: { limit } };
+    }
+    return null;
   }
 
   async submit(input: VideoInput): Promise<string> {
