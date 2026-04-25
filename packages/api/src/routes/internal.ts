@@ -239,6 +239,67 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * POST /internal/decrement-tokens
+   * Called by Metabox admin when rolling back a token-pack purchase
+   * (AiBotOrder / Order with token-pack). Decrements regular tokenBalance
+   * by `tokens`, FLOORED at 0 (если юзер уже потратил часть пачки —
+   * списываем сколько есть, в минус не уходим).
+   *
+   * НЕ трогает subscriptionTokenBalance и LocalSubscription — для
+   * подписок отдельный путь /revoke-tokens.
+   *
+   * Body: { telegramId: string, tokens: number, description?: string }
+   */
+  fastify.post("/decrement-tokens", async (request, reply) => {
+    const { telegramId, tokens, description } = request.body as {
+      telegramId: string;
+      tokens: number;
+      description?: string;
+    };
+
+    if (!telegramId || typeof tokens !== "number" || tokens <= 0) {
+      return reply
+        .code(400)
+        .send({ error: "telegramId and positive tokens are required" });
+    }
+
+    const userId = BigInt(telegramId);
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return { ok: true, deducted: 0, newBalance: 0 };
+    }
+
+    const currentBalance = Number(user.tokenBalance);
+    const actualDeduct = Math.min(currentBalance, tokens);
+
+    if (actualDeduct === 0) {
+      return { ok: true, deducted: 0, newBalance: currentBalance };
+    }
+
+    await db.$transaction([
+      db.user.update({
+        where: { id: userId },
+        data: { tokenBalance: { decrement: actualDeduct } },
+      }),
+      db.tokenTransaction.create({
+        data: {
+          userId,
+          amount: -actualDeduct,
+          type: "debit",
+          reason: "metabox_rollback",
+          description: description || null,
+        },
+      }),
+    ]);
+
+    return {
+      ok: true,
+      deducted: actualDeduct,
+      newBalance: currentBalance - actualDeduct,
+    };
+  });
+
+  /**
    * POST /internal/reset-token-balance
    * Sets user token balance to exactly 0. Used when admin disconnects TG
    * and transfers all tokens to site. More reliable than decrement.
