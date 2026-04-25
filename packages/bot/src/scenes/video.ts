@@ -594,6 +594,11 @@ export async function handleVideoMediaInputRemove(ctx: BotContext): Promise<void
 
 // ── Incoming prompt in VIDEO_ACTIVE state ─────────────────────────────────────
 
+function applyValidationParams(msg: string, params?: Record<string, string | number>): string {
+  if (!params) return msg;
+  return Object.entries(params).reduce((s, [k, v]) => s.replaceAll(`{${k}}`, String(v)), msg);
+}
+
 /**
  * Executes a text prompt in the active video session.
  * Used by handleVideoMessage (text) and the voice-prompt callback.
@@ -637,6 +642,35 @@ export async function executeVideoPrompt(
     }
   }
 
+  // Resolve full model settings before any state mutations so validation sees
+  // the complete picture (voice provider, avatar id, etc.).
+  const allModelSettings = await userStateService.getModelSettings(ctx.user.id);
+  const fullModelSettings = allModelSettings[modelId] ?? {};
+
+  // Validate before consuming any state — user keeps media inputs if rejected.
+  // Peek at one-shot refs via the state row already fetched above (no extra DB call).
+  const validationError = videoGenerationService.validateVideoRequest(
+    {
+      modelId,
+      prompt,
+      imageUrl: state?.videoRefImageUrl ?? undefined,
+      aspectRatio: modelSettings?.aspectRatio,
+      duration: modelSettings?.duration,
+      modelSettings: fullModelSettings,
+      userId: ctx.user.id,
+    },
+    { hasVoiceFile: !!state?.videoRefVoiceUrl },
+  );
+  if (validationError) {
+    await ctx.reply(
+      applyValidationParams(
+        ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string,
+        validationError.params,
+      ),
+    );
+    return;
+  }
+
   // Clear media inputs for this model (consumed on generation start)
   if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id, modelId);
 
@@ -647,10 +681,6 @@ export async function executeVideoPrompt(
   // For HeyGen/D-ID: pick up any previously saved raw voice recording (one-shot)
   const rawVoiceS3Key =
     (await userStateService.getAndClearVideoRefVoiceUrl(ctx.user.id)) ?? undefined;
-
-  // Resolve full model settings (webapp-saved) for EL TTS check
-  const allModelSettings = await userStateService.getModelSettings(ctx.user.id);
-  const fullModelSettings = allModelSettings[modelId] ?? {};
 
   const pendingMsg = await ctx.reply(pickVideoPending(ctx));
 
@@ -679,27 +709,6 @@ export async function executeVideoPrompt(
 
     // Build voice override: raw recording > EL TTS > nothing (adapter uses configured voice_id)
     const effectiveVoiceS3Key = rawVoiceS3Key ?? elTtsS3Key ?? undefined;
-
-    const validationError = videoGenerationService.validateVideoRequest(
-      {
-        modelId,
-        prompt,
-        imageUrl,
-        aspectRatio: modelSettings?.aspectRatio,
-        duration: modelSettings?.duration,
-        modelSettings: {
-          ...fullModelSettings,
-          ...(effectiveVoiceS3Key ? { voice_s3key: effectiveVoiceS3Key } : {}),
-        },
-        userId: ctx.user.id,
-      },
-      { hasVoiceFile: !!effectiveVoiceS3Key },
-    );
-    if (validationError) {
-      await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
-      await ctx.reply(ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string);
-      return;
-    }
 
     await videoGenerationService.submitVideo({
       userId: ctx.user.id,
@@ -1053,7 +1062,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       { hasVoiceFile: false },
     );
     if (validationError) {
-      await ctx.reply(ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string);
+      await ctx.reply(applyValidationParams(ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string, validationError.params));
       return;
     }
 
@@ -1519,7 +1528,7 @@ export async function handleVideoAvatarVoiceCallback(ctx: BotContext): Promise<v
     { hasVoiceFile: true },
   );
   if (validationError) {
-    await ctx.reply(ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string);
+    await ctx.reply(applyValidationParams(ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string, validationError.params));
     return;
   }
 
