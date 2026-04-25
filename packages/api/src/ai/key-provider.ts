@@ -20,6 +20,7 @@ export function resolveKeyProvider(modelId: string): string {
   }
   if (provider === "suno") return "apipass";
   if (provider === "xai") return "grok"; // env-переменная — GROK_API_KEY
+  if (provider === "kie-claude") return "kie"; // Claude через kie использует общий kie-ключ
 
   return provider;
 }
