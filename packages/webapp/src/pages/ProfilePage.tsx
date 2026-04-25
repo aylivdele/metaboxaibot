@@ -4,9 +4,17 @@ import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { TranslationKey } from "../i18n.js";
 // import { BannerSlider } from "../components/BannerSlider.js";
-import type { UserProfile, GalleryJob, GalleryOutput, Model, ModelSettingDef } from "../types.js";
+import type {
+  UserProfile,
+  GalleryJob,
+  GalleryOutput,
+  GalleryFolder,
+  Model,
+  ModelSettingDef,
+} from "../types.js";
 import { openExternalLink } from "../utils/telegram.js";
 import { SETTING_TRANSLATIONS } from "@metabox/shared-browser";
+import { StyledSelect } from "../components/management/StyledSelect.js";
 
 export type ProfileTab = "overview" | "gallery" | "account";
 
@@ -38,7 +46,13 @@ const REASON_KEYS: Record<string, string> = {
   soul_creation: "profile.reason.soul_creation",
 };
 
-export function ProfilePage({ initialSection }: { initialSection?: ProfileTab }) {
+export function ProfilePage({
+  initialSection,
+  onGoToManagement,
+}: {
+  initialSection?: ProfileTab;
+  onGoToManagement?: (section: string, modelId: string) => void;
+}) {
   const { t } = useI18n();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,7 +106,7 @@ export function ProfilePage({ initialSection }: { initialSection?: ProfileTab })
       </div>
 
       {activeTab === "overview" && <OverviewTab profile={profile} />}
-      {activeTab === "gallery" && <GalleryTab />}
+      {activeTab === "gallery" && <GalleryTab onGoToManagement={onGoToManagement} />}
       {activeTab === "account" && <AccountTab profile={profile} />}
     </div>
   );
@@ -220,9 +234,14 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
 const SECTIONS = ["image", "audio", "video"] as const;
 type Section = (typeof SECTIONS)[number];
 
-function GalleryTab() {
+function GalleryTab({
+  onGoToManagement,
+}: {
+  onGoToManagement?: (section: string, modelId: string) => void;
+}) {
   const { t, locale } = useI18n();
   const [section, setSection] = useState<Section>("image");
+  const [modelFilter, setModelFilter] = useState<string | null>(null);
   const [items, setItems] = useState<GalleryJob[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -233,6 +252,15 @@ function GalleryTab() {
   // option labels (settings page-style) instead of raw key/value strings.
   // Cached per section visit; refreshed when the active section chip changes.
   const [modelsById, setModelsById] = useState<Record<string, Model>>({});
+  const [modelCounts, setModelCounts] = useState<Record<string, number>>({});
+
+  // Folders state
+  const [folders, setFolders] = useState<GalleryFolder[]>([]);
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+  const [folderModalJob, setFolderModalJob] = useState<GalleryJob | null>(null);
+  const [editFolder, setEditFolder] = useState<GalleryFolder | null>(null);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+
   const LIMIT = 20;
 
   const sectionLabels: Record<Section, string> = {
@@ -241,40 +269,66 @@ function GalleryTab() {
     video: locale === "ru" ? "🎬 Видео" : "🎬 Video",
   };
 
-  const load = useCallback((sec: Section, pg: number) => {
-    setLoading(true);
-    setError(null);
-    api.gallery
-      .list({ section: sec, page: pg, limit: LIMIT })
-      .then((res) => {
-        setItems(res.items);
-        setTotal(res.total);
-      })
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
+  const loadFolders = useCallback(() => {
+    api.gallery.folders
+      .list()
+      .then(setFolders)
+      .catch(() => void 0);
   }, []);
 
   useEffect(() => {
-    load(section, page);
-  }, [section, page, load]);
+    loadFolders();
+  }, [loadFolders]);
 
-  // Fetch model definitions once per section change. Failure is silent — the
-  // modal falls back to raw key/value rendering when models are missing.
-  // Note: gallery jobs use section "image" in the DB but the corresponding
-  // model definitions live under section "design" (legacy naming). Map the
-  // chip section to the API section so the dropdown actually returns models.
+  const load = useCallback(
+    (sec: Section, pg: number, mid: string | null, folderId: string | null) => {
+      setLoading(true);
+      setError(null);
+      api.gallery
+        .list({
+          section: sec,
+          page: pg,
+          limit: LIMIT,
+          modelId: mid ?? undefined,
+          folderId: folderId ?? undefined,
+        })
+        .then((res) => {
+          setItems(res.items);
+          setTotal(res.total);
+        })
+        .catch((err: Error) => setError(err.message))
+        .finally(() => setLoading(false));
+    },
+    [],
+  );
+
+  useEffect(() => {
+    load(section, page, modelFilter, activeFolderId);
+  }, [section, page, modelFilter, activeFolderId, load]);
+
+  // Fetch model definitions + per-model generation counts on section change.
+  // Failure is silent — the modal falls back to raw key/value rendering when
+  // models are missing, and the select shows unsorted models when counts fail.
+  // Note: gallery jobs use section "image" in the DB but model definitions
+  // live under section "design" (legacy naming).
   useEffect(() => {
     let cancelled = false;
     const apiSection = section === "image" ? "design" : section;
-    api.models
-      .list(apiSection)
-      .then((list) => {
+    Promise.allSettled([api.models.list(apiSection), api.gallery.modelCounts(section)]).then(
+      ([modelsResult, countsResult]) => {
         if (cancelled) return;
-        const map: Record<string, Model> = {};
-        for (const m of list) map[m.id] = m;
-        setModelsById((prev) => ({ ...prev, ...map }));
-      })
-      .catch(() => void 0);
+        if (modelsResult.status === "fulfilled") {
+          const modelMap: Record<string, Model> = {};
+          for (const m of modelsResult.value) modelMap[m.id] = m;
+          setModelsById((prev) => ({ ...prev, ...modelMap }));
+        }
+        if (countsResult.status === "fulfilled") {
+          const countMap: Record<string, number> = {};
+          for (const c of countsResult.value) countMap[c.modelId] = c.count;
+          setModelCounts((prev) => ({ ...prev, ...countMap }));
+        }
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -282,6 +336,18 @@ function GalleryTab() {
 
   const handleSectionChange = (sec: Section) => {
     setSection(sec);
+    setModelFilter(null);
+    setActiveFolderId(null);
+    setPage(1);
+  };
+
+  const handleModelFilterChange = (mid: string | null) => {
+    setModelFilter(mid);
+    setPage(1);
+  };
+
+  const handleFolderChange = (folderId: string | null) => {
+    setActiveFolderId(folderId);
     setPage(1);
   };
 
@@ -289,17 +355,68 @@ function GalleryTab() {
     await api.gallery.sendJob(jobId);
   }, []);
 
-  const handleDelete = useCallback(async (jobId: string) => {
-    await api.gallery.deleteJob(jobId);
-    setItems((prev) => prev.filter((j) => j.id !== jobId));
-    setTotal((prev) => Math.max(0, prev - 1));
-  }, []);
+  const handleDelete = useCallback(
+    async (jobId: string) => {
+      await api.gallery.deleteJob(jobId);
+      setItems((prev) => prev.filter((j) => j.id !== jobId));
+      setTotal((prev) => Math.max(0, prev - 1));
+      loadFolders();
+    },
+    [loadFolders],
+  );
+
+  const handleToggleFavorite = useCallback(
+    async (job: GalleryJob) => {
+      const favFolder = folders.find((f) => f.isDefault);
+      const isFav = favFolder ? job.folderIds.includes(favFolder.id) : false;
+
+      if (isFav && favFolder) {
+        await api.gallery.favorites.remove(job.id);
+        if (activeFolderId === favFolder.id) {
+          setItems((prev) => prev.filter((j) => j.id !== job.id));
+          setTotal((prev) => Math.max(0, prev - 1));
+        } else {
+          setItems((prev) =>
+            prev.map((j) =>
+              j.id === job.id
+                ? { ...j, folderIds: j.folderIds.filter((id) => id !== favFolder.id) }
+                : j,
+            ),
+          );
+        }
+        setFolders((prev) =>
+          prev.map((f) => (f.id === favFolder.id ? { ...f, itemCount: f.itemCount - 1 } : f)),
+        );
+      } else {
+        const { folderId } = await api.gallery.favorites.add(job.id);
+        setItems((prev) =>
+          prev.map((j) => (j.id === job.id ? { ...j, folderIds: [...j.folderIds, folderId] } : j)),
+        );
+        const favAlreadyExists = folders.some((f) => f.id === folderId);
+        setFolders((prev) => {
+          if (!prev.find((f) => f.id === folderId)) return prev;
+          return prev.map((f) => (f.id === folderId ? { ...f, itemCount: f.itemCount + 1 } : f));
+        });
+        if (!favAlreadyExists) {
+          loadFolders();
+        }
+      }
+    },
+    [folders, activeFolderId, loadFolders],
+  );
 
   const totalPages = Math.ceil(total / LIMIT);
+  const favFolder = folders.find((f) => f.isDefault);
+
+  const activeSectionKey = section === "image" ? "design" : section;
+  const sectionModels = Object.values(modelsById)
+    .filter((m) => m.section === activeSectionKey)
+    .sort((a, b) => (modelCounts[b.id] ?? 0) - (modelCounts[a.id] ?? 0));
 
   return (
     <>
-      <div className="section-chips" style={{ marginTop: 8 }}>
+      {/* Section chips */}
+      <div className="gallery-folders" style={{ marginTop: 8 }}>
         {SECTIONS.map((sec) => (
           <button
             key={sec}
@@ -311,11 +428,81 @@ function GalleryTab() {
         ))}
       </div>
 
+      {/* Folder chips */}
+      <div className="gallery-folders">
+        <button
+          className={`chip${activeFolderId === null ? " chip--active" : ""}`}
+          onClick={() => handleFolderChange(null)}
+        >
+          {t("gallery.folder.all")}
+        </button>
+        {folders.map((folder) => (
+          <button
+            key={folder.id}
+            className={`chip${activeFolderId === folder.id ? " chip--active" : ""}`}
+            onClick={() => handleFolderChange(folder.id)}
+          >
+            {folder.isDefault
+              ? `♥ ${folder.name}`
+              : folder.isPinned
+                ? `⭐ ${folder.name}`
+                : folder.name}
+            {folder.itemCount > 0 && (
+              <span className="gallery-folders__count">{folder.itemCount}</span>
+            )}
+          </button>
+        ))}
+        <button
+          className="chip gallery-folders__add"
+          onClick={() => setCreateFolderOpen(true)}
+          aria-label={t("gallery.folder.new")}
+        >
+          +
+        </button>
+        {activeFolderId && folders.find((f) => f.id === activeFolderId && !f.isDefault) && (
+          <button
+            className="gallery-folders__edit-btn"
+            onClick={() => setEditFolder(folders.find((f) => f.id === activeFolderId) ?? null)}
+            aria-label={t("gallery.folder.editTitle")}
+          >
+            ✎
+          </button>
+        )}
+      </div>
+
+      {sectionModels.length > 0 && (
+        <StyledSelect
+          style={{ display: "inline-block" }}
+          value={modelFilter ?? ""}
+          onChange={(v) => handleModelFilterChange(v === "" ? null : v)}
+          options={[
+            { value: "", label: locale === "ru" ? "Все модели" : "All models" },
+            ...sectionModels.map((m) => ({ value: m.id, label: m.name })),
+          ]}
+        />
+      )}
+
       {loading && <div className="page-loading">{t("common.loading")}</div>}
       {error && <div className="page-error">{error}</div>}
 
-      {!loading && !error && items.length === 0 && (
-        <div className="empty-state">{t("gallery.empty")}</div>
+      {!loading && !error && items.length === 0 && modelFilter !== null && (
+        <div className="gallery-empty-model">
+          <p className="gallery-empty-model__text">{t("gallery.emptyModel")}</p>
+          {onGoToManagement && (
+            <button
+              className="btn btn--primary"
+              onClick={() => onGoToManagement(activeSectionKey, modelFilter)}
+            >
+              {t("gallery.tryModel")}
+            </button>
+          )}
+        </div>
+      )}
+
+      {!loading && !error && items.length === 0 && modelFilter === null && (
+        <div className="empty-state">
+          {activeFolderId ? t("gallery.folder.empty") : t("gallery.empty")}
+        </div>
       )}
 
       {!loading && items.length > 0 && (
@@ -324,9 +511,12 @@ function GalleryTab() {
             <GalleryCard
               key={job.id}
               job={job}
+              isFavorited={favFolder ? job.folderIds.includes(favFolder.id) : false}
               onSend={handleSend}
               onDelete={handleDelete}
               onOpenDetails={setDetailsJob}
+              onToggleFavorite={handleToggleFavorite}
+              onAddToFolder={setFolderModalJob}
             />
           ))}
         </div>
@@ -363,7 +553,258 @@ function GalleryTab() {
           />,
           document.body,
         )}
+
+      {folderModalJob &&
+        createPortal(
+          <FolderPickerModal
+            job={folderModalJob}
+            folders={folders}
+            onClose={() => setFolderModalJob(null)}
+            onUpdate={(updatedJob) => {
+              setFolderModalJob(updatedJob);
+              setItems((prev) => prev.map((j) => (j.id === updatedJob.id ? updatedJob : j)));
+              loadFolders();
+            }}
+          />,
+          document.body,
+        )}
+
+      {createFolderOpen &&
+        createPortal(
+          <FolderEditModal
+            folder={null}
+            onClose={() => setCreateFolderOpen(false)}
+            onSave={async (name) => {
+              const created = await api.gallery.folders.create(name);
+              setFolders((prev) => [...prev, created]);
+              setCreateFolderOpen(false);
+            }}
+          />,
+          document.body,
+        )}
+
+      {editFolder &&
+        createPortal(
+          <FolderEditModal
+            folder={editFolder}
+            onClose={() => setEditFolder(null)}
+            onSave={async (name, isPinned) => {
+              const updated = await api.gallery.folders.update(editFolder.id, { name, isPinned });
+              setFolders((prev) =>
+                prev.map((f) =>
+                  f.id === updated.id ? { ...f, ...updated, itemCount: f.itemCount } : f,
+                ),
+              );
+              setEditFolder(null);
+            }}
+            onDelete={async () => {
+              await api.gallery.folders.delete(editFolder.id);
+              setFolders((prev) => prev.filter((f) => f.id !== editFolder.id));
+              if (activeFolderId === editFolder.id) handleFolderChange(null);
+              setEditFolder(null);
+            }}
+          />,
+          document.body,
+        )}
     </>
+  );
+}
+
+/* ── Folder Picker Modal ───────────────────────────────────────────────────── */
+
+function FolderPickerModal({
+  job,
+  folders,
+  onClose,
+  onUpdate,
+}: {
+  job: GalleryJob;
+  folders: GalleryFolder[];
+  onClose: () => void;
+  onUpdate: (job: GalleryJob) => void;
+}) {
+  const { t } = useI18n();
+  const [pending, setPending] = useState<string | null>(null);
+
+  const toggle = async (folder: GalleryFolder) => {
+    if (pending) return;
+    setPending(folder.id);
+    const isIn = job.folderIds.includes(folder.id);
+    try {
+      if (isIn) {
+        await api.gallery.folders.removeItem(folder.id, job.id);
+        onUpdate({ ...job, folderIds: job.folderIds.filter((id) => id !== folder.id) });
+      } else {
+        await api.gallery.folders.addItem(folder.id, job.id);
+        onUpdate({ ...job, folderIds: [...job.folderIds, folder.id] });
+      }
+    } catch {
+      // silent
+    } finally {
+      setPending(null);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="modal-close" onClick={onClose} aria-label="close">
+          ×
+        </button>
+        <div className="modal-title">{t("gallery.folder.addToFolder")}</div>
+        {folders.length === 0 ? (
+          <div className="gallery-modal__settings">{t("gallery.folder.empty")}</div>
+        ) : (
+          <ul className="folder-picker__list">
+            {folders.map((folder) => {
+              const checked = job.folderIds.includes(folder.id);
+              return (
+                <li key={folder.id}>
+                  <button
+                    type="button"
+                    className={`folder-picker__item${checked ? " folder-picker__item--checked" : ""}`}
+                    onClick={() => void toggle(folder)}
+                    disabled={pending === folder.id}
+                  >
+                    <span className="folder-picker__check">{checked ? "✓" : ""}</span>
+                    <span className="folder-picker__name">
+                      {folder.isDefault ? `♥ ${folder.name}` : folder.name}
+                    </span>
+                    {pending === folder.id && <span className="folder-picker__spinner">…</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="modal-actions">
+          <button type="button" className="btn btn--primary" onClick={onClose}>
+            {t("gallery.folder.done")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Folder Edit / Create Modal ────────────────────────────────────────────── */
+
+function FolderEditModal({
+  folder,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  folder: GalleryFolder | null;
+  onClose: () => void;
+  onSave: (name: string, isPinned?: boolean) => Promise<void>;
+  onDelete?: () => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const [name, setName] = useState(folder?.name ?? "");
+  const [isPinned, setIsPinned] = useState(folder?.isPinned ?? false);
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const isCreate = folder === null;
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      await onSave(name.trim(), isCreate ? undefined : isPinned);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setDeleting(true);
+    try {
+      await onDelete();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (confirmDelete) {
+    return (
+      <div className="modal-overlay" onClick={() => !deleting && setConfirmDelete(false)}>
+        <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-title">{t("gallery.folder.deleteConfirmTitle")}</div>
+          <div className="modal-text">{t("gallery.folder.deleteConfirmText")}</div>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setConfirmDelete(false)}
+              disabled={deleting}
+            >
+              {t("gallery.folder.cancel")}
+            </button>
+            <button
+              type="button"
+              className="btn btn--danger"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? "…" : t("gallery.folder.delete")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="modal-close" onClick={onClose} aria-label="close">
+          ×
+        </button>
+        <div className="modal-title">
+          {isCreate ? t("gallery.folder.createTitle") : t("gallery.folder.editTitle")}
+        </div>
+        <input
+          className="folder-edit__input"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={t("gallery.folder.namePlaceholder")}
+          autoFocus
+          onKeyDown={(e) => e.key === "Enter" && void handleSave()}
+        />
+        {!isCreate && (
+          <button
+            type="button"
+            className={`folder-edit__pin-btn${isPinned ? " folder-edit__pin-btn--active" : ""}`}
+            onClick={() => setIsPinned((v) => !v)}
+          >
+            ⭐ {isPinned ? t("gallery.folder.unpin") : t("gallery.folder.pin")}
+          </button>
+        )}
+        <div className="modal-actions">
+          {!isCreate && onDelete && (
+            <button
+              type="button"
+              className="btn btn--danger"
+              onClick={() => setConfirmDelete(true)}
+            >
+              {t("gallery.folder.delete")}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={handleSave}
+            disabled={saving || !name.trim()}
+          >
+            {saving ? "…" : t("gallery.folder.save")}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -462,14 +903,20 @@ function AudioPlayButton({
 
 function GalleryCard({
   job,
+  isFavorited,
   onSend,
   onDelete,
   onOpenDetails,
+  onToggleFavorite,
+  onAddToFolder,
 }: {
   job: GalleryJob;
+  isFavorited: boolean;
   onSend: (jobId: string) => Promise<void>;
   onDelete: (jobId: string) => Promise<void>;
   onOpenDetails: (job: GalleryJob) => void;
+  onToggleFavorite: (job: GalleryJob) => Promise<void>;
+  onAddToFolder: (job: GalleryJob) => void;
 }) {
   const { t, locale } = useI18n();
   const [loading, setLoading] = useState(false);
@@ -548,17 +995,54 @@ function GalleryCard({
   const tokensLabel = tokens ? `${tokens} ${t("gallery.costTokens")}` : t("gallery.costUnknown");
   const collageOutputs = outputs.slice(0, 4);
 
+  const [favLoading, setFavLoading] = useState(false);
+
+  const handleToggleFavoriteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (favLoading) return;
+    setFavLoading(true);
+    try {
+      await onToggleFavorite(job);
+    } finally {
+      setFavLoading(false);
+    }
+  };
+
   return (
     <div className="gallery-card">
-      <button
-        type="button"
-        className="gallery-card__delete"
-        onClick={() => setConfirmDelete(true)}
-        title={t("gallery.delete")}
-        aria-label={t("gallery.delete")}
-      >
-        ×
-      </button>
+      <div className="gallery-card__top-actions">
+        <button
+          type="button"
+          className={`gallery-card__fav${isFavorited ? " gallery-card__fav--active" : ""}`}
+          onClick={handleToggleFavoriteClick}
+          disabled={favLoading}
+          title={isFavorited ? "Убрать из избранного" : "В избранное"}
+          aria-label="Favorites"
+        >
+          {isFavorited ? "♥" : "♡"}
+        </button>
+        <button
+          type="button"
+          className="gallery-card__folder-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddToFolder(job);
+          }}
+          title={t("gallery.folder.addToFolder")}
+          aria-label={t("gallery.folder.addToFolder")}
+        >
+          🗂
+        </button>
+        <button
+          type="button"
+          className="gallery-card__delete"
+          onClick={() => setConfirmDelete(true)}
+          title={t("gallery.delete")}
+          aria-label={t("gallery.delete")}
+        >
+          ×
+        </button>
+      </div>
 
       {isImage && outputs.length > 1 ? (
         <div

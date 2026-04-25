@@ -53,6 +53,10 @@ function AppContent() {
   const initial = parseHash();
   const [page, setPage] = useState<Page>(initial.page);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [managementTarget, setManagementTarget] = useState<{
+    section: string;
+    modelId: string;
+  } | null>(null);
   const { ready, error, warning } = useTelegramInit();
   const { t } = useI18n();
 
@@ -63,6 +67,16 @@ function AppContent() {
   }, [ready]);
 
   const isAdmin = profile?.role === "ADMIN" || profile?.role === "MODERATOR";
+
+  const navigate = (p: Page) => {
+    if (p === "management") setManagementTarget(null);
+    setPage(p);
+  };
+
+  const goToManagement = (section: string, modelId: string) => {
+    setManagementTarget({ section, modelId });
+    setPage("management");
+  };
 
   const handleLearning = async () => {
     // Refresh profile to check if metaboxUserId is still valid
@@ -138,11 +152,13 @@ function AppContent() {
                 ? (initial.section as ProfileTab)
                 : undefined
             }
+            onGoToManagement={goToManagement}
           />
         )}
         {page === "management" && (
           <ManagementPage
-            initialSection={initial.section}
+            initialSection={managementTarget?.section ?? initial.section}
+            initialModelId={managementTarget?.modelId}
             initialAction={initial.action}
             finishedOnboarding={profile?.finishedOnboarding ?? true}
           />
@@ -165,7 +181,7 @@ function AppContent() {
       {page !== "linkMetabox" && (
         <BottomNav
           current={page}
-          onChange={setPage}
+          onChange={navigate}
           showAdmin={isAdmin}
           onLearning={() => void handleLearning()}
         />

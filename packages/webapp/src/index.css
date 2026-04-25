@@ -311,6 +311,27 @@ textarea::placeholder {
   color: var(--text-hint);
   margin: 20px 0 10px;
 }
+.gallery-empty-model {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 20px;
+  text-align: center;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: 1.5px dashed var(--border);
+}
+.gallery-empty-model__text {
+  color: var(--text-hint);
+  font-size: 14px;
+  margin: 0;
+}
+.gallery-empty-model .btn {
+  flex: none;
+  padding: 12px 28px;
+}
+
 .empty-state {
   color: var(--text-hint);
   text-align: center;
@@ -2016,10 +2037,18 @@ textarea::placeholder {
   gap: 8px;
 }
 
-.gallery-card__delete {
+.gallery-card__top-actions {
   position: absolute;
   top: 6px;
   right: 6px;
+  display: flex;
+  gap: 4px;
+  z-index: 2;
+}
+
+.gallery-card__delete,
+.gallery-card__fav,
+.gallery-card__folder-btn {
   width: 26px;
   height: 26px;
   display: flex;
@@ -2029,14 +2058,164 @@ textarea::placeholder {
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
   border: none;
-  font-size: 18px;
+  font-size: 15px;
   line-height: 1;
   cursor: pointer;
-  z-index: 2;
   transition: background 0.15s var(--ease);
+  padding: 0;
+}
+.gallery-card__delete {
+  font-size: 18px;
 }
 .gallery-card__delete:hover {
   background: rgba(229, 57, 53, 0.9);
+}
+.gallery-card__fav--active {
+  color: #ff4f6d;
+  background: rgba(0, 0, 0, 0.65);
+}
+.gallery-card__fav:hover,
+.gallery-card__folder-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* ── Gallery Folders ─────────────────────────────────────────────────────── */
+.gallery-folders {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  align-items: center;
+  flex-wrap: nowrap;
+  padding-bottom: 2px;
+}
+.gallery-folders::-webkit-scrollbar {
+  display: none;
+}
+.gallery-folders .chip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.gallery-folders__count {
+  font-size: 11px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 99px;
+  padding: 1px 5px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 1.4;
+}
+.gallery-folders__add {
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  border-radius: 50% !important;
+}
+.gallery-folders__edit-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-hint);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+.gallery-folders__edit-btn:hover {
+  color: var(--text-primary);
+}
+
+/* ── Folder Picker ────────────────────────────────────────────────────────── */
+.folder-picker__list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.folder-picker__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+.folder-picker__item:hover {
+  background: var(--bg-card-hover, var(--bg-card));
+}
+.folder-picker__item--checked {
+  border-color: var(--accent);
+  background: var(--accent-lighter, var(--bg-secondary));
+}
+.folder-picker__check {
+  width: 18px;
+  color: var(--accent);
+  font-weight: 700;
+  text-align: center;
+  flex-shrink: 0;
+}
+.folder-picker__name {
+  flex: 1;
+}
+.folder-picker__spinner {
+  color: var(--text-hint);
+  font-size: 13px;
+}
+
+/* ── Folder Edit Modal ───────────────────────────────────────────────────── */
+.folder-edit__input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 15px;
+  margin: 12px 0 8px;
+  outline: none;
+  box-sizing: border-box;
+}
+.folder-edit__input:focus {
+  border-color: var(--accent);
+}
+.folder-edit__pin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: all 0.15s;
+}
+.folder-edit__pin-btn--active {
+  border-color: var(--accent);
+  background: var(--accent-lighter, var(--bg-secondary));
+  color: var(--text-primary);
 }
 
 .modal-actions {
