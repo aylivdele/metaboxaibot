@@ -202,7 +202,9 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          script: rm -rf /var/www/metabox/*
+          # `mkdir -p` covers the first-deploy case when the directory doesn't
+          # exist yet (rm -rf /nonexistent/* would otherwise abort the step).
+          script: mkdir -p /var/www/metabox && rm -rf /var/www/metabox/*
       - name: Upload webapp dist to VPS
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -270,11 +272,18 @@ jobs:
           GH_ACTOR: ${{ github.actor }}
           IMAGE_TAG: ${{ github.sha }}
           GHCR_IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
+          # Mirror what test-pipeline does — pull/restart only services that
+          # actually got rebuilt in this run. On first-ever deploy or when
+          # only one service changed, this avoids a `docker compose pull` for
+          # tags that don't exist in GHCR yet.
+          BUILT_API: ${{ needs.build-api.result == 'success' && 'true' || 'false' }}
+          BUILT_BOT: ${{ needs.build-bot.result == 'success' && 'true' || 'false' }}
+          BUILT_WORKER: ${{ needs.build-worker.result == 'success' && 'true' || 'false' }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: GHCR_TOKEN,GH_ACTOR,IMAGE_TAG,GHCR_IMAGE_PREFIX
+          envs: GHCR_TOKEN,GH_ACTOR,IMAGE_TAG,GHCR_IMAGE_PREFIX,BUILT_API,BUILT_BOT,BUILT_WORKER
           script: |
             set -e
             cd /opt/metaboxaibot
@@ -285,23 +294,46 @@ jobs:
             echo "Updating repo (compose file, nginx config)..."
             git -c "url.https://x-access-token:${GHCR_TOKEN}@github.com/.insteadOf=https://github.com/" pull origin main
 
-            echo "Updating IMAGE_TAG and GHCR_IMAGE_PREFIX in .env..."
-            sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env \
-              || echo "IMAGE_TAG=$IMAGE_TAG" >> .env
-            sed -i "s|^GHCR_IMAGE_PREFIX=.*|GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX|" .env \
-              || echo "GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX" >> .env
+            # Only update IMAGE_TAG if at least one service was rebuilt — otherwise
+            # the version pin stays on whatever ran last successfully.
+            if [ "$BUILT_API" = "true" ] || [ "$BUILT_BOT" = "true" ] || [ "$BUILT_WORKER" = "true" ]; then
+              echo "Updating IMAGE_TAG and GHCR_IMAGE_PREFIX in .env..."
+              sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$IMAGE_TAG|" .env \
+                || echo "IMAGE_TAG=$IMAGE_TAG" >> .env
+              sed -i "s|^GHCR_IMAGE_PREFIX=.*|GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX|" .env \
+                || echo "GHCR_IMAGE_PREFIX=$GHCR_IMAGE_PREFIX" >> .env
+            else
+              echo "No services rebuilt — keeping existing IMAGE_TAG"
+            fi
 
-            echo "Pulling new images..."
-            docker compose -f docker-compose.prod.yml pull bot api worker
+            # Pull only services that were actually rebuilt — avoids fetching
+            # stale `:latest` tags for sibling services that didn't change.
+            SERVICES=""
+            [ "$BUILT_API" = "true" ]    && SERVICES="$SERVICES api"
+            [ "$BUILT_BOT" = "true" ]    && SERVICES="$SERVICES bot"
+            [ "$BUILT_WORKER" = "true" ] && SERVICES="$SERVICES worker"
 
-            echo "Restarting services..."
-            docker compose -f docker-compose.prod.yml up -d --no-build --remove-orphans
+            if [ -n "$SERVICES" ]; then
+              echo "Pulling new images:$SERVICES"
+              docker compose -f docker-compose.prod.yml pull $SERVICES
+
+              echo "Restarting updated services:$SERVICES"
+              docker compose -f docker-compose.prod.yml up -d --no-build --remove-orphans $SERVICES
+            else
+              echo "No new images to pull — skipping restart"
+            fi
 
             echo "Pruning old images..."
             docker image prune -af
 
-            # Ensure nginx configs are symlinked
-            sudo ln -sf /opt/metaboxaibot/infra/nginx/nginx.web-prod.conf /etc/nginx/sites-enabled/metabox-web 2>/dev/null || true
+            # Ensure nginx configs are symlinked. All three are first-deploy
+            # safe (`|| true` swallows "already exists") and idempotent:
+            #   • nginx.server.conf    — Mini App + API on aibox.metabox.global
+            #   • nginx.web-prod.conf  — Web SPA on ai.metabox.global
+            #   • nginx.metrics.conf   — Observability on metrics.aibox.metabox.global
+            sudo ln -sf /opt/metaboxaibot/infra/nginx/nginx.server.conf    /etc/nginx/sites-enabled/metabox         2>/dev/null || true
+            sudo ln -sf /opt/metaboxaibot/infra/nginx/nginx.web-prod.conf  /etc/nginx/sites-enabled/metabox-web     2>/dev/null || true
+            sudo ln -sf /opt/metaboxaibot/infra/nginx/nginx.metrics.conf   /etc/nginx/sites-enabled/metabox-metrics 2>/dev/null || true
 
             sudo nginx -t && sudo systemctl reload nginx
 

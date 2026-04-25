@@ -547,17 +547,23 @@ export const stateRoutes: FastifyPluginAsync = async (fastify) => {
             ? "VIDEO_ACTIVE"
             : undefined;
 
+    // Always overwrite the FSM state, even when the section is unchanged.
+    // Skipping the write on same-section leaks transient sub-states like
+    // HEYGEN_AVATAR_PHOTO or HIGGSFIELD_SOUL_PHOTO across model activation
+    // — e.g. user clicks "Create avatar" in HeyGen (state = HEYGEN_AVATAR_PHOTO,
+    // section = video), then activates Kling 3 Pro (still video) without
+    // tapping ❌ Cancel. With the old guard the bot stayed in
+    // HEYGEN_AVATAR_PHOTO, so the next photo dropped into a Kling media slot
+    // got captured by the avatar-creation handler instead.
     let sectionSwitched = false;
     if (newState) {
       const prev = await userStateService.get(userId);
-      if (prev?.section !== section) {
-        sectionSwitched = true;
-        await userStateService.setState(
-          userId,
-          newState as Parameters<typeof userStateService.setState>[1],
-          section as Section,
-        );
-      }
+      sectionSwitched = prev?.section !== section;
+      await userStateService.setState(
+        userId,
+        newState as Parameters<typeof userStateService.setState>[1],
+        section as Section,
+      );
     }
 
     await sendModelActivatedNotification(userId, section, modelId, sectionSwitched);

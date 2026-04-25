@@ -1,0 +1,47 @@
+# Promtail config — metaboxaibot prod server.
+# Tails Docker container logs via /var/run/docker.sock and pushes them to
+# the central Loki on the metabox-site stage server.
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  # Mounted from named volume `promtail-positions` so offsets survive
+  # container restarts (otherwise promtail re-ships all logs every restart).
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: https://loki.stage.meta-box.ru/loki/api/v1/push
+    # Defensive timeouts in case the stage server is briefly unreachable —
+    # promtail retries with backoff before dropping.
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Use Docker container name as `service` label.
+      - source_labels: [__meta_docker_container_name]
+        regex: '/?(.*)'
+        target_label: service
+      # `server` label distinguishes this host from `stage` (metabox-site
+      # test) and `prod` (metabox-site prod). All three flow into the same
+      # Grafana, so the label is the only way to filter.
+      - target_label: server
+        replacement: aibot-prod
+      # Skip targets without a container name (paused / removed).
+      - source_labels: [__meta_docker_container_name]
+        action: drop
+        regex: ''
+    pipeline_stages:
+      # Drop entries older than 240h (10d) to avoid re-shipping ancient logs
+      # if positions are lost or a docker log file got copied in from elsewhere.
+      - drop:
+          older_than: 240h
+          drop_counter_reason: too_old

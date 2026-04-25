@@ -934,16 +934,17 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     const current = await userStateService.getMediaInputs(ctx.user.id, slotModelId);
     const existing = current[activeSlot.slotKey] ?? [];
     const userId = ctx.user.id;
-    if (existing.length >= activeSlot.maxImages) {
-      // Single-image slot: replace existing. Multi-image slot: drop overflow
-      // silently (an album larger than maxImages shouldn't wipe earlier items).
-      if (activeSlot.maxImages === 1) {
-        await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
-        await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
-      }
-    } else {
-      await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
-    }
+    // Manual slot pick: when the slot is already full, FIFO-evict the oldest
+    // entry and append the new one. Works uniformly for single-image
+    // (replace) and multi-image (cyclic) slots.
+    const isFull = existing.length >= activeSlot.maxImages;
+    await userStateService.addMediaInput(
+      userId,
+      slotModelId,
+      activeSlot.slotKey,
+      tgSlotValue,
+      isFull,
+    );
 
     const label = slot
       ? (ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey)
@@ -1185,10 +1186,16 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
     if (slot?.mode === "reference_video") {
       const current = await userStateService.getMediaInputs(userId, slotModelId);
       const existing = current[activeSlot.slotKey] ?? [];
-      if (existing.length >= activeSlot.maxImages) {
-        await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
-      }
-      await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
+      // Full → FIFO-evict oldest. Don't `clearMediaInputSlot` — that would
+      // wipe every prior reference instead of cycling one out.
+      const isFull = existing.length >= activeSlot.maxImages;
+      await userStateService.addMediaInput(
+        userId,
+        slotModelId,
+        activeSlot.slotKey,
+        tgSlotValue,
+        isFull,
+      );
       debounceSlotReply(userId, mediaGroupId, async () => {
         const freshInputs = await userStateService.getMediaInputs(userId, slotModelId);
         const freshCount = freshInputs[activeSlot.slotKey]?.length ?? 0;
@@ -1420,10 +1427,16 @@ export async function handleVideoVoice(ctx: BotContext): Promise<void> {
       }
       const current = await userStateService.getMediaInputs(userId, slotModelId);
       const existing = current[activeSlot.slotKey] ?? [];
-      if (existing.length >= activeSlot.maxImages) {
-        await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
-      }
-      await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
+      // Full → FIFO-evict oldest. Don't `clearMediaInputSlot` — that would
+      // wipe every prior reference audio instead of cycling one out.
+      const isFull = existing.length >= activeSlot.maxImages;
+      await userStateService.addMediaInput(
+        userId,
+        slotModelId,
+        activeSlot.slotKey,
+        tgSlotValue,
+        isFull,
+      );
       const updatedCount = Math.min(existing.length + 1, activeSlot.maxImages);
       if (updatedCount >= activeSlot.maxImages) {
         clearActiveSlot(userId);

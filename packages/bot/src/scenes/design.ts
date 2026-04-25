@@ -674,16 +674,18 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     const current = await userStateService.getMediaInputs(ctx.user.id, slotModelId);
     const existing = current[activeSlot.slotKey] ?? [];
     const userId = ctx.user.id;
-    if (existing.length >= activeSlot.maxImages) {
-      // Single-image slot: replace existing. Multi-image slot: drop overflow
-      // silently (an album larger than maxImages shouldn't wipe earlier items).
-      if (activeSlot.maxImages === 1) {
-        await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
-        await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
-      }
-    } else {
-      await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
-    }
+    // Manual slot pick: when the slot is already full, FIFO-evict the oldest
+    // entry and append the new one. Works uniformly for single-image
+    // (replace) and multi-image (cyclic) slots — the user just chose this
+    // exact slot, dropping their input silently feels broken.
+    const isFull = existing.length >= activeSlot.maxImages;
+    await userStateService.addMediaInput(
+      userId,
+      slotModelId,
+      activeSlot.slotKey,
+      tgSlotValue,
+      isFull,
+    );
 
     const label = slot
       ? (ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey)
