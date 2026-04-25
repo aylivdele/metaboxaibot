@@ -7,6 +7,7 @@ import type {
   AdminUsersResponse,
   BannerSlide,
   GalleryResponse,
+  GalleryFolder,
   CatalogResponse,
   HeyGenVoice,
   HeyGenAvatar,
@@ -230,11 +231,12 @@ export const api = {
   },
 
   gallery: {
-    list: (params: { section?: string; page?: number; limit?: number }) => {
+    list: (params: { section?: string; page?: number; limit?: number; folderId?: string }) => {
       const qs = new URLSearchParams();
       if (params.section) qs.set("section", params.section);
       if (params.page) qs.set("page", String(params.page));
       if (params.limit) qs.set("limit", String(params.limit));
+      if (params.folderId) qs.set("folderId", params.folderId);
       return request<GalleryResponse>(`/gallery?${qs.toString()}`);
     },
     sendJob: (jobId: string) =>
@@ -244,6 +246,39 @@ export const api = {
       request<{ url: string }>(`/gallery/outputs/${outputId}/original-url`),
     deleteJob: (jobId: string) =>
       request<{ success: boolean }>(`/gallery/jobs/${jobId}`, { method: "DELETE" }),
+    folders: {
+      list: () => request<GalleryFolder[]>("/gallery/folders"),
+      create: (name: string) =>
+        request<GalleryFolder>("/gallery/folders", {
+          method: "POST",
+          body: JSON.stringify({ name }),
+        }),
+      update: (folderId: string, patch: { name?: string; isPinned?: boolean }) =>
+        request<GalleryFolder>(`/gallery/folders/${folderId}`, {
+          method: "PATCH",
+          body: JSON.stringify(patch),
+        }),
+      delete: (folderId: string) =>
+        request<{ success: boolean }>(`/gallery/folders/${folderId}`, { method: "DELETE" }),
+      addItem: (folderId: string, jobId: string) =>
+        request<{ success: boolean }>(`/gallery/folders/${folderId}/items`, {
+          method: "POST",
+          body: JSON.stringify({ jobId }),
+        }),
+      removeItem: (folderId: string, jobId: string) =>
+        request<{ success: boolean }>(`/gallery/folders/${folderId}/items/${jobId}`, {
+          method: "DELETE",
+        }),
+    },
+    favorites: {
+      add: (jobId: string) =>
+        request<{ folderId: string }>("/gallery/favorites", {
+          method: "POST",
+          body: JSON.stringify({ jobId }),
+        }),
+      remove: (jobId: string) =>
+        request<{ success: boolean }>(`/gallery/favorites/${jobId}`, { method: "DELETE" }),
+    },
   },
 
   imageSettings: {

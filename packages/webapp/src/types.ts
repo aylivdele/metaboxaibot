@@ -297,6 +297,16 @@ export interface GalleryOutput {
   thumbnailUrl: string | null;
 }
 
+export interface GalleryFolder {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  isPinned: boolean;
+  pinnedAt: string | null;
+  itemCount: number;
+  createdAt: string;
+}
+
 export interface GalleryJob {
   id: string;
   section: string;
@@ -309,6 +319,8 @@ export interface GalleryJob {
   /** Internal tokens debited. Stringified Decimal — null for old jobs / recovery fast-path. */
   tokensSpent: string | null;
   completedAt: string | null;
+  /** IDs of folders this job belongs to. */
+  folderIds: string[];
   outputs: GalleryOutput[];
 }
 

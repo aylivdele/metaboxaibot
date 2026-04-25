@@ -231,6 +231,25 @@ const translations = {
     "gallery.costUnknown": "—",
     "gallery.morePhotos": "+{n}",
 
+    // Gallery folders
+    "gallery.folder.all": "All",
+    "gallery.folder.favorites": "Favorites",
+    "gallery.folder.new": "New folder",
+    "gallery.folder.createTitle": "Create folder",
+    "gallery.folder.editTitle": "Edit folder",
+    "gallery.folder.namePlaceholder": "Folder name",
+    "gallery.folder.pin": "Pin",
+    "gallery.folder.unpin": "Unpin",
+    "gallery.folder.deleteConfirmTitle": "Delete folder?",
+    "gallery.folder.deleteConfirmText": "Generations will not be deleted.",
+    "gallery.folder.delete": "Delete",
+    "gallery.folder.cancel": "Cancel",
+    "gallery.folder.save": "Save",
+    "gallery.folder.empty": "This folder is empty",
+    "gallery.folder.addToFolder": "Add to folder",
+    "gallery.folder.added": "✓ Added",
+    "gallery.folder.done": "Done",
+
     // Settings
     "settings.title": "Account Settings",
     "settings.email": "Email",
@@ -589,6 +608,25 @@ const translations = {
     "gallery.costTokens": "токенов",
     "gallery.costUnknown": "—",
     "gallery.morePhotos": "+{n}",
+
+    // Gallery folders
+    "gallery.folder.all": "Все",
+    "gallery.folder.favorites": "Избранное",
+    "gallery.folder.new": "Новая папка",
+    "gallery.folder.createTitle": "Создать папку",
+    "gallery.folder.editTitle": "Редактировать папку",
+    "gallery.folder.namePlaceholder": "Название папки",
+    "gallery.folder.pin": "Закрепить",
+    "gallery.folder.unpin": "Открепить",
+    "gallery.folder.deleteConfirmTitle": "Удалить папку?",
+    "gallery.folder.deleteConfirmText": "Генерации удалены не будут.",
+    "gallery.folder.delete": "Удалить",
+    "gallery.folder.cancel": "Отмена",
+    "gallery.folder.save": "Сохранить",
+    "gallery.folder.empty": "Папка пуста",
+    "gallery.folder.addToFolder": "В папку",
+    "gallery.folder.added": "✓ Добавлено",
+    "gallery.folder.done": "Готово",
 
     // Settings
     "settings.title": "Настройки аккаунта",
