@@ -1478,14 +1478,17 @@ function GalleryDetailsModal({
   }
 
   // Pass 2: any keys present in modelSettings but missing from the current
-  // model definition (setting may have been removed since). Show with a
-  // best-effort label, but skip the always-hidden technical companion keys.
+  // model definition (setting may have been removed since — например, при
+  // смене провайдера у модели). Локальный словарь может быть пустым (ru),
+  // поэтому фоллбек: locale → en → raw key. Без второго шага русские юзеры
+  // видят сырое имя ключа на старых джобах.
+  const settingLocaleEn = SETTING_TRANSLATIONS["en"] ?? {};
   for (const [key, value] of Object.entries(rawSettings)) {
     if (seenKeys.has(key)) continue;
     if (ALWAYS_HIDDEN_SETTING_KEYS.has(key)) continue;
     if (value === null || value === undefined || value === "") continue;
     if (Array.isArray(value) && value.length === 0) continue;
-    const label = settingLocale[key]?.label ?? key;
+    const label = settingLocale[key]?.label ?? settingLocaleEn[key]?.label ?? key;
     entries.push({ key, label, value: formatValue(undefined, value) });
   }
 

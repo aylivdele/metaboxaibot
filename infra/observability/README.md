@@ -62,7 +62,7 @@ docker compose -f docker-compose.observability.yml up -d
 
 ```bash
 docker compose -f docker-compose.observability.yml ps
-docker logs metabox_promtail --tail 20
+docker logs aibot_promtail --tail 20
 curl -s http://127.0.0.1:9100/metrics | head -3
 curl -s http://127.0.0.1:8080/metrics | head -3
 curl -s https://metrics.aibox.metabox.global/node | head -3   # 200 OK
@@ -124,7 +124,7 @@ node-exporter / cadvisor дашборды не фильтруют по этом�
 **Логов из бот-прода нет в Grafana.** Сначала проверь:
 
 ```bash
-docker logs metabox_promtail --tail 50
+docker logs aibot_promtail --tail 50
 ```
 
 Если видишь повторяющиеся `connection refused` или `tls: handshake failure` —

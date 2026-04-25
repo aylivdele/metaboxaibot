@@ -801,10 +801,38 @@ export const MODEL_TRANSLATIONS: Record<string, Record<string, ModelTranslation>
   ru: {},
 };
 
-/** Map of locale code → setting translations. Russian falls back to ModelSettingDef strings. */
+/**
+ * Russian-only entries для настроек, которые были удалены из текущих
+ * ModelSettingDef'ов (например, после смены провайдера у модели), но всё ещё
+ * встречаются в исторических `modelSettings` старых джобов в галерее. Без
+ * этих записей модалка показывала бы сырое имя ключа.
+ *
+ * Английские переводы для этих ключей живут в SETTING_TRANSLATIONS_EN
+ * (они там нужны и для активных моделей).
+ */
+const SETTING_TRANSLATIONS_RU: Record<string, SettingTranslation> = {
+  // Удалены из Nano Banana при переезде на kie (kie не поддерживает).
+  enable_web_search: {
+    label: "Поиск в интернете",
+    description:
+      "Разрешить модели обращаться к интернету для уточнения деталей промпта. Влияет на цену.",
+  },
+  thinking_level: {
+    label: "Уровень размышлений",
+    description:
+      "Минимальный — небольшой буст следования инструкции, Высокий — глубокий анализ промпта. Отключено = без дополнительных рассуждений. Влияет на цену.",
+    options: { "": "Отключено" },
+  },
+};
+
+/**
+ * Map of locale code → setting translations. Russian translations для активных
+ * настроек живут в `ModelSettingDef.label/description` (модели уже на русском).
+ * Здесь только сиротские ключи — см. SETTING_TRANSLATIONS_RU выше.
+ */
 export const SETTING_TRANSLATIONS: Record<string, Record<string, SettingTranslation>> = {
   en: SETTING_TRANSLATIONS_EN,
-  ru: {},
+  ru: SETTING_TRANSLATIONS_RU,
 };
 
 /**
