@@ -365,6 +365,15 @@ export interface Translations {
     uploadPromptDesignRef: string;
     uploadPromptDesignMulti: string;
     uploadPromptDesignStyleRef: string;
+    uploadPromptVideoFirstFrame: string;
+    uploadPromptVideoLastFrame: string;
+    uploadPromptVideoMotionImage: string;
+    uploadPromptVideoDrivingAudio: string;
+    uploadPromptVideoMotionVideo: string;
+    uploadPromptVideoFirstClip: string;
+    uploadPromptVideoRefImages: string;
+    uploadPromptVideoRefVideos: string;
+    uploadPromptVideoRefAudios: string;
     imageSaved: string;
     imageSavedSingle: string;
     tooManyMedia: string;
@@ -486,7 +495,7 @@ export function buildResultCaption(
     sliced = opts?.emptyPromptLabel ?? "";
   }
   const suffix = opts?.suffix ? ` ${opts.suffix}` : "";
-  let caption = sliced ? `✅ ${displayName}: ${sliced}${suffix}` : `✅ ${displayName}:${suffix}`;
+  let caption = sliced ? `✅ ${displayName}: ${sliced}${suffix}` : `✅ ${displayName}${suffix}`;
   const cost = opts?.cost;
   const sub = opts?.subscriptionBalance;
   const reg = opts?.tokenBalance;
