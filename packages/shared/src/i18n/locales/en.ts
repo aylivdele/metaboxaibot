@@ -159,6 +159,8 @@ export default {
       "❌ Higgsfield requires an image to generate video. Please send a photo first, then your text prompt.",
     promptTooLong:
       "❌ Prompt is too long — this model supports up to {limit} characters. Please shorten your text and try again.",
+    klingElementsRequired:
+      "❌ Your prompt contains element references (like @element_dog) but no element images were uploaded. Use the element slots below to attach reference images, or remove the @element references from your prompt.",
     runwayRequiresImage:
       "❌ Runway requires an image to generate video. Please send a photo first, then your text prompt.",
     heygenNeedsVoice:
