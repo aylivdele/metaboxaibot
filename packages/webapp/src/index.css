@@ -726,7 +726,8 @@ textarea::placeholder {
   background: var(--accent-gradient);
   color: var(--text-on-accent);
   box-shadow: var(--shadow-accent);
-  border-color: transparent;
+  border: none;
+  padding: 9.5px 19.5px;
 }
 
 .dialog-list {
