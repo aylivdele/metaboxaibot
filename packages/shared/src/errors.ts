@@ -21,9 +21,16 @@ export class UserFacingError extends Error {
       key?: string;
       params?: Record<string, string | number>;
       notifyOps?: boolean;
+      /**
+       * Оригинальная ошибка, которую этот UserFacingError оборачивает.
+       * Используется в notifyTechError — серилайзер развернёт цепочку
+       * через `caused by:` и положит в alert полный traceback провайдера
+       * (например, raw 429 body от kie/openai), не теряя контекст.
+       */
+      cause?: unknown;
     },
   ) {
-    super(message);
+    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
     this.name = "UserFacingError";
     this.key = options?.key;
     this.params = options?.params;

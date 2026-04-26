@@ -465,9 +465,9 @@ export default {
     motionVideo: "Reference Video",
     motionElement: "Face Element",
     motionImageSlotHint:
-      "Kling Motion — transfer movements from a reference video to any character image.\n\n📸 Character Image (required): character should have clear body proportions, no occlusion, and occupy more than 5% of the image area.\n\n👤 Face Element (optional): upload a face photo to enhance identity preservation. Reference as @Element1 in prompt.\n\n⚙️ Character orientation is configured in Management.",
+      "📸 Character Image (required): character should have clear body proportions, no occlusion, and occupy more than 5% of the image area.",
     motionVideoSlotHint:
-      "Kling Motion — transfer movements from a reference video to any character image.\n\n🎬 Reference Video (required): video with movements to transfer. Should contain a realistic-style character with entire body or upper body visible, including head, without obstruction. Max 30 s.\n\n⚙️ Character orientation is configured in Management.",
+      "🎬 Reference Video (required): video with movements to transfer. Should contain a realistic-style character with entire body or upper body visible, including head, without obstruction. Max 30 s.",
     motionElementHint:
       "Optional element for facial consistency binding. Upload a facial element to enhance identity preservation in the generated video. Only 1 element is supported. Reference in prompt as @Element1. Element binding is only supported when 'Character orientation' is 'video'.",
     uploadPromptVideo: 'Send a video for "{slot}".',

@@ -169,6 +169,7 @@ export class GptImageAdapter implements ImageAdapter {
         throw new UserFacingError(err.message, {
           key: "gptImageModerationBlocked",
           params: { violations },
+          cause: err,
         });
       }
       throw err;
