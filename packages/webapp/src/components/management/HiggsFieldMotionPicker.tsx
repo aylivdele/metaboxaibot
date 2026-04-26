@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api/client.js";
+import { useI18n } from "../../i18n.js";
 import type { HiggsFieldMotion } from "../../types.js";
 import { CustomSlider } from "./CustomSlider.js";
 import { StyledSelect } from "./StyledSelect.js";
@@ -40,6 +41,7 @@ function getCategory(motion: HiggsFieldMotion): string {
 }
 
 export function HiggsFieldMotionPicker({ value, onChange }: HiggsFieldMotionPickerProps) {
+  const { t, locale } = useI18n();
   const [motions, setMotions] = useState<HiggsFieldMotion[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeCategory, setActiveCategory] = useState("all");
@@ -80,11 +82,11 @@ export function HiggsFieldMotionPicker({ value, onChange }: HiggsFieldMotionPick
   };
 
   if (loading) {
-    return <div className="motion-picker__loading">Загрузка пресетов…</div>;
+    return <div className="motion-picker__loading">{t("picker.loadingPresets")}</div>;
   }
 
   if (motions.length === 0) {
-    return <div className="motion-picker__empty">Пресеты не найдены</div>;
+    return <div className="motion-picker__empty">{t("picker.noPresets")}</div>;
   }
 
   return (
@@ -94,13 +96,12 @@ export function HiggsFieldMotionPicker({ value, onChange }: HiggsFieldMotionPick
         onChange={setActiveCategory}
         options={categories.map((cat) => ({
           value: cat,
-          label: cat === "all" ? "Все категории" : cat,
+          label: cat === "all" ? t("picker.categoryAll") : cat,
         }))}
       />
 
       <div className="motion-picker__limit-notice">
-        Можно выбрать не более {MAX_MOTIONS} пресетов. При выборе нового лишний будет заменён
-        автоматически.
+        {t("picker.maxMotions").replace("{max}", String(MAX_MOTIONS))}
       </div>
 
       <div className="motion-picker__grid">
@@ -127,7 +128,9 @@ export function HiggsFieldMotionPicker({ value, onChange }: HiggsFieldMotionPick
               <span className="motion-picker__item-name">{motion.name}</span>
               {selected && (
                 <div className="motion-picker__strength" onClick={(e) => e.stopPropagation()}>
-                  <span className="motion-picker__strength-label">Сила: {strength.toFixed(2)}</span>
+                  <span className="motion-picker__strength-label">
+                    {t("picker.strength").replace("{n}", strength.toFixed(2))}
+                  </span>
                   <CustomSlider
                     min={0.1}
                     max={1.0}
@@ -144,7 +147,9 @@ export function HiggsFieldMotionPicker({ value, onChange }: HiggsFieldMotionPick
 
       {value.length > 0 && (
         <div className="motion-picker__summary">
-          Выбрано: {value.length} пресет{value.length === 1 ? "" : value.length < 5 ? "а" : "ов"}
+          {locale === "ru"
+            ? `Выбрано: ${value.length} пресет${value.length === 1 ? "" : value.length < 5 ? "а" : "ов"}`
+            : t("picker.selectedPresets").replace("{n}", String(value.length))}
         </div>
       )}
     </div>
