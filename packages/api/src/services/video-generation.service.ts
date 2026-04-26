@@ -92,6 +92,7 @@ export interface ValidateVideoParams {
   aspectRatio?: string;
   duration?: number;
   modelSettings?: Record<string, unknown>;
+  mediaInputs?: Record<string, string[]>;
   userId?: bigint;
 }
 
@@ -113,6 +114,7 @@ export const videoGenerationService = {
       aspectRatio: params.aspectRatio,
       duration: params.duration,
       modelSettings: params.modelSettings,
+      mediaInputs: params.mediaInputs,
       userId: params.userId,
     };
     return adapter.validateRequest(input, ctx);
