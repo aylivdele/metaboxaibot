@@ -16,7 +16,9 @@ import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 
 /** USD → tokens с применением per-model multiplier (единый шаблон с calculateCost). */
 function modelUsdToTokens(modelId: string, usd: number): number {
-  return Math.ceil(usdToTokens(usd) * getModelMultiplier(modelId));
+  // Без округления — фронт форматирует через toFixed(2). Округление здесь
+  // распухало бы дробные cost matrix-ячейки (например, 0.012 → 1).
+  return usdToTokens(usd) * getModelMultiplier(modelId);
 }
 
 type AuthRequestM = FastifyRequest & { userId: bigint };

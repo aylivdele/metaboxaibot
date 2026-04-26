@@ -406,12 +406,11 @@ export function calculateCost(
   });
   const addonUsd = computeAddonUsd(model, modelSettings);
   const llmUsd = computeLlmUsd(rates, inputTokens, outputTokens, extra?.cachedInputTokens ?? 0);
-  // Применяем per-model multiplier (по умолчанию 1.0) на финальные токены —
-  // одна детерминированная точка округления. Math.ceil — никогда не списываем
-  // меньше базовой цены при multiplier < 1 (юзер на скидке получит N-1 вместо
-  // N, недокус ≤ 1 токена).
-  const baseTokens = usdToTokens(mediaUsd + addonUsd + llmUsd);
-  return Math.ceil(baseTokens * getModelMultiplier(model.id));
+  // Применяем per-model multiplier (по умолчанию 1.0) на финальные токены.
+  // НЕ округляем — для LLM-моделей одно сообщение часто стоит долю токена
+  // (например, 0.05 ✦), и Math.ceil превращало бы это в 1 ✦ (×20 overcharge).
+  // Внутренние токены — Decimal в БД, fractional accepted в deductTokens.
+  return usdToTokens(mediaUsd + addonUsd + llmUsd) * getModelMultiplier(model.id);
 }
 
 /** Convert a USD cost to internal tokens using the billing config. */

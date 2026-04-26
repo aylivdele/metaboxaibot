@@ -99,8 +99,8 @@ function buildActivationCostLine(
   // Compute cost range via costMatrix
   if (model.costMatrix && !model.costVariants) {
     const multiplier = getModelMultiplier(model.id);
-    const costs = Object.values(model.costMatrix.table).map((v) =>
-      Math.ceil(usdToTokens(v as number) * multiplier),
+    const costs = Object.values(model.costMatrix.table).map(
+      (v) => usdToTokens(v as number) * multiplier,
     );
     const min = Math.min(...costs);
     const max = Math.max(...costs);

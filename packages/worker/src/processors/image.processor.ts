@@ -335,8 +335,10 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
               inputImagesMegapixels,
             });
       // chargeMultiplier > 1 — virtual batch: было K успешных sub-job'ов,
-      // каждый стоил perImageInternalCost. Округление вверх — billing safety.
-      const internalCost = Math.ceil(perImageInternalCost * chargeMultiplier);
+      // каждый стоил perImageInternalCost. БЕЗ округления — для текстовых
+      // моделей (которые сюда не ходят, но соблюдаем единый contract) одно
+      // сообщение может стоить дробно; deductTokens принимает float.
+      const internalCost = perImageInternalCost * chargeMultiplier;
 
       deductResult = await deductTokens(BigInt(userIdStr), internalCost, modelId);
       await db.generationJob.update({
