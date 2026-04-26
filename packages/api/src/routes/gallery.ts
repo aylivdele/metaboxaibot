@@ -85,20 +85,22 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       page?: string;
       limit?: string;
       modelId?: string;
+      modelIds?: string;
       folderId?: string;
     };
   }>("/gallery", async (request) => {
     const userId = (request as AuthRequest).userId;
-    const { section, page = "1", limit = "20", modelId, folderId } = request.query;
+    const { section, page = "1", limit = "20", modelId, modelIds, folderId } = request.query;
 
     const take = Math.min(parseInt(limit, 10) || 20, 100);
     const skip = (Math.max(parseInt(page, 10) || 1, 1) - 1) * take;
 
+    const modelIdsArray = modelIds ? modelIds.split(",").filter(Boolean) : null;
     const where = {
       userId,
       status: "done",
       ...(section ? { section } : {}),
-      ...(modelId ? { modelId } : {}),
+      ...(modelIdsArray ? { modelId: { in: modelIdsArray } } : modelId ? { modelId } : {}),
       ...(folderId ? { folderItems: { some: { folderId } } } : {}),
     };
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
@@ -294,16 +294,32 @@ function GalleryTab({
     loadFolders();
   }, [loadFolders]);
 
+  const resolveModelIdsForFilter = useCallback(
+    (filter: string | null): { modelId?: string; modelIds?: string } => {
+      if (!filter) return {};
+      if (filter.startsWith("family:")) {
+        const familyId = filter.slice(7);
+        const ids = Object.values(modelsById)
+          .filter((m) => m.familyId === familyId)
+          .map((m) => m.id);
+        return ids.length > 0 ? { modelIds: ids.join(",") } : {};
+      }
+      return { modelId: filter };
+    },
+    [modelsById],
+  );
+
   const load = useCallback(
     (sec: Section, pg: number, mid: string | null, folderId: string | null) => {
       setLoading(true);
       setError(null);
+      const modelParams = resolveModelIdsForFilter(mid);
       api.gallery
         .list({
           section: sec,
           page: pg,
           limit: LIMIT,
-          modelId: mid ?? undefined,
+          ...modelParams,
           folderId: folderId ?? undefined,
         })
         .then((res) => {
@@ -313,7 +329,7 @@ function GalleryTab({
         .catch((err: Error) => setError(err.message))
         .finally(() => setLoading(false));
     },
-    [],
+    [resolveModelIdsForFilter],
   );
 
   useEffect(() => {
@@ -423,9 +439,33 @@ function GalleryTab({
   const favFolder = folders.find((f) => f.isDefault);
 
   const activeSectionKey = section === "image" ? "design" : section;
-  const sectionModels = Object.values(modelsById)
-    .filter((m) => m.section === activeSectionKey)
-    .sort((a, b) => (modelCounts[b.id] ?? 0) - (modelCounts[a.id] ?? 0));
+
+  const pickerOptions = useMemo(() => {
+    const allModels = Object.values(modelsById).filter((m) => m.section === activeSectionKey);
+    const familyCountMap = new Map<string, number>();
+    for (const m of allModels) {
+      if (m.familyId) {
+        familyCountMap.set(m.familyId, (familyCountMap.get(m.familyId) ?? 0) + (modelCounts[m.id] ?? 0));
+      }
+    }
+    const seenFamilies = new Set<string>();
+    const opts: { value: string; label: string; count: number }[] = [];
+    for (const m of allModels) {
+      if (m.familyId) {
+        if (!seenFamilies.has(m.familyId)) {
+          seenFamilies.add(m.familyId);
+          opts.push({
+            value: `family:${m.familyId}`,
+            label: m.familyName ?? m.familyId,
+            count: familyCountMap.get(m.familyId) ?? 0,
+          });
+        }
+      } else {
+        opts.push({ value: m.id, label: m.name, count: modelCounts[m.id] ?? 0 });
+      }
+    }
+    return opts.sort((a, b) => b.count - a.count);
+  }, [modelsById, modelCounts, activeSectionKey]);
 
   return (
     <>
@@ -484,14 +524,14 @@ function GalleryTab({
         )}
       </div>
 
-      {sectionModels.length > 0 && (
+      {pickerOptions.length > 0 && (
         <StyledSelect
           style={{ display: "inline-block" }}
           value={modelFilter ?? ""}
           onChange={(v) => handleModelFilterChange(v === "" ? null : v)}
           options={[
             { value: "", label: t("gallery.allModels") },
-            ...sectionModels.map((m) => ({ value: m.id, label: m.name })),
+            ...pickerOptions.map((opt) => ({ value: opt.value, label: opt.label })),
           ]}
         />
       )}
