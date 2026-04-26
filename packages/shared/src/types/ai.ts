@@ -294,6 +294,14 @@ export interface AIModel {
    * в существующий multi-output UX и спишет только за успешные.
    */
   maxVirtualBatch?: number;
+  /**
+   * Native batch с per-output биллингом: провайдер берёт деньги за каждое
+   * сгенерированное изображение отдельно (Replicate Midjourney и т.п.).
+   * При >1 outputs из одного API-call'а финал умножит cost на K (count).
+   * По умолчанию false — это означает, что `costUsdPerRequest` уже покрывает
+   * весь call независимо от количества изображений (KIE nano-banana и т.п.).
+   */
+  chargePerOutput?: boolean;
   contextStrategy: ContextStrategy;
   contextMaxMessages: number; // актуально для db_history: сколько сообщений отправлять
   /**

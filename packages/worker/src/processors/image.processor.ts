@@ -575,7 +575,18 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
               }),
           });
           const imageResults: ImageResult[] = Array.isArray(genResult) ? genResult : [genResult];
-          if (!(await finalizeResults(imageResults))) return;
+          // Native batch: для моделей где провайдер биллит per-output (Midjourney
+          // через Replicate с num_outputs > 1) — умножаем cost на K. Для KIE
+          // и подобных провайдеров с per-call биллингом флаг не задан → K не применим.
+          const nativeBatchCharge =
+            modelMeta?.chargePerOutput && imageResults.length > 1 ? imageResults.length : undefined;
+          if (
+            !(await finalizeResults(
+              imageResults,
+              nativeBatchCharge ? { chargeMultiplier: nativeBatchCharge } : {},
+            ))
+          )
+            return;
         } else {
           // Async adapter — submit then schedule poll.
           if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
@@ -763,7 +774,17 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         }
 
         const imageResults: ImageResult[] = Array.isArray(pollResult) ? pollResult : [pollResult];
-        if (!(await finalizeResults(imageResults))) return;
+        // См. sync-adapter аналог выше — chargePerOutput для native batch
+        // с per-image биллингом провайдера (Midjourney через Replicate).
+        const nativeBatchCharge =
+          modelMeta?.chargePerOutput && imageResults.length > 1 ? imageResults.length : undefined;
+        if (
+          !(await finalizeResults(
+            imageResults,
+            nativeBatchCharge ? { chargeMultiplier: nativeBatchCharge } : {},
+          ))
+        )
+          return;
       }
     }
 

@@ -585,6 +585,11 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
+    // Native batch: Replicate API параметром `num_outputs` возвращает 1-4 картинки
+    // за один call. nativeBatchMax > 1 → virtual batch для модели не применяется.
+    // chargePerOutput → finalize умножит стоимость на K (Replicate биллит per-image).
+    nativeBatchMax: 4,
+    chargePerOutput: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: [
@@ -601,6 +606,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       "9:21",
     ],
     settings: [
+      NUM_IMAGES_SETTING,
       mkAspectRatio([
         "1:1",
         "16:9",

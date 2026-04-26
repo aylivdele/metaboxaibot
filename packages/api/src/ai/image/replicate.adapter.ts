@@ -117,6 +117,12 @@ export class ReplicateAdapter implements ImageAdapter {
     if (ms.model) msExtras.model = ms.model;
     if (ms.image_size) msExtras.image_size = ms.image_size;
     if (ms.safety_filter_level) msExtras.safety_filter_level = ms.safety_filter_level;
+    // Native batch: midjourney/FLUX/SD на Replicate принимают num_outputs (1-4).
+    // Берём из num_images (наш единый picker), кэпим по 1..4.
+    if (ms.num_images !== undefined) {
+      const n = Math.max(1, Math.min(4, Number(ms.num_images) || 1));
+      if (n > 1) msExtras.num_outputs = n;
+    }
 
     const useDirectAspectRatio =
       DIRECT_ASPECT_RATIO_MODELS.has(this.modelId) || IDEOGRAM_MODELS.has(this.modelId);
@@ -189,17 +195,27 @@ export class ReplicateAdapter implements ImageAdapter {
     return prediction.id;
   }
 
-  async poll(predictionId: string): Promise<ImageResult | null> {
+  async poll(predictionId: string): Promise<ImageResult | ImageResult[] | null> {
     const prediction = await this.client.predictions.get(predictionId);
 
     if (prediction.status === "succeeded") {
       const output = prediction.output as string[] | string | undefined;
-      const url = Array.isArray(output) ? output[0] : output;
-      if (!url) throw new Error("Replicate returned no image URL");
-      // Detect format from URL (Replicate URLs end with .png, .jpg, .webp, etc.)
-      const urlExt = url.split("?")[0].split(".").pop()?.toLowerCase() ?? "png";
+      // Если провайдер вернул массив (native batch с num_outputs > 1) — отдаём
+      // ImageResult[]. Image processor уже умеет обрабатывать array (Stage 3
+      // mediaGroup + button matrix).
+      if (Array.isArray(output)) {
+        if (output.length === 0) throw new Error("Replicate returned no image URLs");
+        return output.map((url, i) => {
+          const urlExt = url.split("?")[0].split(".").pop()?.toLowerCase() ?? "png";
+          const contentType =
+            urlExt === "jpg" || urlExt === "jpeg" ? "image/jpeg" : `image/${urlExt}`;
+          return { url, filename: `${this.modelId}-${i}.${urlExt}`, contentType };
+        });
+      }
+      if (!output) throw new Error("Replicate returned no image URL");
+      const urlExt = output.split("?")[0].split(".").pop()?.toLowerCase() ?? "png";
       const contentType = urlExt === "jpg" || urlExt === "jpeg" ? "image/jpeg" : `image/${urlExt}`;
-      return { url, filename: `${this.modelId}.${urlExt}`, contentType };
+      return { url: output, filename: `${this.modelId}.${urlExt}`, contentType };
     }
 
     if (prediction.status === "failed" || prediction.status === "canceled") {
