@@ -455,19 +455,34 @@ async function sendVideoSlotUploadPrompt(
     section: "video",
   });
 
-  const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
   const maxImages = slot.maxImages ?? 1;
-  const isVideoSlot = slot.mode === "motion_video" || slot.mode === "first_clip";
-  const msg =
-    slot.mode === "reference_element"
-      ? ctx.t.mediaInput.uploadPromptElement.replace("{slot}", String(label))
-      : isVideoSlot
-        ? ctx.t.mediaInput.uploadPromptVideo.replace("{slot}", String(label))
-        : maxImages > 1
-          ? ctx.t.mediaInput.uploadPromptMulti
-              .replace("{slot}", String(label))
-              .replace("{max}", String(maxImages))
-          : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
+  let msg: string;
+  if (slot.mode === "reference_element") {
+    const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+    msg = ctx.t.mediaInput.uploadPromptElement.replace("{slot}", String(label));
+  } else if (slot.mode === "motion_video") {
+    msg = ctx.t.mediaInput.uploadPromptVideoMotionVideo;
+  } else if (slot.mode === "first_clip") {
+    msg = ctx.t.mediaInput.uploadPromptVideoFirstClip;
+  } else if (maxImages > 1) {
+    if (slot.labelKey === "referenceVideos") {
+      msg = ctx.t.mediaInput.uploadPromptVideoRefVideos.replace("{max}", String(maxImages));
+    } else if (slot.labelKey === "referenceAudios") {
+      msg = ctx.t.mediaInput.uploadPromptVideoRefAudios.replace("{max}", String(maxImages));
+    } else {
+      msg = ctx.t.mediaInput.uploadPromptVideoRefImages.replace("{max}", String(maxImages));
+    }
+  } else if (slot.labelKey === "lastFrame") {
+    msg = ctx.t.mediaInput.uploadPromptVideoLastFrame;
+  } else if (slot.labelKey === "motionImage") {
+    msg = ctx.t.mediaInput.uploadPromptVideoMotionImage;
+  } else if (slot.labelKey === "drivingAudio") {
+    msg = ctx.t.mediaInput.uploadPromptVideoDrivingAudio;
+  } else if (slot.labelKey === "reference") {
+    msg = ctx.t.mediaInput.uploadPromptDesignRef;
+  } else {
+    msg = ctx.t.mediaInput.uploadPromptVideoFirstFrame;
+  }
   const kb = new InlineKeyboard().text(ctx.t.mediaInput.cancel, `mi_cancel:video`);
   const isWan = modelId === "wan";
   const isKlingMotion = modelId === "kling-motion" || modelId === "kling-motion-pro";
