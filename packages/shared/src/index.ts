@@ -30,6 +30,10 @@ export type {
 // Constants
 export { SUPPORTED_LANGUAGES, LANGUAGE_LABELS, RTL_LANGUAGES } from "./constants/languages.js";
 export { AI_MODELS, MODELS_BY_SECTION } from "./constants/models.js";
+export { FALLBACK_DESIGN_MODELS } from "./constants/models/design.models.js";
+export { FALLBACK_VIDEO_MODELS } from "./constants/models/video.models.js";
+export { getFallbackCandidates, isFallbackCompatible } from "./constants/models/fallback.js";
+export type { FallbackSection } from "./constants/models/fallback.js";
 export {
   MODEL_FAMILIES,
   FAMILIES_BY_SECTION,

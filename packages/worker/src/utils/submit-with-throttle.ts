@@ -22,7 +22,11 @@
  */
 
 import type { Job, Queue } from "bullmq";
-import { checkThrottle, tripThrottle } from "@metabox/api/services/throttle";
+import {
+  checkThrottle,
+  tripThrottle,
+  markProviderLongCooldown,
+} from "@metabox/api/services/throttle";
 import { classifyRateLimit, LONG_WINDOW_THRESHOLD_MS } from "@metabox/api/utils/rate-limit-error";
 import { markRateLimited, recordSuccess, recordError } from "@metabox/api/services/key-pool";
 import { notifyRateLimit } from "./notify-error.js";
@@ -138,6 +142,12 @@ export async function submitWithThrottle<T, D extends object>(
     }
 
     if (cls.isLongWindow || cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS) {
+      // Provider-wide маркер: на TTL=cooldownMs провайдер считается "лежачим",
+      // submit-fallback цикл будет пропускать его без вызова acquireKey.
+      // Per-key throttle уже выставлен выше через markRateLimited/tripThrottle.
+      if (provider) {
+        void markProviderLongCooldown(provider, cls.cooldownMs, cls.reason);
+      }
       logger.warn(
         { modelId, keyId, cooldownMs: cls.cooldownMs, reason: cls.reason },
         "submitWithThrottle: long-window quota — failing job",

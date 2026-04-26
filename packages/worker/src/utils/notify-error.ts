@@ -5,6 +5,7 @@
 
 import { config } from "@metabox/shared";
 import { Api } from "grammy";
+import { getRedis } from "@metabox/api/redis";
 
 const telegram = new Api(config.bot.token);
 
@@ -147,6 +148,81 @@ export async function notifyRateLimit(ctx: RateLimitNotificationContext): Promis
 
   await telegram
     .sendMessage(chatId, text, {
+      parse_mode: "HTML",
+      ...(threadId ? { message_thread_id: threadId } : {}),
+    })
+    .catch(() => void 0);
+}
+
+export interface FallbackNotificationContext {
+  /** "image" | "video" */
+  section: string;
+  /** Common modelId (primary == fallback id by construction). */
+  modelId: string;
+  /** Provider строка primary модели. */
+  primaryProvider: string;
+  /** Provider строка модели на которую переключились (или null если все упали). */
+  fallbackProvider: string | null;
+  /** Причина переключения. */
+  reason:
+    | "pool_exhausted"
+    | "long_window_rate_limit"
+    | "persistent_5xx"
+    | "provider_long_cooldown_marker"
+    | "all_candidates_failed";
+  /** GenerationJob.id для трассировки. */
+  jobId?: string;
+  /** Internal user ID, если доступен. */
+  userId?: string;
+}
+
+const FALLBACK_ALERT_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Алерт в технический tg-канал о факте fallback'а. Дедуплицируется через
+ * Redis SETNX (TTL 5 мин) по ключу `alert:fallback:<primary>:<fallback>` —
+ * первый fallback за окно отправляется, последующие в том же окне пишутся
+ * только в лог.
+ *
+ * Для случая `fallbackProvider === null` (все кандидаты упали) — отдельный
+ * ключ `alert:fallback:<primary>:NONE`.
+ */
+export async function notifyFallback(ctx: FallbackNotificationContext): Promise<void> {
+  const chatId = config.alerts.chatId;
+  if (!chatId) return;
+
+  const fbLabel = ctx.fallbackProvider ?? "NONE";
+  // Включаем modelId в ключ — иначе разные модели одного провайдера маскируют
+  // алерты друг друга (flux-2 fal→kie за минуту до seedream-5 fal→kie скрыл бы
+  // второй алерт).
+  const dedupeKey = `alert:fallback:${ctx.modelId}:${ctx.primaryProvider}:${fbLabel}`;
+  const redis = getRedis();
+  const setResult = await redis
+    .set(dedupeKey, ctx.reason, "PX", FALLBACK_ALERT_TTL_MS, "NX")
+    .catch(() => null);
+  if (setResult !== "OK") return; // дубликат за окно — не шлём
+
+  const threadId = config.alerts.threadId;
+  const allFailed = ctx.fallbackProvider === null;
+  const header = allFailed
+    ? `❌ <b>Fallback FAILED</b> [${ctx.section}/${ctx.modelId}]`
+    : `🔁 <b>Fallback</b> [${ctx.section}/${ctx.modelId}]`;
+
+  const lines: string[] = [header];
+  if (allFailed) {
+    lines.push(`all candidates exhausted (primary: <code>${ctx.primaryProvider}</code>)`);
+  } else {
+    lines.push(`<code>${ctx.primaryProvider}</code> → <code>${ctx.fallbackProvider}</code>`);
+  }
+  lines.push(`reason: <code>${ctx.reason}</code>`);
+
+  const meta: string[] = [];
+  if (ctx.jobId) meta.push(`job: <code>${ctx.jobId}</code>`);
+  if (ctx.userId) meta.push(`user: <code>${ctx.userId}</code>`);
+  if (meta.length) lines.push(meta.join(" | "));
+
+  await telegram
+    .sendMessage(chatId, lines.join("\n"), {
       parse_mode: "HTML",
       ...(threadId ? { message_thread_id: threadId } : {}),
     })

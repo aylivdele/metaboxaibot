@@ -15,6 +15,7 @@ import { logger } from "../logger.js";
 
 const PREFIX = "throttle:model:";
 const KEY_PREFIX = "throttle:key:";
+const PROVIDER_LONG_COOLDOWN_PREFIX = "provider:long-cooldown:";
 
 function key(modelId: string): string {
   return `${PREFIX}${modelId}`;
@@ -22,6 +23,10 @@ function key(modelId: string): string {
 
 function keyKey(keyId: string): string {
   return `${KEY_PREFIX}${keyId}`;
+}
+
+function providerLongCooldownKey(provider: string): string {
+  return `${PROVIDER_LONG_COOLDOWN_PREFIX}${provider}`;
 }
 
 export interface ThrottleStatus {
@@ -110,4 +115,53 @@ export async function tripKeyThrottle(
 /** Сбросить cooldown с ключа вручную (используется admin clear-throttle endpoint). */
 export async function clearKeyThrottle(keyId: string): Promise<void> {
   await getRedis().del(keyKey(keyId));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Provider-wide long-cooldown marker
+//
+// Когда мы получаем long-window rate-limit (часовой и более) от какого-то
+// провайдера, ставим provider-уровневый Redis-флаг с TTL = cooldownMs.
+// Submit-fallback цикл проверяет этот флаг ДО `acquireKey` и пропускает
+// провайдера мгновенно, не плодя лишних acquire/submit при очевидно лежачем
+// провайдере. Когда TTL истёк → флаг исчезает сам, primary снова в игре.
+//
+// Per-key throttle при этом продолжает работать как раньше: ключи с коротким
+// cooldown'ом обрабатываются acquireKey'ем без участия этого маркера.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Поставить provider-wide long-cooldown маркер. TTL = cooldownMs. */
+export async function markProviderLongCooldown(
+  provider: string,
+  cooldownMs: number,
+  reason: string,
+): Promise<void> {
+  if (cooldownMs <= 0) return;
+  const redis = getRedis();
+  await redis.set(providerLongCooldownKey(provider), reason, "PX", cooldownMs);
+  logger.warn(
+    { provider, cooldownMs, reason },
+    "throttle.markProviderLongCooldown: provider-wide gate set",
+  );
+}
+
+/** True если у провайдера активен provider-wide long-cooldown маркер. */
+export async function isProviderInLongCooldown(provider: string): Promise<boolean> {
+  return (await getRedis().exists(providerLongCooldownKey(provider))) === 1;
+}
+
+/**
+ * Возвращает оставшееся время cooldown'а в миллисекундах, либо null если маркер
+ * не активен. Нужно когда мы хотим использовать актуальный TTL для defer'а
+ * job'а вместо хардкод-минуты.
+ */
+export async function getProviderLongCooldownRemaining(provider: string): Promise<number | null> {
+  const pttl = await getRedis().pttl(providerLongCooldownKey(provider));
+  // ioredis returns -2 if key doesn't exist, -1 if no expiry, >= 0 if has expiry.
+  return pttl > 0 ? pttl : null;
+}
+
+/** Сбросить provider-wide маркер вручную (для оператора). */
+export async function clearProviderLongCooldown(provider: string): Promise<void> {
+  await getRedis().del(providerLongCooldownKey(provider));
 }

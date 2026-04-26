@@ -1567,3 +1567,16 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
   //   ],
   // },
 };
+
+/**
+ * Fallback-альтернативы для видео-моделей. `id` совпадает с primary
+ * из VIDEO_MODELS; `provider` (и всё остальное) — собственное.
+ * При недоступности primary processor возьмёт первую запись с тем же id,
+ * совместимую с media-режимом задачи (см. isFallbackCompatible).
+ *
+ * Пустой массив = fallback выключен. Цена для биллинга всегда берётся
+ * из primary, независимо от того, какой fallback сработал.
+ *
+ * Для sticky-моделей (HeyGen avatar) fallback не имеет смысла — не заполняем.
+ */
+export const FALLBACK_VIDEO_MODELS: AIModel[] = [];

@@ -2210,3 +2210,14 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     ],
   },
 };
+
+/**
+ * Fallback-альтернативы для дизайн-моделей. `id` совпадает с primary
+ * из DESIGN_MODELS; `provider` (и всё остальное) — собственное.
+ * При недоступности primary processor возьмёт первую запись с тем же id,
+ * совместимую с media-режимом задачи (см. isFallbackCompatible).
+ *
+ * Пустой массив = fallback выключен. Цена для биллинга всегда берётся
+ * из primary, независимо от того, какой fallback сработал.
+ */
+export const FALLBACK_DESIGN_MODELS: AIModel[] = [];

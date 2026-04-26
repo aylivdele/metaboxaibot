@@ -120,6 +120,18 @@ function parseRetryAfter(headers?: Record<string, string | string[] | undefined>
   return null;
 }
 
+/**
+ * Returns true if the error looks like an HTTP 5xx response.
+ * Используется в fallback-логике как «provider transient failure» сигнал,
+ * отличный от 429 (rate-limit) и валидационных 4xx.
+ */
+export function isFiveXxError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { status?: number; statusCode?: number; response?: { status?: number } };
+  const status = e.status ?? e.statusCode ?? e.response?.status;
+  return typeof status === "number" && status >= 500 && status < 600;
+}
+
 /** Classify an arbitrary thrown error as rate-limit-related or not. */
 export function classifyRateLimit(err: unknown, provider?: string): RateLimitClassification {
   const e = asErrorLike(err);

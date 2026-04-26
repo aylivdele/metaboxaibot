@@ -6,7 +6,6 @@ import { getIntervalForElapsed } from "../utils/poll-schedule.js";
 import { Api } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
 import type { ImageJobData } from "@metabox/api/queues";
-import { getImageQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createImageAdapter } from "@metabox/api/ai/image";
 import type { ImageResult } from "@metabox/api/ai/image";
@@ -30,12 +29,21 @@ import { buildDownloadButton } from "@metabox/api/utils/download-token";
 import { isUniqueViolation } from "../utils/prisma-errors.js";
 import { InputFile } from "grammy";
 import { logger } from "../logger.js";
-import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
+import {
+  config,
+  AI_MODELS,
+  getT,
+  buildResultCaption,
+  getFallbackCandidates,
+  isFallbackCompatible,
+} from "@metabox/shared";
+import type { AIModel } from "@metabox/shared";
 import type { DeductResult } from "@metabox/api/services";
 import { notifyTechError, notifyRateLimit } from "../utils/notify-error.js";
-import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
-import { acquireForSubmit, acquireForPoll } from "../utils/acquire-for-processor.js";
-import { resolveKeyProvider } from "@metabox/api/ai/key-provider";
+import { isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
+import { submitWithFallback } from "../utils/submit-with-fallback.js";
+import { acquireForPoll } from "../utils/acquire-for-processor.js";
+import { resolveKeyProviderForModel } from "@metabox/api/ai/key-provider";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
 import {
   acquireKey,
@@ -43,8 +51,13 @@ import {
   recordError,
   recordSuccess,
 } from "@metabox/api/services/key-pool";
+import { isProviderInLongCooldown, markProviderLongCooldown } from "@metabox/api/services/throttle";
 import { isPoolExhaustedError } from "@metabox/api/utils/pool-exhausted-error";
-import { classifyRateLimit, LONG_WINDOW_THRESHOLD_MS } from "@metabox/api/utils/rate-limit-error";
+import {
+  classifyRateLimit,
+  isFiveXxError,
+  LONG_WINDOW_THRESHOLD_MS,
+} from "@metabox/api/utils/rate-limit-error";
 import type { Prisma } from "@prisma/client";
 
 /**
@@ -62,6 +75,12 @@ interface VirtualBatchSubJob {
   status: "pending" | "succeeded" | "failed";
   providerJobId?: string | null;
   providerKeyId?: string | null;
+  /**
+   * Provider строка, на которой sub-job был засабмичен. Может быть primary
+   * `provider` или fallback'овый. На poll-стадии processor использует это
+   * поле чтобы подобрать правильный AIModel + adapter.
+   */
+  effectiveProvider?: string;
   /** Sync-адаптер: результат, чтобы restart не сабмитил повторно. */
   result?: ImageResult;
   error?: string;
@@ -69,6 +88,22 @@ interface VirtualBatchSubJob {
 interface VirtualBatchState {
   n: number;
   subJobs: VirtualBatchSubJob[];
+}
+
+/**
+ * State-shape `inputData.fallback` (для single-shot path).
+ *
+ * - `effectiveProvider`: provider строка, на которой состоялся успешный submit.
+ *   Poll-stage использует её для выбора адаптера.
+ *
+ * Для virtual batch sticky-lock derived из `subJobs[*].effectiveProvider` —
+ * не дублируется в FallbackState, чтобы избежать race'а между двумя записями
+ * в inputData (writeBatchState + writeFallbackState).
+ */
+interface FallbackState {
+  primaryProvider: string;
+  effectiveProvider?: string;
+  attemptedProviders?: string[];
 }
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
@@ -146,7 +181,20 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
   const t = getT(userLang);
   const modelMeta = AI_MODELS[modelId];
   const modelName = modelMeta?.name ?? modelId;
-  const keyProvider = resolveKeyProvider(modelId);
+
+  // Fallback-кандидаты: уже отфильтрованные по media-режиму задачи (если у
+  // задачи есть, например, edit slots — fallback должен их поддерживать).
+  const fallbackCandidates: AIModel[] = modelMeta
+    ? getFallbackCandidates(modelId, "design").filter((m) =>
+        isFallbackCompatible(m, job.data.mediaInputs),
+      )
+    : [];
+
+  /** Подобрать AIModel по provider строке (primary или один из fallback'ов). */
+  const findModelByProvider = (provider: string): AIModel | undefined => {
+    if (modelMeta?.provider === provider) return modelMeta;
+    return fallbackCandidates.find((m) => m.provider === provider);
+  };
 
   // ── Virtual batch detection ─────────────────────────────────────────────
   // Если модель — single-only (`nativeBatchMax === 1`) и у неё задан
@@ -204,6 +252,35 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         data: { inputData: merged as unknown as Prisma.InputJsonValue },
       });
       // Также обновляем in-memory snapshot, чтобы readBatchState() сразу видел новое.
+      if (existingJob) {
+        (existingJob.inputData as unknown) = merged;
+      }
+    };
+
+    /** Прочитать текущее fallback-state из inputData. */
+    const readFallbackState = (): FallbackState => {
+      const raw = (existingJob?.inputData as Record<string, unknown> | null | undefined)
+        ?.fallback as FallbackState | undefined;
+      return {
+        primaryProvider: modelMeta?.provider ?? "",
+        ...(raw ?? {}),
+      };
+    };
+
+    /** Записать обновлённое fallback-state в inputData (мерджится). */
+    const writeFallbackState = async (next: FallbackState): Promise<void> => {
+      const current = await db.generationJob.findUnique({
+        where: { id: dbJobId },
+        select: { inputData: true },
+      });
+      const merged = {
+        ...((current?.inputData as Record<string, unknown> | null | undefined) ?? {}),
+        fallback: next,
+      };
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { inputData: merged as unknown as Prisma.InputJsonValue },
+      });
       if (existingJob) {
         (existingJob.inputData as unknown) = merged;
       }
@@ -326,7 +403,25 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
       // Adapter-supplied cost (e.g. gpt-image, which sums text + image input +
       // output tokens from OpenAI usage) wins over the matrix lookup, since
       // the matrix only covers per-image output cost.
-      const adapterUsdCost = firstResult.providerUsdCost;
+      //
+      // ВАЖНО: при fallback'е игнорируем adapter cost — иначе пользователь
+      // мог бы переплатить по более дорогой схеме fallback провайдера. Цена
+      // всегда по primary (см. план fallback'а).
+      //
+      // Detection: для single-shot читаем `inputData.fallback.effectiveProvider`,
+      // для virtual batch — derive из `subJobs[*].effectiveProvider` (см. A4
+      // в audit'е: lockedProvider не хранится отдельно во избежание race'ов).
+      const fbState = readFallbackState();
+      let effectiveProviderForBilling = fbState.effectiveProvider;
+      if (!effectiveProviderForBilling && isVirtualBatch) {
+        const vbState = readBatchState();
+        effectiveProviderForBilling = vbState.subJobs.find(
+          (s) => s.effectiveProvider,
+        )?.effectiveProvider;
+      }
+      const usedFallback =
+        !!effectiveProviderForBilling && effectiveProviderForBilling !== model.provider;
+      const adapterUsdCost = usedFallback ? undefined : firstResult.providerUsdCost;
       const perImageInternalCost =
         adapterUsdCost !== undefined
           ? usdToTokens(adapterUsdCost)
@@ -396,6 +491,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
       // Skip-на-failure: 429/PoolExhausted/generic от одного sub-job не обрывают
       // батч, помечают только этот sub-job как failed и продолжаем.
       if (isVirtualBatch) {
+        if (!modelMeta) throw new Error(`Unknown image model: ${modelId}`);
         const state = readBatchState();
         // Пробегаем по sub-job'ам в порядке индекса. Уже sub-job с providerJobId
         // или терминальным статусом — restart-recovery, пропускаем.
@@ -417,83 +513,156 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             );
           }
 
-          let subAcquired: Awaited<ReturnType<typeof acquireKey>> | null = null;
-          try {
-            subAcquired = await acquireKey(keyProvider);
-          } catch (e) {
-            if (isPoolExhaustedError(e)) {
-              state.subJobs[i] = {
-                status: "failed",
-                error: "Pool exhausted: no provider keys available",
-              };
-              await writeBatchState(state);
-              continue;
-            }
-            throw e;
+          // Sticky: если в batch уже есть sub-job с известным effectiveProvider
+          // (succeeded ИЛИ pending с providerJobId), все остальные sub-jobs идут
+          // на этот же provider. Derive из subJobs — без отдельного хранения,
+          // чтобы избежать race'а между writeBatchState и writeFallbackState.
+          const lockedProvider = state.subJobs
+            .slice(0, i)
+            .find(
+              (s) =>
+                s.effectiveProvider &&
+                (s.status === "succeeded" || (s.status === "pending" && s.providerJobId)),
+            )?.effectiveProvider;
+
+          const subCandidates: AIModel[] = lockedProvider
+            ? (() => {
+                const m = findModelByProvider(lockedProvider);
+                return m ? [m] : [];
+              })()
+            : [modelMeta, ...fallbackCandidates];
+
+          if (subCandidates.length === 0) {
+            state.subJobs[i] = {
+              status: "failed",
+              error: `Locked provider ${lockedProvider} not found`,
+            };
+            await writeBatchState(state);
+            continue;
           }
 
-          const subAdapter = createImageAdapter(modelId, subAcquired);
-          try {
-            if (!subAdapter.isAsync && subAdapter.generate) {
-              const r = await subAdapter.generate({
-                prompt: effectivePrompt,
-                negativePrompt,
-                imageUrl: job.data.sourceImageUrl,
-                mediaInputs: job.data.mediaInputs,
-                aspectRatio,
-                modelSettings,
-              });
-              const result = Array.isArray(r) ? r[0] : r;
-              state.subJobs[i] = {
-                status: "succeeded",
-                providerKeyId: subAcquired.keyId,
-                result,
-              };
-              if (subAcquired.keyId) void recordSuccess(subAcquired.keyId);
-            } else if (subAdapter.submit) {
-              const providerJobId = await subAdapter.submit({
-                prompt: effectivePrompt,
-                negativePrompt,
-                imageUrl: job.data.sourceImageUrl,
-                mediaInputs: job.data.mediaInputs,
-                aspectRatio,
-                modelSettings,
-              });
-              state.subJobs[i] = {
-                status: "pending",
-                providerJobId,
-                providerKeyId: subAcquired.keyId,
-              };
-              // Submit accepted by provider — counts as success for per-key metrics
-              // (то же поведение что в submitWithThrottle для non-VB path).
-              if (subAcquired.keyId) void recordSuccess(subAcquired.keyId);
-            } else {
-              throw new Error(`Adapter ${modelId} has no generate()/submit()`);
+          // Per-sub-job candidate loop. На каждом кандидате:
+          // - pre-check long-cooldown маркер → skip
+          // - acquireKey → PoolExhausted skip, прочее throw
+          // - submit:
+          //   • success → mark sub-job succeeded, выходим из loop'а
+          //   • short 429 / non-rate-limit / 5xx-without-allow → mark sub-job
+          //     failed, выходим (НЕ ходим к следующему кандидату — это не
+          //     "недоступность primary", это локальная проблема одного запроса)
+          //   • long-window 429 / 5xx (allowFiveXxFallback) → continue к следующему
+          //     кандидату
+          // Если sticky locked — кандидат всего один, при failure sub-job просто
+          // помечается failed (строгий sticky).
+          const allowFiveXxFallback = job.attemptsMade >= 2;
+          let subSettled = false;
+          let lastSubError = "";
+
+          for (const candidate of subCandidates) {
+            const candidateProvider = candidate.provider;
+            const candidateKeyProvider = resolveKeyProviderForModel(candidate);
+
+            if (await isProviderInLongCooldown(candidateKeyProvider).catch(() => false)) {
+              lastSubError = `${candidateProvider} in long cooldown`;
+              continue;
             }
-          } catch (err) {
-            // Per-sub-job error handling: classify as 429 vs generic, record on
-            // key, mark sub-job failed. NEVER rethrow — batch must continue.
-            const cls = classifyRateLimit(err, keyProvider);
-            const message = err instanceof Error ? err.message : String(err);
-            if (cls.isRateLimit) {
-              if (subAcquired.keyId) {
-                void markRateLimited(subAcquired.keyId, cls.cooldownMs, cls.reason);
+
+            let subAcquired: Awaited<ReturnType<typeof acquireKey>>;
+            try {
+              subAcquired = await acquireKey(candidateKeyProvider);
+            } catch (e) {
+              if (isPoolExhaustedError(e)) {
+                lastSubError = `${candidateProvider} pool exhausted`;
+                continue;
+              }
+              throw e;
+            }
+
+            const subAdapter = createImageAdapter(candidate, subAcquired);
+            try {
+              if (!subAdapter.isAsync && subAdapter.generate) {
+                const r = await subAdapter.generate({
+                  prompt: effectivePrompt,
+                  negativePrompt,
+                  imageUrl: job.data.sourceImageUrl,
+                  mediaInputs: job.data.mediaInputs,
+                  aspectRatio,
+                  modelSettings,
+                });
+                const result = Array.isArray(r) ? r[0] : r;
+                state.subJobs[i] = {
+                  status: "succeeded",
+                  providerKeyId: subAcquired.keyId,
+                  effectiveProvider: candidateProvider,
+                  result,
+                };
+              } else if (subAdapter.submit) {
+                const providerJobId = await subAdapter.submit({
+                  prompt: effectivePrompt,
+                  negativePrompt,
+                  imageUrl: job.data.sourceImageUrl,
+                  mediaInputs: job.data.mediaInputs,
+                  aspectRatio,
+                  modelSettings,
+                });
+                state.subJobs[i] = {
+                  status: "pending",
+                  providerJobId,
+                  providerKeyId: subAcquired.keyId,
+                  effectiveProvider: candidateProvider,
+                };
+              } else {
+                throw new Error(`Adapter ${modelId} has no generate()/submit()`);
+              }
+              if (subAcquired.keyId) void recordSuccess(subAcquired.keyId);
+              subSettled = true;
+              break;
+            } catch (err) {
+              const cls = classifyRateLimit(err, candidateKeyProvider);
+              const message = err instanceof Error ? err.message : String(err);
+              if (cls.isRateLimit) {
+                if (subAcquired.keyId) {
+                  void markRateLimited(subAcquired.keyId, cls.cooldownMs, cls.reason);
+                }
+                const isLong = cls.isLongWindow || cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS;
+                if (isLong) {
+                  void markProviderLongCooldown(candidateKeyProvider, cls.cooldownMs, cls.reason);
+                  void notifyRateLimit({
+                    section: "image",
+                    modelId,
+                    cooldownMs: cls.cooldownMs,
+                    reason: cls.reason,
+                    isLongWindow: true,
+                  });
+                  lastSubError = `long-window: ${message.slice(0, 200)}`;
+                  continue; // → следующий кандидат (long-window триггерит fallback)
+                }
+                // Short-window 429 — НЕ fallback, mark sub-job failed.
                 void notifyRateLimit({
                   section: "image",
                   modelId,
                   cooldownMs: cls.cooldownMs,
                   reason: cls.reason,
-                  isLongWindow: cls.isLongWindow || cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS,
+                  isLongWindow: false,
                 });
+                lastSubError = `rate-limit: ${message.slice(0, 200)}`;
+                break;
               }
-              state.subJobs[i] = {
-                status: "failed",
-                error: `rate-limit: ${message.slice(0, 200)}`,
-              };
-            } else {
+              if (isFiveXxError(err) && allowFiveXxFallback) {
+                if (subAcquired.keyId) void recordError(subAcquired.keyId, message.slice(0, 500));
+                lastSubError = `5xx: ${message.slice(0, 200)}`;
+                continue; // → следующий кандидат (persistent 5xx триггерит fallback)
+              }
               if (subAcquired.keyId) void recordError(subAcquired.keyId, message.slice(0, 500));
-              state.subJobs[i] = { status: "failed", error: message.slice(0, 200) };
+              lastSubError = message.slice(0, 200);
+              break;
             }
+          }
+
+          if (!subSettled) {
+            state.subJobs[i] = {
+              status: "failed",
+              error: lastSubError || "Pool exhausted: no provider keys available",
+            };
           }
           await writeBatchState(state);
         }
@@ -547,41 +716,52 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         // Fall-through to Stage 3 (sync VB или K=0).
       } else {
         // ── Single-shot path (не virtual batch) ─────────────────────────────
-        const acquired = await acquireForSubmit({
-          provider: keyProvider,
-          modelId,
-          job,
-          token,
-          queue: getImageQueue(),
-        });
-        const adapter = createImageAdapter(modelId, acquired);
+        if (!modelMeta) throw new Error(`Unknown image model: ${modelId}`);
 
-        if (!adapter.isAsync && adapter.generate) {
+        // Sync vs async — определяется на primary; fallback'и того же режима.
+        const isAsync = createImageAdapter(modelMeta).isAsync;
+
+        if (!isAsync) {
           // Sync adapter (DALL-E, gpt-image, recraft) — generate inline, then finalize.
-          const genResult = await submitWithThrottle({
-            modelId,
-            provider: modelMeta?.provider,
+          const fbResult = await submitWithFallback<ImageResult | ImageResult[], ImageJobData>({
+            primaryModel: modelMeta,
+            fallbacks: fallbackCandidates,
             section: "image",
             job,
             token,
-            queue: getImageQueue(),
-            keyId: acquired.keyId,
-            submit: () =>
-              adapter.generate!({
+            allowFiveXxFallback: job.attemptsMade >= 2,
+            jobId: dbJobId,
+            userId: userIdStr,
+            submit: async (model, acquired) => {
+              const adapter = createImageAdapter(model, acquired);
+              if (!adapter.generate) {
+                throw new Error(`Adapter ${model.id} (${model.provider}) has no generate()`);
+              }
+              return adapter.generate({
                 prompt: effectivePrompt,
                 negativePrompt,
                 imageUrl: job.data.sourceImageUrl,
                 mediaInputs: job.data.mediaInputs,
                 aspectRatio,
                 modelSettings,
-              }),
+              });
+            },
           });
-          const imageResults: ImageResult[] = Array.isArray(genResult) ? genResult : [genResult];
+
+          await writeFallbackState({
+            primaryProvider: modelMeta.provider,
+            effectiveProvider: fbResult.effectiveProvider,
+            attemptedProviders: fbResult.attempts.map((a) => a.provider),
+          });
+
+          const imageResults: ImageResult[] = Array.isArray(fbResult.result)
+            ? fbResult.result
+            : [fbResult.result];
           // Native batch: для моделей где провайдер биллит per-output (Midjourney
           // через Replicate с num_outputs > 1) — умножаем cost на K. Для KIE
           // и подобных провайдеров с per-call биллингом флаг не задан → K не применим.
           const nativeBatchCharge =
-            modelMeta?.chargePerOutput && imageResults.length > 1 ? imageResults.length : undefined;
+            modelMeta.chargePerOutput && imageResults.length > 1 ? imageResults.length : undefined;
           if (
             !(await finalizeResults(
               imageResults,
@@ -591,36 +771,48 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             return;
         } else {
           // Async adapter — submit then schedule poll.
-          if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
-
           let providerJobId: string;
+
           if (existingJob?.providerJobId) {
             providerJobId = existingJob.providerJobId;
             logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
           } else {
-            providerJobId = await submitWithThrottle({
-              modelId,
-              provider: modelMeta?.provider,
+            const fbResult = await submitWithFallback<string, ImageJobData>({
+              primaryModel: modelMeta,
+              fallbacks: fallbackCandidates,
               section: "image",
               job,
               token,
-              queue: getImageQueue(),
-              keyId: acquired.keyId,
-              submit: () =>
-                adapter.submit!({
+              allowFiveXxFallback: job.attemptsMade >= 2,
+              jobId: dbJobId,
+              userId: userIdStr,
+              submit: async (model, acquired) => {
+                const adapter = createImageAdapter(model, acquired);
+                if (!adapter.submit) {
+                  throw new Error(`Adapter ${model.id} (${model.provider}) has no submit()`);
+                }
+                return adapter.submit({
                   prompt: effectivePrompt,
                   negativePrompt,
                   imageUrl: job.data.sourceImageUrl,
                   mediaInputs: job.data.mediaInputs,
                   aspectRatio,
                   modelSettings,
-                }),
+                });
+              },
+            });
+            providerJobId = fbResult.result;
+
+            await writeFallbackState({
+              primaryProvider: modelMeta.provider,
+              effectiveProvider: fbResult.effectiveProvider,
+              attemptedProviders: fbResult.attempts.map((a) => a.provider),
             });
             await db.generationJob.update({
               where: { id: dbJobId },
               data: {
                 providerJobId,
-                providerKeyId: acquired.keyId,
+                providerKeyId: fbResult.acquired.keyId,
                 // Фиксируем момент перехода в poll-стадию: после Redis wipe
                 // recovery восстановит таймер с этой точки, а не с нуля.
                 pollStartedAt: new Date(),
@@ -658,8 +850,14 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
           pendingIndices.map(async (i) => {
             const sub = state.subJobs[i];
             try {
-              const subAcquired = await acquireForPoll(sub.providerKeyId ?? null, keyProvider);
-              const subAdapter = createImageAdapter(modelId, subAcquired);
+              // Подбираем модель / keyProvider по effectiveProvider sub-job'а.
+              // Для legacy записей (effectiveProvider не выставлен) — primary.
+              const effModel =
+                (sub.effectiveProvider && findModelByProvider(sub.effectiveProvider)) || modelMeta;
+              if (!effModel) throw new Error(`Unknown image model: ${modelId}`);
+              const effKeyProvider = resolveKeyProviderForModel(effModel);
+              const subAcquired = await acquireForPoll(sub.providerKeyId ?? null, effKeyProvider);
+              const subAdapter = createImageAdapter(effModel, subAcquired);
               if (!subAdapter.poll) {
                 state.subJobs[i] = {
                   ...sub,
@@ -731,8 +929,16 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         const providerJobId = existingJob?.providerJobId;
         if (!providerJobId) throw new Error(`Image poll stage without providerJobId: ${dbJobId}`);
 
-        const acquired = await acquireForPoll(existingJob?.providerKeyId, keyProvider);
-        const adapter = createImageAdapter(modelId, acquired);
+        // Если на submit-стадии случился fallback — используем его модель.
+        const fbStateNow = readFallbackState();
+        const effModel =
+          (fbStateNow.effectiveProvider && findModelByProvider(fbStateNow.effectiveProvider)) ||
+          modelMeta;
+        if (!effModel) throw new Error(`Unknown image model: ${modelId}`);
+        const effKeyProvider = resolveKeyProviderForModel(effModel);
+
+        const acquired = await acquireForPoll(existingJob?.providerKeyId, effKeyProvider);
+        const adapter = createImageAdapter(effModel, acquired);
         if (!adapter.poll) throw new Error(`Adapter ${modelId} has no poll()`);
 
         const pollResult = await adapter.poll(providerJobId);

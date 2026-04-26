@@ -1,3 +1,5 @@
+import { AI_MODELS } from "@metabox/shared";
+import type { AIModel } from "@metabox/shared";
 import type { VideoAdapter } from "./base.adapter.js";
 import { FalVideoAdapter } from "./fal.adapter.js";
 import { RunwayAdapter } from "./runway.adapter.js";
@@ -13,50 +15,61 @@ import { KieVideoAdapter } from "./kie.adapter.js";
 import { buildProxyFetch } from "../transport/proxy-fetch.js";
 import type { AdapterContext } from "../with-pool.js";
 
-/** FAL.ai-backed video models */
-const FAL_MODELS = new Set(["pika", "seedance"]);
-
-/** Replicate-backed video models */
-const REPLICATE_MODELS = new Set(["sora"]);
-
-export function createVideoAdapter(modelId: string, ctx?: AdapterContext): VideoAdapter {
+/**
+ * Принимает либо строку (modelId, lookup в AI_MODELS), либо готовый AIModel
+ * объект. Второй вариант нужен для fallback: у fallback-модели тот же `id`,
+ * что и у primary, но другой `provider` — lookup по id вернул бы не ту запись.
+ *
+ * Диспетчеризация по `model.provider` — каждое значение строки одной модели
+ * детерминированно мапится на конкретный класс адаптера.
+ */
+export function createVideoAdapter(
+  modelOrId: string | AIModel,
+  ctx?: AdapterContext,
+): VideoAdapter {
   const apiKey = ctx?.apiKey;
   const fetchFn = ctx ? (buildProxyFetch(ctx.proxy) ?? undefined) : undefined;
 
-  if (FAL_MODELS.has(modelId)) return new FalVideoAdapter(modelId, apiKey, fetchFn);
-  if (REPLICATE_MODELS.has(modelId)) return new ReplicateVideoAdapter(modelId, apiKey, fetchFn);
+  const model = typeof modelOrId === "string" ? AI_MODELS[modelOrId] : modelOrId;
+  if (!model) throw new Error(`Unknown video model: ${String(modelOrId)}`);
+  const modelId = model.id;
 
-  switch (modelId) {
-    case "wan":
+  // Legacy quirks: certain primary modelIds route to a different adapter than
+  // their `provider` field would suggest. Only matched when the model is the
+  // canonical primary definition (matching provider). Fallback registrations
+  // for the same id with a different provider fall through to the provider
+  // switch below.
+  if (modelId === "pika" && model.provider === "pika") {
+    return new FalVideoAdapter(modelId, apiKey, fetchFn);
+  }
+  if (modelId === "sora" && model.provider === "openai") {
+    return new ReplicateVideoAdapter(modelId, apiKey, fetchFn);
+  }
+
+  switch (model.provider) {
+    case "fal":
+      return new FalVideoAdapter(modelId, apiKey, fetchFn);
+    case "replicate":
+      return new ReplicateVideoAdapter(modelId, apiKey, fetchFn);
+    case "alibaba":
       return new AlibabaVideoAdapter(modelId, apiKey, fetchFn);
     case "minimax":
-    case "hailuo":
-    case "hailuo-fast":
       return new MinimaxVideoAdapter(modelId, apiKey, fetchFn);
     case "runway":
       return new RunwayAdapter(apiKey, fetchFn);
-    case "luma-ray2":
+    case "luma":
       return new LumaAdapter(modelId, apiKey, fetchFn);
     case "heygen":
       return new HeyGenAdapter(apiKey, undefined, fetchFn);
-    case "d-id":
+    case "did":
       return new DIDAdapter(apiKey, undefined, fetchFn);
-    case "veo":
-    case "veo-fast":
+    case "google":
       return new VeoAdapter(modelId, apiKey, fetchFn);
-    case "higgsfield-lite":
     case "higgsfield":
-    case "higgsfield-preview":
       return new HiggsFieldAdapter(modelId, apiKey, undefined, fetchFn);
-    case "grok-imagine":
-    case "seedance-2":
-    case "seedance-2-fast":
-    case "kling":
-    case "kling-pro":
-    case "kling-motion":
-    case "kling-motion-pro":
+    case "kie":
       return new KieVideoAdapter(modelId, apiKey, fetchFn);
     default:
-      throw new Error(`Unknown video model: ${modelId}`);
+      throw new Error(`No video adapter for provider: ${model.provider} (model: ${modelId})`);
   }
 }

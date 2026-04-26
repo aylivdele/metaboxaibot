@@ -1,0 +1,379 @@
+/**
+ * Provider-level fallback wrapper для submit-стадии image/video processor'ов.
+ *
+ * Идея: у одной и той же модели (modelId) может быть зарегистрировано
+ * несколько AIModel-определений с разными provider'ами — primary в
+ * AI_MODELS, плюс fallbacks в FALLBACK_*_MODELS. Когда primary недоступен,
+ * мы пробуем fallback'ов по очереди: для каждого вызываем acquireKey + submit.
+ * Первый успешный submit возвращается с указанием effectiveProvider; processor
+ * сохраняет его в inputData.fallback и использует на poll-стадии.
+ *
+ * Билинг всегда по primary — fallback прозрачен для пользователя.
+ *
+ * Триггеры fallback (consrative, согласовано с пользователем):
+ *   - PoolExhaustedError (все ключи провайдера в cooldown)
+ *   - long-window 429 (cooldownMs > LONG_WINDOW_THRESHOLD_MS)
+ *   - persistent 5xx (когда `attemptsMade >= 2`, т.е. 3-я попытка BullMQ)
+ *
+ * НЕ триггеры (defer same job, как submitWithThrottle):
+ *   - short-window 429 — дефёрим job, BullMQ retry с другим ключом из пула
+ *
+ * Pre-check long-cooldown: для каждого кандидата сначала проверяем
+ * provider-wide маркер в Redis. Если выставлен — пропускаем без acquireKey'a.
+ *
+ * Env-only режим (acquired.keyId === null): на любой 429 дополнительно к
+ * ключевому throttle тригерим model-level gate (`tripThrottle(modelId)`),
+ * чтобы избежать thundering herd на env-only моделях (раньше это делал
+ * submitWithThrottle).
+ */
+
+import type { Job } from "bullmq";
+import type { AIModel } from "@metabox/shared";
+import {
+  acquireKey,
+  markRateLimited,
+  recordSuccess,
+  recordError,
+  type AcquiredKey,
+} from "@metabox/api/services/key-pool";
+import {
+  isProviderInLongCooldown,
+  markProviderLongCooldown,
+  getProviderLongCooldownRemaining,
+  tripThrottle,
+} from "@metabox/api/services/throttle";
+import { isPoolExhaustedError } from "@metabox/api/utils/pool-exhausted-error";
+import {
+  classifyRateLimit,
+  isFiveXxError,
+  LONG_WINDOW_THRESHOLD_MS,
+} from "@metabox/api/utils/rate-limit-error";
+import { resolveKeyProviderForModel } from "@metabox/api/ai/key-provider";
+import { logger } from "../logger.js";
+import { delayJob } from "./delay-job.js";
+import { notifyRateLimit, notifyFallback } from "./notify-error.js";
+
+/** На какой попытке (BullMQ attemptsMade) разрешён fallback по 5xx. */
+const PERSISTENT_5XX_ATTEMPT_THRESHOLD = 2;
+
+const MIN_DEFER_MS = 1_000;
+const JITTER_MS = 2_000;
+function withJitter(ms: number): number {
+  return Math.max(MIN_DEFER_MS, ms + Math.floor(Math.random() * JITTER_MS));
+}
+
+export type FallbackReason =
+  | "pool_exhausted"
+  | "long_window_rate_limit"
+  | "persistent_5xx"
+  | "provider_long_cooldown_marker";
+
+export interface FallbackCandidateAttempt {
+  provider: string;
+  outcome:
+    | "success"
+    | "skipped_long_cooldown"
+    | "pool_exhausted"
+    | "long_window"
+    | "persistent_5xx";
+  error?: string;
+}
+
+export interface SubmitWithFallbackResult<T> {
+  /** Что вернул успешный submit/generate. */
+  result: T;
+  /** Acquired key для этого успешного запроса (нужен для providerKeyId attribution). */
+  acquired: AcquiredKey;
+  /** Provider строка модели, на которой был успех (`primary.provider` или `fallback.provider`). */
+  effectiveProvider: string;
+  /** Сама AIModel, на которой случился успех — нужна для poll-стадии createAdapter. */
+  effectiveModel: AIModel;
+  /** Был ли это fallback (effectiveProvider !== primary.provider). */
+  usedFallback: boolean;
+  /** История попыток (для логов / debug). */
+  attempts: FallbackCandidateAttempt[];
+}
+
+interface SubmitWithFallbackOptions<T, D extends object> {
+  primaryModel: AIModel;
+  /** Кандидаты-fallback'ы. Передаются уже отфильтрованные по совместимости (mediaInputs). */
+  fallbacks: AIModel[];
+  /** "image" | "video" — для логов и нотификаций. */
+  section: string;
+  /** BullMQ job — нужен для defer'а. */
+  job: Job<D>;
+  token?: string;
+  /** Доступен ли fallback по persistent 5xx? Передаётся `job.attemptsMade >= 2`. */
+  allowFiveXxFallback: boolean;
+  /** ID DB job'а — для алертов/логов. */
+  jobId?: string;
+  /** User ID для алертов. */
+  userId?: string;
+  /**
+   * Реальный submit-вызов. Принимает acquired key + модель для инстанцирования
+   * адаптера. Должен либо вернуть результат, либо бросить ошибку (PoolExhausted,
+   * 429, 5xx, etc.) — НЕ дефёрить и НЕ оборачивать ошибки.
+   */
+  submit: (model: AIModel, acquired: AcquiredKey) => Promise<T>;
+}
+
+/**
+ * Пробует primary, потом каждого fallback'а. На каждом кандидате:
+ *  1. Если provider-wide long-cooldown маркер выставлен → пропустить (set
+ *     lastPoolExhausted с актуальным TTL для defer'а в конце).
+ *  2. acquireKey → если PoolExhausted → пропустить (set lastPoolExhausted).
+ *  3. submit() → если успех → вернуть SubmitWithFallbackResult.
+ *  4. На 429: classifyRateLimit + markRateLimited на ключе.
+ *     - long-window → markProviderLongCooldown, notify, переход на следующего.
+ *     - short window → defer SAME job (как submitWithThrottle), бросаем
+ *       DelayedError. На fallback'ах short-window тоже defer (мы уже коммитнулись
+ *       не трогать primary дальше; даём короткую паузу на восстановление ключей).
+ *  5. На 5xx (если allowFiveXxFallback) → пропустить.
+ *  6. На любую другую ошибку → бросить наверх.
+ *
+ * Если ВСЕ кандидаты упали без short-429-defer:
+ *  - Если хоть один был long-window/PoolExhausted/marker → defer job.
+ *  - Иначе (все 5xx с allowFiveXxFallback) бросаем последнюю ошибку наверх.
+ */
+export async function submitWithFallback<T, D extends object>(
+  opts: SubmitWithFallbackOptions<T, D>,
+): Promise<SubmitWithFallbackResult<T>> {
+  const candidates = [opts.primaryModel, ...opts.fallbacks];
+  const attempts: FallbackCandidateAttempt[] = [];
+  let lastError: unknown;
+  // Минимальный delay из всех кандидатов, готовых defer'нуть. MIN (а не MAX),
+  // чтобы проснуться как только первый кандидат восстановится — иначе ждали
+  // бы пока самый «лежачий» провайдер выйдет из cooldown'а.
+  let lastDeferDelay: number | null = null;
+  const updateDeferDelay = (candidateMs: number): void => {
+    lastDeferDelay = lastDeferDelay === null ? candidateMs : Math.min(lastDeferDelay, candidateMs);
+  };
+
+  for (const candidate of candidates) {
+    const isPrimary = candidate === opts.primaryModel;
+    const candidateProvider = candidate.provider;
+    const keyProvider = resolveKeyProviderForModel(candidate);
+
+    // 1. Pre-check provider-wide long-cooldown marker.
+    if (await isProviderInLongCooldown(keyProvider).catch(() => false)) {
+      attempts.push({ provider: candidateProvider, outcome: "skipped_long_cooldown" });
+      // Используем актуальный TTL для defer'а — иначе хардкод-60s заставит
+      // BullMQ просыпаться слишком часто и каждый раз снова skip'аться.
+      const remaining = await getProviderLongCooldownRemaining(keyProvider).catch(() => null);
+      updateDeferDelay(remaining ?? 60_000);
+      logger.info(
+        { jobId: opts.jobId, modelId: opts.primaryModel.id, provider: keyProvider, remaining },
+        "submitWithFallback: skipping candidate — provider in long cooldown",
+      );
+      continue;
+    }
+
+    // 2. acquireKey
+    let acquired: AcquiredKey;
+    try {
+      acquired = await acquireKey(keyProvider);
+    } catch (err) {
+      if (isPoolExhaustedError(err)) {
+        attempts.push({ provider: candidateProvider, outcome: "pool_exhausted" });
+        updateDeferDelay(err.retryAfterMs);
+        logger.info(
+          { jobId: opts.jobId, modelId: opts.primaryModel.id, provider: keyProvider },
+          "submitWithFallback: candidate pool exhausted — trying next",
+        );
+        continue;
+      }
+      // Не PoolExhausted — это что-то системное. Бросаем наверх.
+      throw err;
+    }
+
+    // 3. Submit.
+    try {
+      const result = await opts.submit(candidate, acquired);
+      // Success.
+      if (acquired.keyId) void recordSuccess(acquired.keyId);
+      attempts.push({ provider: candidateProvider, outcome: "success" });
+
+      if (!isPrimary) {
+        const reason = inferFallbackReason(attempts);
+        logger.warn(
+          {
+            jobId: opts.jobId,
+            event: "provider_fallback",
+            section: opts.section,
+            modelId: opts.primaryModel.id,
+            primaryProvider: opts.primaryModel.provider,
+            fallbackProvider: candidateProvider,
+            reason,
+            attempts,
+          },
+          "submitWithFallback: switched to fallback provider",
+        );
+        void notifyFallback({
+          section: opts.section,
+          modelId: opts.primaryModel.id,
+          primaryProvider: opts.primaryModel.provider,
+          fallbackProvider: candidateProvider,
+          reason,
+          jobId: opts.jobId,
+          userId: opts.userId,
+        });
+      }
+
+      return {
+        result,
+        acquired,
+        effectiveProvider: candidateProvider,
+        effectiveModel: candidate,
+        usedFallback: !isPrimary,
+        attempts,
+      };
+    } catch (err) {
+      lastError = err;
+      const message = err instanceof Error ? err.message : String(err);
+      const cls = classifyRateLimit(err, keyProvider);
+
+      if (cls.isRateLimit) {
+        // Per-key throttle: bad key карантинится, остальные ключи провайдера
+        // продолжают работу. notifyRateLimit вызываем всегда per-key (как делал
+        // оригинальный submitWithThrottle). Для env-mode используем `tripThrottle`
+        // с проверкой возврата чтобы не спамить tg-канал из нескольких workers.
+        let shouldNotify = true;
+        if (acquired.keyId) {
+          void markRateLimited(acquired.keyId, cls.cooldownMs, cls.reason);
+        } else {
+          // Env-only режим — model-level gate (legacy thundering-herd protection).
+          // tripThrottle через SETNX вернёт false если gate уже стоит → не дублируем нотификацию.
+          shouldNotify = await tripThrottle(opts.primaryModel.id, cls.cooldownMs, cls.reason);
+        }
+
+        const isLong = cls.isLongWindow || cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS;
+
+        if (isLong) {
+          // Provider-wide маркер: на TTL=cooldownMs провайдер заблокирован для всех job'ов.
+          void markProviderLongCooldown(keyProvider, cls.cooldownMs, cls.reason);
+          if (shouldNotify) {
+            void notifyRateLimit({
+              section: opts.section,
+              modelId: opts.primaryModel.id,
+              cooldownMs: cls.cooldownMs,
+              reason: cls.reason,
+              isLongWindow: true,
+            });
+          }
+          attempts.push({
+            provider: candidateProvider,
+            outcome: "long_window",
+            error: cls.reason,
+          });
+          updateDeferDelay(cls.cooldownMs);
+          continue;
+        }
+
+        // Short-window 429: НЕ триггер fallback'а (consrative). Дефёрим текущий
+        // job — BullMQ retry с другим ключом из того же пула. То же поведение
+        // что у оригинального submitWithThrottle.
+        if (shouldNotify) {
+          void notifyRateLimit({
+            section: opts.section,
+            modelId: opts.primaryModel.id,
+            cooldownMs: cls.cooldownMs,
+            reason: cls.reason,
+            isLongWindow: false,
+          });
+        }
+        const delay = withJitter(cls.cooldownMs);
+        logger.info(
+          {
+            jobId: opts.jobId,
+            modelId: opts.primaryModel.id,
+            provider: candidateProvider,
+            delay,
+            reason: cls.reason,
+          },
+          "submitWithFallback: short-window 429 — deferring (no fallback for short window)",
+        );
+        await delayJob(opts.job, opts.job.data as Record<string, unknown>, delay, opts.token);
+        throw new Error("unreachable: delayJob did not throw");
+      }
+
+      // 5xx — fallback только если этот BullMQ job уже несколько раз пытался.
+      if (isFiveXxError(err) && opts.allowFiveXxFallback) {
+        if (acquired.keyId) void recordError(acquired.keyId, message.slice(0, 500));
+        attempts.push({
+          provider: candidateProvider,
+          outcome: "persistent_5xx",
+          error: message.slice(0, 200),
+        });
+        logger.warn(
+          {
+            jobId: opts.jobId,
+            provider: candidateProvider,
+            attemptsMade: opts.allowFiveXxFallback,
+            err: message.slice(0, 200),
+          },
+          "submitWithFallback: 5xx after retries — trying fallback",
+        );
+        // Не выставляем lastDeferDelay — если все 5xx-ят, бросим оригинальную ошибку наверх.
+        continue;
+      }
+
+      // Другая ошибка (4xx non-429, validation, content policy, transient 5xx
+      // на attempt 1-2, etc.) — НЕ fallback'имся. Пробрасываем наверх:
+      // BullMQ ретраит, либо processor превратит в user-facing failure.
+      if (acquired.keyId) void recordError(acquired.keyId, message.slice(0, 500));
+      throw err;
+    }
+  }
+
+  // Все кандидаты упали без явного defer'а через short 429.
+  logger.error(
+    {
+      jobId: opts.jobId,
+      event: "provider_fallback",
+      section: opts.section,
+      modelId: opts.primaryModel.id,
+      primaryProvider: opts.primaryModel.provider,
+      attempts,
+    },
+    "submitWithFallback: all candidates exhausted",
+  );
+  void notifyFallback({
+    section: opts.section,
+    modelId: opts.primaryModel.id,
+    primaryProvider: opts.primaryModel.provider,
+    fallbackProvider: null,
+    reason: "all_candidates_failed",
+    jobId: opts.jobId,
+    userId: opts.userId,
+  });
+
+  // Если хоть один кандидат указал, что готов defer'нуть (PoolExhausted /
+  // long-window / cooldown marker) — defer job.
+  if (lastDeferDelay !== null) {
+    const delay = withJitter(lastDeferDelay);
+    logger.info(
+      { jobId: opts.jobId, modelId: opts.primaryModel.id, delay },
+      "submitWithFallback: defering job (all candidates pool-exhausted/long-cooldown)",
+    );
+    await delayJob(opts.job, opts.job.data as Record<string, unknown>, delay, opts.token);
+    throw new Error("unreachable: delayJob did not throw");
+  }
+
+  // Все 5xx — бросаем оригинальную ошибку (BullMQ retries / failure).
+  // long-window/PoolExhausted/marker уже выставили lastDeferDelay → ушли в defer выше.
+  if (lastError) throw lastError;
+  throw new Error(`submitWithFallback: no candidates available for ${opts.primaryModel.id}`);
+}
+
+function inferFallbackReason(attempts: FallbackCandidateAttempt[]): FallbackReason {
+  // Берём outcome первого кандидата (primary) как причину.
+  const primaryOutcome = attempts[0]?.outcome;
+  if (primaryOutcome === "skipped_long_cooldown") return "provider_long_cooldown_marker";
+  if (primaryOutcome === "pool_exhausted") return "pool_exhausted";
+  if (primaryOutcome === "long_window") return "long_window_rate_limit";
+  if (primaryOutcome === "persistent_5xx") return "persistent_5xx";
+  return "pool_exhausted";
+}
+
+// Re-export для удобства caller'ов, которые хотят определить allowFiveXxFallback.
+export { PERSISTENT_5XX_ATTEMPT_THRESHOLD };

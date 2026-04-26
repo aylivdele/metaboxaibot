@@ -1,4 +1,5 @@
 import { AI_MODELS } from "@metabox/shared";
+import type { AIModel } from "@metabox/shared";
 import type { ImageAdapter } from "./base.adapter.js";
 export type { ImageResult } from "./base.adapter.js";
 import { DalleAdapter } from "./dalle.adapter.js";
@@ -15,10 +16,18 @@ import { buildProxyFetch } from "../transport/proxy-fetch.js";
  * Если `ctx` передан — используем выбранный из пула ключ + (опционально) прокси.
  * FAL SDK конфигурируется глобально и не поддерживает per-instance fetch —
  * прокси для FAL на MVP игнорируется.
+ *
+ * Принимает либо строку (modelId, lookup в AI_MODELS), либо готовый AIModel
+ * объект. Второй вариант нужен для fallback: у fallback-модели тот же `id`,
+ * что и у primary, но другой `provider` — лookup по id вернул бы не ту запись.
  */
-export function createImageAdapter(modelId: string, ctx?: AdapterContext): ImageAdapter {
-  const model = AI_MODELS[modelId];
-  if (!model) throw new Error(`Unknown model: ${modelId}`);
+export function createImageAdapter(
+  modelOrId: string | AIModel,
+  ctx?: AdapterContext,
+): ImageAdapter {
+  const model = typeof modelOrId === "string" ? AI_MODELS[modelOrId] : modelOrId;
+  if (!model) throw new Error(`Unknown model: ${String(modelOrId)}`);
+  const modelId = model.id;
 
   const apiKey = ctx?.apiKey;
   const fetchFn = ctx ? (buildProxyFetch(ctx.proxy) ?? undefined) : undefined;
