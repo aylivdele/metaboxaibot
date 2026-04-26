@@ -7,12 +7,6 @@ type Period = "M1" | "M3" | "M6" | "M12";
 const ALL_PERIODS: Period[] = ["M1", "M3", "M6", "M12"];
 const PERIOD_MONTHS: Record<Period, number> = { M1: 1, M3: 3, M6: 6, M12: 12 };
 
-const BADGE_LABELS: Record<string, string> = {
-  top: "🔥 Топ",
-  profitable: "💎 Выгодно",
-  best_value: "💎 Выгодно",
-};
-
 type TgWebApp = {
   openInvoice?: (url: string, cb?: (status: string) => void) => void;
   openLink?: (url: string) => void;
@@ -35,6 +29,15 @@ interface ModalState {
 interface TariffsProps {
   profile?: { metaboxUserId: string | null } | null;
   onLinkMetabox: () => void;
+}
+
+function getBadgeLabel(
+  badge: string,
+  t: (key: Parameters<ReturnType<typeof useI18n>["t"]>[0]) => string,
+): string {
+  if (badge === "top") return t("tariffs.badge.top");
+  if (badge === "profitable" || badge === "best_value") return t("tariffs.badge.profitable");
+  return badge;
 }
 
 export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
@@ -217,7 +220,7 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
                   <div className="plan-card__info">
                     <div className="plan-card__label">{sub.name}</div>
                     <div className="plan-card__tokens">
-                      {"⚡"} {(sub.tokens * months).toLocaleString("ru-RU")} токенов
+                      {"⚡"} {(sub.tokens * months).toLocaleString()} {t("tariffs.tokens")}
                     </div>
                   </div>
 
@@ -285,8 +288,7 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
               Сначала нужна активная платная подписка. */}
           {!catalog.hasPaidSubscription && (
             <div className="tariff-note" style={{ marginTop: 0, marginBottom: 12 }}>
-              Докупить пакеты токенов можно только при активной подписке. Сначала оформите любой
-              тариф выше.
+              {t("tariffs.pkgLockedNote")}
             </div>
           )}
 
@@ -300,12 +302,12 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
                   style={locked ? { opacity: 0.55 } : undefined}
                 >
                   {pkg.badge && (
-                    <div className="plan-card__badge">{BADGE_LABELS[pkg.badge] ?? pkg.badge}</div>
+                    <div className="plan-card__badge">{getBadgeLabel(pkg.badge, t)}</div>
                   )}
                   <div className="plan-card__info">
                     <div className="plan-card__label">{pkg.name}</div>
                     <div className="plan-card__tokens">
-                      {"⚡"} {pkg.tokens.toLocaleString("ru-RU")} токенов
+                      {"⚡"} {pkg.tokens.toLocaleString()} {t("tariffs.tokens")}
                     </div>
                   </div>
                   <div className="plan-card__price">
@@ -316,9 +318,9 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
                     onClick={() => openPkgModal(pkg)}
                     disabled={locked}
                     style={locked ? { cursor: "not-allowed" } : undefined}
-                    title={locked ? "Нужна активная подписка" : undefined}
+                    title={locked ? t("tariffs.pkgLockedTitle") : undefined}
                   >
-                    {locked ? "Нужна подписка" : t("tariffs.buy")}
+                    {locked ? t("tariffs.pkgLockedBtn") : t("tariffs.buy")}
                   </button>
                 </div>
               );
@@ -401,7 +403,7 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
             <button className="payment-modal__close" onClick={() => setShowSubRequired(false)}>
               ×
             </button>
-            <h3 className="payment-modal__title">Подписка обязательна</h3>
+            <h3 className="payment-modal__title">{t("tariffs.pkgLockedTitle")}</h3>
             <p
               style={{
                 fontSize: 14,
@@ -410,8 +412,7 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
                 lineHeight: 1.5,
               }}
             >
-              Покупка дополнительных токенов доступна только при активной подписке. Оформите
-              подписку, чтобы получить доступ к пакетам токенов.
+              {t("tariffs.subRequiredText")}
             </p>
             <button
               className="payment-modal__option payment-modal__option--card"
@@ -420,7 +421,7 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
             >
-              <span className="payment-modal__option-label">Перейти к подпискам</span>
+              <span className="payment-modal__option-label">{t("tariffs.goToSubscriptions")}</span>
               <span className="payment-modal__option-price">↑</span>
             </button>
           </div>

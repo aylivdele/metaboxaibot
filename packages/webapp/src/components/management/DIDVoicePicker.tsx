@@ -85,7 +85,7 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
       meta:
         `${voice.provider} · ${langLabel}` +
         (voice.gender
-          ? ` · ${voice.gender === "male" ? "М" : voice.gender === "female" ? "Ж" : voice.gender}`
+          ? ` · ${voice.gender === "male" ? t("picker.genderM") : voice.gender === "female" ? t("picker.genderF") : voice.gender}`
           : ""),
       hasPreview: !!previewUrl,
       resolvePreviewUrl: previewUrl ? () => previewUrl : undefined,
@@ -129,7 +129,7 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
 
       {tab === "official" &&
         (voicesLoading ? (
-          <div className="voice-picker__loading">Загрузка голосов…</div>
+          <div className="voice-picker__loading">{t("picker.loadingVoices")}</div>
         ) : (
           <>
             <div className="voice-picker__filters">
@@ -140,7 +140,7 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
               >
                 {languages.map((l) => (
                   <option key={l} value={l}>
-                    {l === "all" ? "Все языки" : l}
+                    {l === "all" ? t("picker.langAll") : l}
                   </option>
                 ))}
               </select>
@@ -151,7 +151,7 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
               >
                 {providers.map((p) => (
                   <option key={p} value={p}>
-                    {p === "all" ? "Все провайдеры" : p}
+                    {p === "all" ? t("picker.providerAll") : p}
                   </option>
                 ))}
               </select>
@@ -162,7 +162,11 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
                     className={`voice-picker__gender-btn${genderFilter === g ? " voice-picker__gender-btn--active" : ""}`}
                     onClick={() => setGenderFilter(g)}
                   >
-                    {g === "all" ? "Все" : g === "male" ? "М" : "Ж"}
+                    {g === "all"
+                      ? t("picker.genderAll")
+                      : g === "male"
+                        ? t("picker.genderM")
+                        : t("picker.genderF")}
                   </button>
                 ))}
               </div>
@@ -171,14 +175,14 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
               items={officialItems}
               selectedId={voiceId}
               onSelect={selectOfficial}
-              emptyText="Голоса не найдены"
+              emptyText={t("picker.noVoices")}
             />
           </>
         ))}
 
       {tab === "mine" &&
         (myVoicesLoading ? (
-          <div className="voice-picker__loading">Загрузка…</div>
+          <div className="voice-picker__loading">{t("picker.loading")}</div>
         ) : (
           <VoiceList
             items={mineItems}

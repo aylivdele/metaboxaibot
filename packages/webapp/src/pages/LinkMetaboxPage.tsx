@@ -83,29 +83,38 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       if (code === "MERGE_BLOCKED") {
         const sm = err?.siteMentor || {};
         const bm = err?.botMentor || {};
+        const unknown = t("linkMetabox.merge.unknown");
         setMergeBlockedModal({
-          siteMentor: { name: sm.name || "Неизвестен", contact: sm.contact || "" },
-          botMentor: { name: bm.name || "Неизвестен", contact: bm.contact || "" },
+          siteMentor: { name: sm.name || unknown, contact: sm.contact || "" },
+          botMentor: { name: bm.name || unknown, contact: bm.contact || "" },
         });
       } else if (code === "MENTOR_CONFLICT") {
         const sm = err?.siteMentor || {};
         const bm = err?.botMentor || {};
-        const siteInfo = sm.contact ? `${sm.name} (${sm.contact})` : sm.name || "Неизвестен";
-        const botInfo = bm.contact ? `${bm.name} (${bm.contact})` : bm.name || "Неизвестен";
+        const unknown = t("linkMetabox.merge.unknown");
+        const siteInfo = sm.contact ? `${sm.name} (${sm.contact})` : sm.name || unknown;
+        const botInfo = bm.contact ? `${bm.name} (${bm.contact})` : bm.name || unknown;
         setError(
-          `Конфликт наставников. На сайте: ${siteInfo}, в боте: ${botInfo}. Для объединения перейдите по кнопке AI Box на сайте Metabox.`,
+          t("linkMetabox.error.mentorConflict")
+            .replace("{site}", siteInfo)
+            .replace("{bot}", botInfo),
         );
       } else if (code === "TELEGRAM_MISMATCH" && err?.linkedTo) {
         const lt = err.linkedTo;
         const tgInfo = lt.telegramUsername ? `@${lt.telegramUsername}` : lt.telegramPhone || "";
         setError(
-          `Этот аккаунт уже привязан к другому Telegram${tgInfo ? ` (${tgInfo})` : ""}. Войдите с того Telegram или обратитесь в поддержку @${supportTg}`,
+          t("linkMetabox.error.telegramMismatch")
+            .replace("{info}", tgInfo ? ` (${tgInfo})` : "")
+            .replace("{support}", supportTg),
         );
       } else if (code === "TELEGRAM_LINKED" && err?.linkedTo) {
         const lt = err.linkedTo;
         const tgInfo = lt.telegramUsername ? `@${lt.telegramUsername}` : lt.telegramPhone || "";
         setError(
-          `На аккаунте ${lt.name || email}${tgInfo ? ` (${tgInfo})` : ""} уже привязан другой Telegram. Обратитесь в поддержку @${supportTg}`,
+          t("linkMetabox.error.telegramLinkedOther")
+            .replace("{name}", lt.name || email)
+            .replace("{info}", tgInfo ? ` (${tgInfo})` : "")
+            .replace("{support}", supportTg),
         );
       } else {
         const key = code ? ERROR_MAP[code] : undefined;
@@ -198,10 +207,10 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
             <button className="modal-close" onClick={() => setMergeBlockedModal(null)}>
               ✕
             </button>
-            <h3 className="modal-title">⛔ Невозможно объединить аккаунты</h3>
-            <p className="modal-text">У вас разные наставники и на обоих аккаунтах есть покупки.</p>
+            <h3 className="modal-title">{t("linkMetabox.merge.blocked")}</h3>
+            <p className="modal-text">{t("linkMetabox.merge.blockedText")}</p>
             <div className="modal-mentor">
-              <span className="modal-mentor-label">Наставник на сайте:</span>
+              <span className="modal-mentor-label">{t("linkMetabox.merge.mentorSite")}</span>
               <span className="modal-mentor-name">
                 <b>{mergeBlockedModal.siteMentor.name}</b>
                 {mergeBlockedModal.siteMentor.contact &&
@@ -225,7 +234,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
               </span>
             </div>
             <div className="modal-mentor">
-              <span className="modal-mentor-label">Наставник в боте:</span>
+              <span className="modal-mentor-label">{t("linkMetabox.merge.mentorBot")}</span>
               <span className="modal-mentor-name">
                 <b>{mergeBlockedModal.botMentor.name}</b>
                 {mergeBlockedModal.botMentor.contact &&
@@ -249,7 +258,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
               </span>
             </div>
             <p className="modal-support">
-              Если у вас есть вопросы — обратитесь в поддержку:{" "}
+              {t("linkMetabox.merge.support")}{" "}
               <a
                 href={`https://t.me/${import.meta.env.VITE_SUPPORT_TG ?? "metaboxsupport"}`}
                 target="_blank"
@@ -260,7 +269,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
               </a>
             </p>
             <button className="primary-btn" onClick={() => setMergeBlockedModal(null)}>
-              Понятно
+              {t("linkMetabox.merge.ok")}
             </button>
           </div>
         </div>
