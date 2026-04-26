@@ -481,9 +481,11 @@ export default {
     uploadPromptVideoDrivingAudio: "Отправьте аудиофайл.",
     uploadPromptVideoMotionVideo: "Отправьте видео для переноса движений.",
     uploadPromptVideoFirstClip: "Отправьте начальный видеоклип.",
-    uploadPromptVideoRefImages: "Отправьте до {max} изображений для использования в качестве референсов.",
+    uploadPromptVideoRefImages:
+      "Отправьте до {max} изображений для использования в качестве референсов.",
     uploadPromptVideoRefVideos: "Отправьте до {max} видео для использования в качестве референсов.",
-    uploadPromptVideoRefAudios: "Отправьте до {max} аудиофайлов для использования в качестве референсов.",
+    uploadPromptVideoRefAudios:
+      "Отправьте до {max} аудиофайлов для использования в качестве референсов.",
     uploadPromptElement:
       "Отправьте 1–4 фото или 1 видео для «{slot}». Первое фото — главный вид, остальные (до 3) — референсы с других ракурсов.",
     imageSaved: "✅ {slot}: изображение {n}/{max} сохранено.",
