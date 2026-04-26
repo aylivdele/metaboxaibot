@@ -457,7 +457,7 @@ function GalleryTab({
             onClick={() => handleFolderChange(folder.id)}
           >
             {folder.isDefault
-              ? `♥ ${folder.name}`
+              ? `♥ ${t("gallery.folder.favorites")}`
               : folder.isPinned
                 ? `⭐ ${folder.name}`
                 : folder.name}
