@@ -116,4 +116,56 @@ export const adminApi = {
 
   // Providers summary
   listProviders: () => apiClient<{ providers: ProviderSummary[] }>("/admin/providers"),
+
+  // ── Pricing ──────────────────────────────────────────────────────────────
+  pricing: {
+    getAll: () => apiClient<PricingSnapshotDto>("/admin/pricing"),
+    setModel: (id: string, body: { multiplier: number; note?: string | null }) =>
+      apiClient<{ model: ModelPricingDto }, typeof body>(`/admin/pricing/model/${id}`, {
+        method: "PUT",
+        body,
+      }),
+    deleteModel: (id: string) =>
+      apiClient<{ success: true; model: ModelPricingDto | null }>(`/admin/pricing/model/${id}`, {
+        method: "DELETE",
+      }),
+    setGlobal: (body: { multiplier: number; note?: string | null }) =>
+      apiClient<{ global: PricingEntryDto | null; configDefault: number }, typeof body>(
+        "/admin/pricing/global",
+        { method: "PUT", body },
+      ),
+    deleteGlobal: () =>
+      apiClient<{ success: true; configDefault: number }>("/admin/pricing/global", {
+        method: "DELETE",
+      }),
+  },
 };
+
+// ── Pricing types ──────────────────────────────────────────────────────────
+
+export interface PricingEntryDto {
+  multiplier: number;
+  note: string | null;
+  updatedBy: string | null;
+  updatedAt: string;
+}
+
+export interface ModelPricingDto {
+  id: string;
+  name: string;
+  section: string;
+  provider: string;
+  isLLM: boolean;
+  baseTokens: number;
+  effectiveTokens: number;
+  multiplier: number;
+  note: string | null;
+  updatedBy: string | null;
+  updatedAt: string | null;
+}
+
+export interface PricingSnapshotDto {
+  configDefault: number;
+  global: PricingEntryDto | null;
+  models: ModelPricingDto[];
+}

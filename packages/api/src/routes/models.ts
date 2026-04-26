@@ -3,16 +3,21 @@ import {
   AI_MODELS,
   MODEL_FAMILIES,
   MODELS_BY_SECTION,
-  config,
   getResolvedModes,
   defaultModeId,
   getT,
   type AIModel,
   type Language,
 } from "@metabox/shared";
-import { calculateCost } from "../services/token.service.js";
+import { calculateCost, usdToTokens } from "../services/token.service.js";
+import { getModelMultiplier } from "../services/pricing-config.service.js";
 import { db } from "../db.js";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
+
+/** USD → tokens с применением per-model multiplier (единый шаблон с calculateCost). */
+function modelUsdToTokens(modelId: string, usd: number): number {
+  return Math.ceil(usdToTokens(usd) * getModelMultiplier(modelId));
+}
 
 type AuthRequestM = FastifyRequest & { userId: bigint };
 
@@ -99,10 +104,7 @@ function serializeModel(m: AIModel, lang: Language) {
       ? {
           dims: m.costMatrix.dims,
           table: Object.fromEntries(
-            Object.entries(m.costMatrix.table).map(([k, v]) => [
-              k,
-              (v / config.billing.usdPerToken) * config.billing.targetMargin,
-            ]),
+            Object.entries(m.costMatrix.table).map(([k, v]) => [k, modelUsdToTokens(m.id, v)]),
           ),
         }
       : null,
@@ -142,10 +144,7 @@ function serializeModel(m: AIModel, lang: Language) {
       ? m.costAddons.map((addon) => ({
           settingKey: addon.settingKey,
           map: Object.fromEntries(
-            Object.entries(addon.map).map(([k, v]) => [
-              k,
-              ((v as number) / config.billing.usdPerToken) * config.billing.targetMargin,
-            ]),
+            Object.entries(addon.map).map(([k, v]) => [k, modelUsdToTokens(m.id, v as number)]),
           ),
         }))
       : null,

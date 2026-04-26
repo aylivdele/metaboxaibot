@@ -1,7 +1,8 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { userStateService } from "../services/user-state.service.js";
-import { calculateCost, computeVideoTokens } from "../services/token.service.js";
+import { calculateCost, computeVideoTokens, usdToTokens } from "../services/token.service.js";
+import { getModelMultiplier } from "../services/pricing-config.service.js";
 import { db } from "../db.js";
 import {
   AI_MODELS,
@@ -97,8 +98,9 @@ function buildActivationCostLine(
 
   // Compute cost range via costMatrix
   if (model.costMatrix && !model.costVariants) {
-    const costs = Object.values(model.costMatrix.table).map(
-      (v) => ((v as number) / config.billing.usdPerToken) * config.billing.targetMargin,
+    const multiplier = getModelMultiplier(model.id);
+    const costs = Object.values(model.costMatrix.table).map((v) =>
+      Math.ceil(usdToTokens(v as number) * multiplier),
     );
     const min = Math.min(...costs);
     const max = Math.max(...costs);

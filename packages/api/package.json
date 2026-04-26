@@ -113,6 +113,10 @@
       "types": "./src/services/key-pool.service.ts",
       "default": "./dist/services/key-pool.service.js"
     },
+    "./services/pricing-config": {
+      "types": "./src/services/pricing-config.service.ts",
+      "default": "./dist/services/pricing-config.service.js"
+    },
     "./utils/pool-exhausted-error": {
       "types": "./src/utils/pool-exhausted-error.ts",
       "default": "./dist/utils/pool-exhausted-error.js"

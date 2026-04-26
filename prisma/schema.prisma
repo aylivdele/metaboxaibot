@@ -442,3 +442,23 @@ model ProviderKey {
   @@map("provider_keys")
 }
 
+// ─────────────────────────────────────────────
+// Runtime price overrides — управляются из админки.
+// scope="model": множитель для конкретной модели (key=modelId, multiplier ~ 0.5..2).
+// scope="global": override для config.billing.targetMargin (key="targetMargin").
+// Пустая таблица = поведение полностью идентично env-конфигу (multiplier=1, margin=config).
+// ─────────────────────────────────────────────
+model PricingOverride {
+  id         String   @id @default(cuid())
+  scope      String // "model" | "global"
+  key        String // model.id для scope="model", "targetMargin" для scope="global"
+  multiplier Decimal  @db.Decimal(6, 4)
+  note       String?
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([scope, key])
+  @@map("pricing_overrides")
+}
+

@@ -1,6 +1,7 @@
 import { db } from "../db.js";
 import { config } from "@metabox/shared";
 import type { AIModel } from "@metabox/shared";
+import { getModelMultiplier, getEffectiveTargetMargin } from "./pricing-config.service.js";
 
 export interface DeductResult {
   /** Tokens actually deducted (same as input `amount`). */
@@ -405,12 +406,17 @@ export function calculateCost(
   });
   const addonUsd = computeAddonUsd(model, modelSettings);
   const llmUsd = computeLlmUsd(rates, inputTokens, outputTokens, extra?.cachedInputTokens ?? 0);
-  return usdToTokens(mediaUsd + addonUsd + llmUsd);
+  // Применяем per-model multiplier (по умолчанию 1.0) на финальные токены —
+  // одна детерминированная точка округления. Math.ceil — никогда не списываем
+  // меньше базовой цены при multiplier < 1 (юзер на скидке получит N-1 вместо
+  // N, недокус ≤ 1 токена).
+  const baseTokens = usdToTokens(mediaUsd + addonUsd + llmUsd);
+  return Math.ceil(baseTokens * getModelMultiplier(model.id));
 }
 
 /** Convert a USD cost to internal tokens using the billing config. */
 export function usdToTokens(usd: number): number {
-  return (usd / config.billing.usdPerToken) * config.billing.targetMargin;
+  return (usd / config.billing.usdPerToken) * getEffectiveTargetMargin();
 }
 
 /**

@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Key, Globe } from "lucide-react";
+import { Key, Globe, Tags } from "lucide-react";
 import clsx from "clsx";
 
 const links = [
   { to: "/admin/keys", label: "API-ключи", icon: Key },
   { to: "/admin/proxies", label: "Прокси", icon: Globe },
+  { to: "/admin/pricing", label: "Цены моделей", icon: Tags },
 ];
 
 export default function AdminLayout() {

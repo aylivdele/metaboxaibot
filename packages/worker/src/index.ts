@@ -14,7 +14,12 @@ import { sendUsageReport, msUntilNextMidnightMsk } from "./monitors/usage-report
 import { runWatchdog } from "./monitors/watchdog.monitor.js";
 import { runCleanupOldJobs } from "./monitors/cleanup-old-jobs.monitor.js";
 import { reconcileOrphanedJobs } from "./reconcile.js";
+import { initPricingConfig } from "@metabox/api/services/pricing-config";
 import { logger } from "./logger.js";
+
+// Загружаем runtime price overrides до первого calculateCost (final billing
+// в processor'ах). При пустой таблице поведение идентично env-конфигу.
+await initPricingConfig();
 
 const connection = new Redis(config.redis.url, {
   maxRetriesPerRequest: null,
