@@ -128,7 +128,7 @@ export class RecraftAdapter implements ImageAdapter {
     this.fetchFn = fetchFn;
   }
 
-  async generate(input: ImageInput): Promise<ImageResult> {
+  async generate(input: ImageInput): Promise<ImageResult | ImageResult[]> {
     const apiKey = this.apiKeyOverride ?? config.ai.recraft;
     if (!apiKey) throw new Error("RECRAFT_API_KEY not configured");
 
@@ -139,13 +139,16 @@ export class RecraftAdapter implements ImageAdapter {
     const isV4 = this.modelId.startsWith("recraft-v4");
     const defaultStyle = isVector ? "vector_illustration" : "realistic_image";
     const style = (ms.style as string | undefined) ?? defaultStyle;
+    // Native batch: Recraft API параметр `n` (1-6). Возвращает массив data[N].
+    // Биллинг per-image — chargePerOutput на модели включён, finalize × K.
+    const n = Math.max(1, Math.min(6, Number(ms.num_images) || 1));
 
     // Build optional controls block (V3 supports artistic_level; all support no_text)
     const controls: Record<string, unknown> = {};
     if (ms.no_text) controls.no_text = true;
     if (isV3 && ms.artistic_level != null) controls.artistic_level = Number(ms.artistic_level);
 
-    let url: string;
+    let urls: string[];
 
     const imageUrl = input.mediaInputs?.edit?.[0] ?? input.imageUrl;
 
@@ -207,6 +210,7 @@ export class RecraftAdapter implements ImageAdapter {
       form.append("model", recraftModel);
       if (!isV4) form.append("style", style);
       form.append("strength", String(strength));
+      if (n > 1) form.append("n", String(n));
       if (isV3 && ms.substyle) form.append("substyle", ms.substyle as string);
       if (ms.seed != null) form.append("random_seed", String(ms.seed));
       if (Object.keys(controls).length) form.append("controls", JSON.stringify(controls));
@@ -225,7 +229,7 @@ export class RecraftAdapter implements ImageAdapter {
         throw new Error(`Recraft API error ${resp.status}: ${txt}`);
       }
       const data = (await resp.json()) as { data: Array<{ url: string }> };
-      url = data.data[0]?.url;
+      urls = data.data.map((d) => d.url).filter(Boolean);
     } else {
       // Text-to-image
       const sizeMap = isV3
@@ -240,6 +244,7 @@ export class RecraftAdapter implements ImageAdapter {
         size,
         ...(!isV4 ? { style } : {}),
       };
+      if (n > 1) body.n = n;
       if (isV3 && ms.substyle) body.substyle = ms.substyle;
       if (ms.seed != null) body.random_seed = ms.seed;
       if (Object.keys(controls).length) body.controls = controls;
@@ -261,11 +266,17 @@ export class RecraftAdapter implements ImageAdapter {
         throw new Error(`Recraft API error ${resp.status}: ${txt}`);
       }
       const data = (await resp.json()) as { data: Array<{ url: string }> };
-      url = data.data[0]?.url;
+      urls = data.data.map((d) => d.url).filter(Boolean);
     }
 
-    if (!url) throw new Error("Recraft: no image URL in response");
+    if (!urls.length) throw new Error("Recraft: no image URL in response");
     const ext = isVector ? "svg" : "png";
-    return { url, filename: `${this.modelId}.${ext}` };
+    // Native batch: при n>1 отдаём массив для multi-output UX (mediaGroup +
+    // button matrix). При n=1 — single ImageResult, чтобы не менять поведение
+    // single-output Stage 3 path.
+    if (urls.length > 1) {
+      return urls.map((url, i) => ({ url, filename: `${this.modelId}-${i}.${ext}` }));
+    }
+    return { url: urls[0], filename: `${this.modelId}.${ext}` };
   }
 }

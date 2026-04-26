@@ -1,5 +1,5 @@
 import type { AIModel, MediaInputSlot, ModelSettingDef } from "../../types/ai.js";
-import { mkAspectRatio, NUM_IMAGES_SETTING } from "./_helpers.js";
+import { mkAspectRatio, mkNumImagesSetting, NUM_IMAGES_SETTING } from "./_helpers.js";
 
 const MI_EDIT: MediaInputSlot = {
   slotKey: "edit",
@@ -755,12 +755,16 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     familyId: "gpt-image",
     versionLabel: "2",
     variantLabel: "Standard",
-    // Временно проксируем через KIE — флэт $0.06 за запрос. Прямая интеграция
-    // с OpenAI Images API сохранена в виде закомментированного блока ниже:
-    // для отката снять комменты, вернуть provider:"openai" и расширить условие
-    // в packages/api/src/ai/image/factory.ts.
+    // Временно проксируем через KIE. Прямая интеграция с OpenAI Images API
+    // сохранена в виде закомментированного блока ниже: для отката снять
+    // комменты, вернуть provider:"openai" и расширить условие в factory.ts.
     provider: "kie",
-    costUsdPerRequest: 0.06,
+    // Базовая цена = 1K. Точная стоимость определяется variant-ом resolution.
+    costUsdPerRequest: 0.03,
+    costVariants: {
+      settingKey: "resolution",
+      map: { "1K": 0.03, "2K": 0.05, "4K": 0.08 },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -775,17 +779,62 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       {
         key: "aspect_ratio",
         label: "Соотношение сторон",
-        description: "Auto — модель сама подберёт исходя из промпта.",
+        description:
+          "Auto — модель сама подберёт исходя из промпта. Для 4K-разрешения нужно выбрать конкретное соотношение (не Auto и не 1:1).",
         type: "select",
         options: [
-          { value: "auto", label: "Auto" },
-          { value: "1:1", label: "1:1" },
+          // Auto допускает только 1K. При 2K/4K в picker'е разрешения этот
+          // вариант становится недоступным — юзер должен явно выбрать AR.
+          {
+            value: "auto",
+            label: "Auto",
+            unavailableIf: {
+              or: [
+                { key: "resolution", eq: "2K" },
+                { key: "resolution", eq: "4K" },
+              ],
+            },
+          },
+          // 1:1 несовместим с 4K (KIE-схема). При 4K — disabled.
+          {
+            value: "1:1",
+            label: "1:1",
+            unavailableIf: { key: "resolution", eq: "4K" },
+          },
           { value: "16:9", label: "16:9" },
           { value: "9:16", label: "9:16" },
           { value: "4:3", label: "4:3" },
           { value: "3:4", label: "3:4" },
         ],
         default: "auto",
+      },
+      {
+        key: "resolution",
+        label: "Разрешение",
+        description:
+          "1K — стандарт, 4K — максимальные детали. Влияет на цену. 4K требует aspect_ratio ≠ auto/1:1.",
+        type: "select",
+        options: [
+          { value: "1K", label: "1K" },
+          // 2K несовместим с aspect_ratio = "auto" (KIE-схема: auto → только 1K).
+          {
+            value: "2K",
+            label: "2K",
+            unavailableIf: { key: "aspect_ratio", eq: "auto" },
+          },
+          // 4K несовместим с auto и 1:1.
+          {
+            value: "4K",
+            label: "4K",
+            unavailableIf: {
+              or: [
+                { key: "aspect_ratio", eq: "auto" },
+                { key: "aspect_ratio", eq: "1:1" },
+              ],
+            },
+          },
+        ],
+        default: "1K",
       },
       {
         key: "nsfw_checker",
@@ -1529,11 +1578,20 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
+    // Native batch: fal-ai/flux-2 принимает num_images (1-4) за один call, возвращает
+    // массив ImageFile[]. nativeBatchMax > 1 → virtual batch не применяется.
+    // chargePerOutput → finalize умножает стоимость на K (FAL биллит per-image-MP).
+    nativeBatchMax: 4,
+    chargePerOutput: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     // FAL image_size categories: square_hd, landscape_4_3, portrait_4_3, landscape_16_9, portrait_16_9
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
-    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]), ...FLUX_SETTINGS],
+    settings: [
+      NUM_IMAGES_SETTING,
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      ...FLUX_SETTINGS,
+    ],
   },
   "flux-pro": {
     id: "flux-pro",
@@ -1581,12 +1639,15 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
-    maxVirtualBatch: 4,
+    // Native batch: Recraft API принимает n (1-6) за один call. Биллинг per-image,
+    // chargePerOutput → finalize умножит cost на K.
+    nativeBatchMax: 6,
+    chargePerOutput: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
-      NUM_IMAGES_SETTING,
+      mkNumImagesSetting(6),
       mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
       {
         key: "style",
@@ -1744,12 +1805,13 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
-    maxVirtualBatch: 4,
+    nativeBatchMax: 6,
+    chargePerOutput: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
-      NUM_IMAGES_SETTING,
+      mkNumImagesSetting(6),
       mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
       {
         key: "strength",
@@ -1794,12 +1856,13 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
-    maxVirtualBatch: 4,
+    nativeBatchMax: 6,
+    chargePerOutput: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
-      NUM_IMAGES_SETTING,
+      mkNumImagesSetting(6),
       mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
       {
         key: "strength",
@@ -1844,12 +1907,13 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
-    maxVirtualBatch: 4,
+    nativeBatchMax: 6,
+    chargePerOutput: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
-      NUM_IMAGES_SETTING,
+      mkNumImagesSetting(6),
       {
         key: "strength",
         label: "Сила изменения",
@@ -1893,12 +1957,13 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
-    maxVirtualBatch: 4,
+    nativeBatchMax: 6,
+    chargePerOutput: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
-      NUM_IMAGES_SETTING,
+      mkNumImagesSetting(6),
       {
         key: "strength",
         label: "Сила изменения",
@@ -1942,10 +2007,18 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
+    // Native batch: FAL seedream принимает num_images (1-6) за один call.
+    // Биллинг per-image — chargePerOutput на модели включён, finalize × K.
+    nativeBatchMax: 6,
+    chargePerOutput: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
-    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]), ...SEEDREAM_SETTINGS],
+    settings: [
+      mkNumImagesSetting(6),
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      ...SEEDREAM_SETTINGS,
+    ],
   },
   "higgsfield-soul": {
     id: "higgsfield-soul",
@@ -2123,9 +2196,17 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
+    // Native batch: FAL seedream принимает num_images (1-6) за один call.
+    // Биллинг per-image — chargePerOutput на модели включён, finalize × K.
+    nativeBatchMax: 6,
+    chargePerOutput: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
-    settings: [mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]), ...SEEDREAM_SETTINGS],
+    settings: [
+      mkNumImagesSetting(6),
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      ...SEEDREAM_SETTINGS,
+    ],
   },
 };

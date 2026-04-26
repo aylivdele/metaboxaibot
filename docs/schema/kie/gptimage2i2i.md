@@ -134,18 +134,33 @@ paths:
                         - value: "3:4"
                           name: ""
                           description: ""
-                    nsfw_checker:
-                      type: boolean
+                    resolution:
+                      type: string
+                      enum:
+                        - 1K
+                        - 2K
+                        - 4K
+                      x-apidog-enum:
+                        - value: 1K
+                          name: ""
+                          description: ""
+                        - value: 2K
+                          name: ""
+                          description: ""
+                        - value: 4K
+                          name: ""
+                          description: ""
                       description: >-
-                        Defaults to false. You can set it to false based on your
-                        needs. If set to false, our content filtering will be
-                        disabled, and all results will be returned directly by
-                        the model itself.
+                        Image resolution: Note: Images with a 1:1 aspect ratio
+                        cannot be converted to 4K images. Images with the aspect
+                        ratio set to "auto" or without a specified aspect ratio
+                        parameter will only be converted to 1K images;
+                        otherwise, the task will fail to create.
                   x-apidog-orders:
                     - prompt
                     - input_urls
                     - aspect_ratio
-                    - nsfw_checker
+                    - resolution
                   x-apidog-ignore-properties: []
               x-apidog-orders:
                 - model
@@ -161,7 +176,6 @@ paths:
                   - >-
                     https://static.aiquickdraw.com/tools/example/1776782793756_wrogXTdd.png
                 aspect_ratio: auto
-                nsfw_checker: true
       responses:
         "200":
           description: Request successful
