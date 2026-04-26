@@ -19,7 +19,7 @@
  * (5 минут) подстраховывает от потерянных pubsub-сообщений.
  */
 
-import { Redis } from "ioredis";
+import type { Redis } from "ioredis";
 import { config } from "@metabox/shared";
 import { db } from "../db.js";
 import { getRedis } from "../redis.js";
