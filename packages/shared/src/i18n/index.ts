@@ -361,6 +361,10 @@ export interface Translations {
     uploadPrompt: string;
     uploadPromptMulti: string;
     uploadPromptElement: string;
+    uploadPromptDesignEdit: string;
+    uploadPromptDesignRef: string;
+    uploadPromptDesignMulti: string;
+    uploadPromptDesignStyleRef: string;
     imageSaved: string;
     imageSavedSingle: string;
     tooManyMedia: string;

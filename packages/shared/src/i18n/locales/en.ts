@@ -475,6 +475,10 @@ export default {
     uploadPromptVideo: 'Send a video for "{slot}".',
     uploadPrompt: 'Send a photo for "{slot}".',
     uploadPromptMulti: 'Send up to {max} photos for "{slot}".',
+    uploadPromptDesignEdit: 'Send a photo for "Source Image".',
+    uploadPromptDesignRef: 'Send a reference photo.',
+    uploadPromptDesignMulti: 'Send up to {max} photos for reference.',
+    uploadPromptDesignStyleRef: 'Send up to {max} photos for "Style Reference".',
     uploadPromptElement:
       'Send 1–4 photos or 1 video for "{slot}". First photo = frontal view; the rest (up to 3) = reference views.',
     imageSaved: "✅ {slot}: image {n}/{max} saved.",

@@ -286,14 +286,18 @@ async function sendDesignSlotUploadPrompt(
     section: "design",
   });
 
-  const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
   const maxImages = slot.maxImages ?? 1;
-  const msg =
-    maxImages > 1
-      ? ctx.t.mediaInput.uploadPromptMulti
-          .replace("{slot}", String(label))
-          .replace("{max}", String(maxImages))
-      : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
+  let msg: string;
+  if (maxImages > 1) {
+    msg =
+      slot.labelKey === "styleReference"
+        ? ctx.t.mediaInput.uploadPromptDesignStyleRef.replace("{max}", String(maxImages))
+        : ctx.t.mediaInput.uploadPromptDesignMulti.replace("{max}", String(maxImages));
+  } else if (slot.labelKey === "reference") {
+    msg = ctx.t.mediaInput.uploadPromptDesignRef;
+  } else {
+    msg = ctx.t.mediaInput.uploadPromptDesignEdit;
+  }
   const kb = new InlineKeyboard().text(ctx.t.mediaInput.cancel, `mi_cancel:design`);
   await ctx.reply(msg, { reply_markup: kb });
 }
