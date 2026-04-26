@@ -2111,6 +2111,9 @@ textarea::placeholder {
   text-align: center;
   line-height: 1.4;
 }
+.gallery-folders .chip:has(.gallery-folders__count) {
+  gap: 8px;
+}
 .gallery-folders__add {
   width: 32px;
   height: 32px;
