@@ -30,6 +30,12 @@ export interface ImageJobData {
   lastIntervalMs?: number;
   /** Soft retry counter for transient network failures (DNS hiccups etc.). */
   transientRetries?: number;
+  /**
+   * Сколько изображений сгенерировать (1..maxVirtualBatch). При >1 и
+   * `model.nativeBatchMax === 1` воркер запустит N последовательных submit'ов
+   * с разнесением во времени и склеит результат в существующий multi-output UX.
+   */
+  numImages?: number;
 }
 
 export function getImageQueue(): Queue<ImageJobData> {

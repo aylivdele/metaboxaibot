@@ -103,8 +103,20 @@ export const generationService = {
 
     // For per-megapixel models assume 1 MP (typical for most image resolutions)
     const estimatedMegapixels = model.costUsdPerMPixel ? 1.0 : undefined;
-    const estimatedCost = calculateCost(model, 0, 0, estimatedMegapixels, undefined, modelSettings);
-    await checkBalance(userId, estimatedCost);
+    const perImageCost = calculateCost(model, 0, 0, estimatedMegapixels, undefined, modelSettings);
+
+    // Virtual batch: для моделей с `maxVirtualBatch > 1` юзер может попросить N
+    // картинок (1..maxVirtualBatch). Воркер делает N submit'ов, скидывает в один
+    // mediaGroup. Списание идёт только за успешные (K × per-image), но для
+    // checkBalance берём worst-case (n × per-image).
+    const maxBatch = model.maxVirtualBatch ?? 1;
+    const isVirtualBatchEligible = maxBatch > 1 && (model.nativeBatchMax ?? 1) === 1;
+    const requestedN = Number(modelSettings.num_images ?? 1);
+    const numImages = isVirtualBatchEligible
+      ? Math.max(1, Math.min(maxBatch, Number.isFinite(requestedN) ? Math.floor(requestedN) : 1))
+      : 1;
+
+    await checkBalance(userId, perImageCost * numImages);
 
     const job = await db.generationJob.create({
       data: {
@@ -127,6 +139,9 @@ export const generationService = {
                 }
               : {};
           })(),
+          // Persist `n` для virtual-batch воркера: чтобы после restart'а воркер
+          // знал сколько sub-job'ов запускать без перечитывания userState.
+          ...(numImages > 1 ? { batch: { n: numImages } } : {}),
         },
         status: "pending",
         ...(params.sourceMessageId ? { sourceMessageId: params.sourceMessageId } : {}),
@@ -149,6 +164,7 @@ export const generationService = {
         sendOriginalLabel,
         aspectRatio: effectiveAspectRatio,
         modelSettings,
+        ...(numImages > 1 ? { numImages } : {}),
       },
       {
         jobId: job.id,

@@ -280,6 +280,20 @@ export interface AIModel {
    */
   promptOptionalRequiresMedia?: boolean;
   isAsync: boolean; // требует очереди (для image/video/audio)
+  /**
+   * Сколько изображений модель отдаёт за один API-call (native batch). Если 1 (или
+   * не задано) — модель — single-only и может получить virtual batch через
+   * `maxVirtualBatch`. Если >1 — провайдер сам поддерживает batch (KIE
+   * nano-banana и т.п.); virtual batch для таких моделей НЕ применяется.
+   */
+  nativeBatchMax?: number;
+  /**
+   * Максимум для virtual batch (1 или undefined = picker `num_images` не показываем).
+   * Применяется только когда `nativeBatchMax` равен 1/undefined. Воркер запустит
+   * до N последовательных submit'ов внутри одной GenerationJob, объединит результаты
+   * в существующий multi-output UX и спишет только за успешные.
+   */
+  maxVirtualBatch?: number;
   contextStrategy: ContextStrategy;
   contextMaxMessages: number; // актуально для db_history: сколько сообщений отправлять
   /**

@@ -1,5 +1,5 @@
 import type { AIModel, MediaInputSlot, ModelSettingDef } from "../../types/ai.js";
-import { mkAspectRatio } from "./_helpers.js";
+import { mkAspectRatio, NUM_IMAGES_SETTING } from "./_helpers.js";
 
 const MI_EDIT: MediaInputSlot = {
   slotKey: "edit",
@@ -129,6 +129,7 @@ const FLUX_PRO_SETTINGS: ModelSettingDef[] = [
 
 /** Ideogram v3 — shared generation controls (quality / balanced / turbo). */
 const IDEOGRAM_SETTINGS: ModelSettingDef[] = [
+  NUM_IMAGES_SETTING,
   mkAspectRatio([
     "1:1",
     "4:3",
@@ -983,10 +984,12 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
+    maxVirtualBatch: 4,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: null,
     settings: [
+      NUM_IMAGES_SETTING,
       {
         key: "size",
         label: "Размер",
@@ -1176,11 +1179,13 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
+    maxVirtualBatch: 4,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     // DALL-E 3 only supports exactly 3 sizes
     supportedAspectRatios: ["1:1", "16:9", "9:16"],
     settings: [
+      NUM_IMAGES_SETTING,
       mkAspectRatio(["1:1", "16:9", "9:16"]),
       {
         key: "quality",
@@ -1224,6 +1229,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
+    maxVirtualBatch: 4,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: [
@@ -1262,6 +1268,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
+    maxVirtualBatch: 4,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: [
@@ -1300,6 +1307,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
+    maxVirtualBatch: 4,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: [
@@ -1567,10 +1575,12 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
+    maxVirtualBatch: 4,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
+      NUM_IMAGES_SETTING,
       mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
       {
         key: "style",
@@ -1728,10 +1738,12 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
+    maxVirtualBatch: 4,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
+      NUM_IMAGES_SETTING,
       mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
       {
         key: "strength",
@@ -1776,10 +1788,12 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
+    maxVirtualBatch: 4,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
+      NUM_IMAGES_SETTING,
       mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
       {
         key: "strength",
@@ -1824,10 +1838,12 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
+    maxVirtualBatch: 4,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
+      NUM_IMAGES_SETTING,
       {
         key: "strength",
         label: "Сила изменения",
@@ -1871,10 +1887,12 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     supportsVoice: false,
     supportsWeb: false,
     isAsync: false,
+    maxVirtualBatch: 4,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
+      NUM_IMAGES_SETTING,
       {
         key: "strength",
         label: "Сила изменения",

@@ -456,6 +456,11 @@ export const SETTING_TRANSLATIONS_EN: Record<string, SettingTranslation> = {
     description: "How many tokens the model can spend on internal reasoning (0 = disabled).",
   },
   // ── Shared (media) ───────────────────────────────────────────────────────────
+  num_images: {
+    label: "Number of images",
+    description:
+      "Generate several variations in one request. You're only charged for the successful ones.",
+  },
   aspect_ratio: {
     label: "Aspect ratio",
     description: "Shape of the output image: landscape, portrait or square.",

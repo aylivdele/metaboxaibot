@@ -42,3 +42,23 @@ export function mkDurationSlider(min: number, max: number): ModelSettingDef {
     default: min,
   };
 }
+
+/**
+ * Picker «количество изображений» (1-4) для virtual batch.
+ * Применять к single-only моделям (DALL-E, Recraft, gpt-image, FLUX, Ideogram и т.п.),
+ * у которых задано `maxVirtualBatch`. Воркер запустит N последовательных submit'ов
+ * с разнесением во времени; списание идёт только за успешные.
+ */
+export const NUM_IMAGES_SETTING: ModelSettingDef = {
+  key: "num_images",
+  label: "Количество изображений",
+  description: "Сгенерировать несколько вариантов за один запрос. Списывается только за успешные.",
+  type: "select",
+  options: [
+    { value: 1, label: "1" },
+    { value: 2, label: "2" },
+    { value: 3, label: "3" },
+    { value: 4, label: "4" },
+  ],
+  default: 1,
+};

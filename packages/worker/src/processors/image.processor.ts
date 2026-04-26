@@ -32,11 +32,44 @@ import { InputFile } from "grammy";
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
 import type { DeductResult } from "@metabox/api/services";
-import { notifyTechError } from "../utils/notify-error.js";
+import { notifyTechError, notifyRateLimit } from "../utils/notify-error.js";
 import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import { acquireForSubmit, acquireForPoll } from "../utils/acquire-for-processor.js";
 import { resolveKeyProvider } from "@metabox/api/ai/key-provider";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
+import {
+  acquireKey,
+  markRateLimited,
+  recordError,
+  recordSuccess,
+} from "@metabox/api/services/key-pool";
+import { isPoolExhaustedError } from "@metabox/api/utils/pool-exhausted-error";
+import { classifyRateLimit, LONG_WINDOW_THRESHOLD_MS } from "@metabox/api/utils/rate-limit-error";
+import type { Prisma } from "@prisma/client";
+
+/**
+ * Per-sub-job state в `inputData.batch.subJobs[i]` для virtual batch.
+ * Сохраняется ПОСЛЕ каждого submit/poll для idempotent restart-recovery.
+ *
+ * - `pending` — запрос отправлен (`providerJobId` есть для async, или ждём
+ *   первого poll-tick), но конечного результата ещё нет.
+ * - `succeeded` — есть готовый ImageResult (хранится здесь же `result`,
+ *   sync-адаптеры — на случай если worker крашнулся между submit и finalize).
+ * - `failed` — терминальная ошибка (429 после eviction-попытки, PoolExhausted,
+ *   contentPolicy от провайдера и т.п.). Хранится в `error`.
+ */
+interface VirtualBatchSubJob {
+  status: "pending" | "succeeded" | "failed";
+  providerJobId?: string | null;
+  providerKeyId?: string | null;
+  /** Sync-адаптер: результат, чтобы restart не сабмитил повторно. */
+  result?: ImageResult;
+  error?: string;
+}
+interface VirtualBatchState {
+  n: number;
+  subJobs: VirtualBatchSubJob[];
+}
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
 
@@ -115,6 +148,22 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
   const modelName = modelMeta?.name ?? modelId;
   const keyProvider = resolveKeyProvider(modelId);
 
+  // ── Virtual batch detection ─────────────────────────────────────────────
+  // Если модель — single-only (`nativeBatchMax === 1`) и у неё задан
+  // `maxVirtualBatch > 1`, юзер мог попросить N=2..4 картинок. Воркер делает
+  // N последовательных submit'ов с разнесением во времени, а в финале склеивает
+  // в один mediaGroup. Если все возвращают 1 image — и `n === 1` — это просто
+  // обычная single-flow, в которой `isVirtualBatch === false`.
+  const requestedN = job.data.numImages ?? 1;
+  const nativeBatchMax = modelMeta?.nativeBatchMax ?? 1;
+  const isVirtualBatch = requestedN > 1 && nativeBatchMax === 1;
+  const SUB_STAGGER_MIN_MS = 12_000;
+  const SUB_STAGGER_JITTER_MS = 3_000;
+
+  // Накопленные ошибки sub-job'ов — выводятся юзеру в footer-сообщении
+  // после mediaGroup (либо одиночным сообщением при K=0).
+  const batchErrors: string[] = [];
+
   try {
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
@@ -122,9 +171,43 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         providerJobId: true,
         providerKeyId: true,
         status: true,
+        inputData: true,
         outputs: { orderBy: { index: "asc" as const } },
       },
     });
+
+    /** Прочитать текущее состояние virtual batch из inputData. */
+    const readBatchState = (): VirtualBatchState => {
+      const raw = (existingJob?.inputData as Record<string, unknown> | null | undefined)?.batch as
+        | { n?: number; subJobs?: VirtualBatchSubJob[] }
+        | undefined;
+      const n = raw?.n ?? requestedN;
+      const subJobs = Array.isArray(raw?.subJobs) ? [...raw!.subJobs!] : [];
+      while (subJobs.length < n) subJobs.push({ status: "pending" });
+      return { n, subJobs };
+    };
+
+    /** Записать обновлённое состояние virtual batch в inputData (мерджится с существующим). */
+    const writeBatchState = async (state: VirtualBatchState): Promise<void> => {
+      const current = await db.generationJob.findUnique({
+        where: { id: dbJobId },
+        select: { inputData: true },
+      });
+      const merged = {
+        ...((current?.inputData as Record<string, unknown> | null | undefined) ?? {}),
+        batch: { n: state.n, subJobs: state.subJobs },
+      };
+      // Prisma's InputJsonValue is structural; через unknown-cast снимаем type-mismatch
+      // (VirtualBatchSubJob[] не наследует index-signature, хотя по содержанию валиден).
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { inputData: merged as unknown as Prisma.InputJsonValue },
+      });
+      // Также обновляем in-memory snapshot, чтобы readBatchState() сразу видел новое.
+      if (existingJob) {
+        (existingJob.inputData as unknown) = merged;
+      }
+    };
 
     // Output records created during finalization — used for buttons in Stage 3
     let outputRecords: Array<{ id: string; outputUrl: string | null; s3Key: string | null }> = [];
@@ -138,7 +221,15 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
     // pending/processing → done). Returns `false` if another handler beat us
     // to it (stalled-redelivery race) — caller should skip the user-facing
     // send to avoid duplicate messages.
-    const finalizeResults = async (imageResults: ImageResult[]): Promise<boolean> => {
+    //
+    // Для virtual batch: `chargeMultiplier` = K (count успешных sub-job'ов).
+    // Списываем `perImageCost × K`, не `perImageCost × 1`. По умолчанию 1 — для
+    // single-output и для native-batch, где базовый расчёт уже корректен.
+    const finalizeResults = async (
+      imageResults: ImageResult[],
+      options: { chargeMultiplier?: number } = {},
+    ): Promise<boolean> => {
+      const chargeMultiplier = options.chargeMultiplier ?? 1;
       for (let i = 0; i < imageResults.length; i++) {
         const ir = imageResults[i];
         const keySuffix = imageResults.length > 1 ? `${dbJobId}_${i + 1}` : dbJobId;
@@ -236,13 +327,16 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
       // output tokens from OpenAI usage) wins over the matrix lookup, since
       // the matrix only covers per-image output cost.
       const adapterUsdCost = firstResult.providerUsdCost;
-      const internalCost =
+      const perImageInternalCost =
         adapterUsdCost !== undefined
           ? usdToTokens(adapterUsdCost)
           : calculateCost(model, 0, 0, megapixels, undefined, modelSettings, undefined, undefined, {
               hasInputImage,
               inputImagesMegapixels,
             });
+      // chargeMultiplier > 1 — virtual batch: было K успешных sub-job'ов,
+      // каждый стоил perImageInternalCost. Округление вверх — billing safety.
+      const internalCost = Math.ceil(perImageInternalCost * chargeMultiplier);
 
       deductResult = await deductTokens(BigInt(userIdStr), internalCost, modelId);
       await db.generationJob.update({
@@ -271,6 +365,14 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         "Resumed mid-finalize generation: re-sending result to user (tokens NOT deducted — cost context lost)",
       );
       outputRecords = existingJob.outputs;
+      // Если это был virtual batch с partial success — подгружаем ошибки из
+      // inputData.batch.subJobs, чтобы Stage 3 показал footer.
+      if (isVirtualBatch) {
+        const state = readBatchState();
+        for (const s of state.subJobs) {
+          if (s.status === "failed" && s.error) batchErrors.push(s.error);
+        }
+      }
     } else if (stage === "generate") {
       // ── Stage 1: submit (or sync-generate) ─────────────────────────────
       await db.generationJob.update({
@@ -285,47 +387,176 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         modelId,
       );
 
-      const acquired = await acquireForSubmit({
-        provider: keyProvider,
-        modelId,
-        job,
-        token,
-        queue: getImageQueue(),
-      });
-      const adapter = createImageAdapter(modelId, acquired);
+      // ── Virtual batch path ──────────────────────────────────────────────
+      // Делаем N последовательных submit'ов с разнесением 12-15s между ними.
+      // Для sync-адаптеров — collect results inline; для async — записываем
+      // providerJobId каждого sub-job в inputData.batch и идём в poll-стадию.
+      // Skip-на-failure: 429/PoolExhausted/generic от одного sub-job не обрывают
+      // батч, помечают только этот sub-job как failed и продолжаем.
+      if (isVirtualBatch) {
+        const state = readBatchState();
+        // Пробегаем по sub-job'ам в порядке индекса. Уже sub-job с providerJobId
+        // или терминальным статусом — restart-recovery, пропускаем.
+        for (let i = 0; i < state.n; i++) {
+          const sub = state.subJobs[i];
+          if (sub.status !== "pending" || sub.providerJobId || sub.result) continue;
 
-      if (!adapter.isAsync && adapter.generate) {
-        // Sync adapter (DALL-E, gpt-image, recraft) — generate inline, then finalize.
-        const genResult = await submitWithThrottle({
+          // Stagger между NEW submit'ами (не первый и не следующий за пропущенным).
+          // Кладём паузу ПЕРЕД текущим, кроме первого свежего.
+          const isFirstFresh = !state.subJobs
+            .slice(0, i)
+            .some(
+              (p) =>
+                p.providerJobId !== undefined || p.result !== undefined || p.status === "failed",
+            );
+          if (!isFirstFresh) {
+            await new Promise((r) =>
+              setTimeout(r, SUB_STAGGER_MIN_MS + Math.floor(Math.random() * SUB_STAGGER_JITTER_MS)),
+            );
+          }
+
+          let subAcquired: Awaited<ReturnType<typeof acquireKey>> | null = null;
+          try {
+            subAcquired = await acquireKey(keyProvider);
+          } catch (e) {
+            if (isPoolExhaustedError(e)) {
+              state.subJobs[i] = {
+                status: "failed",
+                error: "Pool exhausted: no provider keys available",
+              };
+              await writeBatchState(state);
+              continue;
+            }
+            throw e;
+          }
+
+          const subAdapter = createImageAdapter(modelId, subAcquired);
+          try {
+            if (!subAdapter.isAsync && subAdapter.generate) {
+              const r = await subAdapter.generate({
+                prompt: effectivePrompt,
+                negativePrompt,
+                imageUrl: job.data.sourceImageUrl,
+                mediaInputs: job.data.mediaInputs,
+                aspectRatio,
+                modelSettings,
+              });
+              const result = Array.isArray(r) ? r[0] : r;
+              state.subJobs[i] = {
+                status: "succeeded",
+                providerKeyId: subAcquired.keyId,
+                result,
+              };
+              if (subAcquired.keyId) void recordSuccess(subAcquired.keyId);
+            } else if (subAdapter.submit) {
+              const providerJobId = await subAdapter.submit({
+                prompt: effectivePrompt,
+                negativePrompt,
+                imageUrl: job.data.sourceImageUrl,
+                mediaInputs: job.data.mediaInputs,
+                aspectRatio,
+                modelSettings,
+              });
+              state.subJobs[i] = {
+                status: "pending",
+                providerJobId,
+                providerKeyId: subAcquired.keyId,
+              };
+              // Submit accepted by provider — counts as success for per-key metrics
+              // (то же поведение что в submitWithThrottle для non-VB path).
+              if (subAcquired.keyId) void recordSuccess(subAcquired.keyId);
+            } else {
+              throw new Error(`Adapter ${modelId} has no generate()/submit()`);
+            }
+          } catch (err) {
+            // Per-sub-job error handling: classify as 429 vs generic, record on
+            // key, mark sub-job failed. NEVER rethrow — batch must continue.
+            const cls = classifyRateLimit(err, keyProvider);
+            const message = err instanceof Error ? err.message : String(err);
+            if (cls.isRateLimit) {
+              if (subAcquired.keyId) {
+                void markRateLimited(subAcquired.keyId, cls.cooldownMs, cls.reason);
+                void notifyRateLimit({
+                  section: "image",
+                  modelId,
+                  cooldownMs: cls.cooldownMs,
+                  reason: cls.reason,
+                  isLongWindow: cls.isLongWindow || cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS,
+                });
+              }
+              state.subJobs[i] = {
+                status: "failed",
+                error: `rate-limit: ${message.slice(0, 200)}`,
+              };
+            } else {
+              if (subAcquired.keyId) void recordError(subAcquired.keyId, message.slice(0, 500));
+              state.subJobs[i] = { status: "failed", error: message.slice(0, 200) };
+            }
+          }
+          await writeBatchState(state);
+        }
+
+        // Submit-loop done. Decide: finalize if all sync (no pending), else poll.
+        const stillPending = state.subJobs.some((s) => s.status === "pending");
+        if (!stillPending) {
+          // Все sync или все failed. Собираем successes и финализируем.
+          const successResults: ImageResult[] = [];
+          for (const s of state.subJobs) {
+            if (s.status === "succeeded" && s.result) successResults.push(s.result);
+            else if (s.status === "failed" && s.error) batchErrors.push(s.error);
+          }
+          if (successResults.length === 0) {
+            // K=0 — все провалились. Помечаем job failed и идём в Stage 3 для
+            // отправки error-only сообщения.
+            await db.generationJob.update({
+              where: { id: dbJobId },
+              data: { status: "failed", error: batchErrors.join("; ").slice(0, 1000) },
+            });
+            // outputRecords остаётся пустым; Stage 3 обработает K=0 по footer-ветке.
+          } else {
+            if (
+              !(await finalizeResults(successResults, { chargeMultiplier: successResults.length }))
+            )
+              return;
+          }
+        } else {
+          // Есть async sub-job'ы → schedule poll.
+          logger.info(
+            {
+              dbJobId,
+              n: state.n,
+              pending: state.subJobs.filter((s) => s.status === "pending").length,
+            },
+            "Virtual batch poll scheduled",
+          );
+          await delayJob(
+            job,
+            {
+              ...job.data,
+              stage: "poll",
+              pollStartedAt: Date.now(),
+              lastIntervalMs: INITIAL_POLL_INTERVAL_MS,
+            },
+            INITIAL_POLL_INTERVAL_MS,
+            token,
+          );
+          return;
+        }
+        // Fall-through to Stage 3 (sync VB или K=0).
+      } else {
+        // ── Single-shot path (не virtual batch) ─────────────────────────────
+        const acquired = await acquireForSubmit({
+          provider: keyProvider,
           modelId,
-          provider: modelMeta?.provider,
-          section: "image",
           job,
           token,
           queue: getImageQueue(),
-          keyId: acquired.keyId,
-          submit: () =>
-            adapter.generate!({
-              prompt: effectivePrompt,
-              negativePrompt,
-              imageUrl: job.data.sourceImageUrl,
-              mediaInputs: job.data.mediaInputs,
-              aspectRatio,
-              modelSettings,
-            }),
         });
-        const imageResults: ImageResult[] = Array.isArray(genResult) ? genResult : [genResult];
-        if (!(await finalizeResults(imageResults))) return;
-      } else {
-        // Async adapter — submit then schedule poll.
-        if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
+        const adapter = createImageAdapter(modelId, acquired);
 
-        let providerJobId: string;
-        if (existingJob?.providerJobId) {
-          providerJobId = existingJob.providerJobId;
-          logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
-        } else {
-          providerJobId = await submitWithThrottle({
+        if (!adapter.isAsync && adapter.generate) {
+          // Sync adapter (DALL-E, gpt-image, recraft) — generate inline, then finalize.
+          const genResult = await submitWithThrottle({
             modelId,
             provider: modelMeta?.provider,
             section: "image",
@@ -334,7 +565,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             queue: getImageQueue(),
             keyId: acquired.keyId,
             submit: () =>
-              adapter.submit!({
+              adapter.generate!({
                 prompt: effectivePrompt,
                 negativePrompt,
                 imageUrl: job.data.sourceImageUrl,
@@ -343,82 +574,197 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
                 modelSettings,
               }),
           });
-          await db.generationJob.update({
-            where: { id: dbJobId },
-            data: {
-              providerJobId,
-              providerKeyId: acquired.keyId,
-              // Фиксируем момент перехода в poll-стадию: после Redis wipe
-              // recovery восстановит таймер с этой точки, а не с нуля.
-              pollStartedAt: new Date(),
-            },
-          });
-        }
+          const imageResults: ImageResult[] = Array.isArray(genResult) ? genResult : [genResult];
+          if (!(await finalizeResults(imageResults))) return;
+        } else {
+          // Async adapter — submit then schedule poll.
+          if (!adapter.submit) throw new Error(`Adapter ${modelId} has no submit()`);
 
-        logger.info({ dbJobId, providerJobId }, "Image poll scheduled");
-        await delayJob(
-          job,
-          {
-            ...job.data,
-            stage: "poll",
-            pollStartedAt: Date.now(),
-            lastIntervalMs: INITIAL_POLL_INTERVAL_MS,
-          },
-          INITIAL_POLL_INTERVAL_MS,
-          token,
-        );
-      }
+          let providerJobId: string;
+          if (existingJob?.providerJobId) {
+            providerJobId = existingJob.providerJobId;
+            logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
+          } else {
+            providerJobId = await submitWithThrottle({
+              modelId,
+              provider: modelMeta?.provider,
+              section: "image",
+              job,
+              token,
+              queue: getImageQueue(),
+              keyId: acquired.keyId,
+              submit: () =>
+                adapter.submit!({
+                  prompt: effectivePrompt,
+                  negativePrompt,
+                  imageUrl: job.data.sourceImageUrl,
+                  mediaInputs: job.data.mediaInputs,
+                  aspectRatio,
+                  modelSettings,
+                }),
+            });
+            await db.generationJob.update({
+              where: { id: dbJobId },
+              data: {
+                providerJobId,
+                providerKeyId: acquired.keyId,
+                // Фиксируем момент перехода в poll-стадию: после Redis wipe
+                // recovery восстановит таймер с этой точки, а не с нуля.
+                pollStartedAt: new Date(),
+              },
+            });
+          }
+
+          logger.info({ dbJobId, providerJobId }, "Image poll scheduled");
+          await delayJob(
+            job,
+            {
+              ...job.data,
+              stage: "poll",
+              pollStartedAt: Date.now(),
+              lastIntervalMs: INITIAL_POLL_INTERVAL_MS,
+            },
+            INITIAL_POLL_INTERVAL_MS,
+            token,
+          );
+        }
+      } // close `} else {` of single-shot path (virtual-batch branch above)
     } else {
       // ── Stage 2: poll ──────────────────────────────────────────────────
-      const providerJobId = existingJob?.providerJobId;
-      if (!providerJobId) throw new Error(`Image poll stage without providerJobId: ${dbJobId}`);
+      if (isVirtualBatch) {
+        // Параллельный poll всех pending sub-job'ов одной волной. Each sub-job
+        // имеет собственный sticky `providerKeyId`, поэтому acquireForPoll даёт
+        // тот же ключ что и при submit. Failure одного sub-job (включая timeout
+        // или provider error) помечает только его, не валит весь батч.
+        const state = readBatchState();
+        const pendingIndices = state.subJobs
+          .map((s, i) => (s.status === "pending" && s.providerJobId ? i : -1))
+          .filter((i) => i >= 0);
 
-      const acquired = await acquireForPoll(existingJob?.providerKeyId, keyProvider);
-      const adapter = createImageAdapter(modelId, acquired);
-      if (!adapter.poll) throw new Error(`Adapter ${modelId} has no poll()`);
+        await Promise.all(
+          pendingIndices.map(async (i) => {
+            const sub = state.subJobs[i];
+            try {
+              const subAcquired = await acquireForPoll(sub.providerKeyId ?? null, keyProvider);
+              const subAdapter = createImageAdapter(modelId, subAcquired);
+              if (!subAdapter.poll) {
+                state.subJobs[i] = {
+                  ...sub,
+                  status: "failed",
+                  error: `Adapter ${modelId} has no poll()`,
+                };
+                return;
+              }
+              const r = await subAdapter.poll(sub.providerJobId!);
+              if (r === null) return; // ещё pending, оставляем как есть
+              const result = Array.isArray(r) ? r[0] : r;
+              state.subJobs[i] = { ...sub, status: "succeeded", result };
+              if (sub.providerKeyId) void recordSuccess(sub.providerKeyId);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              if (sub.providerKeyId) void recordError(sub.providerKeyId, message.slice(0, 500));
+              state.subJobs[i] = { ...sub, status: "failed", error: message.slice(0, 200) };
+            }
+          }),
+        );
+        await writeBatchState(state);
 
-      const pollResult = await adapter.poll(providerJobId);
+        // Settled? — finalize. Иначе — schedule next poll-tick.
+        const stillPending = state.subJobs.some((s) => s.status === "pending");
+        if (stillPending) {
+          const elapsed = Date.now() - (job.data.pollStartedAt ?? Date.now());
+          const interval = getIntervalForElapsed(elapsed);
+          if (interval === null) {
+            // 24h timeout — fail batch entirely.
+            await db.generationJob.update({
+              where: { id: dbJobId },
+              data: { status: "failed", error: "poll timeout (24h)" },
+            });
+            await telegram
+              .sendMessage(
+                telegramChatId,
+                t.errors.generationTimedOut24h.replace("{modelName}", modelName),
+              )
+              .catch(() => void 0);
+            throw new UnrecoverableError("poll timeout 24h");
+          }
+          await delayJob(
+            job,
+            { ...job.data, stage: "poll", lastIntervalMs: interval },
+            interval,
+            token,
+          );
+          return;
+        }
 
-      if (!pollResult) {
-        // Not done yet — schedule the next poll with tiered interval.
-        const elapsed = Date.now() - (job.data.pollStartedAt ?? Date.now());
-        const interval = getIntervalForElapsed(elapsed);
-
-        if (interval === null) {
-          // 24 h hard cap — cancel and notify.
+        // All settled — собираем successes + errors.
+        const successResults: ImageResult[] = [];
+        for (const s of state.subJobs) {
+          if (s.status === "succeeded" && s.result) successResults.push(s.result);
+          else if (s.status === "failed" && s.error) batchErrors.push(s.error);
+        }
+        if (successResults.length === 0) {
           await db.generationJob.update({
             where: { id: dbJobId },
-            data: { status: "failed", error: "poll timeout (24h)" },
+            data: { status: "failed", error: batchErrors.join("; ").slice(0, 1000) },
           });
-          await telegram
-            .sendMessage(
-              telegramChatId,
-              t.errors.generationTimedOut24h.replace("{modelName}", modelName),
-            )
-            .catch(() => void 0);
-          throw new UnrecoverableError("poll timeout 24h");
+        } else {
+          if (!(await finalizeResults(successResults, { chargeMultiplier: successResults.length })))
+            return;
+        }
+        // Fall-through to Stage 3 (footer + send).
+      } else {
+        // ── Single-shot poll path (не virtual batch) ────────────────────────
+        const providerJobId = existingJob?.providerJobId;
+        if (!providerJobId) throw new Error(`Image poll stage without providerJobId: ${dbJobId}`);
+
+        const acquired = await acquireForPoll(existingJob?.providerKeyId, keyProvider);
+        const adapter = createImageAdapter(modelId, acquired);
+        if (!adapter.poll) throw new Error(`Adapter ${modelId} has no poll()`);
+
+        const pollResult = await adapter.poll(providerJobId);
+
+        if (!pollResult) {
+          // Not done yet — schedule the next poll with tiered interval.
+          const elapsed = Date.now() - (job.data.pollStartedAt ?? Date.now());
+          const interval = getIntervalForElapsed(elapsed);
+
+          if (interval === null) {
+            // 24 h hard cap — cancel and notify.
+            await db.generationJob.update({
+              where: { id: dbJobId },
+              data: { status: "failed", error: "poll timeout (24h)" },
+            });
+            await telegram
+              .sendMessage(
+                telegramChatId,
+                t.errors.generationTimedOut24h.replace("{modelName}", modelName),
+              )
+              .catch(() => void 0);
+            throw new UnrecoverableError("poll timeout 24h");
+          }
+
+          if (job.data.lastIntervalMs !== undefined && interval !== job.data.lastIntervalMs) {
+            await telegram
+              .sendMessage(
+                telegramChatId,
+                t.errors.generationStillRunning.replace("{modelName}", modelName),
+              )
+              .catch(() => void 0);
+          }
+
+          await delayJob(
+            job,
+            { ...job.data, stage: "poll", lastIntervalMs: interval },
+            interval,
+            token,
+          );
+          return; // unreachable — restores TS narrowing for pollResult
         }
 
-        if (job.data.lastIntervalMs !== undefined && interval !== job.data.lastIntervalMs) {
-          await telegram
-            .sendMessage(
-              telegramChatId,
-              t.errors.generationStillRunning.replace("{modelName}", modelName),
-            )
-            .catch(() => void 0);
-        }
-
-        await delayJob(
-          job,
-          { ...job.data, stage: "poll", lastIntervalMs: interval },
-          interval,
-          token,
-        );
-        return; // unreachable — restores TS narrowing for pollResult
+        const imageResults: ImageResult[] = Array.isArray(pollResult) ? pollResult : [pollResult];
+        if (!(await finalizeResults(imageResults))) return;
       }
-
-      const imageResults: ImageResult[] = Array.isArray(pollResult) ? pollResult : [pollResult];
-      if (!(await finalizeResults(imageResults))) return;
     }
 
     // ── Stage 3: send to user ────────────────────────────────────────────
@@ -430,6 +776,17 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         subscriptionBalance: deductResult?.subscriptionTokenBalance,
         tokenBalance: deductResult?.tokenBalance,
       });
+
+    // K=0 для virtual batch — все sub-job'ы failed, mediaGroup нет, шлём
+    // только error-сообщение со списком причин и выходим.
+    if (outputRecords.length === 0 && batchErrors.length > 0) {
+      const text = t.design.batchAllFailed
+        .replace("{total}", String(requestedN))
+        .replace("{errors}", batchErrors.join("\n• "));
+      await telegram.sendMessage(telegramChatId, "• " + text).catch(() => void 0);
+      logger.info({ dbJobId, errors: batchErrors.length }, "Virtual batch all failed");
+      return;
+    }
 
     // Batch: multiple outputs → send as media group
     if (outputRecords.length > 1) {
@@ -490,6 +847,17 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         await telegram.sendMessage(telegramChatId, hintText, {
           reply_markup: { inline_keyboard: rows },
         });
+      }
+
+      // Virtual-batch partial-success footer: K из N сгенерировано, перечисляем ошибки.
+      if (batchErrors.length > 0) {
+        const text = t.design.batchPartialFooter
+          .replace("{success}", String(outputRecords.length))
+          .replace("{total}", String(requestedN))
+          .replace("{errors}", batchErrors.join("\n• "));
+        await telegram
+          .sendMessage(telegramChatId, "• " + text)
+          .catch((reason) => logger.warn(reason, "Could not send batch partial footer"));
       }
 
       if (dialogId) {
@@ -579,6 +947,18 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         caption: singleCaption,
         reply_markup: replyMarkup,
       });
+    }
+
+    // Virtual-batch partial-success c K=1 (один success + 1..3 failures).
+    // К одиночному фото добавляем footer-сообщение с разбором ошибок.
+    if (batchErrors.length > 0) {
+      const text = t.design.batchPartialFooter
+        .replace("{success}", String(outputRecords.length))
+        .replace("{total}", String(requestedN))
+        .replace("{errors}", batchErrors.join("\n• "));
+      await telegram
+        .sendMessage(telegramChatId, "• " + text)
+        .catch((reason) => logger.warn(reason, "Could not send batch partial footer"));
     }
 
     logger.info({ dbJobId }, "Image job completed");

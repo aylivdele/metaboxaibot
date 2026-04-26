@@ -89,6 +89,8 @@ export default {
       "You can refine an image, get the original uncompressed file sent back into the chat, or download it via link (we recommend opening the link in a browser if you're using the mobile version of Telegram).\n\n🔄 - Refine\n📎 - Send as file\n⬇️ - Download",
     batchActionsNoDownload:
       "You can refine an image or get the original uncompressed file sent back into the chat.\n\n🔄 - Refine\n📎 - Send as file",
+    batchPartialFooter: "✅ Generated {success} of {total}. Failed:\n{errors}",
+    batchAllFailed: "❌ Failed to generate any of {total}. Errors:\n{errors}",
     chooseModel: "🎨 Choose model",
   },
   audio: {
