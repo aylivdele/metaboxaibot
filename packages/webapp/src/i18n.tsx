@@ -267,6 +267,7 @@ const translations = {
     "gallery.addToFav": "Add to favorites",
     "gallery.removeFromFav": "Remove from favorites",
 
+    "gallery.folder.favorites": "Favorites",
     "gallery.folder.all": "All",
     "gallery.folder.new": "New folder",
     "gallery.folder.createTitle": "New folder",
@@ -724,6 +725,7 @@ const translations = {
     "gallery.addToFav": "В избранное",
     "gallery.removeFromFav": "Убрать из избранного",
 
+    "gallery.folder.favorites": "Избранное",
     "gallery.folder.all": "Все",
     "gallery.folder.new": "Новая папка",
     "gallery.folder.createTitle": "Новая папка",
