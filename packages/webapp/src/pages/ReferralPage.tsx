@@ -119,7 +119,7 @@ export function ReferralPage({ onLinkMetabox }: { onLinkMetabox: () => void }) {
         </div>
         <div className="referral-stat">
           <div className="referral-stat__value referral-stat__value--small">
-            от&nbsp;{minReward.toLocaleString("ru-RU")}&nbsp;₽
+            {t("referral.rewardFrom")}&nbsp;{minReward.toLocaleString()}&nbsp;₽
           </div>
           <div className="referral-stat__label">{t("referral.rewardPerSub")}</div>
         </div>

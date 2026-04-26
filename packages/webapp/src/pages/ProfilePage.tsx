@@ -101,7 +101,7 @@ export function ProfilePage({
           className={`profile-tabs__btn${activeTab === "account" ? " profile-tabs__btn--active" : ""}`}
           onClick={() => setActiveTab("account")}
         >
-          Аккаунт
+          {t("profile.tabAccount")}
         </button>
       </div>
 
@@ -115,6 +115,7 @@ export function ProfilePage({
 /* ── Subscription Countdown ────────────────────────────────────────────────── */
 
 function useCountdown(endDate: string) {
+  const { t, locale } = useI18n();
   const [text, setText] = useState("");
   const [urgent, setUrgent] = useState(false);
 
@@ -122,7 +123,7 @@ function useCountdown(endDate: string) {
     const update = () => {
       const diff = new Date(endDate).getTime() - Date.now();
       if (diff <= 0) {
-        setText("Подписка истекла");
+        setText(t("profile.countdown.expired"));
         setUrgent(true);
         return;
       }
@@ -132,14 +133,26 @@ function useCountdown(endDate: string) {
       const seconds = Math.floor((diff % 60000) / 1000);
 
       if (days >= 1) {
-        const w = days === 1 ? "день" : days < 5 ? "дня" : "дней";
-        setText(`${days} ${w}`);
+        let dayStr: string;
+        if (locale === "ru") {
+          const w = days === 1 ? "день" : days < 5 ? "дня" : "дней";
+          dayStr = `${days} ${w}`;
+        } else {
+          dayStr = `${days} ${days === 1 ? t("profile.countdown.day") : t("profile.countdown.days")}`;
+        }
+        setText(dayStr);
         setUrgent(false);
       } else if (hours >= 1) {
-        setText(`${hours} ч ${minutes} мин`);
+        setText(
+          t("profile.countdown.hMin").replace("{h}", String(hours)).replace("{m}", String(minutes)),
+        );
         setUrgent(true);
       } else {
-        setText(`${minutes} мин ${seconds} сек`);
+        setText(
+          t("profile.countdown.minSec")
+            .replace("{m}", String(minutes))
+            .replace("{s}", String(seconds)),
+        );
         setUrgent(true);
       }
     };
@@ -147,7 +160,7 @@ function useCountdown(endDate: string) {
     const diff = new Date(endDate).getTime() - Date.now();
     const interval = setInterval(update, diff < 86400000 ? 1000 : 60000);
     return () => clearInterval(interval);
-  }, [endDate]);
+  }, [endDate, t, locale]);
 
   return { text, urgent };
 }
@@ -155,7 +168,7 @@ function useCountdown(endDate: string) {
 /* ── Overview Tab ──────────────────────────────────────────────────────────── */
 
 function OverviewTab({ profile }: { profile: UserProfile }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const sub = profile.subscription;
   const progressPct = sub ? Math.max(0, Math.min(100, (sub.daysLeft / sub.totalDays) * 100)) : 0;
   const countdown = useCountdown(sub?.endDate ?? "");
@@ -191,7 +204,8 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
               {countdown.text}
             </span>
             <span className="sub-card__end-date">
-              до {new Date(sub.endDate).toLocaleDateString("ru-RU")}
+              {t("profile.until")}{" "}
+              {new Date(sub.endDate).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
             </span>
           </div>
           <div className="sub-card__bar">
@@ -239,7 +253,7 @@ function GalleryTab({
 }: {
   onGoToManagement?: (section: string, modelId: string) => void;
 }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [section, setSection] = useState<Section>("image");
   const [modelFilter, setModelFilter] = useState<string | null>(null);
   const [items, setItems] = useState<GalleryJob[]>([]);
@@ -264,9 +278,9 @@ function GalleryTab({
   const LIMIT = 20;
 
   const sectionLabels: Record<Section, string> = {
-    image: locale === "ru" ? "🎨 Изображения" : "🎨 Images",
-    audio: locale === "ru" ? "🎧 Аудио" : "🎧 Audio",
-    video: locale === "ru" ? "🎬 Видео" : "🎬 Video",
+    image: `🎨 ${t("gallery.section.image")}`,
+    audio: `🎧 ${t("gallery.section.audio")}`,
+    video: `🎬 ${t("gallery.section.video")}`,
   };
 
   const loadFolders = useCallback(() => {
@@ -476,7 +490,7 @@ function GalleryTab({
           value={modelFilter ?? ""}
           onChange={(v) => handleModelFilterChange(v === "" ? null : v)}
           options={[
-            { value: "", label: locale === "ru" ? "Все модели" : "All models" },
+            { value: "", label: t("gallery.allModels") },
             ...sectionModels.map((m) => ({ value: m.id, label: m.name })),
           ]}
         />
@@ -1016,7 +1030,7 @@ function GalleryCard({
           className={`gallery-card__fav${isFavorited ? " gallery-card__fav--active" : ""}`}
           onClick={handleToggleFavoriteClick}
           disabled={favLoading}
-          title={isFavorited ? "Убрать из избранного" : "В избранное"}
+          title={isFavorited ? t("gallery.removeFromFav") : t("gallery.addToFav")}
           aria-label="Favorites"
         >
           {isFavorited ? "♥" : "♡"}
@@ -1676,6 +1690,7 @@ interface AccountData {
 }
 
 function AccountTab(_props: { profile: UserProfile }) {
+  const { t } = useI18n();
   const [data, setData] = useState<AccountData | null>(null);
 
   useEffect(() => {
@@ -1694,27 +1709,27 @@ function AccountTab(_props: { profile: UserProfile }) {
           {data?.email ? (
             <span>{data.email}</span>
           ) : (
-            <span className="account-hint">Аккаунт Metabox не привязан</span>
+            <span className="account-hint">{t("account.notLinked")}</span>
           )}
         </div>
       </div>
 
       {/* Status */}
       <div className="account-section">
-        <div className="account-label">Статус</div>
+        <div className="account-label">{t("account.status")}</div>
         <div className="account-value">
           {data?.userStatus === "PARTNER"
-            ? "Партнёр"
+            ? t("account.statusPartner")
             : data?.userStatus === "CLIENT"
-              ? "Клиент"
-              : "Пользователь"}
+              ? t("account.statusClient")
+              : t("account.statusUser")}
         </div>
       </div>
 
       {/* Mentor */}
       {data?.mentor && (
         <div className="account-section">
-          <div className="account-label">Наставник</div>
+          <div className="account-label">{t("account.mentor")}</div>
           <div className="account-value">
             <div className="account-mentor-name">{data.mentor.name}</div>
             {data.mentor.telegramUsername ? (
@@ -1745,7 +1760,7 @@ function AccountTab(_props: { profile: UserProfile }) {
       {/* Referral code */}
       {data?.referralCode && (
         <div className="account-section">
-          <div className="account-label">Реферальный код</div>
+          <div className="account-label">{t("account.referralCode")}</div>
           <div className="account-value account-value--mono">{data.referralCode}</div>
         </div>
       )}

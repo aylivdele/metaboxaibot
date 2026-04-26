@@ -170,7 +170,7 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
             <input
               className="voice-picker__search"
               type="text"
-              placeholder="Поиск…"
+              placeholder={t("picker.search")}
               value={search}
               onChange={handleSearchChange}
             />
@@ -181,14 +181,18 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
                   className={`voice-picker__gender-btn${genderFilter === g ? " voice-picker__gender-btn--active" : ""}`}
                   onClick={() => handleGenderChange(g)}
                 >
-                  {g === "all" ? "Все" : g === "Man" ? "М" : "Ж"}
+                  {g === "all"
+                    ? t("picker.genderAll")
+                    : g === "Man"
+                      ? t("picker.genderM")
+                      : t("picker.genderF")}
                 </button>
               ))}
             </div>
           </div>
 
           {loading ? (
-            <div className="voice-picker__loading">Загрузка аватаров…</div>
+            <div className="voice-picker__loading">{t("picker.loadingAvatars")}</div>
           ) : (
             <>
               <div className="avatar-picker__grid">
@@ -214,7 +218,7 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
                   );
                 })}
                 {!loading && avatars.length === 0 && (
-                  <div className="voice-picker__empty">Аватары не найдены</div>
+                  <div className="voice-picker__empty">{t("picker.noAvatars")}</div>
                 )}
                 {hasMore && (
                   <button
@@ -222,7 +226,7 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
                     onClick={handleLoadMore}
                     disabled={loadingMore}
                   >
-                    {loadingMore ? "Загрузка…" : "Загрузить ещё"}
+                    {loadingMore ? t("picker.loading") : t("picker.loadMore")}
                   </button>
                 )}
               </div>
@@ -242,7 +246,7 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
           </button>
 
           {myAvatarsLoading ? (
-            <div className="voice-picker__loading">Загрузка…</div>
+            <div className="voice-picker__loading">{t("picker.loading")}</div>
           ) : myAvatars.length === 0 ? (
             <div className="voice-picker__empty">{t("uploads.emptyAvatars")}</div>
           ) : (
