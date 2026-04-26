@@ -479,10 +479,10 @@ export function buildResultCaption(
     sliced = prompt.slice(0, maxLen);
     if (prompt.length > maxLen) sliced += "...";
   } else {
-    sliced = opts?.emptyPromptLabel ?? t.common.generationNoPrompt;
+    sliced = opts?.emptyPromptLabel ?? "";
   }
   const suffix = opts?.suffix ? ` ${opts.suffix}` : "";
-  let caption = `✅ ${displayName}: ${sliced}${suffix}`;
+  let caption = sliced ? `✅ ${displayName}: ${sliced}${suffix}` : `✅ ${displayName}:${suffix}`;
   const cost = opts?.cost;
   const sub = opts?.subscriptionBalance;
   const reg = opts?.tokenBalance;
