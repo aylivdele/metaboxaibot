@@ -15,8 +15,9 @@ import type {
 import { openExternalLink } from "../utils/telegram.js";
 import { SETTING_TRANSLATIONS } from "@metabox/shared-browser";
 import { StyledSelect } from "../components/management/StyledSelect.js";
+import { AvatarsPage } from "./AvatarsPage.js";
 
-export type ProfileTab = "overview" | "gallery" | "account";
+export type ProfileTab = "overview" | "gallery" | "account" | "avatars";
 
 /**
  * Format a token amount with dynamic precision so small values never show as 0.00.
@@ -103,11 +104,18 @@ export function ProfilePage({
         >
           {t("profile.tabAccount")}
         </button>
+        <button
+          className={`profile-tabs__btn${activeTab === "avatars" ? " profile-tabs__btn--active" : ""}`}
+          onClick={() => setActiveTab("avatars")}
+        >
+          {t("profile.tabAvatars")}
+        </button>
       </div>
 
       {activeTab === "overview" && <OverviewTab profile={profile} />}
       {activeTab === "gallery" && <GalleryTab onGoToManagement={onGoToManagement} />}
       {activeTab === "account" && <AccountTab profile={profile} />}
+      {activeTab === "avatars" && <AvatarsPage />}
     </div>
   );
 }

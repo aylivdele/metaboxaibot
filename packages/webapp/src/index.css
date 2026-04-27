@@ -2657,7 +2657,7 @@ textarea::placeholder {
 
 .profile-tabs__btn {
   flex: 1;
-  padding: 9px 12px;
+  padding: 9px 8px;
   border-radius: calc(var(--radius-sm) - 2px);
   font-size: 13px;
   font-weight: 600;
@@ -4454,4 +4454,152 @@ textarea::placeholder {
 .account-mentor-email {
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+/* ── Avatars Page ──────────────────────────────────────────────────────────── */
+
+.avatars-page__filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.avatars-page__filter-btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 13px;
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.avatars-page__filter-btn--active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.avatars-page__create-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.avatars-page__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.avatars-page__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: var(--card-bg);
+}
+
+.avatars-page__card--muted {
+  opacity: 0.7;
+}
+
+.avatars-page__img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: calc(var(--radius-sm) - 2px);
+}
+
+.avatars-page__img--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary, #2a2a2a);
+  font-size: 32px;
+}
+
+.avatars-page__provider {
+  align-self: flex-start;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+}
+
+.avatars-page__provider--heygen {
+  background: color-mix(in srgb, #3a7de5 15%, transparent);
+  color: #5a9df7;
+}
+
+.avatars-page__provider--higgsfield_soul {
+  background: color-mix(in srgb, #9f5ae5 15%, transparent);
+  color: #c07af7;
+}
+
+.avatars-page__name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.avatars-page__actions {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+}
+
+.avatars-page__action-btn {
+  flex: 1;
+  padding: 2px 6px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1.5;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.avatars-page__action-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.avatars-page__action-btn--danger:hover:not(:disabled) {
+  border-color: #e05555;
+  color: #e05555;
+}
+
+.avatars-page__rename-row {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  align-items: center;
+}
+
+.avatars-page__rename-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  padding: 2px 5px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg, var(--card-bg));
+  color: var(--text-primary);
 }

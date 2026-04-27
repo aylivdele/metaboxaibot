@@ -174,6 +174,15 @@ const translations = {
     "referral.step3": "You both receive bonus tokens",
     "referral.rewardFrom": "from",
 
+    // Avatars page
+    "profile.tabAvatars": "Avatars",
+    "avatars.filterAll": "All",
+    "avatars.filterHeyGen": "HeyGen",
+    "avatars.filterSoul": "Soul",
+    "avatars.empty": "No avatars yet",
+    "avatars.confirmDeleteTitle": "Delete avatar?",
+    "avatars.confirmDeleteText": "The avatar will be permanently removed.",
+
     // Gallery model filter
     "gallery.allModels": "All models",
 
@@ -633,6 +642,15 @@ const translations = {
     "referral.step2": "Друг открывает бота по вашей ссылке",
     "referral.step3": "Вы оба получаете бонусные токены",
     "referral.rewardFrom": "от",
+
+    // Avatars page
+    "profile.tabAvatars": "Аватары",
+    "avatars.filterAll": "Все",
+    "avatars.filterHeyGen": "HeyGen",
+    "avatars.filterSoul": "Soul",
+    "avatars.empty": "Аватаров пока нет",
+    "avatars.confirmDeleteTitle": "Удалить аватар?",
+    "avatars.confirmDeleteText": "Аватар будет удалён без возможности восстановления.",
 
     // Gallery model filter
     "gallery.allModels": "Все модели",
