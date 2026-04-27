@@ -9,7 +9,9 @@
  * удаляет env-ключи и убирает переменные из окружения.
  */
 import "dotenv/config";
-import { db } from "../src/db.js";
+// dist (not src) — script runs in runtime image where только compiled output присутствует.
+// Локально: предварительно `pnpm -F @metabox/api build`.
+import { db } from "../dist/db.js";
 import { config, encryptSecret, maskKey } from "@metabox/shared";
 
 interface Seed {
