@@ -10,7 +10,9 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
-    "seed:keys": "tsx scripts/seed-keys-from-env.ts"
+    "seed:keys": "tsx scripts/seed-keys-from-env.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "exports": {
     ".": {

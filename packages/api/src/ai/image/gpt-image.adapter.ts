@@ -32,7 +32,10 @@ const OUTPUT_TOKENS_FALLBACK: Record<string, Record<string, number>> = {
  * KIE 4K + auto/1:1 не разрешён правилами unavailableIf, но на всякий случай
  * fallback'имся к 2K square.
  */
-function kieAspectResolutionToOpenAISize(aspect: string | undefined, resolution: string): string {
+export function kieAspectResolutionToOpenAISize(
+  aspect: string | undefined,
+  resolution: string,
+): string {
   // Square / auto
   if (!aspect || aspect === "auto" || aspect === "1:1") {
     if (resolution === "2K") return "2048x2048";

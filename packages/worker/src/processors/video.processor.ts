@@ -46,6 +46,7 @@ import type { AIModel } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
 import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import { submitWithFallback } from "../utils/submit-with-fallback.js";
+import { computeSeedance2BillableUsd } from "../utils/seedance2-billing.js";
 import {
   acquireForSubmit,
   acquireForPoll,
@@ -61,24 +62,6 @@ import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
 import { UserFacingError } from "@metabox/shared";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
-
-/**
- * Seedance 2.0 evolink: per-second rates, применяемые ТОЛЬКО когда у задачи
- * есть `ref_videos` (r2v режим с input video). При наличии input video
- * provider использует пониженный rate, но дополнительно билит входное видео:
- *   billable_seconds = output + max(input_total_duration, output)
- *
- * No-video rates остаются в `costMatrix`/`costVariants` AIModel — corresponding
- * preview в mini-app для типичного случая корректен. Этот override применяется
- * только в runtime billing path video processor'а.
- *
- * Fast variant не имеет 1080p — попытка использовать выпадет к calculateCost
- * fallback (no-video matrix) с warning.
- */
-const SEEDANCE2_RATES_WITH_VIDEO: Record<string, Record<string, number>> = {
-  "seedance-2": { "480p": 0.056, "720p": 0.121, "1080p": 0.302 },
-  "seedance-2-fast": { "480p": 0.045, "720p": 0.096 },
-};
 
 const telegram = new Api(config.bot.token);
 
@@ -591,15 +574,14 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
           const inputDurations = await Promise.all(
             refVideos.map((u) => fetchClipDurationSec(u).catch(() => 0)),
           );
-          const totalInputDuration = inputDurations.reduce((sum, d) => sum + d, 0);
-          // "Minimum billable input duration = output duration"
-          const billableInput = Math.max(totalInputDuration, effectiveDuration);
-          const totalSec = effectiveDuration + billableInput;
-
           const resolution = (modelSettings?.resolution as string | undefined) ?? "720p";
-          const rate = SEEDANCE2_RATES_WITH_VIDEO[modelId]?.[resolution];
-          if (rate !== undefined) {
-            const usd = rate * totalSec;
+          const usd = computeSeedance2BillableUsd({
+            modelId: modelId as "seedance-2" | "seedance-2-fast",
+            resolution,
+            outputDuration: effectiveDuration,
+            inputVideoDurations: inputDurations,
+          });
+          if (usd !== null) {
             internalCost = usdToTokens(usd) * getModelMultiplier(modelId);
           } else {
             // Неизвестное разрешение — fallback на calculateCost (no-video matrix).

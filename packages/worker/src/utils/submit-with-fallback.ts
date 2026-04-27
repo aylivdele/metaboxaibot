@@ -52,6 +52,7 @@ import { resolveKeyProviderForModel } from "@metabox/api/ai/key-provider";
 import { logger } from "../logger.js";
 import { delayJob } from "./delay-job.js";
 import { notifyRateLimit, notifyFallback } from "./notify-error.js";
+import { RateLimitLongWindowError } from "./submit-with-throttle.js";
 
 /** На какой попытке (BullMQ attemptsMade) разрешён fallback по 5xx. */
 const PERSISTENT_5XX_ATTEMPT_THRESHOLD = 2;
@@ -61,6 +62,28 @@ const JITTER_MS = 2_000;
 function withJitter(ms: number): number {
   return Math.max(MIN_DEFER_MS, ms + Math.floor(Math.random() * JITTER_MS));
 }
+
+/**
+ * UX cap на длительность одного defer-цикла. Без cap'а юзер мог бы ждать часами,
+ * пока истечёт TTL primary'ного long-cooldown маркера (например, 100 мин). С cap'ом
+ * BullMQ просыпается каждые ≤10 мин, перепроверяет состояние провайдера, и если
+ * primary всё ещё лежит — defer'ит снова (counter инкрементится).
+ */
+const MAX_FALLBACK_DEFER_MS = 10 * 60 * 1000;
+
+/**
+ * Circuit breaker: после N defer'ов подряд для одного и того же job'а отказываемся
+ * и фейлим терминально через RateLimitLongWindowError. Защита от бесконечного
+ * loop'а когда provider chain полностью dead.
+ *
+ * `delayJob` использует `moveToDelayed`, который НЕ инкрементирует BullMQ
+ * `attemptsMade` — настройка `attempts: N` на queue не сработала бы. Поэтому
+ * считаем сами через `inputData.fallbackDeferCount`.
+ *
+ * 6 × 10 мин ≈ 1 час максимум — достаточно для большинства реальных
+ * recovery-сценариев, после чего юзер получит ошибку и попробует позже сам.
+ */
+const MAX_FALLBACK_DEFERS = 6;
 
 export type FallbackReason =
   | "pool_exhausted"
@@ -146,6 +169,11 @@ export async function submitWithFallback<T, D extends object>(
   // бы пока самый «лежачий» провайдер выйдет из cooldown'а.
   let lastDeferDelay: number | null = null;
   const updateDeferDelay = (candidateMs: number): void => {
+    // Fix: PoolExhaustedError(provider, 0) бросается envFallback'ом когда
+    // provider misconfigured (нет ни env-ключа, ни DB-rows) — это не "ждать 0мс",
+    // а "этот provider в принципе не работает". Не позволяем такому 0 поглощать
+    // useful TTL других candidates через MIN. Игнорируем noise-значения.
+    if (candidateMs <= 0) return;
     lastDeferDelay = lastDeferDelay === null ? candidateMs : Math.min(lastDeferDelay, candidateMs);
   };
 
@@ -350,12 +378,48 @@ export async function submitWithFallback<T, D extends object>(
   // Если хоть один кандидат указал, что готов defer'нуть (PoolExhausted /
   // long-window / cooldown marker) — defer job.
   if (lastDeferDelay !== null) {
-    const delay = withJitter(lastDeferDelay);
+    // Fix: circuit breaker. delayJob использует moveToDelayed, который НЕ
+    // инкрементирует BullMQ attemptsMade — без своего счётчика job был бы в
+    // бесконечном loop'е если provider chain полностью dead. Считаем defer'ы
+    // в inputData.fallbackDeferCount, после MAX — терминально фейлим job через
+    // RateLimitLongWindowError (processor покажет user-facing "model unavailable").
+    const jobData = opts.job.data as Record<string, unknown>;
+    const currentDeferCount =
+      typeof jobData.fallbackDeferCount === "number" ? jobData.fallbackDeferCount : 0;
+    const newDeferCount = currentDeferCount + 1;
+
+    if (newDeferCount >= MAX_FALLBACK_DEFERS) {
+      logger.error(
+        {
+          jobId: opts.jobId,
+          modelId: opts.primaryModel.id,
+          deferCount: newDeferCount,
+          maxDefers: MAX_FALLBACK_DEFERS,
+        },
+        "submitWithFallback: max defers exceeded — failing job terminally",
+      );
+      throw new RateLimitLongWindowError(opts.primaryModel.id, lastDeferDelay);
+    }
+
+    // Fix: cap defer delay на 10 мин. Без cap'а юзер мог бы ждать часами,
+    // пока истечёт TTL primary'ного long-cooldown маркера. Cap → BullMQ просыпается
+    // каждые ≤10 мин и перепроверяет состояние; если provider всё ещё лежит —
+    // defer'ит снова (counter инкрементится в сторону MAX_FALLBACK_DEFERS).
+    const cappedDelay = Math.min(lastDeferDelay, MAX_FALLBACK_DEFER_MS);
+    const delay = withJitter(cappedDelay);
+
     logger.info(
-      { jobId: opts.jobId, modelId: opts.primaryModel.id, delay },
+      {
+        jobId: opts.jobId,
+        modelId: opts.primaryModel.id,
+        delay,
+        rawDelay: lastDeferDelay,
+        capped: lastDeferDelay > MAX_FALLBACK_DEFER_MS,
+        deferCount: newDeferCount,
+      },
       "submitWithFallback: defering job (all candidates pool-exhausted/long-cooldown)",
     );
-    await delayJob(opts.job, opts.job.data as Record<string, unknown>, delay, opts.token);
+    await delayJob(opts.job, { ...jobData, fallbackDeferCount: newDeferCount }, delay, opts.token);
     throw new Error("unreachable: delayJob did not throw");
   }
 

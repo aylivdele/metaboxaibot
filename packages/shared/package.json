@@ -15,7 +15,9 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@metabox/shared-browser": "workspace:*"

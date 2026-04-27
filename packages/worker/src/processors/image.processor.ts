@@ -42,6 +42,7 @@ import type { DeductResult } from "@metabox/api/services";
 import { notifyTechError, notifyRateLimit } from "../utils/notify-error.js";
 import { isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import { submitWithFallback } from "../utils/submit-with-fallback.js";
+import { deriveLockedProvider, detectUsedFallback } from "../utils/fallback-state.js";
 import { acquireForPoll } from "../utils/acquire-for-processor.js";
 import { resolveKeyProviderForModel } from "@metabox/api/ai/key-provider";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
@@ -412,15 +413,12 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
       // для virtual batch — derive из `subJobs[*].effectiveProvider` (см. A4
       // в audit'е: lockedProvider не хранится отдельно во избежание race'ов).
       const fbState = readFallbackState();
-      let effectiveProviderForBilling = fbState.effectiveProvider;
-      if (!effectiveProviderForBilling && isVirtualBatch) {
-        const vbState = readBatchState();
-        effectiveProviderForBilling = vbState.subJobs.find(
-          (s) => s.effectiveProvider,
-        )?.effectiveProvider;
-      }
-      const usedFallback =
-        !!effectiveProviderForBilling && effectiveProviderForBilling !== model.provider;
+      const { usedFallback } = detectUsedFallback({
+        fallbackState: fbState,
+        batchState: isVirtualBatch ? readBatchState() : undefined,
+        isVirtualBatch,
+        primaryProvider: model.provider,
+      });
       const adapterUsdCost = usedFallback ? undefined : firstResult.providerUsdCost;
       const perImageInternalCost =
         adapterUsdCost !== undefined
@@ -517,13 +515,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
           // (succeeded ИЛИ pending с providerJobId), все остальные sub-jobs идут
           // на этот же provider. Derive из subJobs — без отдельного хранения,
           // чтобы избежать race'а между writeBatchState и writeFallbackState.
-          const lockedProvider = state.subJobs
-            .slice(0, i)
-            .find(
-              (s) =>
-                s.effectiveProvider &&
-                (s.status === "succeeded" || (s.status === "pending" && s.providerJobId)),
-            )?.effectiveProvider;
+          const lockedProvider = deriveLockedProvider(state.subJobs, i);
 
           const subCandidates: AIModel[] = lockedProvider
             ? (() => {
