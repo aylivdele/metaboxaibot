@@ -248,6 +248,19 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
 const SECTIONS = ["image", "audio", "video"] as const;
 type Section = (typeof SECTIONS)[number];
 
+function sortFolders(arr: GalleryFolder[]): GalleryFolder[] {
+  return [...arr].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+    if (a.isPinned && b.isPinned) {
+      const pa = a.pinnedAt ?? "";
+      const pb = b.pinnedAt ?? "";
+      if (pa !== pb) return pa < pb ? -1 : 1;
+    }
+    if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 function GalleryTab({
   onGoToManagement,
 }: {
@@ -367,7 +380,6 @@ function GalleryTab({
   const handleSectionChange = (sec: Section) => {
     setSection(sec);
     setModelFilter(null);
-    setActiveFolderId(null);
     setPage(1);
   };
 
@@ -645,8 +657,10 @@ function GalleryTab({
             onSave={async (name, isPinned) => {
               const updated = await api.gallery.folders.update(editFolder.id, { name, isPinned });
               setFolders((prev) =>
-                prev.map((f) =>
-                  f.id === updated.id ? { ...f, ...updated, itemCount: f.itemCount } : f,
+                sortFolders(
+                  prev.map((f) =>
+                    f.id === updated.id ? { ...f, ...updated, itemCount: f.itemCount } : f,
+                  ),
                 ),
               );
               setEditFolder(null);
