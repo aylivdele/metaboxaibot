@@ -726,7 +726,8 @@ textarea::placeholder {
   background: var(--accent-gradient);
   color: var(--text-on-accent);
   box-shadow: var(--shadow-accent);
-  border-color: transparent;
+  border: none;
+  padding: 9.5px 19.5px;
 }
 
 .dialog-list {
@@ -2110,6 +2111,9 @@ textarea::placeholder {
   text-align: center;
   line-height: 1.4;
 }
+.gallery-folders .chip:has(.gallery-folders__count) {
+  gap: 8px;
+}
 .gallery-folders__add {
   width: 32px;
   height: 32px;
@@ -2120,20 +2124,6 @@ textarea::placeholder {
   font-size: 20px;
   flex-shrink: 0;
   border-radius: 50% !important;
-}
-.gallery-folders__edit-btn {
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  color: var(--text-hint);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 6px;
-  transition: color 0.15s;
-}
-.gallery-folders__edit-btn:hover {
-  color: var(--text-primary);
 }
 
 /* ── Folder Picker ────────────────────────────────────────────────────────── */
@@ -2247,6 +2237,49 @@ textarea::placeholder {
   right: 0;
   color: #fff;
   font-size: 26px;
+}
+
+/* ── Image Lightbox ─────────────────────────────────────────────────────────── */
+.gallery-lightbox-overlay {
+  background: rgba(0, 0, 0, 0.92);
+  padding: 16px;
+}
+.gallery-lightbox {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: min(92vw, 700px);
+  width: 100%;
+  gap: 12px;
+  animation: fadeInScale 0.15s ease;
+}
+.gallery-lightbox__header {
+  display: flex;
+  justify-content: flex-end;
+}
+.gallery-lightbox__close {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.gallery-lightbox__img {
+  max-width: 100%;
+  max-height: calc(90vh - 110px);
+  object-fit: contain;
+  border-radius: var(--radius);
+  display: block;
+  margin: 0 auto;
+}
+.gallery-lightbox__actions {
+  display: flex;
+  gap: 8px;
+}
+.gallery-lightbox__actions .gallery-card__btn {
+  flex: 1;
 }
 
 .gallery-card__model {
