@@ -519,7 +519,8 @@ export default {
   },
   modelModes: {
     pickerTitle: "Choose mode:",
-    activated: "Mode «{mode}» activated.",
+    activated:
+      "Mode «{mode}» activated.\n✉️ Send a text prompt to start generation.\n🖼 To attach images — use the slot buttons below.",
     activatedTextOnly: "Mode «{mode}» activated. Send a text prompt to start generation.",
     change: "🔄 Change mode",
     t2v: "Text → video",

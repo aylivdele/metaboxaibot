@@ -334,25 +334,31 @@ export async function activateVideoModel(
       reply_markup: sectionReplyMarkup,
     });
 
-    let hint = ctx.t.video.hintVideoDefault;
-    let appendVoiceHint = true;
-    switch (modelId) {
-      case "heygen":
-        hint = ctx.t.video.hintHeygen;
-        appendVoiceHint = false; // avatar hints already mention voice
-        break;
-      case "d-id":
-        hint = ctx.t.video.hintDid;
-        appendVoiceHint = false;
-        break;
-      case "higgsfield-lite":
-      case "higgsfield":
-      case "higgsfield-preview":
-        hint = ctx.t.video.hintHiggsfield;
+    // Для modes-aware моделей generic-хинт лишний — он не отражает режим и
+    // дублирует информацию в активационном сообщении после выбора режима
+    // (см. mode-select.ts handleModeSet → t.modelModes.activated). Хинт со
+    // слотами шлём только если модель single-mode.
+    if (!modes) {
+      let hint = ctx.t.video.hintVideoDefault;
+      let appendVoiceHint = true;
+      switch (modelId) {
+        case "heygen":
+          hint = ctx.t.video.hintHeygen;
+          appendVoiceHint = false; // avatar hints already mention voice
+          break;
+        case "d-id":
+          hint = ctx.t.video.hintDid;
+          appendVoiceHint = false;
+          break;
+        case "higgsfield-lite":
+        case "higgsfield":
+        case "higgsfield-preview":
+          hint = ctx.t.video.hintHiggsfield;
+      }
+      await ctx.reply(appendVoiceHint ? `${hint}\n\n${ctx.t.voice.inputHint}` : hint, {
+        reply_markup: inlineKb,
+      });
     }
-    await ctx.reply(appendVoiceHint ? `${hint}\n\n${ctx.t.voice.inputHint}` : hint, {
-      reply_markup: modes ? undefined : inlineKb,
-    });
 
     // For modes-aware models, send a mode picker. The picker click handler
     // (`mode:` callback) will follow up with the mode-activated message and
