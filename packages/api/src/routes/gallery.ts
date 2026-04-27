@@ -1,16 +1,19 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
-import { getFileUrl, deleteFile } from "../services/s3.service.js";
+import { getFileUrl, deleteFile, compressForTelegramPhoto } from "../services/s3.service.js";
 import { buildDownloadButton, generateDownloadToken } from "../utils/download-token.js";
 import { AI_MODELS, config, getT } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
-// Telegram URL-fetch limits when the bot sends a remote URL to the Bot API:
-// images go through sendPhoto (5 MB), other media + documents use 20 MB.
-const PHOTO_URL_MAX_BYTES = 5 * 1024 * 1024;
-const MEDIA_URL_MAX_BYTES = 20 * 1024 * 1024;
+// Telegram multipart-upload limits (когда бот шлёт файл как multipart, а не URL):
+//   sendPhoto       ≤ 10 MB
+//   sendDocument/Video/Audio ≤ 50 MB
+// Для image > 10 MB компрессируем через compressForTelegramPhoto до ≤ 9 MB,
+// чтобы оставаться в sendPhoto. Для video/audio > 50 MB шлём download-ссылку.
+const PHOTO_BUFFER_MAX_BYTES = 10 * 1024 * 1024;
+const MEDIA_BUFFER_MAX_BYTES = 50 * 1024 * 1024;
 
 type TelegramSendMethod = "sendPhoto" | "sendVideo" | "sendAudio" | "sendDocument";
 
@@ -28,46 +31,101 @@ function methodParamKey(method: TelegramSendMethod): "photo" | "video" | "audio"
   return "document";
 }
 
-/** Probe Content-Length via HEAD. Returns null on any failure (network, 4xx, missing header). */
-async function probeFileSize(url: string): Promise<number | null> {
-  try {
-    const res = await fetch(url, { method: "HEAD" });
-    if (!res.ok) return null;
-    const len = res.headers.get("content-length");
-    if (!len) return null;
-    const n = parseInt(len, 10);
-    return Number.isFinite(n) ? n : null;
-  } catch {
-    return null;
-  }
+/** Скачивает URL в Buffer. Бросает при не-2xx или сетевой ошибке. */
+async function downloadBuffer(url: string): Promise<Buffer> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
 }
 
-async function sendFileToUser(
+/** Дефолтное имя файла для multipart, если не удалось извлечь из s3Key/URL. */
+function defaultFilename(section: string, index: number): string {
+  if (section === "image") return `image-${index + 1}.png`;
+  if (section === "video") return `video-${index + 1}.mp4`;
+  if (section === "audio") return `audio-${index + 1}.mp3`;
+  return `file-${index + 1}.bin`;
+}
+
+function filenameFromS3Key(s3Key: string | null, fallback: string): string {
+  if (!s3Key) return fallback;
+  const tail = s3Key.split("/").pop();
+  return tail && tail.length > 0 ? tail : fallback;
+}
+
+/**
+ * Multipart send to Telegram. Заменяет URL-based fetch — Telegram не качает файл сам,
+ * мы заливаем буфер напрямую. Это убирает 5/20 MB лимиты на URL-fetch (теперь
+ * действуют 10/50 MB лимиты на multipart, что обычно перекрывает all our outputs).
+ */
+async function sendBufferToUser(
   userId: bigint,
   method: TelegramSendMethod,
-  fileUrl: string,
+  buffer: Buffer,
+  filename: string,
   caption: string,
   replyMarkup?: object,
 ): Promise<void> {
   const paramKey = methodParamKey(method);
-
-  const body: Record<string, unknown> = {
-    chat_id: userId.toString(),
-    [paramKey]: fileUrl,
-    caption,
-    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
-  };
+  const form = new FormData();
+  form.append("chat_id", userId.toString());
+  if (caption) form.append("caption", caption);
+  if (replyMarkup) form.append("reply_markup", JSON.stringify(replyMarkup));
+  form.append(paramKey, new Blob([new Uint8Array(buffer)]), filename);
 
   const res = await fetch(`https://api.telegram.org/bot${config.bot.token}/${method}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: form,
   });
 
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { description?: string };
     throw new Error(`Telegram API error: ${err.description ?? res.status}`);
   }
+}
+
+/**
+ * Multipart media group для batch image-job'ов. Каждый Buffer attach'ится через
+ * `attach://<name>`, JSON в `media` ссылается на эти имена.
+ */
+async function sendMediaGroupBuffers(
+  userId: bigint,
+  items: Array<{ buffer: Buffer; filename: string; caption?: string }>,
+): Promise<boolean> {
+  const form = new FormData();
+  form.append("chat_id", userId.toString());
+  const media = items.map((item, i) => {
+    const attachName = `file${i}`;
+    form.append(attachName, new Blob([new Uint8Array(item.buffer)]), item.filename);
+    return {
+      type: "photo" as const,
+      media: `attach://${attachName}`,
+      ...(item.caption ? { caption: item.caption } : {}),
+    };
+  });
+  form.append("media", JSON.stringify(media));
+
+  const res = await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMediaGroup`, {
+    method: "POST",
+    body: form,
+  });
+  return res.ok;
+}
+
+/**
+ * Готовит buffer для sendPhoto: если > 10 MB — компрессирует через
+ * compressForTelegramPhoto (target 9 MB) и переименовывает на .jpg.
+ * Иначе возвращает as-is.
+ */
+async function prepareImageBuffer(
+  buffer: Buffer,
+  baseFilename: string,
+): Promise<{ buffer: Buffer; filename: string }> {
+  if (buffer.byteLength <= PHOTO_BUFFER_MAX_BYTES) {
+    return { buffer, filename: baseFilename };
+  }
+  const compressed = await compressForTelegramPhoto(buffer);
+  const jpegName = baseFilename.replace(/\.[^.]+$/, "") + ".jpg";
+  return { buffer: compressed, filename: jpegName };
 }
 
 export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
@@ -216,26 +274,43 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     });
     const t = getT((user?.language ?? "ru") as Parameters<typeof getT>[0]);
 
-    // Telegram bot multipart-upload ceiling — what the bot's `orig_` handler
-    // can re-deliver as a document. Above this we have to fall back to a
-    // browser download link.
+    // Telegram bot multipart-upload ceiling — что бот может re-deliver как document
+    // через `orig_` callback. Выше — только browser download link.
     const TELEGRAM_DOC_MAX_BYTES = 50 * 1024 * 1024;
 
     type ResolvedOutput = {
       id: string;
       s3Key: string | null;
-      url: string;
-      size: number | null;
+      buffer: Buffer;
+      size: number;
+      filename: string;
     };
 
+    // Скачиваем КАЖДЫЙ output в буфер. S3 first, при failure — fallback на
+    // provider URL (короткоживущий, может уже не работать). Если оба не
+    // отдали — output skip'ается. Это как в воркере: Telegram'у мы файл
+    // ВСЕГДА заливаем multipart'ом, а не передаём URL — иначе на больших
+    // файлах ловим "failed to get HTTP URL content".
     const resolved: ResolvedOutput[] = [];
-    for (const out of job.outputs) {
-      let url: string | null = null;
-      if (out.s3Key) url = await getFileUrl(out.s3Key);
-      if (!url) url = out.outputUrl;
-      if (!url) continue;
-      const size = await probeFileSize(url);
-      resolved.push({ id: out.id, s3Key: out.s3Key, url, size });
+    for (let i = 0; i < job.outputs.length; i++) {
+      const out = job.outputs[i];
+      let buffer: Buffer | null = null;
+      if (out.s3Key) {
+        const s3Url = await getFileUrl(out.s3Key);
+        if (s3Url) buffer = await downloadBuffer(s3Url).catch(() => null);
+      }
+      if (!buffer && out.outputUrl) {
+        buffer = await downloadBuffer(out.outputUrl).catch(() => null);
+      }
+      if (!buffer) continue;
+      const filename = filenameFromS3Key(out.s3Key, defaultFilename(job.section, i));
+      resolved.push({
+        id: out.id,
+        s3Key: out.s3Key,
+        buffer,
+        size: buffer.byteLength,
+        filename,
+      });
     }
     if (resolved.length === 0) return reply.code(422).send({ error: "No deliverable outputs" });
 
@@ -261,16 +336,15 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     /**
-     * Action button — orig (callback) when bot can re-upload as document
-     * (≤ 50 MB or unknown size), otherwise a direct download URL when the
-     * file lives in S3, otherwise null (no way to deliver).
+     * Action button — orig (callback) когда бот может перезалить как document
+     * (≤ 50 MB), иначе direct download URL если файл в S3, иначе null.
      */
     const buildActionButton = (
       out: ResolvedOutput,
       n: number,
       multi: boolean,
     ): InlineButton | null => {
-      if (out.size === null || out.size <= TELEGRAM_DOC_MAX_BYTES) {
+      if (out.size <= TELEGRAM_DOC_MAX_BYTES) {
         return {
           text: multi ? `${n}. 📎` : t.common.sendOriginal,
           callback_data: `orig_${out.id}`,
@@ -284,36 +358,35 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
 
     // ── Image batch: media group + refine+action pairs follow-up ───────────
     if (isImageJob && resolved.length > 1) {
-      const mediaGroup = resolved.map((out, i) => ({
-        type: "photo" as const,
-        media: out.url,
-        ...(i === 0 ? { caption } : {}),
-      }));
-
-      let groupOk = false;
-      try {
-        const res = await fetch(`${botUrl}/sendMediaGroup`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: userId.toString(), media: mediaGroup }),
+      // Каждое фото готовим под лимит sendPhoto multipart (10 MB) — компрессим
+      // если больше. Telegram не принимает media group из mixed types, поэтому
+      // выгоднее сжать чем переключаться на sendDocument для всей группы.
+      const items: Array<{ buffer: Buffer; filename: string; caption?: string }> = [];
+      for (let i = 0; i < resolved.length; i++) {
+        const out = resolved[i];
+        const prepared = await prepareImageBuffer(out.buffer, out.filename);
+        items.push({
+          buffer: prepared.buffer,
+          filename: prepared.filename,
+          ...(i === 0 ? { caption } : {}),
         });
-        groupOk = res.ok;
-      } catch {
-        // network error — fall through to per-output retry below
       }
 
+      const groupOk = await sendMediaGroupBuffers(userId, items).catch(() => false);
+
       if (!groupOk) {
-        // Telegram rejected the group (likely a photo > 5 MB URL limit). Fall
-        // back to sending each one individually as a document so the user
-        // still gets every file. Caption goes only on the first message.
-        // Per-output failures are swallowed so one bad file doesn't block the
-        // rest of the batch — the follow-up button row gives the user another
-        // way to fetch them.
+        // Group rejected (rare после compression) — шлём каждый файл отдельно
+        // как document. Per-output failures swallowed чтобы один bad file не
+        // блокировал остальные.
         for (let i = 0; i < resolved.length; i++) {
           const out = resolved[i];
-          await sendFileToUser(userId, "sendDocument", out.url, i === 0 ? caption : "").catch(
-            () => void 0,
-          );
+          await sendBufferToUser(
+            userId,
+            "sendDocument",
+            out.buffer,
+            out.filename,
+            i === 0 ? caption : "",
+          ).catch(() => void 0);
         }
       }
 
@@ -368,8 +441,6 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       const out = resolved[i];
       const isFirst = i === 0;
       const sectionMethod = sectionToMethod(job.section);
-      const sectionLimit =
-        sectionMethod === "sendPhoto" ? PHOTO_URL_MAX_BYTES : MEDIA_URL_MAX_BYTES;
 
       const refineRow: InlineButton[] | null = isImageJob
         ? [buildRefineButton(out, i + 1, false)]
@@ -385,11 +456,12 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           }
         : undefined;
 
-      const tooLargeForDocument = out.size !== null && out.size > MEDIA_URL_MAX_BYTES;
-      const tooLargeForSectionMethod =
-        out.size !== null && out.size > sectionLimit && out.size <= MEDIA_URL_MAX_BYTES;
+      // Multipart лимит для не-image — 50 MB. Выше — единственный путь
+      // download-link сообщением.
+      const tooLargeForMultipart =
+        sectionMethod !== "sendPhoto" && out.size > MEDIA_BUFFER_MAX_BYTES;
 
-      if (tooLargeForDocument) {
+      if (tooLargeForMultipart) {
         await fetch(`${botUrl}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -402,20 +474,25 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         continue;
       }
 
+      // Image: компрессим если > 10 MB чтобы остаться в sendPhoto. Остальные
+      // секции — буфер as-is (мы уже знаем что он ≤ 50 MB по проверке выше).
+      let sendBuffer = out.buffer;
+      let sendFilename = out.filename;
+      if (sectionMethod === "sendPhoto") {
+        const prepared = await prepareImageBuffer(out.buffer, out.filename);
+        sendBuffer = prepared.buffer;
+        sendFilename = prepared.filename;
+      }
+
       try {
-        if (tooLargeForSectionMethod) {
-          // Document by URL fits; refine still works on a document for images,
-          // so attach the markup even in this branch.
-          await sendFileToUser(
-            userId,
-            "sendDocument",
-            out.url,
-            isFirst ? caption : "",
-            replyMarkup,
-          );
-        } else {
-          await sendFileToUser(userId, sectionMethod, out.url, isFirst ? caption : "", replyMarkup);
-        }
+        await sendBufferToUser(
+          userId,
+          sectionMethod,
+          sendBuffer,
+          sendFilename,
+          isFirst ? caption : "",
+          replyMarkup,
+        );
       } catch (err) {
         const isTooLarge =
           err instanceof Error &&
