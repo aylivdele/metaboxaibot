@@ -11,7 +11,14 @@ import {
 } from "@metabox/api/services";
 import type { StoredAttachment } from "@metabox/api/services";
 import { logger } from "../logger.js";
-import { config, AI_MODELS, buildDialogHint, generateWebToken } from "@metabox/shared";
+import {
+  config,
+  AI_MODELS,
+  buildDialogHint,
+  generateWebToken,
+  UserFacingError,
+  resolveUserFacingError,
+} from "@metabox/shared";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { InlineKeyboard } from "grammy";
 import { toMarkdownV2, closeOpenMarkdownV2 } from "../utils/markdown.js";
@@ -183,6 +190,18 @@ async function streamGptResponse(
       await ctx.reply(ctx.t.gpt.docExtractFailed);
     } else if (err instanceof ContextOverflowError) {
       await ctx.reply(ctx.t.gpt.contextOverflow);
+    } else if (err instanceof UserFacingError) {
+      await ctx.reply(resolveUserFacingError(err, ctx.t.errors));
+      // Тех-канал получает alert только если UserFacingError просит об этом
+      // (notifyOps=true) или несёт оригинальную ошибку через cause —
+      // notifyTechError развернёт её через `caused by:` в alert'е.
+      if (err.notifyOps || err.cause !== undefined) {
+        void notifyTechError(err.cause ?? err, {
+          section: "gpt",
+          dialogId,
+          userId: String(ctx.user!.id),
+        });
+      }
     } else {
       await ctx.reply(ctx.t.errors.unexpected);
       void notifyTechError(err, {

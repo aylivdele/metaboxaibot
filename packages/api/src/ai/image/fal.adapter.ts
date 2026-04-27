@@ -32,6 +32,20 @@ const ASPECT_RATIO_MODELS = new Set<string>();
  */
 const IMAGE_URLS_ARRAY_MODELS = new Set(["flux", "flux-pro", "seedream-4.5", "seedream-5"]);
 
+/**
+ * Map: modelId → max количество изображений за один call (FAL `num_images`).
+ * Скоупим явно: для не-batch endpoint'ов передача неизвестного параметра может
+ * быть отклонена FAL-ом или дать неожиданное поведение. Поднимаем cap по схеме
+ * каждого endpoint'а:
+ *   - flux-2:        num_images 1-4
+ *   - seedream v4.5/v5: num_images 1-6
+ */
+const NATIVE_BATCH_MAX: Record<string, number> = {
+  flux: 4,
+  "seedream-5": 6,
+  "seedream-4.5": 6,
+};
+
 /** Separator used to pack endpoint+requestId into a single opaque string. */
 const SEP = "||";
 
@@ -83,6 +97,13 @@ export class FalAdapter implements ImageAdapter {
     if (ms.acceleration) msExtras.acceleration = ms.acceleration;
     if (ms.enable_prompt_expansion != null)
       msExtras.enable_prompt_expansion = ms.enable_prompt_expansion;
+    // Native batch: FAL endpoint'ы принимают num_images (cap зависит от endpoint'а).
+    // Передаём только когда n>1 и только для известных моделей (NATIVE_BATCH_MAX).
+    const batchCap = NATIVE_BATCH_MAX[this.modelId];
+    if (batchCap !== undefined && ms.num_images !== undefined) {
+      const n = Math.max(1, Math.min(batchCap, Number(ms.num_images) || 1));
+      if (n > 1) msExtras.num_images = n;
+    }
 
     const useAspectRatio = ASPECT_RATIO_MODELS.has(this.modelId);
     const falInput = {
@@ -104,7 +125,7 @@ export class FalAdapter implements ImageAdapter {
     return `${endpoint}${SEP}${request_id}`;
   }
 
-  async poll(providerJobId: string): Promise<ImageResult | null> {
+  async poll(providerJobId: string): Promise<ImageResult | ImageResult[] | null> {
     const sepIdx = providerJobId.lastIndexOf(SEP);
     const endpoint = providerJobId.slice(0, sepIdx);
     const requestId = providerJobId.slice(sepIdx + SEP.length);
@@ -128,17 +149,33 @@ export class FalAdapter implements ImageAdapter {
         }>;
       }
     ).images;
-    const img = images?.[0];
-    if (!img?.url) throw new Error("FAL returned no image URL");
-    const contentType = img.content_type ?? "image/png";
-    const ext = contentType.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
-    return {
-      url: img.url,
-      filename: img.file_name ?? `${this.modelId}.${ext}`,
-      contentType,
-      width: img.width,
-      height: img.height,
+    if (!images?.length) throw new Error("FAL returned no image URL");
+
+    const toResult = (
+      img: {
+        url: string;
+        width?: number;
+        height?: number;
+        content_type?: string;
+        file_name?: string;
+      },
+      idx: number,
+    ): ImageResult => {
+      const contentType = img.content_type ?? "image/png";
+      const ext = contentType.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
+      return {
+        url: img.url,
+        filename: img.file_name ?? `${this.modelId}-${idx}.${ext}`,
+        contentType,
+        width: img.width,
+        height: img.height,
+      };
     };
+
+    // Native batch: вернули N>1 → отдаём массив (image.processor.ts уже умеет
+    // multi-output → mediaGroup + button matrix). Для одиночного результата —
+    // single ImageResult, чтобы single-output Stage 3 path работал как раньше.
+    return images.length > 1 ? images.map(toResult) : toResult(images[0], 0);
   }
 
   private resolveSize(input: ImageInput): string {

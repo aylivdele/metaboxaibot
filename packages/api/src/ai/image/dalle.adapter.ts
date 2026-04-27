@@ -65,7 +65,7 @@ export class DalleAdapter implements ImageAdapter {
         "code" in err &&
         (err as { code?: string }).code === "content_policy_violation"
       ) {
-        throw new UserFacingError(err.message, { key: "contentPolicyViolation" });
+        throw new UserFacingError(err.message, { key: "contentPolicyViolation", cause: err });
       }
       throw err;
     }

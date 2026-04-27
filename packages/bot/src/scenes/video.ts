@@ -455,19 +455,34 @@ async function sendVideoSlotUploadPrompt(
     section: "video",
   });
 
-  const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
   const maxImages = slot.maxImages ?? 1;
-  const isVideoSlot = slot.mode === "motion_video" || slot.mode === "first_clip";
-  const msg =
-    slot.mode === "reference_element"
-      ? ctx.t.mediaInput.uploadPromptElement.replace("{slot}", String(label))
-      : isVideoSlot
-        ? ctx.t.mediaInput.uploadPromptVideo.replace("{slot}", String(label))
-        : maxImages > 1
-          ? ctx.t.mediaInput.uploadPromptMulti
-              .replace("{slot}", String(label))
-              .replace("{max}", String(maxImages))
-          : ctx.t.mediaInput.uploadPrompt.replace("{slot}", String(label));
+  let msg: string;
+  if (slot.mode === "reference_element") {
+    const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+    msg = ctx.t.mediaInput.uploadPromptElement.replace("{slot}", String(label));
+  } else if (slot.mode === "motion_video") {
+    msg = ctx.t.mediaInput.uploadPromptVideoMotionVideo;
+  } else if (slot.mode === "first_clip") {
+    msg = ctx.t.mediaInput.uploadPromptVideoFirstClip;
+  } else if (maxImages > 1) {
+    if (slot.labelKey === "referenceVideos") {
+      msg = ctx.t.mediaInput.uploadPromptVideoRefVideos.replace("{max}", String(maxImages));
+    } else if (slot.labelKey === "referenceAudios") {
+      msg = ctx.t.mediaInput.uploadPromptVideoRefAudios.replace("{max}", String(maxImages));
+    } else {
+      msg = ctx.t.mediaInput.uploadPromptVideoRefImages.replace("{max}", String(maxImages));
+    }
+  } else if (slot.labelKey === "lastFrame") {
+    msg = ctx.t.mediaInput.uploadPromptVideoLastFrame;
+  } else if (slot.labelKey === "motionImage") {
+    msg = ctx.t.mediaInput.uploadPromptVideoMotionImage;
+  } else if (slot.labelKey === "drivingAudio") {
+    msg = ctx.t.mediaInput.uploadPromptVideoDrivingAudio;
+  } else if (slot.labelKey === "reference") {
+    msg = ctx.t.mediaInput.uploadPromptDesignRef;
+  } else {
+    msg = ctx.t.mediaInput.uploadPromptVideoFirstFrame;
+  }
   const kb = new InlineKeyboard().text(ctx.t.mediaInput.cancel, `mi_cancel:video`);
   const isWan = modelId === "wan";
   const isKlingMotion = modelId === "kling-motion" || modelId === "kling-motion-pro";
@@ -685,6 +700,7 @@ export async function executeVideoPrompt(
       aspectRatio: modelSettings?.aspectRatio,
       duration: modelSettings?.duration,
       modelSettings: fullModelSettings,
+      mediaInputs,
       userId: ctx.user.id,
     },
     { hasVoiceFile: !!state?.videoRefVoiceUrl },
@@ -1086,6 +1102,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
         aspectRatio: modelSettings?.aspectRatio,
         duration: modelSettings?.duration,
         modelSettings: fullModelSettings,
+        mediaInputs,
         userId: ctx.user.id,
       },
       { hasVoiceFile: false },
@@ -1269,6 +1286,32 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
     const current = await userStateService.getMediaInputs(userId, modelId);
     const targetSlot = pickAutoSlot(activeModeSlots, current, "video");
     if (targetSlot) {
+      if (targetSlot.constraints) {
+        let durationSec: number | undefined = videoMsg?.duration;
+        let fileSizeBytes: number | undefined = fileSize || undefined;
+        if (isVideoDoc) {
+          try {
+            const file = await ctx.api.getFile(fileId);
+            const probeUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+            const meta = await probeVideoMetadata(probeUrl);
+            if (meta.durationSec !== null) durationSec = meta.durationSec;
+            fileSizeBytes = meta.fileSizeBytes;
+          } catch (err) {
+            logger.warn({ err }, "probeVideoMetadata failed in auto-slot");
+            await ctx.reply(ctx.t.errors.mediaSlotReadMetadataFailed);
+            return;
+          }
+        }
+        const violation = validateMediaAgainstSlot(
+          targetSlot,
+          { durationSec, fileSizeBytes },
+          ctx.t,
+        );
+        if (violation) {
+          await ctx.reply(violation);
+          return;
+        }
+      }
       await userStateService.addMediaInput(userId, modelId, targetSlot.slotKey, tgSlotValue);
       debounceSlotReply(
         userId,

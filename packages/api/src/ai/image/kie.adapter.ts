@@ -148,12 +148,18 @@ export class KieImageAdapter implements ImageAdapter {
       // packages/shared/.../design.models.ts — для отката достаточно вернуть
       // provider:"openai" и снять комменты.
       const isI2I = imageUrls.length > 0;
+      const aspectRatio = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "auto";
+      // KIE-схема: aspect_ratio "auto" поддерживает только 1K; aspect_ratio "1:1"
+      // не поддерживает 4K. Несовместимые комбинации createTask отклонит — НЕ
+      // даунгрейдим client-side, иначе списали бы за выбранное разрешение, а
+      // получили бы более низкое (overcharge без feedback'а).
+      const resolution = (ms.resolution as string | undefined) ?? "1K";
       const inputPayload: Record<string, unknown> = {
         prompt: input.prompt,
         nsfw_checker: ms.nsfw_checker !== undefined ? ms.nsfw_checker : false,
+        aspect_ratio: aspectRatio,
+        resolution,
       };
-      inputPayload.aspect_ratio =
-        (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "auto";
 
       if (isI2I) {
         const uploaded = await Promise.all(

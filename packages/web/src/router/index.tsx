@@ -25,6 +25,7 @@ const NotFoundPage = lazy(() => import("@/pages/NotFound"));
 const AdminLayout = lazy(() => import("@/pages/AdminLayout"));
 const AdminKeysPage = lazy(() => import("@/pages/AdminKeys"));
 const AdminProxiesPage = lazy(() => import("@/pages/AdminProxies"));
+const AdminPricingPage = lazy(() => import("@/pages/AdminPricing"));
 
 function PageFallback() {
   return (
@@ -91,6 +92,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="keys" replace /> },
       { path: "keys", element: withSuspense(<AdminKeysPage />) },
       { path: "proxies", element: withSuspense(<AdminProxiesPage />) },
+      { path: "pricing", element: withSuspense(<AdminPricingPage />) },
     ],
   },
 

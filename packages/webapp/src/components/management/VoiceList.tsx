@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "../../i18n.js";
 
 export interface VoiceListItem {
   /** Stable key within the list. Compared against `selectedId` to mark selection. */
@@ -25,6 +26,7 @@ interface VoiceListProps {
  * which has its own rename/delete affordances.
  */
 export function VoiceList({ items, selectedId, onSelect, emptyText }: VoiceListProps) {
+  const { t } = useI18n();
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -97,7 +99,7 @@ export function VoiceList({ items, selectedId, onSelect, emptyText }: VoiceListP
                   e.stopPropagation();
                   void play(item);
                 }}
-                title={isPlaying ? "Стоп" : "Прослушать"}
+                title={isPlaying ? t("picker.stop") : t("picker.play")}
               >
                 {isLoading ? "⏳" : isPlaying ? "⏹" : "▶"}
               </button>

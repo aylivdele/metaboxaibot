@@ -42,3 +42,26 @@ export function mkDurationSlider(min: number, max: number): ModelSettingDef {
     default: min,
   };
 }
+
+/**
+ * Picker «количество изображений» (1..max) для batch генерации.
+ * Используется и для virtual batch (`maxVirtualBatch`), и для native batch
+ * (`nativeBatchMax`) — фронт просто шлёт `modelSettings.num_images`, дальше
+ * адаптер либо передаёт значение провайдеру (native), либо воркер запускает
+ * N последовательных submit'ов с разнесением (virtual). В обоих случаях
+ * списывается за фактически сгенерированные изображения.
+ */
+export function mkNumImagesSetting(max: number): ModelSettingDef {
+  return {
+    key: "num_images",
+    label: "Количество изображений",
+    description:
+      "Сгенерировать несколько вариантов за один запрос. Списывается только за успешные.",
+    type: "select",
+    options: Array.from({ length: max }, (_, i) => ({ value: i + 1, label: String(i + 1) })),
+    default: 1,
+  };
+}
+
+/** Стандартный picker 1-4 (большинство моделей). Equivalent to mkNumImagesSetting(4). */
+export const NUM_IMAGES_SETTING: ModelSettingDef = mkNumImagesSetting(4);

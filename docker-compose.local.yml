@@ -2,7 +2,7 @@ services:
   # ── Infrastructure (no profile → always up with `docker compose up`) ─────────
   postgres:
     image: postgres:16-alpine
-    container_name: metabox_postgres
+    container_name: aibot_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: metabox
@@ -20,7 +20,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: metabox_redis
+    container_name: aibot_redis
     restart: unless-stopped
     command: redis-server --appendonly yes
     ports:
@@ -44,7 +44,7 @@ services:
     build:
       context: .
       dockerfile: infra/docker/Dockerfile.api
-    container_name: metabox_api
+    container_name: aibot_api
     restart: unless-stopped
     env_file: .env
     environment:
@@ -69,7 +69,7 @@ services:
     build:
       context: .
       dockerfile: infra/docker/Dockerfile.worker
-    container_name: metabox_worker
+    container_name: aibot_worker
     restart: unless-stopped
     env_file: .env
     environment:
@@ -88,7 +88,7 @@ services:
     build:
       context: .
       dockerfile: infra/docker/Dockerfile.bot
-    container_name: metabox_bot
+    container_name: aibot_bot
     restart: unless-stopped
     env_file: .env
     environment:
@@ -120,7 +120,7 @@ services:
         VITE_BOT_USERNAME: ${VITE_BOT_USERNAME:-}
         VITE_LEARNING_URL: ${VITE_LEARNING_URL:-}
         VITE_METABOX_LANDING_URL: ${VITE_METABOX_LANDING_URL:-}
-    container_name: metabox_webapp
+    container_name: aibot_webapp
     restart: unless-stopped
     ports:
       - "5174:80"
@@ -132,7 +132,7 @@ services:
       dockerfile: infra/docker/Dockerfile.web.dev
       args:
         VITE_API_BASE_URL: http://localhost:3001
-    container_name: metabox_web
+    container_name: aibot_web
     restart: unless-stopped
     ports:
       - "5173:5174"

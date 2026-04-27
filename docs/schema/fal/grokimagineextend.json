@@ -1,0 +1,271 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "Queue OpenAPI for xai/grok-imagine-video/extend-video",
+    "version": "1.0.0",
+    "description": "The OpenAPI schema for the xai/grok-imagine-video/extend-video queue.",
+    "x-fal-metadata": {
+      "endpointId": "xai/grok-imagine-video/extend-video",
+      "category": "video-to-video",
+      "thumbnailUrl": "https://v3b.fal.media/files/b/0a937b17/7vgMNPVP3FZ6BEZzv5mII_2605d58f4fd84b0ba950203d58c0e445.jpg",
+      "playgroundUrl": "https://fal.ai/models/xai/grok-imagine-video/extend-video",
+      "documentationUrl": "https://fal.ai/models/xai/grok-imagine-video/extend-video/api"
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Fal Key"
+      }
+    },
+    "schemas": {
+      "QueueStatus": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["IN_QUEUE", "IN_PROGRESS", "COMPLETED"] },
+          "request_id": { "type": "string", "description": "The request id." },
+          "response_url": { "type": "string", "description": "The response url." },
+          "status_url": { "type": "string", "description": "The status url." },
+          "cancel_url": { "type": "string", "description": "The cancel url." },
+          "logs": { "type": "object", "description": "The logs.", "additionalProperties": true },
+          "metrics": {
+            "type": "object",
+            "description": "The metrics.",
+            "additionalProperties": true
+          },
+          "queue_position": { "type": "integer", "description": "The queue position." }
+        },
+        "required": ["status", "request_id"]
+      },
+      "GrokImagineVideoExtendVideoInput": {
+        "required": ["prompt", "video_url"],
+        "type": "object",
+        "properties": {
+          "duration": {
+            "default": 6,
+            "maximum": 10,
+            "type": "integer",
+            "title": "Duration",
+            "minimum": 2,
+            "description": "Length of the extension in seconds."
+          },
+          "prompt": {
+            "description": "Text description of what should happen next in the video.",
+            "type": "string",
+            "title": "Prompt",
+            "maxLength": 4096,
+            "examples": ["The camera slowly zooms out to reveal the city skyline at sunset"]
+          },
+          "video_url": {
+            "type": "string",
+            "title": "Video URL",
+            "description": "URL of the source video to extend. Must be MP4 format (H.264, H.265, or AV1 codec), 2-15 seconds long.",
+            "examples": [
+              "https://v3b.fal.media/files/b/0a8b9112/V5Z_NIPE3ppMDWivNo6_q_video_019.mp4"
+            ]
+          }
+        },
+        "title": "XAIVideoExtensionInput",
+        "x-fal-order-properties": ["prompt", "video_url", "duration"]
+      },
+      "GrokImagineVideoExtendVideoOutput": {
+        "required": ["video"],
+        "type": "object",
+        "properties": {
+          "video": {
+            "examples": [
+              {
+                "height": 720,
+                "content_type": "video/mp4",
+                "width": 1280,
+                "url": "https://v3b.fal.media/files/b/0a8b9113/extended_video.mp4",
+                "fps": 24,
+                "num_frames": 384,
+                "duration": 16,
+                "file_name": "extended_video.mp4"
+              }
+            ],
+            "description": "The extended video (original + extension stitched together).",
+            "$ref": "#/components/schemas/VideoFile"
+          }
+        },
+        "title": "XAIVideoExtensionOutput",
+        "x-fal-order-properties": ["video"]
+      },
+      "VideoFile": {
+        "required": ["url"],
+        "type": "object",
+        "properties": {
+          "height": {
+            "title": "Height",
+            "description": "The height of the video",
+            "anyOf": [{ "type": "integer" }, { "type": "null" }]
+          },
+          "file_size": {
+            "examples": [4404019],
+            "title": "File Size",
+            "description": "The size of the file in bytes.",
+            "anyOf": [{ "type": "integer" }, { "type": "null" }]
+          },
+          "content_type": {
+            "examples": ["image/png"],
+            "title": "Content Type",
+            "description": "The mime type of the file.",
+            "anyOf": [{ "type": "string" }, { "type": "null" }]
+          },
+          "width": {
+            "title": "Width",
+            "description": "The width of the video",
+            "anyOf": [{ "type": "integer" }, { "type": "null" }]
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "The URL where the file can be downloaded from."
+          },
+          "fps": {
+            "title": "Fps",
+            "description": "The FPS of the video",
+            "anyOf": [{ "type": "number" }, { "type": "null" }]
+          },
+          "num_frames": {
+            "title": "Num Frames",
+            "description": "The number of frames in the video",
+            "anyOf": [{ "type": "integer" }, { "type": "null" }]
+          },
+          "duration": {
+            "title": "Duration",
+            "description": "The duration of the video",
+            "anyOf": [{ "type": "number" }, { "type": "null" }]
+          },
+          "file_name": {
+            "examples": ["z9RV14K95DvU.png"],
+            "title": "File Name",
+            "description": "The name of the file. It will be auto-generated if not provided.",
+            "anyOf": [{ "type": "string" }, { "type": "null" }]
+          }
+        },
+        "title": "VideoFile",
+        "x-fal-order-properties": [
+          "url",
+          "content_type",
+          "file_name",
+          "file_size",
+          "width",
+          "height",
+          "fps",
+          "duration",
+          "num_frames"
+        ]
+      }
+    }
+  },
+  "paths": {
+    "/xai/grok-imagine-video/extend-video/requests/{request_id}/status": {
+      "get": {
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "description": "Request ID" }
+          },
+          {
+            "name": "logs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "description": "Whether to include logs (`1`) in the response or not (`0`)."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request status.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/QueueStatus" } }
+            }
+          }
+        }
+      }
+    },
+    "/xai/grok-imagine-video/extend-video/requests/{request_id}/cancel": {
+      "put": {
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "description": "Request ID" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request was cancelled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Whether the request was cancelled successfully."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/xai/grok-imagine-video/extend-video": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GrokImagineVideoExtendVideoInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request status.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/QueueStatus" } }
+            }
+          }
+        }
+      }
+    },
+    "/xai/grok-imagine-video/extend-video/requests/{request_id}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "description": "Request ID" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result of the request.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GrokImagineVideoExtendVideoOutput" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "servers": [{ "url": "https://queue.fal.run" }],
+  "security": [{ "apiKeyAuth": [] }]
+}

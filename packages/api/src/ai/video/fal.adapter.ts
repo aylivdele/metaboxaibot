@@ -3,20 +3,39 @@ import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
 
-/** Text-to-video endpoint for each model. */
+/**
+ * Text-to-video endpoint for each model.
+ *
+ * Kling uses o3 (Omni) family — выбран как fallback для primary KIE kling[-pro].
+ * Pricing per-second по quality × audio (см. FALLBACK_VIDEO_MODELS).
+ */
 const FAL_ENDPOINTS: Record<string, string> = {
-  kling: "fal-ai/kling-video/v3/standard/text-to-video",
-  "kling-pro": "fal-ai/kling-video/v3/pro/text-to-video",
+  kling: "fal-ai/kling-video/o3/standard/text-to-video",
+  "kling-pro": "fal-ai/kling-video/o3/pro/text-to-video",
   pika: "fal-ai/pika/v2.2/text-to-video",
   seedance: "fal-ai/bytedance/seedance/v1.5/pro/text-to-video",
 };
 
-/** Image-to-video endpoint. Falls back to the T2V endpoint when absent. */
+/**
+ * Image-to-video endpoint. Falls back to the T2V endpoint when absent.
+ * Используется для kling когда заданы ТОЛЬКО first_frame (+ опционально last_frame),
+ * без ref_element_*. i2v endpoint не принимает elements/image_urls.
+ */
 const FAL_I2V_ENDPOINTS: Record<string, string> = {
-  kling: "fal-ai/kling-video/v3/standard/image-to-video",
-  "kling-pro": "fal-ai/kling-video/v3/pro/image-to-video",
+  kling: "fal-ai/kling-video/o3/standard/image-to-video",
+  "kling-pro": "fal-ai/kling-video/o3/pro/image-to-video",
   seedance: "fal-ai/bytedance/seedance/v1.5/pro/image-to-video",
   pika: "fal-ai/pika/v2.2/image-to-video",
+};
+
+/**
+ * Reference-to-video endpoint (только kling-o3). Используется когда задача
+ * имеет ref_element_* (или только last_frame без first_frame — i2v требует
+ * start image). Принимает start_image_url, end_image_url, image_urls, elements.
+ */
+const FAL_R2V_ENDPOINTS: Record<string, string> = {
+  kling: "fal-ai/kling-video/o3/standard/reference-to-video",
+  "kling-pro": "fal-ai/kling-video/o3/pro/reference-to-video",
 };
 
 /** Kling Motion Control endpoints — dedicated, no T2V/I2V split. */
@@ -24,6 +43,32 @@ const FAL_MOTION_ENDPOINTS: Record<string, string> = {
   "kling-motion": "fal-ai/kling-video/v3/standard/motion-control",
   "kling-motion-pro": "fal-ai/kling-video/v3/pro/motion-control",
 };
+
+/** True если modelId — это kling-o3 семейство (kling или kling-pro). */
+function isKlingO3(modelId: string): boolean {
+  return modelId === "kling" || modelId === "kling-pro";
+}
+
+/**
+ * Remap primary KIE element references `@elementN` (lowercase) → FAL's
+ * `@ElementN` (capitalized) per kling-o3 schema. Безопасно вызывать для любого
+ * prompt'а — если совпадений нет, возвращает строку как есть.
+ */
+function remapKlingElementSyntax(prompt: string): string {
+  return prompt.replace(/@element(\d+)/gi, (_m, idx) => `@Element${idx}`);
+}
+
+/**
+ * Remap primary KIE image references `@imageN` (lowercase) → FAL's `@ImageN`
+ * (capitalized) per grok-imagine r2v schema. Same pattern as Kling's element
+ * remap. KIE example: "@image1 running"; FAL example: "@Image1 running".
+ */
+function remapImageRefSyntax(prompt: string): string {
+  return prompt.replace(/@image(\d+)/gi, (_m, idx) => `@Image${idx}`);
+}
+
+const FAL_GROK_IMAGINE_T2V_ENDPOINT = "xai/grok-imagine-video/text-to-video";
+const FAL_GROK_IMAGINE_R2V_ENDPOINT = "xai/grok-imagine-video/reference-to-video";
 
 /** Separator used to pack endpoint+requestId into a single opaque string. */
 const SEP = "||";
@@ -42,9 +87,30 @@ export class FalVideoAdapter implements VideoAdapter {
     fal.config({ credentials: apiKey });
   }
 
+  /**
+   * Выбор endpoint'а для kling-o3 (3 варианта):
+   *  - есть ref_element_* → reference-to-video (поддерживает elements + start/end)
+   *  - есть только start (или start+end) → image-to-video (image_url required)
+   *  - есть только end (без start) → reference-to-video (i2v требует start)
+   *  - нет media → text-to-video
+   */
+  private selectKlingO3Endpoint(input: VideoInput): string {
+    const mi = input.mediaInputs ?? {};
+    const hasElement = [1, 2, 3, 4, 5].some((i) => mi[`ref_element_${i}`]?.length);
+    const hasStart = !!(mi.first_frame?.[0] || input.imageUrl);
+    const hasEnd = !!mi.last_frame?.[0];
+    if (hasElement) return FAL_R2V_ENDPOINTS[this.modelId];
+    if (hasStart) return FAL_I2V_ENDPOINTS[this.modelId];
+    if (hasEnd) return FAL_R2V_ENDPOINTS[this.modelId];
+    return FAL_ENDPOINTS[this.modelId];
+  }
+
   private selectEndpoint(input: VideoInput): string {
     if (FAL_MOTION_ENDPOINTS[this.modelId]) {
       return FAL_MOTION_ENDPOINTS[this.modelId];
+    }
+    if (isKlingO3(this.modelId)) {
+      return this.selectKlingO3Endpoint(input);
     }
     if (!FAL_I2V_ENDPOINTS[this.modelId]) {
       return FAL_ENDPOINTS[this.modelId] ?? `fal-ai/${this.modelId}`;
@@ -70,6 +136,117 @@ export class FalVideoAdapter implements VideoAdapter {
     if (ms.resolution) msExtras.resolution = ms.resolution;
     if (ms.motion_strength !== undefined) msExtras.motion_strength = ms.motion_strength;
     if (ms.seed != null) msExtras.seed = ms.seed;
+
+    // ── Grok Imagine (xai/grok-imagine-video) ────────────────────────────────
+    // Два endpoint'а:
+    //   - text-to-video:      нет media → prompt only, duration 1-15s, resolution default 720p
+    //   - reference-to-video: есть ref_images (≥1) → +reference_image_urls, duration 1-10s
+    // Endpoint выбирается по runtime mediaInputs. isFallbackCompatible на уровне
+    // FALLBACK_VIDEO_MODELS отсекает несовместимые комбинации (две отдельные
+    // записи: t2v entry без mediaInputs, r2v entry с ref_images required).
+    if (this.modelId === "grok-imagine") {
+      const refImages = input.mediaInputs?.ref_images ?? [];
+      const isR2V = refImages.length > 0;
+      const endpoint = isR2V ? FAL_GROK_IMAGINE_R2V_ENDPOINT : FAL_GROK_IMAGINE_T2V_ENDPOINT;
+
+      const grokBody: Record<string, unknown> = {
+        prompt: remapImageRefSyntax(input.prompt ?? ""),
+      };
+
+      if (isR2V) {
+        grokBody.reference_image_urls = refImages.slice(0, 7);
+      }
+
+      // duration: integer. t2v max 15s, r2v max 10s (FAL hard limits).
+      const rawDuration = (ms.duration as number | undefined) ?? input.duration ?? 8;
+      const maxDuration = isR2V ? 10 : 15;
+      grokBody.duration = Math.max(1, Math.min(maxDuration, Math.round(Number(rawDuration) || 8)));
+
+      // resolution: 480p / 720p
+      if (ms.resolution) grokBody.resolution = ms.resolution;
+
+      const ar = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio;
+      if (ar && ar !== "auto") grokBody.aspect_ratio = ar;
+
+      logCall(endpoint, "submit", grokBody);
+      const { request_id } = await fal.queue.submit(endpoint, { input: grokBody });
+      return `${endpoint}${SEP}${request_id}`;
+    }
+
+    // ── Kling-O3 (kling / kling-pro) ─────────────────────────────────────────
+    // Изолирован от обобщённой ветки ниже потому что:
+    //   1. Endpoints выбираются динамически (t2v/i2v/r2v) — поля payload'а отличаются.
+    //   2. i2v использует `image_url`, r2v использует `start_image_url`.
+    //   3. duration здесь — string enum ("3"-"15"), а не number.
+    //   4. Prompt @elementN → @ElementN remap.
+    if (isKlingO3(this.modelId)) {
+      const endpoint = this.selectKlingO3Endpoint(input);
+      const isI2V = endpoint === FAL_I2V_ENDPOINTS[this.modelId];
+      const isR2V = endpoint === FAL_R2V_ENDPOINTS[this.modelId];
+
+      const startUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
+      const endUrl = input.mediaInputs?.last_frame?.[0];
+
+      const klingBody: Record<string, unknown> = {};
+      if (input.prompt) klingBody.prompt = remapKlingElementSyntax(input.prompt);
+
+      // duration: STRING enum "3"-"15" по схеме FAL.
+      const rawDuration = (ms.duration as number | undefined) ?? input.duration ?? 5;
+      const dur = Math.max(3, Math.min(15, Math.round(Number(rawDuration) || 5)));
+      klingBody.duration = String(dur);
+
+      // generate_audio передаём только если задан в settings (default schema = false,
+      // primary KLING_SETTINGS — true; пользователь может toggle'нуть).
+      if (ms.generate_audio !== undefined) klingBody.generate_audio = !!ms.generate_audio;
+
+      if (isI2V) {
+        // image-to-video: image_url required, end_image_url optional.
+        // Не принимает elements / image_urls / aspect_ratio.
+        if (!startUrl) {
+          throw new Error("FAL kling i2v: start image required");
+        }
+        klingBody.image_url = startUrl;
+        if (endUrl) klingBody.end_image_url = endUrl;
+      } else if (isR2V) {
+        // reference-to-video: всё опционально, но что-то должно быть.
+        if (startUrl) klingBody.start_image_url = startUrl;
+        if (endUrl) klingBody.end_image_url = endUrl;
+
+        // Elements: до 3 (primary KIE has up to 3 ref_element_* slots).
+        const elements: Array<Record<string, unknown>> = [];
+        for (let i = 1; i <= 5; i++) {
+          const urls = input.mediaInputs?.[`ref_element_${i}`] ?? [];
+          if (urls.length === 0) continue;
+          const videoUrl = urls.find((u) => isVideoUrl(u));
+          if (videoUrl) {
+            elements.push({ video_url: videoUrl });
+            continue;
+          }
+          const [frontal, ...refs] = urls;
+          if (!frontal) continue;
+          elements.push({
+            frontal_image_url: frontal,
+            // FAL schema: reference_image_urls is 1-3 images, at least one required.
+            reference_image_urls: refs.length > 0 ? refs.slice(0, 3) : [frontal],
+          });
+        }
+        if (elements.length > 0) klingBody.elements = elements;
+
+        // aspect_ratio (только r2v принимает; default 16:9).
+        const ar = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio;
+        if (ar && ar !== "auto") klingBody.aspect_ratio = ar;
+      } else {
+        // text-to-video: ничего больше не требуется.
+        // FAL t2v также может поддерживать aspect_ratio (хотя в нашей схеме i2v нет).
+        // Передаём осторожно — если api отклонит, сюда упадёт invalid_request.
+        const ar = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio;
+        if (ar && ar !== "auto") klingBody.aspect_ratio = ar;
+      }
+
+      logCall(endpoint, "submit", klingBody);
+      const { request_id } = await fal.queue.submit(endpoint, { input: klingBody });
+      return `${endpoint}${SEP}${request_id}`;
+    }
 
     // ── Kling Motion Control ─────────────────────────────────────────────────
     if (FAL_MOTION_ENDPOINTS[this.modelId]) {
@@ -109,30 +286,6 @@ export class FalVideoAdapter implements VideoAdapter {
       return `${endpoint}${SEP}${request_id}`;
     }
 
-    const klingExtras: Record<string, unknown> = {};
-    if (this.modelId === "kling" || this.modelId === "kling-pro") {
-      const lastFrame = input.mediaInputs?.last_frame?.[0];
-      if (lastFrame) klingExtras.end_image_url = lastFrame;
-
-      const elements: Array<Record<string, unknown>> = [];
-      for (let i = 1; i <= 5; i++) {
-        const urls = input.mediaInputs?.[`ref_element_${i}`] ?? [];
-        if (urls.length === 0) continue;
-        const videoUrl = urls.find((u) => isVideoUrl(u));
-        if (videoUrl) {
-          elements.push({ video_url: videoUrl });
-          continue;
-        }
-        const [frontal, ...refs] = urls;
-        if (!frontal) continue;
-        elements.push({
-          frontal_image_url: frontal,
-          reference_image_urls: refs.length > 0 ? refs.slice(0, 3) : [frontal],
-        });
-      }
-      if (elements.length > 0) klingExtras.elements = elements;
-    }
-
     // Seedance 1.5: last_frame → end_image_url (i2v).
     const seedanceExtras: Record<string, unknown> = {};
     if (this.modelId === "seedance") {
@@ -148,7 +301,6 @@ export class FalVideoAdapter implements VideoAdapter {
       ...(input.duration ? { duration: input.duration } : {}),
       ...(input.aspectRatio ? { aspect_ratio: input.aspectRatio } : {}),
       ...msExtras,
-      ...klingExtras,
       ...seedanceExtras,
     };
     logCall(endpoint, "submit", falInput);

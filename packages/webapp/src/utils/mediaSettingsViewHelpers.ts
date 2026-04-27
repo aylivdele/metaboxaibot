@@ -178,11 +178,15 @@ export function modelCostLabel(
     return `${perSecond.toFixed(2)} ✦${t("manage.price.perSec")}`;
   }
   if (m.tokenCostPerRequest > 0) {
+    // Virtual batch: юзер выбрал n=1..4 → итог = n × per_request. Показываем
+    // одной строкой без пометок «×N» (как договорено). Списание идёт K × per_request,
+    // K = количество успешных sub-job'ов.
+    const numImages = Math.max(1, Math.min(4, Number(values["num_images"] ?? 1) || 1));
     // Multi-dimensional pricing (e.g. quality × size)
     if (m.costMatrix) {
       const key = m.costMatrix.dims.map((dim) => String(values[dim] ?? "")).join("__");
       const cost = m.costMatrix.table[key] ?? m.tokenCostPerRequest;
-      return `${cost.toFixed(2)} ✦${t("manage.price.perReq")}`;
+      return `${(cost * numImages).toFixed(2)} ✦${t("manage.price.perReq")}`;
     }
     // Single-setting variant pricing + optional addons
     let base = m.tokenCostPerRequest;
@@ -194,7 +198,7 @@ export function modelCostLabel(
       );
       base = m.tokenCostVariants.map[vKey] ?? base;
     }
-    const cost = base + resolveAddons(m, values);
+    const cost = (base + resolveAddons(m, values)) * numImages;
     return `${cost.toFixed(2)} ✦${t("manage.price.perReq")}`;
   }
   return null;

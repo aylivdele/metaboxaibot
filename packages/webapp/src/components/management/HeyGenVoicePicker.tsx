@@ -73,7 +73,13 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
     name: v.name,
     meta: [
       v.language,
-      v.gender ? (v.gender === "male" ? "М" : v.gender === "female" ? "Ж" : v.gender) : null,
+      v.gender
+        ? v.gender === "male"
+          ? t("picker.genderM")
+          : v.gender === "female"
+            ? t("picker.genderF")
+            : v.gender
+        : null,
     ]
       .filter(Boolean)
       .join(" · "),
@@ -118,7 +124,7 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
 
       {tab === "official" &&
         (voicesLoading ? (
-          <div className="voice-picker__loading">Загрузка голосов…</div>
+          <div className="voice-picker__loading">{t("picker.loadingVoices")}</div>
         ) : (
           <>
             <div className="voice-picker__filters">
@@ -129,7 +135,7 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
               >
                 {languages.map((l) => (
                   <option key={l} value={l}>
-                    {l === "all" ? "Все языки" : l}
+                    {l === "all" ? t("picker.langAll") : l}
                   </option>
                 ))}
               </select>
@@ -140,7 +146,11 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
                     className={`voice-picker__gender-btn${genderFilter === g ? " voice-picker__gender-btn--active" : ""}`}
                     onClick={() => setGenderFilter(g)}
                   >
-                    {g === "all" ? "Все" : g === "male" ? "М" : "Ж"}
+                    {g === "all"
+                      ? t("picker.genderAll")
+                      : g === "male"
+                        ? t("picker.genderM")
+                        : t("picker.genderF")}
                   </button>
                 ))}
               </div>
@@ -149,14 +159,14 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
               items={officialItems}
               selectedId={voiceId}
               onSelect={selectOfficial}
-              emptyText="Голоса не найдены"
+              emptyText={t("picker.noVoices")}
             />
           </>
         ))}
 
       {tab === "mine" &&
         (myVoicesLoading ? (
-          <div className="voice-picker__loading">Загрузка…</div>
+          <div className="voice-picker__loading">{t("picker.loading")}</div>
         ) : (
           <VoiceList
             items={mineItems}

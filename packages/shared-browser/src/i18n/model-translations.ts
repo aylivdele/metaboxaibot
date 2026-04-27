@@ -288,6 +288,16 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
     description:
       "Generates videos up to 15 seconds with audio. Best at reproducing human movements. Standard version — faster and cheaper than Pro.",
   },
+  "kling-motion": {
+    name: "🎥 Kling Motion",
+    description:
+      "Transfers movements from a reference video onto any character from a photo. Standard — faster and cheaper than Pro. Ideal for portraits and simple animations.",
+  },
+  "kling-motion-pro": {
+    name: "🎥 Kling Motion Pro",
+    description:
+      "Transfers movements from a reference video onto any character from a photo. Pro — higher transfer accuracy and detail.",
+  },
   "kling-pro": {
     name: "🎥 Kling 3.0 Pro",
     description:
@@ -316,9 +326,9 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
       "Image generation with your character (Soul ID). Create a character from 20+ photos — and generate any scene with their appearance. Supports styles, reference images and batch mode.",
   },
   veo: {
-    name: "📽️ Veo 3",
+    name: "📽️ Veo 3.1",
     description:
-      "Google video with audio and voices. Supports vertical format for Reels and Shorts. Standard — maximum quality, higher detail than Fast. Send a photo with text — the video starts from your photo.",
+      "Google video with audio and voices. Supports vertical format for Reels and Shorts. Standard — maximum quality, higher detail than Fast. You can set first and last frames — Veo generates a smooth transition between them.",
   },
   "veo-fast": {
     name: "📽️ Veo 3 Fast",
@@ -381,9 +391,9 @@ export const MODEL_TRANSLATIONS_EN: Record<string, ModelTranslation> = {
       "Standard Hailuo 2.3 by MiniMax — maximum quality, 1080p support and 10-second clips. Accepts a photo as the first frame.",
   },
   wan: {
-    name: "🏯 Wan 2.6 (Alibaba)",
+    name: "🏯 Wan 2.7 (Alibaba)",
     description:
-      "Alibaba video model with high movement quality and 1080p support. Send a photo with text for image-to-video mode.",
+      "Alibaba video model with high movement quality and 1080p support. Supports image-to-video (with optional last frame and driving audio) and video continuation modes. Without media — text-to-video.",
   },
   "grok-imagine": {
     name: "🔮 Grok Imagine",
@@ -456,6 +466,11 @@ export const SETTING_TRANSLATIONS_EN: Record<string, SettingTranslation> = {
     description: "How many tokens the model can spend on internal reasoning (0 = disabled).",
   },
   // ── Shared (media) ───────────────────────────────────────────────────────────
+  num_images: {
+    label: "Number of images",
+    description:
+      "Generate several variations in one request. You're only charged for the successful ones.",
+  },
   aspect_ratio: {
     label: "Aspect ratio",
     description: "Shape of the output image: landscape, portrait or square.",
@@ -471,6 +486,7 @@ export const SETTING_TRANSLATIONS_EN: Record<string, SettingTranslation> = {
   duration: {
     label: "Duration",
     description: "Duration of the video clip in seconds.",
+    options: { "4": "4 s", "6": "6 s", "8": "8 s", "10": "10 s" },
   },
   seed: {
     label: "Seed",
@@ -682,6 +698,7 @@ export const SETTING_TRANSLATIONS_EN: Record<string, SettingTranslation> = {
   substyle: {
     label: "Sub-style",
     description: "Refines the artistic style. Depends on the selected style.",
+    options: { "": "— none —" },
   },
   no_text: {
     label: "No text",
@@ -774,6 +791,32 @@ export const SETTING_TRANSLATIONS_EN: Record<string, SettingTranslation> = {
     description:
       "How closely the output follows the description (0.0–1.0). Lower = more variation.",
   },
+  auto_translate_prompt: {
+    label: "Auto-translate prompt",
+    description:
+      "This model works best (or only) with English prompts. We can translate yours for an additional fee.",
+  },
+  character_orientation: {
+    label: "Character orientation",
+    description:
+      "Whose orientation the character will follow in the result. 'From video' — matches the reference video orientation (recommended). 'From image' — matches the source photo orientation.",
+    options: { video: "From video", image: "From image" },
+  },
+  background_source: {
+    label: "Background source",
+    description:
+      "Where to take the background for the output video. 'From video' — background from the reference video. 'From image' — background from the source photo.",
+    options: { input_video: "From video", input_image: "From image" },
+  },
+  nsfw_checker: {
+    label: "NSFW filter",
+    description: "When disabled — content filtering by the provider is turned off.",
+  },
+  context_window: {
+    label: "Context window",
+    description:
+      "Maximum dialog history size in tokens. Older messages are automatically dropped to fit within this limit.",
+  },
   // ── Video avatar ──────────────────────────────────────────────────────────────
   avatar_id: {
     label: "Avatar",
@@ -801,10 +844,38 @@ export const MODEL_TRANSLATIONS: Record<string, Record<string, ModelTranslation>
   ru: {},
 };
 
-/** Map of locale code → setting translations. Russian falls back to ModelSettingDef strings. */
+/**
+ * Russian-only entries для настроек, которые были удалены из текущих
+ * ModelSettingDef'ов (например, после смены провайдера у модели), но всё ещё
+ * встречаются в исторических `modelSettings` старых джобов в галерее. Без
+ * этих записей модалка показывала бы сырое имя ключа.
+ *
+ * Английские переводы для этих ключей живут в SETTING_TRANSLATIONS_EN
+ * (они там нужны и для активных моделей).
+ */
+const SETTING_TRANSLATIONS_RU: Record<string, SettingTranslation> = {
+  // Удалены из Nano Banana при переезде на kie (kie не поддерживает).
+  enable_web_search: {
+    label: "Поиск в интернете",
+    description:
+      "Разрешить модели обращаться к интернету для уточнения деталей промпта. Влияет на цену.",
+  },
+  thinking_level: {
+    label: "Уровень размышлений",
+    description:
+      "Минимальный — небольшой буст следования инструкции, Высокий — глубокий анализ промпта. Отключено = без дополнительных рассуждений. Влияет на цену.",
+    options: { "": "Отключено" },
+  },
+};
+
+/**
+ * Map of locale code → setting translations. Russian translations для активных
+ * настроек живут в `ModelSettingDef.label/description` (модели уже на русском).
+ * Здесь только сиротские ключи — см. SETTING_TRANSLATIONS_RU выше.
+ */
 export const SETTING_TRANSLATIONS: Record<string, Record<string, SettingTranslation>> = {
   en: SETTING_TRANSLATIONS_EN,
-  ru: {},
+  ru: SETTING_TRANSLATIONS_RU,
 };
 
 /**

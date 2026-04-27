@@ -2,6 +2,7 @@ import { AI_MODELS } from "@metabox/shared";
 import type { LLMAdapter } from "./base.adapter.js";
 import { OpenAIAdapter } from "./openai.adapter.js";
 import { AnthropicAdapter } from "./anthropic.adapter.js";
+import { ClaudeKieAdapter } from "./claude-kie.adapter.js";
 import { GeminiAdapter } from "./gemini.adapter.js";
 import { QwenAdapter } from "./qwen.adapter.js";
 import { GrokAdapter } from "./grok.adapter.js";
@@ -28,7 +29,13 @@ export function createLLMAdapter(modelId: string, ctx?: AdapterContext): LLMAdap
     case "openai":
       return new OpenAIAdapter(modelId, apiKey, fetchFn);
     case "anthropic":
+      // Прямой Anthropic API. Сейчас не используется ни одной активной моделью —
+      // Claude переведён на kie. Адаптер сохранён как rollback-путь: чтобы вернуть
+      // прямой Anthropic для какой-то модели, поменяйте её provider в gpt.models.ts
+      // на "anthropic".
       return new AnthropicAdapter(modelId, model.contextMaxMessages, apiKey, fetchFn);
+    case "kie-claude":
+      return new ClaudeKieAdapter(modelId, model.contextMaxMessages, apiKey, fetchFn);
     case "google":
       return new GeminiAdapter(modelId, model.contextMaxMessages, apiKey);
     case "alibaba":

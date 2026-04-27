@@ -3,16 +3,23 @@ import {
   AI_MODELS,
   MODEL_FAMILIES,
   MODELS_BY_SECTION,
-  config,
   getResolvedModes,
   defaultModeId,
   getT,
   type AIModel,
   type Language,
 } from "@metabox/shared";
-import { calculateCost } from "../services/token.service.js";
+import { calculateCost, usdToTokens } from "../services/token.service.js";
+import { getModelMultiplier } from "../services/pricing-config.service.js";
 import { db } from "../db.js";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
+
+/** USD → tokens с применением per-model multiplier (единый шаблон с calculateCost). */
+function modelUsdToTokens(modelId: string, usd: number): number {
+  // Без округления — фронт форматирует через toFixed(2). Округление здесь
+  // распухало бы дробные cost matrix-ячейки (например, 0.012 → 1).
+  return usdToTokens(usd) * getModelMultiplier(modelId);
+}
 
 type AuthRequestM = FastifyRequest & { userId: bigint };
 
@@ -55,7 +62,10 @@ function serializeModel(m: AIModel, lang: Language) {
     name: m.name,
     description: m.description,
     section: m.section,
-    provider: m.provider,
+    // Нормализуем kie-claude → anthropic для клиентов: provider — это бренд
+    // в UI/каталоге, а не путь до API. kie-claude используется только внутри
+    // фабрики LLM и резолвере ключей.
+    provider: m.provider === "kie-claude" ? "anthropic" : m.provider,
     supportsImages: m.supportsImages,
     supportsDocuments: m.supportsDocuments ?? false,
     supportsVoice: m.supportsVoice,
@@ -96,10 +106,7 @@ function serializeModel(m: AIModel, lang: Language) {
       ? {
           dims: m.costMatrix.dims,
           table: Object.fromEntries(
-            Object.entries(m.costMatrix.table).map(([k, v]) => [
-              k,
-              (v / config.billing.usdPerToken) * config.billing.targetMargin,
-            ]),
+            Object.entries(m.costMatrix.table).map(([k, v]) => [k, modelUsdToTokens(m.id, v)]),
           ),
         }
       : null,
@@ -139,10 +146,7 @@ function serializeModel(m: AIModel, lang: Language) {
       ? m.costAddons.map((addon) => ({
           settingKey: addon.settingKey,
           map: Object.fromEntries(
-            Object.entries(addon.map).map(([k, v]) => [
-              k,
-              ((v as number) / config.billing.usdPerToken) * config.billing.targetMargin,
-            ]),
+            Object.entries(addon.map).map(([k, v]) => [k, modelUsdToTokens(m.id, v as number)]),
           ),
         }))
       : null,

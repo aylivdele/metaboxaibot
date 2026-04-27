@@ -176,19 +176,19 @@ compose -f docker-compose.prod.yml ps`. Или у nginx неправильный
 
 **Бот ничего не делает после деплоя.**
 
-1. `docker logs metabox_bot --tail 100` — ищи `Unauthorized` или
+1. `docker logs aibot_bot --tail 100` — ищи `Unauthorized` или
    `connection refused`.
 2. `BOT_TOKEN` в `.env` — он от прод-бота? Не перепутали с тестовым?
 3. `TELEGRAM_TEST_ENV` в `.env` — должен быть `0`/отсутствовать, иначе
    бот стучится в test DC и получает 401.
 
 **API отвечает 502.**
-Контейнер api упал. `docker logs metabox_api`. Часто ругается на отсутствующий
+Контейнер api упал. `docker logs aibot_api`. Часто ругается на отсутствующий
 обязательный env (`KEY_VAULT_MASTER` сейчас required, без него процесс
 падает на старте).
 
 **Миграции БД не применились.**
 Они применяются `entrypoint.sh` в каждом контейнере (api/bot/worker) на
 старте через `prisma migrate deploy`. Если все три упали и крутятся в
-рестарт-loop — `docker logs metabox_api` покажет в чём затык. Чаще всего
+рестарт-loop — `docker logs aibot_api` покажет в чём затык. Чаще всего
 нет коннекта к postgres или схема в БД конфликтует с миграцией.

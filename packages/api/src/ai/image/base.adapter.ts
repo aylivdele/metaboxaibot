@@ -44,8 +44,8 @@ export interface ImageResult {
 export interface ImageAdapter {
   readonly modelId: string;
   readonly isAsync: boolean;
-  /** Sync generation. Only implemented on sync adapters. */
-  generate?(input: ImageInput): Promise<ImageResult>;
+  /** Sync generation. Only implemented on sync adapters. May return an array for native batch (e.g. Recraft `n=2..6`). */
+  generate?(input: ImageInput): Promise<ImageResult[] | ImageResult>;
   /** Submit async job. Returns provider-side job / prediction ID. */
   submit?(input: ImageInput): Promise<string>;
   /** Poll async result. Returns null if still processing. May return an array for batch generation. */

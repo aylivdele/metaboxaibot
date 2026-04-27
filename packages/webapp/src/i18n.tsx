@@ -18,6 +18,7 @@ const translations = {
     // Profile tabs
     "profile.tabOverview": "Overview",
     "profile.tabGallery": "Gallery",
+    "profile.tabAccount": "Account",
     "profile.tabSettings": "Settings",
 
     // Profile
@@ -36,6 +37,23 @@ const translations = {
     "profile.reason.autotranslate": "📜 Autotranslation",
     "profile.reason.describe_image": "🔍 Reference image description",
     "profile.reason.soul_creation": "🧬 Character creation",
+
+    // Profile countdown
+    "profile.countdown.expired": "Subscription expired",
+    "profile.countdown.day": "day",
+    "profile.countdown.days": "days",
+    "profile.countdown.hMin": "{h}h {m}min",
+    "profile.countdown.minSec": "{m}min {s}sec",
+    "profile.until": "until",
+
+    // Account tab
+    "account.notLinked": "Metabox account not linked",
+    "account.status": "STATUS",
+    "account.statusPartner": "Partner",
+    "account.statusClient": "Client",
+    "account.statusUser": "User",
+    "account.mentor": "MENTOR",
+    "account.referralCode": "REFERRAL CODE",
 
     // Banner
     "banner.welcome.title": "Welcome to Metabox",
@@ -117,6 +135,15 @@ const translations = {
     "tariffs.period.M12": "12 mo",
     "tariffs.tokensTotal": "tokens total",
     "tariffs.close": "Close",
+    "tariffs.badge.top": "🔥 Top",
+    "tariffs.badge.profitable": "💎 Best Value",
+    "tariffs.pkgLockedNote":
+      "Token packages are only available with an active subscription. First, subscribe to any plan above.",
+    "tariffs.pkgLockedBtn": "Subscription required",
+    "tariffs.pkgLockedTitle": "Subscription required",
+    "tariffs.subRequiredText":
+      "Additional token packages are only available with an active subscription. Subscribe to a plan to access token packages.",
+    "tariffs.goToSubscriptions": "Go to subscriptions",
 
     // Referral
     "referral.title": "Referral Program",
@@ -145,6 +172,19 @@ const translations = {
     "referral.step1": "Share your unique link with friends",
     "referral.step2": "Friend opens the bot via your link",
     "referral.step3": "You both receive bonus tokens",
+    "referral.rewardFrom": "from",
+
+    // Avatars page
+    "profile.tabAvatars": "Avatars",
+    "avatars.filterAll": "All",
+    "avatars.filterHeyGen": "HeyGen",
+    "avatars.filterSoul": "Soul",
+    "avatars.empty": "No avatars yet",
+    "avatars.confirmDeleteTitle": "Delete avatar?",
+    "avatars.confirmDeleteText": "The avatar will be permanently removed.",
+
+    // Gallery model filter
+    "gallery.allModels": "All models",
 
     // Admin
     "admin.title": "Admin Panel",
@@ -226,13 +266,15 @@ const translations = {
     "gallery.prompt": "Prompt",
     "gallery.settings": "Settings",
     "gallery.noSettings": "No additional settings",
-    "gallery.cost": "Cost",
-    "gallery.costTokens": "tokens",
-    "gallery.costUnknown": "—",
+
     "gallery.morePhotos": "+{n}",
     "gallery.emptyModel": "You haven't generated anything with this AI yet",
     "gallery.tryModel": "Try it",
 
+    "gallery.addToFav": "Add to favorites",
+    "gallery.removeFromFav": "Remove from favorites",
+
+    "gallery.folder.favorites": "Favorites",
     "gallery.folder.all": "All",
     "gallery.folder.new": "New folder",
     "gallery.folder.createTitle": "New folder",
@@ -246,8 +288,11 @@ const translations = {
     "gallery.folder.addToFolder": "Add to folder",
     "gallery.folder.done": "Done",
     "gallery.folder.empty": "This folder is empty",
+    "gallery.folder.noFolders": "You haven't created any folders yet",
+    "gallery.folder.createFirst": "Create folder",
     "gallery.folder.deleteConfirmTitle": "Delete folder?",
     "gallery.folder.deleteConfirmText": "Generations will not be deleted.",
+    "gallery.folder.selectTitle": "Select folder to edit",
 
     // Settings
     "settings.title": "Account Settings",
@@ -381,6 +426,52 @@ const translations = {
     // Auth errors
     "auth.tokenExpired": "Link expired. Press the «Profile» button in the bot menu again.",
     "auth.openFromTelegram": "Please open this app from Telegram",
+
+    // Picker shared UI
+    "picker.search": "Search…",
+    "picker.loading": "Loading…",
+    "picker.loadingVoices": "Loading voices…",
+    "picker.loadingAvatars": "Loading avatars…",
+    "picker.loadMore": "Load more",
+    "picker.noVoices": "No voices found",
+    "picker.noAvatars": "No avatars found",
+    "picker.genderAll": "All",
+    "picker.genderM": "M",
+    "picker.genderF": "F",
+    "picker.langAll": "All languages",
+    "picker.providerAll": "All providers",
+    "picker.play": "Play",
+    "picker.stop": "Stop",
+    "picker.loadingPresets": "Loading presets…",
+    "picker.noPresets": "No presets found",
+    "picker.categoryAll": "All categories",
+    "picker.maxMotions":
+      "You can select up to {max} presets. If you pick a new one, the oldest will be replaced automatically.",
+    "picker.strength": "Strength: {n}",
+    "picker.selectedPresets": "Selected: {n} preset(s)",
+
+    // OpenAI voice meta
+    "voice.meta.neutral": "Neutral",
+    "voice.meta.male": "Male",
+    "voice.meta.female": "Female",
+    "voice.meta.british": "British",
+    "voice.meta.deepMale": "Deep male",
+    "voice.meta.calm": "Calm",
+
+    // Link Metabox — merge blocked modal & dynamic errors
+    "linkMetabox.merge.blocked": "⛔ Cannot merge accounts",
+    "linkMetabox.merge.blockedText": "You have different mentors and both accounts have purchases.",
+    "linkMetabox.merge.mentorSite": "Site mentor:",
+    "linkMetabox.merge.mentorBot": "Bot mentor:",
+    "linkMetabox.merge.support": "If you have any questions, contact support:",
+    "linkMetabox.merge.ok": "Got it",
+    "linkMetabox.merge.unknown": "Unknown",
+    "linkMetabox.error.mentorConflict":
+      "Mentor conflict. Site: {site}, Bot: {bot}. To merge, use the AI Box button on the Metabox website.",
+    "linkMetabox.error.telegramMismatch":
+      "This account is already linked to another Telegram{info}. Log in from that Telegram or contact support @{support}",
+    "linkMetabox.error.telegramLinkedOther":
+      "Account {name}{info} already has another Telegram linked. Contact support @{support}",
   },
   ru: {
     // Header
@@ -397,6 +488,7 @@ const translations = {
     // Profile tabs
     "profile.tabOverview": "Обзор",
     "profile.tabGallery": "Галерея",
+    "profile.tabAccount": "Аккаунт",
     "profile.tabSettings": "Настройки",
 
     // Profile
@@ -415,6 +507,23 @@ const translations = {
     "profile.reason.describe_image": "🔍 Описание референсного изображения",
     "profile.reason.soul_creation": "🧬 Создание персонажа",
     "profile.reason.admin": "🔧 Корректировка",
+
+    // Profile countdown
+    "profile.countdown.expired": "Подписка истекла",
+    "profile.countdown.day": "день",
+    "profile.countdown.days": "дней",
+    "profile.countdown.hMin": "{h} ч {m} мин",
+    "profile.countdown.minSec": "{m} мин {s} сек",
+    "profile.until": "до",
+
+    // Account tab
+    "account.notLinked": "Аккаунт Metabox не привязан",
+    "account.status": "СТАТУС",
+    "account.statusPartner": "Партнёр",
+    "account.statusClient": "Клиент",
+    "account.statusUser": "Пользователь",
+    "account.mentor": "НАСТАВНИК",
+    "account.referralCode": "РЕФЕРАЛЬНЫЙ КОД",
 
     // Banner
     "banner.welcome.title": "Добро пожаловать",
@@ -496,6 +605,15 @@ const translations = {
     "tariffs.period.M12": "12 мес",
     "tariffs.tokensTotal": "токенов всего",
     "tariffs.close": "Закрыть",
+    "tariffs.badge.top": "🔥 Топ",
+    "tariffs.badge.profitable": "💎 Выгодно",
+    "tariffs.pkgLockedNote":
+      "Докупить пакеты токенов можно только при активной подписке. Сначала оформите любой тариф выше.",
+    "tariffs.pkgLockedBtn": "Нужна подписка",
+    "tariffs.pkgLockedTitle": "Подписка обязательна",
+    "tariffs.subRequiredText":
+      "Покупка дополнительных токенов доступна только при активной подписке. Оформите подписку, чтобы получить доступ к пакетам токенов.",
+    "tariffs.goToSubscriptions": "Перейти к подпискам",
 
     // Referral / Partner
     "referral.title": "Реферальная программа",
@@ -523,6 +641,19 @@ const translations = {
     "referral.step1": "Поделитесь своей ссылкой с друзьями",
     "referral.step2": "Друг открывает бота по вашей ссылке",
     "referral.step3": "Вы оба получаете бонусные токены",
+    "referral.rewardFrom": "от",
+
+    // Avatars page
+    "profile.tabAvatars": "Аватары",
+    "avatars.filterAll": "Все",
+    "avatars.filterHeyGen": "HeyGen",
+    "avatars.filterSoul": "Soul",
+    "avatars.empty": "Аватаров пока нет",
+    "avatars.confirmDeleteTitle": "Удалить аватар?",
+    "avatars.confirmDeleteText": "Аватар будет удалён без возможности восстановления.",
+
+    // Gallery model filter
+    "gallery.allModels": "Все модели",
 
     // Admin
     "admin.title": "Админ-панель",
@@ -603,13 +734,15 @@ const translations = {
     "gallery.prompt": "Промпт",
     "gallery.settings": "Настройки",
     "gallery.noSettings": "Дополнительных настроек нет",
-    "gallery.cost": "Стоимость",
-    "gallery.costTokens": "токенов",
-    "gallery.costUnknown": "—",
+
     "gallery.morePhotos": "+{n}",
     "gallery.emptyModel": "Вы ещё ничего не генерировали с этой нейросетью",
     "gallery.tryModel": "Попробовать",
 
+    "gallery.addToFav": "В избранное",
+    "gallery.removeFromFav": "Убрать из избранного",
+
+    "gallery.folder.favorites": "Избранное",
     "gallery.folder.all": "Все",
     "gallery.folder.new": "Новая папка",
     "gallery.folder.createTitle": "Новая папка",
@@ -623,8 +756,11 @@ const translations = {
     "gallery.folder.addToFolder": "Добавить в папку",
     "gallery.folder.done": "Готово",
     "gallery.folder.empty": "В этой папке пусто",
+    "gallery.folder.noFolders": "У вас пока нет ни одной папки",
+    "gallery.folder.createFirst": "Создать папку",
     "gallery.folder.deleteConfirmTitle": "Удалить папку?",
     "gallery.folder.deleteConfirmText": "Генерации удалены не будут.",
+    "gallery.folder.selectTitle": "Выберите папку",
 
     // Settings
     "settings.title": "Настройки аккаунта",
@@ -757,6 +893,52 @@ const translations = {
     "auth.tokenExpired":
       "Ссылка устарела. Заново откройте главное меню и нажмите кнопку «Профиль».",
     "auth.openFromTelegram": "Пожалуйста, откройте приложение через Telegram",
+
+    // Picker shared UI
+    "picker.search": "Поиск…",
+    "picker.loading": "Загрузка…",
+    "picker.loadingVoices": "Загрузка голосов…",
+    "picker.loadingAvatars": "Загрузка аватаров…",
+    "picker.loadMore": "Загрузить ещё",
+    "picker.noVoices": "Голоса не найдены",
+    "picker.noAvatars": "Аватары не найдены",
+    "picker.genderAll": "Все",
+    "picker.genderM": "М",
+    "picker.genderF": "Ж",
+    "picker.langAll": "Все языки",
+    "picker.providerAll": "Все провайдеры",
+    "picker.play": "Прослушать",
+    "picker.stop": "Стоп",
+    "picker.loadingPresets": "Загрузка пресетов…",
+    "picker.noPresets": "Пресеты не найдены",
+    "picker.categoryAll": "Все категории",
+    "picker.maxMotions":
+      "Можно выбрать не более {max} пресетов. При выборе нового лишний будет заменён автоматически.",
+    "picker.strength": "Сила: {n}",
+    "picker.selectedPresets": "Выбрано: {n} пресет(ов)",
+
+    // OpenAI voice meta
+    "voice.meta.neutral": "Нейтральный",
+    "voice.meta.male": "Мужской",
+    "voice.meta.female": "Женский",
+    "voice.meta.british": "Британский",
+    "voice.meta.deepMale": "Глубокий мужской",
+    "voice.meta.calm": "Спокойный",
+
+    // Link Metabox — merge blocked modal & dynamic errors
+    "linkMetabox.merge.blocked": "⛔ Невозможно объединить аккаунты",
+    "linkMetabox.merge.blockedText": "У вас разные наставники и на обоих аккаунтах есть покупки.",
+    "linkMetabox.merge.mentorSite": "Наставник на сайте:",
+    "linkMetabox.merge.mentorBot": "Наставник в боте:",
+    "linkMetabox.merge.support": "Если у вас есть вопросы — обратитесь в поддержку:",
+    "linkMetabox.merge.ok": "Понятно",
+    "linkMetabox.merge.unknown": "Неизвестен",
+    "linkMetabox.error.mentorConflict":
+      "Конфликт наставников. На сайте: {site}, в боте: {bot}. Для объединения перейдите по кнопке AI Box на сайте Metabox.",
+    "linkMetabox.error.telegramMismatch":
+      "Этот аккаунт уже привязан к другому Telegram{info}. Войдите с того Telegram или обратитесь в поддержку @{support}",
+    "linkMetabox.error.telegramLinkedOther":
+      "На аккаунте {name}{info} уже привязан другой Telegram. Обратитесь в поддержку @{support}",
   },
 } as const;
 

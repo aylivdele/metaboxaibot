@@ -22,8 +22,8 @@ env:
 
 jobs:
   # ── CI: runs on push and pull_request ────────────────────────────────────────
-  lint-and-typecheck:
-    name: Lint & Typecheck
+  lint-typecheck-test:
+    name: Lint, Typecheck & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,11 +40,12 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
+      - run: pnpm test
 
   # ── CD: only on push to develop ──────────────────────────────────────────────
   changes:
     name: Detect changes
-    needs: lint-and-typecheck
+    needs: lint-typecheck-test
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:

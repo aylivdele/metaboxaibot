@@ -14,7 +14,9 @@ import {
   calculateCost,
   computeVideoTokens,
   translatePromptIfNeeded,
+  usdToTokens,
 } from "@metabox/api/services";
+import { getModelMultiplier } from "@metabox/api/services/pricing-config";
 import type { DeductResult } from "@metabox/api/services";
 import {
   buildS3Key,
@@ -32,17 +34,28 @@ import { InputFile } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
 import { parseMp4Info } from "@metabox/api/utils/mp4-duration";
 import { logger } from "../logger.js";
-import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
+import {
+  config,
+  AI_MODELS,
+  getT,
+  buildResultCaption,
+  getFallbackCandidates,
+  isFallbackCompatible,
+} from "@metabox/shared";
+import type { AIModel } from "@metabox/shared";
 import { notifyTechError } from "../utils/notify-error.js";
 import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
+import { submitWithFallback } from "../utils/submit-with-fallback.js";
+import { computeSeedance2BillableUsd } from "../utils/seedance2-billing.js";
 import {
   acquireForSubmit,
   acquireForPoll,
   acquireForSubmitSticky,
 } from "../utils/acquire-for-processor.js";
-import { resolveKeyProvider } from "@metabox/api/ai/key-provider";
+import { resolveKeyProvider, resolveKeyProviderForModel } from "@metabox/api/ai/key-provider";
 import { acquireById } from "@metabox/api/services/key-pool";
 import type { AcquiredKey } from "@metabox/api/services/key-pool";
+import type { Prisma } from "@prisma/client";
 import { userAvatarService } from "@metabox/api/services/user-avatar";
 import { resolveVoiceForTTS } from "@metabox/api/services/user-voice";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
@@ -79,6 +92,35 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
   const modelName = modelMeta?.name ?? modelId;
   const keyProvider = resolveKeyProvider(modelId);
 
+  // Fallback кандидаты: если у задачи есть mediaInputs (image-to-video и т.п.),
+  // fallback должен поддерживать те же слоты. HeyGen с user avatar и аналогичные
+  // sticky-провайдеры не получают fallback (их fallback массив пуст).
+  // Передаём duration чтобы isFallbackCompatible мог отсечь fallback'ов с
+  // меньшим durationRange.max (e.g. FAL grok-imagine 1-10s, primary KIE 6-30s).
+  const requestedDuration =
+    typeof modelSettings?.duration === "number" ? modelSettings.duration : duration;
+  const fallbackCandidates: AIModel[] = modelMeta
+    ? getFallbackCandidates(modelId, "video").filter((m) =>
+        isFallbackCompatible(m, mediaInputs, requestedDuration),
+      )
+    : [];
+
+  /** Подобрать AIModel по provider строке (primary или один из fallback'ов). */
+  const findModelByProvider = (provider: string): AIModel | undefined => {
+    if (modelMeta?.provider === provider) return modelMeta;
+    return fallbackCandidates.find((m) => m.provider === provider);
+  };
+
+  /**
+   * State-shape `inputData.fallback`. Не вводим отдельный type — используем
+   * inline-формат как в image processor'е.
+   */
+  interface FallbackState {
+    primaryProvider: string;
+    effectiveProvider?: string;
+    attemptedProviders?: string[];
+  }
+
   try {
     const existingJob = await db.generationJob.findUnique({
       where: { id: dbJobId },
@@ -86,9 +128,36 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
         providerJobId: true,
         providerKeyId: true,
         status: true,
+        inputData: true,
         outputs: { orderBy: { index: "asc" as const }, take: 1 },
       },
     });
+
+    /** Прочитать fallback state из inputData. */
+    const readFallbackState = (): FallbackState => {
+      const raw = (existingJob?.inputData as Record<string, unknown> | null | undefined)
+        ?.fallback as FallbackState | undefined;
+      return { primaryProvider: modelMeta?.provider ?? "", ...(raw ?? {}) };
+    };
+
+    /** Записать fallback state в inputData (мерджится). */
+    const writeFallbackState = async (next: FallbackState): Promise<void> => {
+      const current = await db.generationJob.findUnique({
+        where: { id: dbJobId },
+        select: { inputData: true },
+      });
+      const merged = {
+        ...((current?.inputData as Record<string, unknown> | null | undefined) ?? {}),
+        fallback: next,
+      };
+      await db.generationJob.update({
+        where: { id: dbJobId },
+        data: { inputData: merged as unknown as Prisma.InputJsonValue },
+      });
+      if (existingJob) {
+        (existingJob.inputData as unknown) = merged;
+      }
+    };
 
     let outputUrl: string;
     let s3Key: string | null;
@@ -176,21 +245,6 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
           }
         }
 
-        const acquired = stickyAvatar
-          ? await acquireForSubmitSticky({
-              acquired: stickyAvatar.acquired,
-              modelId,
-              job,
-              token,
-              queue: getVideoQueue(),
-            })
-          : await acquireForSubmit({
-              provider: keyProvider,
-              modelId,
-              job,
-              token,
-              queue: getVideoQueue(),
-            });
         // If voice_id is a local UserVoice.id (modern picker format) resolve
         // it to the current ElevenLabs externalId here so the provider
         // adapter (HeyGen / D-ID) receives a voice_id it can actually use.
@@ -221,32 +275,113 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
           }
         }
 
-        const submitAdapter = createVideoAdapter(modelId, acquired);
-        providerJobId = await submitWithThrottle({
-          modelId,
-          provider: modelMeta?.provider,
-          section: "video",
-          job,
-          token,
-          queue: getVideoQueue(),
-          keyId: acquired.keyId,
-          submit: () =>
-            submitAdapter.submit({
-              prompt: effectivePrompt,
-              imageUrl,
-              mediaInputs,
-              aspectRatio,
-              duration,
-              modelSettings: effectiveModelSettings,
-              userId: BigInt(userIdStr),
-            }),
-        });
-        logger.info({ dbJobId, modelId, providerJobId }, "Submitted video generation task");
+        let submittedKeyId: string | null = null;
+        let effectiveProvider: string = modelMeta?.provider ?? "";
+
+        if (stickyAvatar) {
+          // HeyGen avatar — fallback не применяется (avatar bound to a single
+          // provider/account). Sticky-acquire + submit как раньше.
+          const acquired = await acquireForSubmitSticky({
+            acquired: stickyAvatar.acquired,
+            modelId,
+            job,
+            token,
+            queue: getVideoQueue(),
+          });
+          const submitAdapter = createVideoAdapter(modelId, acquired);
+          providerJobId = await submitWithThrottle({
+            modelId,
+            provider: modelMeta?.provider,
+            section: "video",
+            job,
+            token,
+            queue: getVideoQueue(),
+            keyId: acquired.keyId,
+            submit: () =>
+              submitAdapter.submit({
+                prompt: effectivePrompt,
+                imageUrl,
+                mediaInputs,
+                aspectRatio,
+                duration,
+                modelSettings: effectiveModelSettings,
+                userId: BigInt(userIdStr),
+              }),
+          });
+          submittedKeyId = acquired.keyId;
+        } else if (modelMeta && fallbackCandidates.length > 0) {
+          // У модели зарегистрированы fallback'и — идём через submitWithFallback.
+          const fbResult = await submitWithFallback<string, VideoJobData>({
+            primaryModel: modelMeta,
+            fallbacks: fallbackCandidates,
+            section: "video",
+            job,
+            token,
+            allowFiveXxFallback: job.attemptsMade >= 2,
+            jobId: dbJobId,
+            userId: userIdStr,
+            submit: async (model, acquired) => {
+              const adapter = createVideoAdapter(model, acquired);
+              return adapter.submit({
+                prompt: effectivePrompt,
+                imageUrl,
+                mediaInputs,
+                aspectRatio,
+                duration,
+                modelSettings: effectiveModelSettings,
+                userId: BigInt(userIdStr),
+              });
+            },
+          });
+          providerJobId = fbResult.result;
+          submittedKeyId = fbResult.acquired.keyId;
+          effectiveProvider = fbResult.effectiveProvider;
+          await writeFallbackState({
+            primaryProvider: modelMeta.provider,
+            effectiveProvider,
+            attemptedProviders: fbResult.attempts.map((a) => a.provider),
+          });
+        } else {
+          // Нет fallback'ов — обычный путь через submitWithThrottle.
+          const acquired = await acquireForSubmit({
+            provider: keyProvider,
+            modelId,
+            job,
+            token,
+            queue: getVideoQueue(),
+          });
+          const submitAdapter = createVideoAdapter(modelId, acquired);
+          providerJobId = await submitWithThrottle({
+            modelId,
+            provider: modelMeta?.provider,
+            section: "video",
+            job,
+            token,
+            queue: getVideoQueue(),
+            keyId: acquired.keyId,
+            submit: () =>
+              submitAdapter.submit({
+                prompt: effectivePrompt,
+                imageUrl,
+                mediaInputs,
+                aspectRatio,
+                duration,
+                modelSettings: effectiveModelSettings,
+                userId: BigInt(userIdStr),
+              }),
+          });
+          submittedKeyId = acquired.keyId;
+        }
+
+        logger.info(
+          { dbJobId, modelId, providerJobId, effectiveProvider },
+          "Submitted video generation task",
+        );
         await db.generationJob.update({
           where: { id: dbJobId },
           data: {
             providerJobId,
-            providerKeyId: acquired.keyId,
+            providerKeyId: submittedKeyId,
             // Фиксируем момент перехода в poll-стадию: после Redis wipe
             // recovery восстановит таймер с этой точки, а не с нуля.
             pollStartedAt: new Date(),
@@ -272,8 +407,16 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
       const providerJobId = existingJob?.providerJobId;
       if (!providerJobId) throw new Error(`Video poll stage without providerJobId: ${dbJobId}`);
 
-      const acquired = await acquireForPoll(existingJob?.providerKeyId, keyProvider);
-      pollAdapter = createVideoAdapter(modelId, acquired);
+      // Если на submit-стадии случился fallback — используем его модель/keyProvider.
+      const fbStateNow = readFallbackState();
+      const effModel =
+        (fbStateNow.effectiveProvider && findModelByProvider(fbStateNow.effectiveProvider)) ||
+        modelMeta;
+      if (!effModel) throw new Error(`Unknown video model: ${modelId}`);
+      const effKeyProvider = resolveKeyProviderForModel(effModel);
+
+      const acquired = await acquireForPoll(existingJob?.providerKeyId, effKeyProvider);
+      pollAdapter = createVideoAdapter(effModel, acquired);
 
       videoResult = await pollAdapter.poll(providerJobId);
 
@@ -417,17 +560,57 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
           : undefined;
         const refVideos = (mediaInputs as Record<string, string[]> | undefined)?.ref_videos ?? [];
         const hasVideoInputs = refVideos.length > 0;
-        const internalCost = calculateCost(
-          model,
-          0,
-          0,
-          undefined,
-          videoTokens,
-          modelSettings,
-          effectiveDuration,
-          undefined,
-          { hasVideoInputs },
-        );
+
+        // Seedance 2.0 evolink: с video input меняется ВСЯ per-second rate
+        // (ниже базовой no-video) И billable_seconds = output + max(input_total, output).
+        // costMatrix/costVariants отражают только no-video rates (для preview).
+        // Здесь — runtime override когда ref_videos непусты.
+        let internalCost: number;
+        const isSeedance2Evolink =
+          (modelId === "seedance-2" || modelId === "seedance-2-fast") &&
+          model.provider === "evolink";
+
+        if (isSeedance2Evolink && hasVideoInputs) {
+          const inputDurations = await Promise.all(
+            refVideos.map((u) => fetchClipDurationSec(u).catch(() => 0)),
+          );
+          const resolution = (modelSettings?.resolution as string | undefined) ?? "720p";
+          const usd = computeSeedance2BillableUsd({
+            modelId: modelId as "seedance-2" | "seedance-2-fast",
+            resolution,
+            outputDuration: effectiveDuration,
+            inputVideoDurations: inputDurations,
+          });
+          if (usd !== null) {
+            internalCost = usdToTokens(usd) * getModelMultiplier(modelId);
+          } else {
+            // Неизвестное разрешение — fallback на calculateCost (no-video matrix).
+            internalCost = calculateCost(
+              model,
+              0,
+              0,
+              undefined,
+              videoTokens,
+              modelSettings,
+              effectiveDuration,
+              undefined,
+              { hasVideoInputs },
+            );
+          }
+        } else {
+          internalCost = calculateCost(
+            model,
+            0,
+            0,
+            undefined,
+            videoTokens,
+            modelSettings,
+            effectiveDuration,
+            undefined,
+            { hasVideoInputs },
+          );
+        }
+
         deductResult = await deductTokens(BigInt(userIdStr), internalCost, modelId);
         await db.generationJob.update({
           where: { id: dbJobId },

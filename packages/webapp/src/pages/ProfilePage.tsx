@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
@@ -15,8 +15,9 @@ import type {
 import { openExternalLink } from "../utils/telegram.js";
 import { SETTING_TRANSLATIONS } from "@metabox/shared-browser";
 import { StyledSelect } from "../components/management/StyledSelect.js";
+import { AvatarsPage } from "./AvatarsPage.js";
 
-export type ProfileTab = "overview" | "gallery" | "account";
+export type ProfileTab = "overview" | "gallery" | "account" | "avatars";
 
 /**
  * Format a token amount with dynamic precision so small values never show as 0.00.
@@ -101,13 +102,20 @@ export function ProfilePage({
           className={`profile-tabs__btn${activeTab === "account" ? " profile-tabs__btn--active" : ""}`}
           onClick={() => setActiveTab("account")}
         >
-          Аккаунт
+          {t("profile.tabAccount")}
+        </button>
+        <button
+          className={`profile-tabs__btn${activeTab === "avatars" ? " profile-tabs__btn--active" : ""}`}
+          onClick={() => setActiveTab("avatars")}
+        >
+          {t("profile.tabAvatars")}
         </button>
       </div>
 
       {activeTab === "overview" && <OverviewTab profile={profile} />}
       {activeTab === "gallery" && <GalleryTab onGoToManagement={onGoToManagement} />}
       {activeTab === "account" && <AccountTab profile={profile} />}
+      {activeTab === "avatars" && <AvatarsPage />}
     </div>
   );
 }
@@ -115,6 +123,7 @@ export function ProfilePage({
 /* ── Subscription Countdown ────────────────────────────────────────────────── */
 
 function useCountdown(endDate: string) {
+  const { t, locale } = useI18n();
   const [text, setText] = useState("");
   const [urgent, setUrgent] = useState(false);
 
@@ -122,7 +131,7 @@ function useCountdown(endDate: string) {
     const update = () => {
       const diff = new Date(endDate).getTime() - Date.now();
       if (diff <= 0) {
-        setText("Подписка истекла");
+        setText(t("profile.countdown.expired"));
         setUrgent(true);
         return;
       }
@@ -132,14 +141,26 @@ function useCountdown(endDate: string) {
       const seconds = Math.floor((diff % 60000) / 1000);
 
       if (days >= 1) {
-        const w = days === 1 ? "день" : days < 5 ? "дня" : "дней";
-        setText(`${days} ${w}`);
+        let dayStr: string;
+        if (locale === "ru") {
+          const w = days === 1 ? "день" : days < 5 ? "дня" : "дней";
+          dayStr = `${days} ${w}`;
+        } else {
+          dayStr = `${days} ${days === 1 ? t("profile.countdown.day") : t("profile.countdown.days")}`;
+        }
+        setText(dayStr);
         setUrgent(false);
       } else if (hours >= 1) {
-        setText(`${hours} ч ${minutes} мин`);
+        setText(
+          t("profile.countdown.hMin").replace("{h}", String(hours)).replace("{m}", String(minutes)),
+        );
         setUrgent(true);
       } else {
-        setText(`${minutes} мин ${seconds} сек`);
+        setText(
+          t("profile.countdown.minSec")
+            .replace("{m}", String(minutes))
+            .replace("{s}", String(seconds)),
+        );
         setUrgent(true);
       }
     };
@@ -147,7 +168,7 @@ function useCountdown(endDate: string) {
     const diff = new Date(endDate).getTime() - Date.now();
     const interval = setInterval(update, diff < 86400000 ? 1000 : 60000);
     return () => clearInterval(interval);
-  }, [endDate]);
+  }, [endDate, t, locale]);
 
   return { text, urgent };
 }
@@ -155,7 +176,7 @@ function useCountdown(endDate: string) {
 /* ── Overview Tab ──────────────────────────────────────────────────────────── */
 
 function OverviewTab({ profile }: { profile: UserProfile }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const sub = profile.subscription;
   const progressPct = sub ? Math.max(0, Math.min(100, (sub.daysLeft / sub.totalDays) * 100)) : 0;
   const countdown = useCountdown(sub?.endDate ?? "");
@@ -191,7 +212,8 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
               {countdown.text}
             </span>
             <span className="sub-card__end-date">
-              до {new Date(sub.endDate).toLocaleDateString("ru-RU")}
+              {t("profile.until")}{" "}
+              {new Date(sub.endDate).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
             </span>
           </div>
           <div className="sub-card__bar">
@@ -234,12 +256,25 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
 const SECTIONS = ["image", "audio", "video"] as const;
 type Section = (typeof SECTIONS)[number];
 
+function sortFolders(arr: GalleryFolder[]): GalleryFolder[] {
+  return [...arr].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+    if (a.isPinned && b.isPinned) {
+      const pa = a.pinnedAt ?? "";
+      const pb = b.pinnedAt ?? "";
+      if (pa !== pb) return pa < pb ? -1 : 1;
+    }
+    if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 function GalleryTab({
   onGoToManagement,
 }: {
   onGoToManagement?: (section: string, modelId: string) => void;
 }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [section, setSection] = useState<Section>("image");
   const [modelFilter, setModelFilter] = useState<string | null>(null);
   const [items, setItems] = useState<GalleryJob[]>([]);
@@ -259,14 +294,16 @@ function GalleryTab({
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [folderModalJob, setFolderModalJob] = useState<GalleryJob | null>(null);
   const [editFolder, setEditFolder] = useState<GalleryFolder | null>(null);
+  const [folderSelectOpen, setFolderSelectOpen] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const pendingFolderJobRef = useRef<GalleryJob | null>(null);
 
   const LIMIT = 20;
 
   const sectionLabels: Record<Section, string> = {
-    image: locale === "ru" ? "🎨 Изображения" : "🎨 Images",
-    audio: locale === "ru" ? "🎧 Аудио" : "🎧 Audio",
-    video: locale === "ru" ? "🎬 Видео" : "🎬 Video",
+    image: `🎨 ${t("gallery.section.image")}`,
+    audio: `🎧 ${t("gallery.section.audio")}`,
+    video: `🎬 ${t("gallery.section.video")}`,
   };
 
   const loadFolders = useCallback(() => {
@@ -280,16 +317,32 @@ function GalleryTab({
     loadFolders();
   }, [loadFolders]);
 
+  const resolveModelIdsForFilter = useCallback(
+    (filter: string | null): { modelId?: string; modelIds?: string } => {
+      if (!filter) return {};
+      if (filter.startsWith("family:")) {
+        const familyId = filter.slice(7);
+        const ids = Object.values(modelsById)
+          .filter((m) => m.familyId === familyId)
+          .map((m) => m.id);
+        return ids.length > 0 ? { modelIds: ids.join(",") } : {};
+      }
+      return { modelId: filter };
+    },
+    [modelsById],
+  );
+
   const load = useCallback(
     (sec: Section, pg: number, mid: string | null, folderId: string | null) => {
       setLoading(true);
       setError(null);
+      const modelParams = resolveModelIdsForFilter(mid);
       api.gallery
         .list({
           section: sec,
           page: pg,
           limit: LIMIT,
-          modelId: mid ?? undefined,
+          ...modelParams,
           folderId: folderId ?? undefined,
         })
         .then((res) => {
@@ -299,7 +352,7 @@ function GalleryTab({
         .catch((err: Error) => setError(err.message))
         .finally(() => setLoading(false));
     },
-    [],
+    [resolveModelIdsForFilter],
   );
 
   useEffect(() => {
@@ -337,7 +390,6 @@ function GalleryTab({
   const handleSectionChange = (sec: Section) => {
     setSection(sec);
     setModelFilter(null);
-    setActiveFolderId(null);
     setPage(1);
   };
 
@@ -409,9 +461,36 @@ function GalleryTab({
   const favFolder = folders.find((f) => f.isDefault);
 
   const activeSectionKey = section === "image" ? "design" : section;
-  const sectionModels = Object.values(modelsById)
-    .filter((m) => m.section === activeSectionKey)
-    .sort((a, b) => (modelCounts[b.id] ?? 0) - (modelCounts[a.id] ?? 0));
+
+  const pickerOptions = useMemo(() => {
+    const allModels = Object.values(modelsById).filter((m) => m.section === activeSectionKey);
+    const familyCountMap = new Map<string, number>();
+    for (const m of allModels) {
+      if (m.familyId) {
+        familyCountMap.set(
+          m.familyId,
+          (familyCountMap.get(m.familyId) ?? 0) + (modelCounts[m.id] ?? 0),
+        );
+      }
+    }
+    const seenFamilies = new Set<string>();
+    const opts: { value: string; label: string; count: number }[] = [];
+    for (const m of allModels) {
+      if (m.familyId) {
+        if (!seenFamilies.has(m.familyId)) {
+          seenFamilies.add(m.familyId);
+          opts.push({
+            value: `family:${m.familyId}`,
+            label: m.familyName ?? m.familyId,
+            count: familyCountMap.get(m.familyId) ?? 0,
+          });
+        }
+      } else {
+        opts.push({ value: m.id, label: m.name, count: modelCounts[m.id] ?? 0 });
+      }
+    }
+    return opts.sort((a, b) => b.count - a.count);
+  }, [modelsById, modelCounts, activeSectionKey]);
 
   return (
     <>
@@ -443,7 +522,7 @@ function GalleryTab({
             onClick={() => handleFolderChange(folder.id)}
           >
             {folder.isDefault
-              ? `♥ ${folder.name}`
+              ? `♥ ${t("gallery.folder.favorites")}`
               : folder.isPinned
                 ? `⭐ ${folder.name}`
                 : folder.name}
@@ -459,25 +538,25 @@ function GalleryTab({
         >
           +
         </button>
-        {activeFolderId && folders.find((f) => f.id === activeFolderId && !f.isDefault) && (
+        {folders.some((f) => !f.isDefault) && (
           <button
-            className="gallery-folders__edit-btn"
-            onClick={() => setEditFolder(folders.find((f) => f.id === activeFolderId) ?? null)}
-            aria-label={t("gallery.folder.editTitle")}
+            className="chip gallery-folders__add"
+            onClick={() => setFolderSelectOpen(true)}
+            aria-label={t("gallery.folder.selectTitle")}
           >
-            ✎
+            ⚙
           </button>
         )}
       </div>
 
-      {sectionModels.length > 0 && (
+      {pickerOptions.length > 0 && (
         <StyledSelect
           style={{ display: "inline-block" }}
           value={modelFilter ?? ""}
           onChange={(v) => handleModelFilterChange(v === "" ? null : v)}
           options={[
-            { value: "", label: locale === "ru" ? "Все модели" : "All models" },
-            ...sectionModels.map((m) => ({ value: m.id, label: m.name })),
+            { value: "", label: t("gallery.allModels") },
+            ...pickerOptions.map((opt) => ({ value: opt.value, label: opt.label })),
           ]}
         />
       )}
@@ -565,6 +644,11 @@ function GalleryTab({
               setItems((prev) => prev.map((j) => (j.id === updatedJob.id ? updatedJob : j)));
               loadFolders();
             }}
+            onCreateFolder={() => {
+              pendingFolderJobRef.current = folderModalJob;
+              setFolderModalJob(null);
+              setCreateFolderOpen(true);
+            }}
           />,
           document.body,
         )}
@@ -573,11 +657,31 @@ function GalleryTab({
         createPortal(
           <FolderEditModal
             folder={null}
-            onClose={() => setCreateFolderOpen(false)}
+            onClose={() => {
+              pendingFolderJobRef.current = null;
+              setCreateFolderOpen(false);
+            }}
             onSave={async (name) => {
               const created = await api.gallery.folders.create(name);
-              setFolders((prev) => [...prev, created]);
+              setFolders((prev) => sortFolders([...prev, created]));
               setCreateFolderOpen(false);
+              if (pendingFolderJobRef.current) {
+                setFolderModalJob(pendingFolderJobRef.current);
+                pendingFolderJobRef.current = null;
+              }
+            }}
+          />,
+          document.body,
+        )}
+
+      {folderSelectOpen &&
+        createPortal(
+          <FolderSelectModal
+            folders={folders.filter((f) => !f.isDefault)}
+            onClose={() => setFolderSelectOpen(false)}
+            onSelect={(folder: GalleryFolder) => {
+              setFolderSelectOpen(false);
+              setEditFolder(folder);
             }}
           />,
           document.body,
@@ -591,8 +695,10 @@ function GalleryTab({
             onSave={async (name, isPinned) => {
               const updated = await api.gallery.folders.update(editFolder.id, { name, isPinned });
               setFolders((prev) =>
-                prev.map((f) =>
-                  f.id === updated.id ? { ...f, ...updated, itemCount: f.itemCount } : f,
+                sortFolders(
+                  prev.map((f) =>
+                    f.id === updated.id ? { ...f, ...updated, itemCount: f.itemCount } : f,
+                  ),
                 ),
               );
               setEditFolder(null);
@@ -617,11 +723,13 @@ function FolderPickerModal({
   folders,
   onClose,
   onUpdate,
+  onCreateFolder,
 }: {
   job: GalleryJob;
   folders: GalleryFolder[];
   onClose: () => void;
   onUpdate: (job: GalleryJob) => void;
+  onCreateFolder: () => void;
 }) {
   const { t } = useI18n();
   const [pending, setPending] = useState<string | null>(null);
@@ -652,36 +760,79 @@ function FolderPickerModal({
           ×
         </button>
         <div className="modal-title">{t("gallery.folder.addToFolder")}</div>
-        {folders.length === 0 ? (
-          <div className="gallery-modal__settings">{t("gallery.folder.empty")}</div>
-        ) : (
-          <ul className="folder-picker__list">
-            {folders.map((folder) => {
-              const checked = job.folderIds.includes(folder.id);
-              return (
-                <li key={folder.id}>
-                  <button
-                    type="button"
-                    className={`folder-picker__item${checked ? " folder-picker__item--checked" : ""}`}
-                    onClick={() => void toggle(folder)}
-                    disabled={pending === folder.id}
-                  >
-                    <span className="folder-picker__check">{checked ? "✓" : ""}</span>
-                    <span className="folder-picker__name">
-                      {folder.isDefault ? `♥ ${folder.name}` : folder.name}
-                    </span>
-                    {pending === folder.id && <span className="folder-picker__spinner">…</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <ul className="folder-picker__list">
+          {folders.map((folder) => {
+            const checked = job.folderIds.includes(folder.id);
+            return (
+              <li key={folder.id}>
+                <button
+                  type="button"
+                  className={`folder-picker__item${checked ? " folder-picker__item--checked" : ""}`}
+                  onClick={() => void toggle(folder)}
+                  disabled={pending === folder.id}
+                >
+                  <span className="folder-picker__check">{checked ? "✓" : ""}</span>
+                  <span className="folder-picker__name">
+                    {folder.isDefault ? `♥ ${folder.name}` : folder.name}
+                  </span>
+                  {pending === folder.id && <span className="folder-picker__spinner">…</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <button
+          type="button"
+          className="btn btn--ghost folder-picker__create"
+          onClick={onCreateFolder}
+        >
+          + {t("gallery.folder.createFirst")}
+        </button>
         <div className="modal-actions">
           <button type="button" className="btn btn--primary" onClick={onClose}>
             {t("gallery.folder.done")}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Folder Select Modal ───────────────────────────────────────────────────── */
+
+function FolderSelectModal({
+  folders,
+  onClose,
+  onSelect,
+}: {
+  folders: GalleryFolder[];
+  onClose: () => void;
+  onSelect: (folder: GalleryFolder) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="modal-close" onClick={onClose} aria-label="close">
+          ×
+        </button>
+        <div className="modal-title">{t("gallery.folder.selectTitle")}</div>
+        <ul className="folder-picker__list">
+          {folders.map((folder) => (
+            <li key={folder.id}>
+              <button
+                type="button"
+                className="folder-picker__item"
+                onClick={() => onSelect(folder)}
+              >
+                <span className="folder-picker__name">
+                  {folder.isPinned ? `⭐ ${folder.name}` : folder.name}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
@@ -772,7 +923,6 @@ function FolderEditModal({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("gallery.folder.namePlaceholder")}
-          autoFocus
           onKeyDown={(e) => e.key === "Enter" && void handleSave()}
         />
         {!isCreate && (
@@ -806,14 +956,6 @@ function FolderEditModal({
       </div>
     </div>
   );
-}
-
-function formatGalleryTokens(raw: string | null): string | null {
-  if (!raw) return null;
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return null;
-  // Up to 2 decimals, trim trailing zeros so whole numbers show as "5", not "5.00".
-  return n.toFixed(2).replace(/\.?0+$/, "");
 }
 
 /**
@@ -936,6 +1078,8 @@ function GalleryCard({
   const [deleting, setDeleting] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [lightboxOutput, setLightboxOutput] = useState<GalleryOutput | null>(null);
+  const [downloadingLightbox, setDownloadingLightbox] = useState(false);
 
   const isImage = job.section === "image";
   const isVideo = job.section === "video";
@@ -980,6 +1124,18 @@ function GalleryCard({
     return res.url;
   };
 
+  const downloadLightboxOriginal = async (outputId: string) => {
+    setDownloadingLightbox(true);
+    try {
+      const { url } = await api.gallery.originalUrl(outputId);
+      openExternalLink(url);
+    } catch {
+      // silent
+    } finally {
+      setDownloadingLightbox(false);
+    }
+  };
+
   const handleConfirmDelete = async () => {
     setDeleting(true);
     try {
@@ -991,8 +1147,6 @@ function GalleryCard({
     }
   };
 
-  const tokens = formatGalleryTokens(job.tokensSpent);
-  const tokensLabel = tokens ? `${tokens} ${t("gallery.costTokens")}` : t("gallery.costUnknown");
   const collageOutputs = outputs.slice(0, 4);
 
   const [favLoading, setFavLoading] = useState(false);
@@ -1016,7 +1170,7 @@ function GalleryCard({
           className={`gallery-card__fav${isFavorited ? " gallery-card__fav--active" : ""}`}
           onClick={handleToggleFavoriteClick}
           disabled={favLoading}
-          title={isFavorited ? "Убрать из избранного" : "В избранное"}
+          title={isFavorited ? t("gallery.removeFromFav") : t("gallery.addToFav")}
           aria-label="Favorites"
         >
           {isFavorited ? "♥" : "♡"}
@@ -1056,7 +1210,12 @@ function GalleryCard({
             const loaded = imgLoaded[out.id];
             const src = out.thumbnailUrl ?? out.previewUrl ?? out.outputUrl ?? "";
             return (
-              <div key={out.id} className="gallery-card__output-tile">
+              <div
+                key={out.id}
+                className="gallery-card__output-tile"
+                onClick={() => setLightboxOutput(out)}
+                style={{ cursor: "zoom-in" }}
+              >
                 {!loaded && src && <div className="gallery-skeleton" />}
                 {!errored && src && (
                   <img
@@ -1077,7 +1236,11 @@ function GalleryCard({
           })}
         </div>
       ) : isImage && previewOutput ? (
-        <div className="gallery-card__preview">
+        <div
+          className="gallery-card__preview"
+          onClick={() => setLightboxOutput(previewOutput)}
+          style={{ cursor: "zoom-in" }}
+        >
           {!imgLoaded[previewOutput.id] && <div className="gallery-skeleton" />}
           {!imgErrors[previewOutput.id] && (
             <img
@@ -1126,13 +1289,12 @@ function GalleryCard({
       <div className="gallery-card__body">
         {isImage ? (
           // Design cards run two-up in a grid, so the single-row meta strip
-          // overflows. Stack model / cost / date vertically and drop the
+          // overflows. Stack model / date vertically and drop the
           // prompt preview entirely — it's available in the details modal.
           <div className="gallery-card__meta gallery-card__meta--stacked">
             <span className="gallery-card__model" title={job.modelName}>
               {job.modelName}
             </span>
-            <span className="gallery-card__cost">{tokensLabel}</span>
             {job.completedAt && (
               <span className="gallery-card__date">
                 {new Date(job.completedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
@@ -1146,7 +1308,6 @@ function GalleryCard({
                 <span className="gallery-card__model" title={job.modelName}>
                   {job.modelName}
                 </span>
-                <span className="gallery-card__cost">{tokensLabel}</span>
               </div>
               {job.completedAt && (
                 <span className="gallery-card__date">
@@ -1219,6 +1380,51 @@ function GalleryCard({
                 ×
               </button>
               <video src={videoUrl} controls autoPlay playsInline className="video-modal__player" />
+            </div>
+          </div>,
+          document.body,
+        )}
+      {lightboxOutput &&
+        createPortal(
+          <div
+            className="modal-overlay gallery-lightbox-overlay"
+            onClick={() => setLightboxOutput(null)}
+          >
+            <div className="gallery-lightbox" onClick={(e) => e.stopPropagation()}>
+              <div className="gallery-lightbox__header">
+                <button
+                  type="button"
+                  className="gallery-lightbox__close"
+                  onClick={() => setLightboxOutput(null)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <img
+                src={lightboxOutput.previewUrl ?? lightboxOutput.outputUrl ?? ""}
+                alt={job.prompt}
+                className="gallery-lightbox__img"
+              />
+              {error && <p className="gallery-card__error">{error}</p>}
+              <div className="gallery-lightbox__actions">
+                <button
+                  type="button"
+                  className={`gallery-card__btn${sent ? " gallery-card__btn--sent" : ""}`}
+                  onClick={handleSend}
+                  disabled={loading || sent}
+                >
+                  {loading ? "…" : sent ? t("gallery.sent") : t("gallery.download")}
+                </button>
+                <button
+                  type="button"
+                  className="gallery-card__btn"
+                  onClick={() => void downloadLightboxOriginal(lightboxOutput.id)}
+                  disabled={downloadingLightbox}
+                >
+                  {downloadingLightbox ? "…" : t("gallery.downloadOriginal")}
+                </button>
+              </div>
             </div>
           </div>,
           document.body,
@@ -1478,14 +1684,17 @@ function GalleryDetailsModal({
   }
 
   // Pass 2: any keys present in modelSettings but missing from the current
-  // model definition (setting may have been removed since). Show with a
-  // best-effort label, but skip the always-hidden technical companion keys.
+  // model definition (setting may have been removed since — например, при
+  // смене провайдера у модели). Локальный словарь может быть пустым (ru),
+  // поэтому фоллбек: locale → en → raw key. Без второго шага русские юзеры
+  // видят сырое имя ключа на старых джобах.
+  const settingLocaleEn = SETTING_TRANSLATIONS["en"] ?? {};
   for (const [key, value] of Object.entries(rawSettings)) {
     if (seenKeys.has(key)) continue;
     if (ALWAYS_HIDDEN_SETTING_KEYS.has(key)) continue;
     if (value === null || value === undefined || value === "") continue;
     if (Array.isArray(value) && value.length === 0) continue;
-    const label = settingLocale[key]?.label ?? key;
+    const label = settingLocale[key]?.label ?? settingLocaleEn[key]?.label ?? key;
     entries.push({ key, label, value: formatValue(undefined, value) });
   }
 
@@ -1673,6 +1882,7 @@ interface AccountData {
 }
 
 function AccountTab(_props: { profile: UserProfile }) {
+  const { t } = useI18n();
   const [data, setData] = useState<AccountData | null>(null);
 
   useEffect(() => {
@@ -1691,27 +1901,27 @@ function AccountTab(_props: { profile: UserProfile }) {
           {data?.email ? (
             <span>{data.email}</span>
           ) : (
-            <span className="account-hint">Аккаунт Metabox не привязан</span>
+            <span className="account-hint">{t("account.notLinked")}</span>
           )}
         </div>
       </div>
 
       {/* Status */}
       <div className="account-section">
-        <div className="account-label">Статус</div>
+        <div className="account-label">{t("account.status")}</div>
         <div className="account-value">
           {data?.userStatus === "PARTNER"
-            ? "Партнёр"
+            ? t("account.statusPartner")
             : data?.userStatus === "CLIENT"
-              ? "Клиент"
-              : "Пользователь"}
+              ? t("account.statusClient")
+              : t("account.statusUser")}
         </div>
       </div>
 
       {/* Mentor */}
       {data?.mentor && (
         <div className="account-section">
-          <div className="account-label">Наставник</div>
+          <div className="account-label">{t("account.mentor")}</div>
           <div className="account-value">
             <div className="account-mentor-name">{data.mentor.name}</div>
             {data.mentor.telegramUsername ? (
@@ -1742,7 +1952,7 @@ function AccountTab(_props: { profile: UserProfile }) {
       {/* Referral code */}
       {data?.referralCode && (
         <div className="account-section">
-          <div className="account-label">Реферальный код</div>
+          <div className="account-label">{t("account.referralCode")}</div>
           <div className="account-value account-value--mono">{data.referralCode}</div>
         </div>
       )}

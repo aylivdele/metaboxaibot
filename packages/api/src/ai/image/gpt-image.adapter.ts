@@ -21,6 +21,53 @@ const OUTPUT_TOKENS_FALLBACK: Record<string, Record<string, number>> = {
   high: { "1024x1024": 4160, "1024x1536": 6240, "1536x1024": 6208 },
 };
 
+/**
+ * Map KIE-style settings (aspect_ratio + resolution) → OpenAI size string.
+ * Срабатывает когда GptImageAdapter вызывается как fallback для KIE primary
+ * gpt-image-2 — modelSettings содержат KIE-формат вместо OpenAI's size/quality.
+ *
+ * Без translation user choices полностью терялись бы: размер всегда был бы
+ * "1024x1024" по умолчанию, без учёта выбранного aspect_ratio + resolution.
+ *
+ * KIE 4K + auto/1:1 не разрешён правилами unavailableIf, но на всякий случай
+ * fallback'имся к 2K square.
+ */
+export function kieAspectResolutionToOpenAISize(
+  aspect: string | undefined,
+  resolution: string,
+): string {
+  // Square / auto
+  if (!aspect || aspect === "auto" || aspect === "1:1") {
+    if (resolution === "2K") return "2048x2048";
+    if (resolution === "4K") return "2048x2048"; // KIE 4K + auto/1:1 запрещён, но safety
+    return "1024x1024";
+  }
+  // Landscape 16:9
+  if (aspect === "16:9") {
+    if (resolution === "2K") return "2048x1152";
+    if (resolution === "4K") return "3840x2160";
+    return "1536x1024";
+  }
+  // Portrait 9:16
+  if (aspect === "9:16") {
+    if (resolution === "2K") return "1152x2048";
+    if (resolution === "4K") return "2160x3840";
+    return "1024x1536";
+  }
+  // 4:3 — у OpenAI нет точного match, ближайший landscape 1536x1024 (3:2)
+  if (aspect === "4:3") {
+    if (resolution === "2K") return "2048x1152";
+    return "1536x1024";
+  }
+  // 3:4 — ближайший portrait
+  if (aspect === "3:4") {
+    if (resolution === "2K") return "1152x2048";
+    return "1024x1536";
+  }
+  // Неизвестный ratio → safe default
+  return "1024x1024";
+}
+
 interface GptImageUsage {
   input_tokens?: number;
   output_tokens?: number;
@@ -88,12 +135,38 @@ export class GptImageAdapter implements ImageAdapter {
     const ms = input.modelSettings ?? {};
     const editUrls = input.mediaInputs?.edit ?? (input.imageUrl ? [input.imageUrl] : []);
     const imageUrl = editUrls[0];
+
+    // ── Settings translation: KIE-style → OpenAI-style ─────────────────────────
+    // Адаптер используется для двух сценариев:
+    //   1. Прямой OpenAI primary (gpt-image-1.5 / gpt-image-2 promotion) —
+    //      modelSettings содержат OpenAI-style (size + quality).
+    //   2. OpenAI fallback для KIE-primary gpt-image-2 — modelSettings содержат
+    //      KIE-style (aspect_ratio + resolution + nsfw_checker).
+    // В сценарии 2 без translation user choices полностью терялись бы (всегда
+    // дефолт 1024x1024 medium). Маппинг ниже выбирает OpenAI-style если задан,
+    // иначе деривает из KIE-style полей.
+    const explicitSize = ms.size as string | undefined;
+    const aspectRatio = ms.aspect_ratio as string | undefined;
+    const kieResolution = (ms.resolution as string | undefined) ?? "1K";
+    const size =
+      explicitSize ??
+      (aspectRatio ? kieAspectResolutionToOpenAISize(aspectRatio, kieResolution) : "1024x1024");
+
+    // KIE primary не имеет quality picker'а — default medium для fallback'а.
     const quality = (ms.quality as string | undefined) ?? "medium";
-    const size = (ms.size as string | undefined) ?? "1024x1024";
+
     const outputFormat = (ms.output_format as string | undefined) ?? "png";
     const outputCompression = ms.output_compression as number | undefined;
     const background = ms.background as string | undefined;
-    const moderation = ms.moderation as string | undefined;
+
+    // KIE-style nsfw_checker → OpenAI-style moderation:
+    //   nsfw_checker=true (фильтр на)  → moderation="auto" (стандартная)
+    //   nsfw_checker=false (фильтр off) → moderation="low" (ослабленная)
+    // OpenAI-style moderation если задан выигрывает.
+    const explicitModeration = ms.moderation as string | undefined;
+    const moderation =
+      explicitModeration ??
+      (typeof ms.nsfw_checker === "boolean" ? (ms.nsfw_checker ? "auto" : "low") : undefined);
 
     logCall(this.modelId, imageUrl ? "edit" : "generate", {
       quality,
@@ -169,6 +242,7 @@ export class GptImageAdapter implements ImageAdapter {
         throw new UserFacingError(err.message, {
           key: "gptImageModerationBlocked",
           params: { violations },
+          cause: err,
         });
       }
       throw err;

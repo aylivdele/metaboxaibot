@@ -9,6 +9,7 @@ import {
   mimeToExtension,
 } from "@metabox/api/utils/mime-detect";
 import { logger } from "../logger.js";
+import { acquireLock, releaseLock } from "../utils/dedup.js";
 
 /**
  * Callback handler for "📎 Send as file" buttons (callback_data: orig_<outputId>).
@@ -45,10 +46,18 @@ export async function handleSendOriginal(ctx: BotContext): Promise<void> {
     return;
   }
 
+  const lockKey = `send-original:${ctx.user.id}:${output.id}`;
+  const locked = await acquireLock(lockKey, 60).catch(() => true);
+  if (!locked) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
   // Prefer a fresh S3 URL; fall back to provider URL
   const url = (output.s3Key ? await getFileUrl(output.s3Key) : null) ?? output.outputUrl;
 
   if (!url) {
+    await releaseLock(lockKey);
     await ctx.answerCallbackQuery();
     return;
   }
@@ -64,6 +73,7 @@ export async function handleSendOriginal(ctx: BotContext): Promise<void> {
     buffer = Buffer.from(await res.arrayBuffer());
   } catch (err) {
     logger.warn({ err, outputId: output.id }, "send-original: failed to download file");
+    await releaseLock(lockKey);
     await ctx.reply(ctx.t.errors.sendOriginalFailed);
     return;
   }
@@ -92,6 +102,7 @@ export async function handleSendOriginal(ctx: BotContext): Promise<void> {
     return undefined;
   });
   if (!message) {
+    await releaseLock(lockKey);
     await ctx.reply(ctx.t.errors.sendOriginalFailed);
   }
 }

@@ -17,8 +17,8 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     defaultModelId: "nano-banana-2",
     members: [
       { modelId: "nano-banana-1", versionLabel: "1", variantLabel: "Standard" },
-      { modelId: "nano-banana-pro", versionLabel: "1", variantLabel: "Pro" },
       { modelId: "nano-banana-2", versionLabel: "2", variantLabel: "Standard" },
+      { modelId: "nano-banana-pro", versionLabel: "pro", variantLabel: "Pro" },
     ],
   },
 

@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: metabox_test_postgres
+    container_name: aibot_test_postgres
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -20,7 +20,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: metabox_test_redis
+    container_name: aibot_test_redis
     restart: always
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
@@ -33,7 +33,7 @@ services:
 
   bot:
     image: ${GHCR_IMAGE_PREFIX:-ghcr.io/aylivdele}/metabox-bot:${IMAGE_TAG:-test}
-    container_name: metabox_test_bot
+    container_name: aibot_test_bot
     restart: always
     env_file: .env
     environment:
@@ -50,7 +50,7 @@ services:
 
   api:
     image: ${GHCR_IMAGE_PREFIX:-ghcr.io/aylivdele}/metabox-api:${IMAGE_TAG:-test}
-    container_name: metabox_test_api
+    container_name: aibot_test_api
     restart: always
     env_file: .env
     environment:
@@ -70,7 +70,7 @@ services:
 
   worker:
     image: ${GHCR_IMAGE_PREFIX:-ghcr.io/aylivdele}/metabox-worker:${IMAGE_TAG:-test}
-    container_name: metabox_test_worker
+    container_name: aibot_test_worker
     restart: always
     env_file: .env
     environment:

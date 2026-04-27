@@ -1,3 +1,4 @@
+import { useI18n } from "../../i18n.js";
 import { VoiceList, type VoiceListItem } from "./VoiceList.js";
 
 interface OpenAIVoicePickerProps {
@@ -5,23 +6,36 @@ interface OpenAIVoicePickerProps {
   onChange: (key: string, value: unknown) => void;
 }
 
-const VOICES: { id: string; name: string; meta: string }[] = [
-  { id: "alloy", name: "Alloy", meta: "Нейтральный" },
-  { id: "ash", name: "Ash", meta: "Мужской" },
-  { id: "coral", name: "Coral", meta: "Женский" },
-  { id: "echo", name: "Echo", meta: "Нейтральный" },
-  { id: "fable", name: "Fable", meta: "Британский" },
-  { id: "nova", name: "Nova", meta: "Женский" },
-  { id: "onyx", name: "Onyx", meta: "Глубокий мужской" },
-  { id: "sage", name: "Sage", meta: "Спокойный" },
-  { id: "shimmer", name: "Shimmer", meta: "Женский" },
+type VoiceDef = {
+  id: string;
+  name: string;
+  metaKey:
+    | "voice.meta.neutral"
+    | "voice.meta.male"
+    | "voice.meta.female"
+    | "voice.meta.british"
+    | "voice.meta.deepMale"
+    | "voice.meta.calm";
+};
+
+const VOICES: VoiceDef[] = [
+  { id: "alloy", name: "Alloy", metaKey: "voice.meta.neutral" },
+  { id: "ash", name: "Ash", metaKey: "voice.meta.male" },
+  { id: "coral", name: "Coral", metaKey: "voice.meta.female" },
+  { id: "echo", name: "Echo", metaKey: "voice.meta.neutral" },
+  { id: "fable", name: "Fable", metaKey: "voice.meta.british" },
+  { id: "nova", name: "Nova", metaKey: "voice.meta.female" },
+  { id: "onyx", name: "Onyx", metaKey: "voice.meta.deepMale" },
+  { id: "sage", name: "Sage", metaKey: "voice.meta.calm" },
+  { id: "shimmer", name: "Shimmer", metaKey: "voice.meta.female" },
 ];
 
 export function OpenAIVoicePicker({ voice, onChange }: OpenAIVoicePickerProps) {
+  const { t } = useI18n();
   const items: VoiceListItem[] = VOICES.map((v) => ({
     id: v.id,
     name: v.name,
-    meta: v.meta,
+    meta: t(v.metaKey),
     hasPreview: true,
     resolvePreviewUrl: () => `/voice-samples/openai/${v.id}.wav`,
   }));

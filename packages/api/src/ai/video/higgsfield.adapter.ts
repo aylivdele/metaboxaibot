@@ -106,11 +106,16 @@ export class HiggsFieldAdapter implements VideoAdapter {
             (d) => d.type === "too_long" && d.ctx?.max_length != null,
           );
           if (tooLong) {
+            const cause = Object.assign(new Error(`Higgsfield HTTP ${res.status}`), {
+              status: res.status,
+              body: text.slice(0, 1000),
+            });
             throw new UserFacingError(
               `Higgsfield: too many motions (max ${tooLong.ctx!.max_length})`,
               {
                 key: "higgsfieldTooManyMotions",
                 params: { max: tooLong.ctx!.max_length! },
+                cause,
               },
             );
           }

@@ -404,17 +404,21 @@ export const GPT_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     settings: [REASONING_EFFORT, ...REASONING_MODEL_SETTINGS],
   },
-  // ── Anthropic ─────────────────────────────────────────────────────────────
+  // ── Claude (через kie.ai) ─────────────────────────────────────────────────
+  // Цены заданы в формате "за 1M API-токенов в USD" — перевод credits→USD
+  // выполняет calculateCost. У kie 1 credit ≈ $0.005, цены ниже взяты с их
+  // прайсинг-страницы. PDF kie не поддерживает напрямую → автоматически
+  // активируется documentTextExtractFallback (см. ниже).
   "claude-opus": {
     id: "claude-opus",
     name: "🎭 Claude 4.6 Opus",
     description:
       "Новейшая и самая умная модель Anthropic (версия 4.6). Лучшая для сложных аналитических и творческих задач. Понимает изображения.",
     section: "gpt",
-    provider: "anthropic",
+    provider: "kie-claude",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 5.0,
-    outputCostUsdPerMToken: 25.0,
+    inputCostUsdPerMToken: 1.425,
+    outputCostUsdPerMToken: 7.15,
     supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
@@ -422,33 +426,36 @@ export const GPT_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 50,
   },
-  "claude-opus-4-5": {
-    id: "claude-opus-4-5",
-    name: "🃏 Claude 4.5 Opus",
-    description:
-      "Предыдущее поколение Opus (версия 4.5). Глубокий анализ и длинные тексты. Чуть слабее 4.6 в рассуждениях, но проверенная стабильность.",
-    section: "gpt",
-    provider: "anthropic",
-    costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 5.0,
-    outputCostUsdPerMToken: 25.0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    contextStrategy: "db_history",
-    contextMaxMessages: 50,
-  },
+  // "claude-opus-4-5": закомментировано — экономически нецелесообразно держать
+  //   предыдущее поколение Opus параллельно с 4.6. Чтобы вернуть — раскомментируйте
+  //   и убедитесь, что claude-opus-4-5 поддерживается у kie на /claude/v1/messages.
+  // "claude-opus-4-5": {
+  //   id: "claude-opus-4-5",
+  //   name: "🃏 Claude 4.5 Opus",
+  //   description:
+  //     "Предыдущее поколение Opus (версия 4.5). Глубокий анализ и длинные тексты. Чуть слабее 4.6 в рассуждениях, но проверенная стабильность.",
+  //   section: "gpt",
+  //   provider: "kie-claude",
+  //   costUsdPerRequest: 0,
+  //   inputCostUsdPerMToken: 1.425,
+  //   outputCostUsdPerMToken: 7.15,
+  //   supportsImages: true,
+  //   supportsVoice: false,
+  //   supportsWeb: false,
+  //   isAsync: false,
+  //   contextStrategy: "db_history",
+  //   contextMaxMessages: 50,
+  // },
   "claude-sonnet": {
     id: "claude-sonnet",
     name: "📜 Claude 4.6 Sonnet",
     description:
       "Новейший Sonnet (версия 4.6) — лучший баланс цена/качество у Anthropic. Быстрее и дешевле Opus, отлично для кода, текстов и анализа.",
     section: "gpt",
-    provider: "anthropic",
+    provider: "kie-claude",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 3.0,
-    outputCostUsdPerMToken: 15.0,
+    inputCostUsdPerMToken: 0.85,
+    outputCostUsdPerMToken: 4.275,
     supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,
@@ -456,33 +463,34 @@ export const GPT_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history", // нет серверного контекста
     contextMaxMessages: 50,
   },
-  "claude-sonnet-4-5": {
-    id: "claude-sonnet-4-5",
-    name: "🖊️ Claude 4.5 Sonnet",
-    description:
-      "Предыдущее поколение Sonnet (версия 4.5). Надёжная рабочая лошадка, чуть слабее 4.6. Отлично для кода и текстов.",
-    section: "gpt",
-    provider: "anthropic",
-    costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 3.0,
-    outputCostUsdPerMToken: 15.0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    contextStrategy: "db_history",
-    contextMaxMessages: 50,
-  },
+  // "claude-sonnet-4-5": закомментировано — см. claude-opus-4-5.
+  // "claude-sonnet-4-5": {
+  //   id: "claude-sonnet-4-5",
+  //   name: "🖊️ Claude 4.5 Sonnet",
+  //   description:
+  //     "Предыдущее поколение Sonnet (версия 4.5). Надёжная рабочая лошадка, чуть слабее 4.6. Отлично для кода и текстов.",
+  //   section: "gpt",
+  //   provider: "kie-claude",
+  //   costUsdPerRequest: 0,
+  //   inputCostUsdPerMToken: 0.85,
+  //   outputCostUsdPerMToken: 4.275,
+  //   supportsImages: true,
+  //   supportsVoice: false,
+  //   supportsWeb: false,
+  //   isAsync: false,
+  //   contextStrategy: "db_history",
+  //   contextMaxMessages: 50,
+  // },
   "claude-haiku": {
     id: "claude-haiku",
     name: "🍃 Claude 4.5 Haiku",
     description:
       "Самая быстрая и дешёвая модель Anthropic. Мгновенные ответы для простых задач, понимает изображения. Слабее Sonnet и Opus в рассуждениях.",
     section: "gpt",
-    provider: "anthropic",
+    provider: "kie-claude",
     costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 1.0,
-    outputCostUsdPerMToken: 5.0,
+    inputCostUsdPerMToken: 0.275,
+    outputCostUsdPerMToken: 1.425,
     supportsImages: true,
     supportsVoice: false,
     supportsWeb: false,

@@ -20,8 +20,8 @@ env:
 
 jobs:
   # ── CI ───────────────────────────────────────────────────────────────────────
-  lint-and-typecheck:
-    name: Lint & Typecheck
+  lint-typecheck-test:
+    name: Lint, Typecheck & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,11 +38,12 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
+      - run: pnpm test
 
   # ── CD ───────────────────────────────────────────────────────────────────────
   changes:
     name: Detect changes
-    needs: lint-and-typecheck
+    needs: lint-typecheck-test
     runs-on: ubuntu-latest
     outputs:
       api: ${{ steps.filter.outputs.api }}

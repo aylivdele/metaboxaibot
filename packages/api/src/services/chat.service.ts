@@ -296,8 +296,8 @@ export const chatService = {
     } catch (err) {
       // Per-key metrics + throttle on 429-class errors. We only attribute when
       // the pool actually gave us a DB-tracked key (env-fallback yields keyId=null).
+      const cls = classifyRateLimit(err, keyProvider);
       if (acquiredKeyId) {
-        const cls = classifyRateLimit(err, keyProvider);
         if (cls.isRateLimit) {
           void markRateLimited(acquiredKeyId, cls.cooldownMs, cls.reason);
         } else {
@@ -308,11 +308,15 @@ export const chatService = {
       // Convert raw 429 into a user-facing message; pool selection already gave us
       // the best available key, so a 429 here means the picked key is now also
       // throttled — the user can retry shortly and a different key may be free.
-      const cls = classifyRateLimit(err, keyProvider);
       if (cls.isRateLimit) {
+        // Оригинальный err (raw 429 + body провайдера) пробрасываем через cause —
+        // notifyTechError развернёт его через `caused by:` в alert'е, чтобы
+        // on-call видел не «Rate-limited on kie», а реальный response от провайдера.
         throw new UserFacingError(`Rate-limited on ${keyProvider}`, {
           key: "modelTemporarilyUnavailable",
           params: { modelName: model?.name ?? dialog.modelId },
+          notifyOps: true,
+          cause: err,
         });
       }
       throw err;

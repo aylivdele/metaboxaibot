@@ -27,7 +27,7 @@
 services:
   promtail:
     image: grafana/promtail:2.9.0
-    container_name: metabox_promtail
+    container_name: aibot_promtail
     restart: always
     mem_limit: 128m
     volumes:
@@ -44,7 +44,7 @@ services:
 
   node-exporter:
     image: prom/node-exporter:v1.7.0
-    container_name: metabox_node_exporter
+    container_name: aibot_node_exporter
     restart: always
     mem_limit: 64m
     pid: host
@@ -58,7 +58,7 @@ services:
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
-    container_name: metabox_cadvisor
+    container_name: aibot_cadvisor
     restart: always
     mem_limit: 128m
     privileged: true

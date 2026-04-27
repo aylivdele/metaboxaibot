@@ -332,24 +332,37 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     settings: [...KLING_MOTION_SETTINGS],
   },
 
+  // Seedance 1.5 Pro — primary через evolink (был FAL, перенесён в FALLBACK_VIDEO_MODELS).
+  // Pricing (per-second × quality × generate_audio):
+  //   480p:  $0.012/s (audio off), $0.024/s (audio on)
+  //   720p:  $0.026/s (audio off), $0.052/s (audio on)
+  //   1080p: $0.058/s (audio off), $0.117/s (audio on)
+  //
+  // Mode auto-detected on evolink stороне по image_urls count:
+  //   0 images → text-to-video, 1 image → image-to-video, 2 images → first-last-frame.
+  // EvolinkVideoAdapter формирует image_urls из first_frame[0] (+ last_frame[0]).
   seedance: {
     id: "seedance",
     name: "💃 Seedance 1.5 Pro (ByteDance)",
     description:
       "Создаёт видео с выразительным движением и генерацией звука. Предыдущее поколение — проверенная стабильность, до 12 секунд. Хорош для креативных и стилизованных роликов.",
     section: "video",
-    provider: "fal",
+    provider: "evolink",
     familyId: "seedance",
     variantLabel: "1.5 Pro",
-    // Per-video-token billing: $2.4/M tokens with audio (default), $1.2/M without audio.
-    // tokens = (w × h × fps × duration) / 1024; 720p 5s ≈ $0.26 with audio
     costUsdPerRequest: 0,
-    costUsdPerMVideoToken: 2.4,
-    costVariants: {
-      settingKey: "generate_audio",
-      map: { true: { costUsdPerMVideoToken: 2.4 }, false: { costUsdPerMVideoToken: 1.2 } },
+    costUsdPerSecond: 0.052, // base = 720p with audio (default settings)
+    costMatrix: {
+      dims: ["resolution", "generate_audio"],
+      table: {
+        "480p__false": 0.012,
+        "480p__true": 0.024,
+        "720p__false": 0.026,
+        "720p__true": 0.052,
+        "1080p__false": 0.058,
+        "1080p__true": 0.117,
+      },
     },
-    videoFps: 24,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -368,7 +381,8 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       {
         key: "resolution",
         label: "Разрешение видео",
-        description: "720p — более чёткое и детальное видео, 480p — быстрее генерируется.",
+        description:
+          "480p — быстрее генерируется, 720p — стандарт, 1080p — максимальная детализация. Влияет на цену.",
         type: "select",
         options: [
           { value: "480p", label: "480p" },
@@ -380,36 +394,52 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       {
         key: "generate_audio",
         label: "Генерировать аудио",
-        description: "Включить автоматическую генерацию звукового сопровождения к видео.",
+        description:
+          "Включить автоматическую генерацию звукового сопровождения к видео. Влияет на цену.",
         type: "toggle",
         default: true,
       },
     ],
   },
 
+  // Seedance 2.0 — primary через evolink (был KIE, перенесён в FALLBACK_VIDEO_MODELS).
+  // Pricing per evolink (per-second × quality, без аудио-фактора — audio free):
+  //   - Standard 480p:  $0.092/s (no video) | $0.056/s (with video)
+  //   - Standard 720p:  $0.199/s | $0.121/s
+  //   - Standard 1080p: $0.496/s | $0.302/s
+  //   - Fast 480p:      $0.075/s | $0.045/s
+  //   - Fast 720p:      $0.161/s | $0.096/s
+  // Web search: +$0.0006/request (только в t2v режиме).
+  //
+  // costUsdPerSecond + costVariants по resolution отражают NO-VIDEO случай —
+  // это default preview в mini-app. Когда у задачи есть `ref_videos`, video
+  // processor применяет custom billing override:
+  //   - Используется with-video rate (ниже базового)
+  //   - effectiveDuration = output + max(input_total, output)
+  // См. video.processor.ts SEEDANCE2_RATES_WITH_VIDEO.
   "seedance-2": {
     id: "seedance-2",
     name: "💃 Seedance 2.0 (ByteDance)",
     description:
       "Новейшая видеомодель ByteDance — значительно выше качество и реалистичность движений по сравнению с 1.5. Встроенный звук, до 15 секунд, широкий выбор соотношений сторон.",
     section: "video",
-    provider: "kie",
+    provider: "evolink",
     familyId: "seedance",
     variantLabel: "2.0 Standard",
-    // Per-second billing, varies by resolution × generate_audio
     costUsdPerRequest: 0,
-    costUsdPerSecond: 0.125,
-    costMatrix: {
-      dims: ["resolution", "generate_audio"],
-      table: {
-        "480p__true": 0.0575,
-        "480p__false": 0.095,
-        "720p__true": 0.125,
-        "720p__false": 0.205,
-        "1080p__true": 0.31,
-        "1080p__false": 0.51,
+    costUsdPerSecond: 0.199, // base = 720p no-video
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "480p": { costUsdPerSecond: 0.092 },
+        "720p": { costUsdPerSecond: 0.199 },
+        "1080p": { costUsdPerSecond: 0.496 },
       },
     },
+    costAddons: [
+      // Web search: +$0.0006 per request when enabled (только t2v реально использует)
+      { settingKey: "enable_web_search", map: { true: 0.0006 } },
+    ],
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -448,9 +478,17 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         key: "generate_audio",
         label: "Генерировать аудио",
         description:
-          "Включить автоматическую генерацию звукового сопровождения к видео. Влияет на цену.",
+          "Включить автоматическую генерацию звукового сопровождения к видео. На evolink аудио — бесплатно.",
         type: "toggle",
         default: true,
+      },
+      {
+        key: "enable_web_search",
+        label: "Web search",
+        description: "Подключить веб-поиск (только text-to-video). +$0.0006 за запрос.",
+        type: "toggle",
+        default: false,
+        advanced: true,
       },
     ],
   },
@@ -461,21 +499,19 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     description:
       "Ускоренная версия Seedance 2.0 — быстрее и дешевле стандарта при схожем качестве. Встроенная генерация звука, до 15 секунд.",
     section: "video",
-    provider: "kie",
+    provider: "evolink",
     familyId: "seedance",
     variantLabel: "2.0 Fast",
-    // Per-second billing, varies by resolution × generate_audio
     costUsdPerRequest: 0,
-    costUsdPerSecond: 0.1,
-    costMatrix: {
-      dims: ["resolution", "generate_audio"],
-      table: {
-        "480p__true": 0.045,
-        "480p__false": 0.0775,
-        "720p__true": 0.1,
-        "720p__false": 0.165,
+    costUsdPerSecond: 0.161, // base = 720p no-video
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "480p": { costUsdPerSecond: 0.075 },
+        "720p": { costUsdPerSecond: 0.161 },
       },
     },
+    costAddons: [{ settingKey: "enable_web_search", map: { true: 0.0006 } }],
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -512,9 +548,17 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
         key: "generate_audio",
         label: "Генерировать аудио",
         description:
-          "Включить автоматическую генерацию звукового сопровождения к видео. Влияет на цену.",
+          "Включить автоматическую генерацию звукового сопровождения к видео. На evolink аудио — бесплатно.",
         type: "toggle",
         default: true,
+      },
+      {
+        key: "enable_web_search",
+        label: "Web search",
+        description: "Подключить веб-поиск (только text-to-video). +$0.0006 за запрос.",
+        type: "toggle",
+        default: false,
+        advanced: true,
       },
     ],
   },
@@ -1567,3 +1611,524 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
   //   ],
   // },
 };
+
+/**
+ * Fallback-альтернативы для видео-моделей. `id` совпадает с primary
+ * из VIDEO_MODELS; `provider` (и всё остальное) — собственное.
+ * При недоступности primary processor возьмёт первую запись с тем же id,
+ * совместимую с media-режимом задачи (см. isFallbackCompatible).
+ *
+ * Пустой массив = fallback выключен. Цена для биллинга всегда берётся
+ * из primary, независимо от того, какой fallback сработал.
+ *
+ * Для sticky-моделей (HeyGen avatar) fallback не имеет смысла — не заполняем.
+ */
+export const FALLBACK_VIDEO_MODELS: AIModel[] = [
+  // ── Kling Motion via evolink (https://api.evolink.ai) ──────────────────────
+  // KIE primary'и роутятся на evolink kling-v3-motion-control:
+  //   kling-motion     → quality=720p
+  //   kling-motion-pro → quality=1080p
+  // Билинг при fallback'е по KIE-цене ($0.10/$0.135 per second). При промоушене
+  // в primary — evolink-цена ($0.12/$0.16 per second), задана в costUsdPerSecond.
+  // KIE primary settings (`character_orientation`, `background_source`) частично
+  // совместимы: evolink принимает character_orientation, но НЕ background_source —
+  // лишний setting просто игнорируется адаптером.
+  {
+    id: "kling-motion",
+    name: "Kling Motion (evolink fallback)",
+    description: "Fallback на evolink при недоступности KIE.",
+    section: "video",
+    provider: "evolink",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.12, // 720p quality
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    promptOptional: true,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    // Те же slot-keys что у primary'я для совместимости в isFallbackCompatible.
+    mediaInputs: KLING_MOTION_MEDIA_INPUTS,
+    settings: [
+      {
+        key: "character_orientation",
+        label: "Ориентация персонажа",
+        description:
+          "«По видео» — ориентация как в референсном видео (рекомендуется). «По изображению» — ориентация как на исходном фото.",
+        type: "select",
+        options: [
+          { value: "video", label: "По видео" },
+          { value: "image", label: "По изображению" },
+        ],
+        default: "video",
+      },
+      {
+        key: "keep_sound",
+        label: "Сохранить звук",
+        description: "Оставить оригинальный звук из референсного видео.",
+        type: "toggle",
+        default: true,
+      },
+    ],
+  },
+  {
+    id: "kling-motion-pro",
+    name: "Kling Motion Pro (evolink fallback)",
+    description: "Fallback на evolink при недоступности KIE.",
+    section: "video",
+    provider: "evolink",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.16, // 1080p quality
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    promptOptional: true,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    mediaInputs: KLING_MOTION_MEDIA_INPUTS,
+    settings: [
+      {
+        key: "character_orientation",
+        label: "Ориентация персонажа",
+        description:
+          "«По видео» — ориентация как в референсном видео (рекомендуется). «По изображению» — ориентация как на исходном фото.",
+        type: "select",
+        options: [
+          { value: "video", label: "По видео" },
+          { value: "image", label: "По изображению" },
+        ],
+        default: "video",
+      },
+      {
+        key: "keep_sound",
+        label: "Сохранить звук",
+        description: "Оставить оригинальный звук из референсного видео.",
+        type: "toggle",
+        default: true,
+      },
+    ],
+  },
+  // ── Kling 3.0 / 3.0 Pro via evolink (kling-o3-image-to-video) ──────────────
+  // Routed на эту модель потому что kling-v3-image-to-video требует image_start
+  // (нет t2v), а kling-o3-r2v требует video_url. o3-i2v — единственный вариант
+  // покрывающий и t2v и i2v режимы primary'я.
+  //
+  // Pricing (per-second, varies by quality × sound):
+  //   720p off=$0.079, on=$0.106
+  //   1080p off=$0.106, on=$0.132
+  // Биллинг при fallback'е по KIE-цене ($0.10/$0.135 with audio). При промоушене
+  // в primary — evolink-цена ниже у std (но дороже у pro).
+  //
+  // Element references (primary's ref_element_*) маппятся через image_urls:
+  // берём ПЕРВОЕ изображение из каждого слота → image_urls[i] →
+  // referenceable в prompt'е через <<<image_N>>> (адаптер сам переписывает
+  // @elementN syntax). Это degraded-режим — теряем многокадровое представление
+  // элемента, но сохраняем визуальный референс.
+  {
+    id: "kling",
+    name: "Kling 3.0 (evolink fallback)",
+    description: "Fallback на evolink при недоступности KIE.",
+    section: "video",
+    provider: "evolink",
+    costUsdPerRequest: 0,
+    // base = audio on (matches primary KLING_SETTINGS default)
+    costUsdPerSecond: 0.106,
+    costVariants: {
+      settingKey: "generate_audio",
+      map: {
+        true: { costUsdPerSecond: 0.106 },
+        false: { costUsdPerSecond: 0.079 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    mediaInputs: KLING_MEDIA_INPUTS,
+    durationRange: { min: 3, max: 15 },
+    settings: [...KLING_SETTINGS],
+  },
+  {
+    id: "kling-pro",
+    name: "Kling 3.0 Pro (evolink fallback)",
+    description: "Fallback на evolink при недоступности KIE.",
+    section: "video",
+    provider: "evolink",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.132,
+    costVariants: {
+      settingKey: "generate_audio",
+      map: {
+        true: { costUsdPerSecond: 0.132 },
+        false: { costUsdPerSecond: 0.106 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    mediaInputs: KLING_MEDIA_INPUTS,
+    durationRange: { min: 3, max: 15 },
+    settings: [...KLING_SETTINGS],
+  },
+  // ── Kling 3.0 / 3.0 Pro via FAL kling-video/o3 (вторичный fallback) ─────────
+  // Перебирается ПОСЛЕ evolink. FalVideoAdapter сам выбирает endpoint по inputs:
+  //   нет media       → fal-ai/kling-video/o3/{quality}/text-to-video
+  //   только start/end → fal-ai/kling-video/o3/{quality}/image-to-video
+  //   ref_element_*   → fal-ai/kling-video/o3/{quality}/reference-to-video
+  //
+  // Pricing (per-second × quality × audio):
+  //   standard 720p: off=$0.084, on=$0.112
+  //   pro 1080p:     off=$0.112, on=$0.140
+  //
+  // Полная fidelity для elements (frontal_image_url + reference_image_urls)
+  // в отличие от evolink i2v — здесь используется родная FAL element-структура.
+  {
+    id: "kling",
+    name: "Kling 3.0 (fal fallback)",
+    description: "Fallback на FAL при недоступности KIE и evolink.",
+    section: "video",
+    provider: "fal",
+    costUsdPerRequest: 0,
+    // base = audio on (matches primary KLING_SETTINGS default)
+    costUsdPerSecond: 0.112,
+    costVariants: {
+      settingKey: "generate_audio",
+      map: {
+        true: { costUsdPerSecond: 0.112 },
+        false: { costUsdPerSecond: 0.084 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    mediaInputs: KLING_MEDIA_INPUTS,
+    durationRange: { min: 3, max: 15 },
+    settings: [...KLING_SETTINGS],
+  },
+  {
+    id: "kling-pro",
+    name: "Kling 3.0 Pro (fal fallback)",
+    description: "Fallback на FAL при недоступности KIE и evolink.",
+    section: "video",
+    provider: "fal",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.14,
+    costVariants: {
+      settingKey: "generate_audio",
+      map: {
+        true: { costUsdPerSecond: 0.14 },
+        false: { costUsdPerSecond: 0.112 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    mediaInputs: KLING_MEDIA_INPUTS,
+    durationRange: { min: 3, max: 15 },
+    settings: [...KLING_SETTINGS],
+  },
+  // ── Seedance 1.5 Pro via FAL (бывший primary) ───────────────────────────────
+  // Промоушен evolink в primary; FAL-реализация осталась как fallback.
+  // Pricing FAL: per-video-token (token = w×h×fps×duration / 1024).
+  //   $2.4/M tokens with audio, $1.2/M without audio.
+  // FalVideoAdapter уже умеет seedance modelId (FAL_ENDPOINTS / FAL_I2V_ENDPOINTS) —
+  // никаких adapter-changes не нужно.
+  {
+    id: "seedance",
+    name: "Seedance 1.5 Pro (fal fallback)",
+    description: "Fallback на FAL при недоступности evolink.",
+    section: "video",
+    provider: "fal",
+    costUsdPerRequest: 0,
+    costUsdPerMVideoToken: 2.4,
+    costVariants: {
+      settingKey: "generate_audio",
+      map: { true: { costUsdPerMVideoToken: 2.4 }, false: { costUsdPerMVideoToken: 1.2 } },
+    },
+    videoFps: 24,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
+    supportedAspectRatios: ["16:9", "9:16", "1:1"],
+    supportedDurations: null,
+    durationRange: { min: 4, max: 12 },
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1"]),
+      mkDurationSlider(4, 12),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        default: "720p",
+      },
+      { key: "generate_audio", label: "Генерировать аудио", type: "toggle", default: true },
+    ],
+  },
+  // ── Seedance 2.0 / 2.0 Fast via KIE (бывший primary) ────────────────────────
+  // Промоушен evolink в primary; KIE-реализация осталась как fallback.
+  // Pricing KIE сохранён как был (matrix [resolution × generate_audio]).
+  // KIE-адаптер уже умеет seedance-2 / seedance-2-fast (KieVideoAdapter
+  // SEEDANCE_MODEL_MAP) — никаких adapter-changes не нужно.
+  {
+    id: "seedance-2",
+    name: "Seedance 2.0 (kie fallback)",
+    description: "Fallback на KIE при недоступности evolink.",
+    section: "video",
+    provider: "kie",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.125,
+    costMatrix: {
+      dims: ["resolution", "generate_audio"],
+      table: {
+        "480p__true": 0.0575,
+        "480p__false": 0.095,
+        "720p__true": 0.125,
+        "720p__false": 0.205,
+        "1080p__true": 0.31,
+        "1080p__false": 0.51,
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    mediaInputs: [
+      MI_SEEDANCE_FIRST_FRAME,
+      MI_SEEDANCE_LAST_FRAME,
+      MI_REF_IMAGES,
+      MI_REF_VIDEOS,
+      MI_REF_AUDIOS,
+    ],
+    modes: SEEDANCE_MODES,
+    supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+    durationRange: { min: 4, max: 15 },
+    settings: [
+      mkAspectRatio(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"], { auto: "Авто" }),
+      mkDurationSlider(4, 15),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        default: "720p",
+      },
+      { key: "generate_audio", label: "Генерировать аудио", type: "toggle", default: true },
+    ],
+  },
+  {
+    id: "seedance-2-fast",
+    name: "Seedance 2.0 Fast (kie fallback)",
+    description: "Fallback на KIE при недоступности evolink.",
+    section: "video",
+    provider: "kie",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.1,
+    costMatrix: {
+      dims: ["resolution", "generate_audio"],
+      table: {
+        "480p__true": 0.045,
+        "480p__false": 0.0775,
+        "720p__true": 0.1,
+        "720p__false": 0.165,
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    mediaInputs: [
+      MI_SEEDANCE_FIRST_FRAME,
+      MI_SEEDANCE_LAST_FRAME,
+      MI_REF_IMAGES,
+      MI_REF_VIDEOS,
+      MI_REF_AUDIOS,
+    ],
+    modes: SEEDANCE_MODES,
+    supportedAspectRatios: ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+    durationRange: { min: 4, max: 15 },
+    settings: [
+      mkAspectRatio(["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"], { auto: "Авто" }),
+      mkDurationSlider(4, 15),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        default: "720p",
+      },
+      { key: "generate_audio", label: "Генерировать аудио", type: "toggle", default: true },
+    ],
+  },
+  // ── Grok Imagine via FAL — две отдельные fallback записи ────────────────────
+  // У FAL отдельные endpoint'ы с разными ограничениями: t2v принимает только
+  // prompt (duration 1-15s), r2v требует prompt + reference_image_urls
+  // (duration 1-10s). Чтобы isFallbackCompatible корректно дифференцировал
+  // совместимость по media и duration, мы регистрируем ДВЕ fallback записи:
+  //
+  //   t2v entry: mediaInputs=[] (нет слотов) → подходит только для t2v запросов.
+  //              durationRange 6-15.
+  //   r2v entry: mediaInputs=[ref_images required] → подходит только когда
+  //              user заполнил ref_images. durationRange 6-10.
+  //
+  // Pricing (общий для обоих endpoint'ов): 480p $0.05/s, 720p $0.07/s.
+  // Per-image input fee $0.002 не учитываем (1-5% от total; biling при
+  // fallback'е по primary KIE цене всё равно).
+  //
+  // Prompt syntax: KIE использует @image1 (lowercase), FAL — @Image1.
+  // FalVideoAdapter сам делает remap.
+  //
+  // FalVideoAdapter в submit() выбирает endpoint по input.mediaInputs.ref_images:
+  //   нет → text-to-video, есть → reference-to-video.
+  {
+    id: "grok-imagine",
+    name: "Grok Imagine (fal t2v fallback)",
+    description: "Fallback на FAL text-to-video при недоступности KIE (без ref_images).",
+    section: "video",
+    provider: "fal",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.05, // base = 480p
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "480p": { costUsdPerSecond: 0.05 },
+        "720p": { costUsdPerSecond: 0.07 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    // Нет media слотов — isFallbackCompatible отвергнет этот fallback на запросах
+    // с любыми media inputs (e.g. ref_images), направив их на r2v entry ниже.
+    mediaInputs: [],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["2:3", "3:2", "1:1", "16:9", "9:16"],
+    // FAL t2v: 1-15s. Intersection с primary (6-30): 6..15.
+    durationRange: { min: 6, max: 15 },
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1", "2:3", "3:2"]),
+      mkDurationSlider(6, 15),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "480p — быстрее и дешевле, 720p — более чёткое видео.",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        default: "480p",
+      },
+    ],
+  },
+  {
+    id: "grok-imagine",
+    name: "Grok Imagine (fal r2v fallback)",
+    description: "Fallback на FAL reference-to-video при недоступности KIE (с ref_images).",
+    section: "video",
+    provider: "fal",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.05,
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "480p": { costUsdPerSecond: 0.05 },
+        "720p": { costUsdPerSecond: 0.07 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [
+      {
+        // required:true → t2v запросы (без ref_images) пропускают этот fallback.
+        slotKey: "ref_images",
+        mode: "reference_image",
+        labelKey: "referenceImages",
+        maxImages: 7,
+        required: true,
+      },
+    ],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["2:3", "3:2", "1:1", "16:9", "9:16"],
+    // FAL r2v: 1-10s. Intersection с primary (6-30): 6..10.
+    durationRange: { min: 6, max: 10 },
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1", "2:3", "3:2"]),
+      mkDurationSlider(6, 10),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "480p — быстрее и дешевле, 720p — более чёткое видео.",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        default: "480p",
+      },
+    ],
+  },
+];

@@ -1,7 +1,7 @@
 export default {
   start: {
     welcome:
-      '🔶 Finally! We\'ve been waiting. This is Metabox — all the best AI tools, one click away.\n\nBy continuing, you agree to the following documents (lawyers made us write this):\n• <a href="{landingUrl}/documents/offer_en.html">Public offer</a>\n• <a href="{landingUrl}/documents/terms_of_use_en.html">Terms of use</a>\n• <a href="{landingUrl}/documents/privacy_en.html">Privacy policy</a>\n• <a href="{landingUrl}/documents/risk_warning_en.html">Risk warning</a>\n• <a href="{landingUrl}/documents/consent_processing_en.html">Consent to personal data processing</a>\n• <a href="{landingUrl}/documents/consent_distribution_en.html">Consent to personal data distribution</a>\n• Consent to receive informational mailings\n\nPick your language:',
+      '🔶 Finally! We\'ve been waiting. This is Metabox — all the best AI tools, one click away.\n\nBy continuing, you agree to our <a href="{landingUrl}/documents/offer_en.html">public offer</a>, <a href="{landingUrl}/documents/terms_of_use_en.html">terms of use</a>, <a href="{landingUrl}/documents/privacy_en.html">privacy policy</a> and <a href="{landingUrl}/documents/risk_warning_en.html">risk warning</a>, and consent to <a href="{landingUrl}/documents/consent_processing_en.html">personal data processing</a>, <a href="{landingUrl}/documents/consent_distribution_en.html">personal data distribution</a> and newsletters. (Yes, it\'s a lot. Yes, we got tired writing them too.)\n\nPick your language to get started:',
     tokensGranted:
       '⚡ 7.50 tokens have been credited for you to explore the bot. To learn more about your account and plans, click the "Profile" button below.',
     yourBalance:
@@ -89,6 +89,8 @@ export default {
       "You can refine an image, get the original uncompressed file sent back into the chat, or download it via link (we recommend opening the link in a browser if you're using the mobile version of Telegram).\n\n🔄 - Refine\n📎 - Send as file\n⬇️ - Download",
     batchActionsNoDownload:
       "You can refine an image or get the original uncompressed file sent back into the chat.\n\n🔄 - Refine\n📎 - Send as file",
+    batchPartialFooter: "✅ Generated {success} of {total}. Failed:\n{errors}",
+    batchAllFailed: "❌ Failed to generate any of {total}. Errors:\n{errors}",
     chooseModel: "🎨 Choose model",
   },
   audio: {
@@ -159,6 +161,8 @@ export default {
       "❌ Higgsfield requires an image to generate video. Please send a photo first, then your text prompt.",
     promptTooLong:
       "❌ Prompt is too long — this model supports up to {limit} characters. Please shorten your text and try again.",
+    klingElementsRequired:
+      "❌ Your prompt contains element references (like @element_dog) but no element images were uploaded. Use the element slots below to attach reference images, or remove the @element references from your prompt.",
     runwayRequiresImage:
       "❌ Runway requires an image to generate video. Please send a photo first, then your text prompt.",
     heygenNeedsVoice:
@@ -463,14 +467,27 @@ export default {
     motionVideo: "Reference Video",
     motionElement: "Face Element",
     motionImageSlotHint:
-      "Kling Motion — transfer movements from a reference video to any character image.\n\n📸 Character Image (required): character should have clear body proportions, no occlusion, and occupy more than 5% of the image area.\n\n👤 Face Element (optional): upload a face photo to enhance identity preservation. Reference as @Element1 in prompt.\n\n⚙️ Character orientation is configured in Management.",
+      "📸 Character Image (required): character should have clear body proportions, no occlusion, and occupy more than 5% of the image area.",
     motionVideoSlotHint:
-      "Kling Motion — transfer movements from a reference video to any character image.\n\n🎬 Reference Video (required): video with movements to transfer. Should contain a realistic-style character with entire body or upper body visible, including head, without obstruction. Max 30 s.\n\n⚙️ Character orientation is configured in Management.",
+      "🎬 Reference Video (required): video with movements to transfer. Should contain a realistic-style character with entire body or upper body visible, including head, without obstruction. Duration: 3 to 30 s.",
     motionElementHint:
       "Optional element for facial consistency binding. Upload a facial element to enhance identity preservation in the generated video. Only 1 element is supported. Reference in prompt as @Element1. Element binding is only supported when 'Character orientation' is 'video'.",
     uploadPromptVideo: 'Send a video for "{slot}".',
     uploadPrompt: 'Send a photo for "{slot}".',
     uploadPromptMulti: 'Send up to {max} photos for "{slot}".',
+    uploadPromptDesignEdit: 'Send a photo for "Source Image".',
+    uploadPromptDesignRef: "Send a reference photo.",
+    uploadPromptDesignMulti: "Send up to {max} photos for reference.",
+    uploadPromptDesignStyleRef: 'Send up to {max} photos for "Style Reference".',
+    uploadPromptVideoFirstFrame: 'Send a photo for "First Frame".',
+    uploadPromptVideoLastFrame: 'Send a photo for "Last Frame".',
+    uploadPromptVideoMotionImage: "Send a photo of the character.",
+    uploadPromptVideoDrivingAudio: "Send an audio file.",
+    uploadPromptVideoMotionVideo: "Send a reference video for motion transfer.",
+    uploadPromptVideoFirstClip: "Send the first video clip.",
+    uploadPromptVideoRefImages: "Send up to {max} images for reference.",
+    uploadPromptVideoRefVideos: "Send up to {max} reference videos.",
+    uploadPromptVideoRefAudios: "Send up to {max} reference audio files.",
     uploadPromptElement:
       'Send 1–4 photos or 1 video for "{slot}". First photo = frontal view; the rest (up to 3) = reference views.',
     imageSaved: "✅ {slot}: image {n}/{max} saved.",

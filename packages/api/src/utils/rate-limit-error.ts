@@ -51,7 +51,13 @@ const LONG_WINDOW_PATTERNS: RegExp[] = [
   /tier limit/i,
 ];
 
-/** Patterns that mark an error as rate-limit / concurrency related. */
+/** Patterns that mark an error as rate-limit / concurrency related.
+ *
+ * Намеренно НЕ включаем общие "try again later" / "please retry" — провайдеры
+ * (Anthropic, OpenAI, kie и т.п.) шлют их в обычных 5xx-ошибках типа
+ * "Server exception, please try again later" — это transient server failure,
+ * а не rate-limit. Реальные rate-limit'ы и так матчатся через 429 status,
+ * "rate limit" / "too many requests" / "quota" / "throttle". */
 const RATE_LIMIT_PATTERNS: RegExp[] = [
   /rate limit/i,
   /rate_limit/i,
@@ -61,8 +67,6 @@ const RATE_LIMIT_PATTERNS: RegExp[] = [
   /quota/i,
   /concurrency/i,
   /concurrent (request|generation)/i,
-  /try again later/i,
-  /please retry/i,
   /throttl/i,
 ];
 
@@ -114,6 +118,18 @@ function parseRetryAfter(headers?: Record<string, string | string[] | undefined>
   const asDate = Date.parse(value);
   if (Number.isFinite(asDate)) return Math.max(0, asDate - Date.now());
   return null;
+}
+
+/**
+ * Returns true if the error looks like an HTTP 5xx response.
+ * Используется в fallback-логике как «provider transient failure» сигнал,
+ * отличный от 429 (rate-limit) и валидационных 4xx.
+ */
+export function isFiveXxError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { status?: number; statusCode?: number; response?: { status?: number } };
+  const status = e.status ?? e.statusCode ?? e.response?.status;
+  return typeof status === "number" && status >= 500 && status < 600;
 }
 
 /** Classify an arbitrary thrown error as rate-limit-related or not. */

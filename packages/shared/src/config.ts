@@ -116,20 +116,39 @@ export const config = {
   },
 
   /**
-   * Admin alerts (optional).
-   * ALERT_CHAT_ID — Telegram chat/channel ID to send low-balance notifications.
-   * ALERT_INTERVAL_HOURS — how often to check (default: 12).
-   * ALERT_FAL_THRESHOLD_USD — alert when FAL balance below this (default: 5).
-   * ALERT_ELEVENLABS_THRESHOLD_CHARS — alert when ElevenLabs chars remaining below this (default: 50000).
+   * Admin alerts (optional) — tech errors, rate-limits, low-balance warnings.
+   * Шлются через notifyTechError / notifyRateLimit / balance.monitor.
+   *
+   * ALERT_CHAT_ID — Telegram chat/channel ID для всех алертов.
+   * ALERT_THREAD_ID — message_thread_id (для тем в супергруппах), опционально.
+   * ALERT_INTERVAL_HOURS — частота проверки балансов (default: 12).
+   * ALERT_FAL_THRESHOLD_USD — порог алерта по балансу FAL (default: 5).
+   * ALERT_ELEVENLABS_THRESHOLD_CHARS — порог по остатку символов ElevenLabs (default: 10000).
    */
   alerts: {
     chatId: opt("ALERT_CHAT_ID"),
-    /** message_thread_id for supergroup topics (optional). */
     threadId: optInt("ALERT_THREAD_ID", 0) || undefined,
-    usageThreadId: optInt("USAGE_THREAD_ID", 0) || undefined,
     intervalHours: optFloat("ALERT_INTERVAL_HOURS", 12),
     falThresholdUsd: optFloat("ALERT_FAL_THRESHOLD_USD", 5),
     elevenlabsThresholdChars: optInt("ALERT_ELEVENLABS_THRESHOLD_CHARS", 10_000),
+  },
+
+  /**
+   * Recurring reports (optional) — daily usage digest и подобные регулярные
+   * информационные сводки. Отделены от alerts, чтобы их можно было слать
+   * в другой канал/тему (нагрузка на алерт-канал у on-call'ов высокая,
+   * отчёты обычно никто не читает в реальном времени).
+   *
+   * Фоллбек: если REPORT_* не заданы, используется alerts.chatId. Это значит,
+   * однопотоковые установки (только ALERT_CHAT_ID) продолжают работать без правок.
+   *
+   * REPORT_CHAT_ID — отдельный канал для отчётов; default — alerts.chatId.
+   * REPORT_THREAD_ID — message_thread_id для отчётов; default — legacy
+   *   USAGE_THREAD_ID (если был задан), иначе undefined.
+   */
+  reports: {
+    chatId: opt("REPORT_CHAT_ID") ?? opt("ALERT_CHAT_ID"),
+    threadId: optInt("REPORT_THREAD_ID", 0) || optInt("USAGE_THREAD_ID", 0) || undefined,
   },
 
   /**
@@ -191,6 +210,7 @@ export const config = {
     recraft: opt("RECRAFT_API_KEY"),
     minimax: opt("MINIMAX_API_KEY"),
     kie: opt("KIE_API_KEY"),
+    evolink: opt("EVOLINK_API_KEY"),
   },
 } as const;
 

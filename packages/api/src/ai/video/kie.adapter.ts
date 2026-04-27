@@ -104,6 +104,15 @@ export class KieVideoAdapter implements VideoAdapter {
     if (input.prompt && input.prompt.length > limit) {
       return { key: "promptTooLong", params: { limit } };
     }
+
+    if (KLING_MODEL_MAP[this.modelId] && input.prompt && /@element_\w+/.test(input.prompt)) {
+      const mi = input.mediaInputs ?? {};
+      const hasElements = Object.keys(mi).some(
+        (k) => k.startsWith("ref_element_") && mi[k]?.length,
+      );
+      if (!hasElements) return { key: "klingElementsRequired" };
+    }
+
     return null;
   }
 
@@ -204,7 +213,9 @@ export class KieVideoAdapter implements VideoAdapter {
       inputPayload.resolution = resolution;
 
       inputPayload.generate_audio = ms.generate_audio !== undefined ? ms.generate_audio : true;
-      inputPayload.web_search = false;
+      // Primary evolink seedance-2 экспонирует enable_web_search setting (только t2v).
+      // Когда KIE — fallback, прокидываем выбор юзера (вместо хардкода false).
+      inputPayload.web_search = !!ms.enable_web_search;
       inputPayload.nsfw_checker = false;
 
       // first_frame / last_frame

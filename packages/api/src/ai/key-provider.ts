@@ -1,4 +1,5 @@
 import { AI_MODELS, config } from "@metabox/shared";
+import type { AIModel } from "@metabox/shared";
 
 /**
  * Резолвит, ключ какого провайдера нужен для конкретной модели.
@@ -12,6 +13,16 @@ import { AI_MODELS, config } from "@metabox/shared";
 export function resolveKeyProvider(modelId: string): string {
   const model = AI_MODELS[modelId];
   if (!model) throw new Error(`Unknown model: ${modelId}`);
+  return resolveKeyProviderForModel(model);
+}
+
+/**
+ * То же что `resolveKeyProvider`, но принимает уже найденный AIModel объект.
+ * Нужен для fallback-моделей: у fallback тот же `id` что у primary, но другой
+ * `provider`. Lookup по id вернул бы primary вместо fallback — для key-pool
+ * resolution это критично.
+ */
+export function resolveKeyProviderForModel(model: AIModel): string {
   const { section, provider } = model;
 
   if (section === "design") {
@@ -20,6 +31,7 @@ export function resolveKeyProvider(modelId: string): string {
   }
   if (provider === "suno") return "apipass";
   if (provider === "xai") return "grok"; // env-переменная — GROK_API_KEY
+  if (provider === "kie-claude") return "kie"; // Claude через kie использует общий kie-ключ
 
   return provider;
 }
@@ -78,6 +90,8 @@ export function envKeyForProvider(provider: string): string | undefined {
       return config.ai.minimax;
     case "kie":
       return config.ai.kie;
+    case "evolink":
+      return config.ai.evolink;
     default:
       return undefined;
   }

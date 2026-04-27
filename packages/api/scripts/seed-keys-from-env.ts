@@ -46,6 +46,7 @@ const seeds: Seed[] = [
   { provider: "recraft", apiKey: config.ai.recraft },
   { provider: "minimax", apiKey: config.ai.minimax },
   { provider: "kie", apiKey: config.ai.kie },
+  { provider: "evolink", apiKey: config.ai.evolink },
 ];
 
 async function main(): Promise<void> {

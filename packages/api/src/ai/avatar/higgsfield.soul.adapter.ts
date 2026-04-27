@@ -83,8 +83,16 @@ export class HiggsFieldSoulAdapter {
     if (!res.ok) {
       const text = await res.text();
       if (res.status === 402 || res.status === 403 || /not enough credits/i.test(text)) {
-        throw new UserFacingError(`Higgsfield Soul out of credits: ${res.status} ${text}`, {
+        // notifyOps: on-call'у нужно знать о биллинговой проблеме (нечем пополнять).
+        // cause: переносим status+body в alert через `caused by:` в serializeError.
+        const cause = Object.assign(new Error(`Higgsfield Soul HTTP ${res.status}`), {
+          status: res.status,
+          body: text.slice(0, 1000),
+        });
+        throw new UserFacingError(`Higgsfield Soul out of credits`, {
           key: "soulProviderUnavailable",
+          notifyOps: true,
+          cause,
         });
       }
       throw new Error(`Higgsfield Soul create failed: ${res.status} ${text}`);

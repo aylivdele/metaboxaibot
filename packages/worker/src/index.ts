@@ -14,7 +14,12 @@ import { sendUsageReport, msUntilNextMidnightMsk } from "./monitors/usage-report
 import { runWatchdog } from "./monitors/watchdog.monitor.js";
 import { runCleanupOldJobs } from "./monitors/cleanup-old-jobs.monitor.js";
 import { reconcileOrphanedJobs } from "./reconcile.js";
+import { initPricingConfig } from "@metabox/api/services/pricing-config";
 import { logger } from "./logger.js";
+
+// Загружаем runtime price overrides до первого calculateCost (final billing
+// в processor'ах). При пустой таблице поведение идентично env-конфигу.
+await initPricingConfig();
 
 const connection = new Redis(config.redis.url, {
   maxRetriesPerRequest: null,
@@ -105,17 +110,22 @@ runCleanupOldJobs().catch((err) => logger.error({ err }, "Cleanup-old-jobs error
 scheduleCleanup();
 
 // ── Balance monitor ───────────────────────────────────────────────────────────
+// Шлёт алерты в alerts.chatId; не запускается, если этот канал не настроен.
+let balanceTimer: ReturnType<typeof setInterval> | undefined;
 if (config.alerts.chatId) {
   const intervalMs = config.alerts.intervalHours * 60 * 60 * 1000;
-  // Run once at startup, then on the configured interval
   checkProviderBalances().catch((err) => logger.error({ err }, "Balance monitor error"));
-  const balanceTimer = setInterval(() => {
+  balanceTimer = setInterval(() => {
     checkProviderBalances().catch((err) => logger.error({ err }, "Balance monitor error"));
   }, intervalMs);
   logger.info({ intervalHours: config.alerts.intervalHours }, "Balance monitor started");
+}
 
-  // ── Daily usage report at 00:00 MSK ──────────────────────────────────────
-  let usageReportTimer: ReturnType<typeof setInterval> | undefined;
+// ── Daily usage report at 00:00 MSK ──────────────────────────────────────────
+// Шлёт в reports.chatId (по умолчанию = alerts.chatId через фоллбек в config).
+// Независим от balance monitor — можно крутить отчёты в отдельном канале без алертов.
+let usageReportTimer: ReturnType<typeof setInterval> | undefined;
+if (config.reports.chatId) {
   const scheduleUsageReport = (): void => {
     const delay = msUntilNextMidnightMsk();
     logger.info({ delayMin: Math.round(delay / 60_000) }, "Usage report scheduled");
@@ -130,30 +140,18 @@ if (config.alerts.chatId) {
     }, delay);
   };
   scheduleUsageReport();
-
-  process.on("SIGTERM", async () => {
-    clearTimeout(watchdogTimer);
-    clearTimeout(cleanupTimer);
-    clearInterval(balanceTimer);
-    if (usageReportTimer) clearInterval(usageReportTimer);
-    await Promise.all([
-      imageWorker.close(),
-      videoWorker.close(),
-      audioWorker.close(),
-      avatarWorker.close(),
-    ]);
-    process.exit(0);
-  });
-} else {
-  process.on("SIGTERM", async () => {
-    clearTimeout(watchdogTimer);
-    clearTimeout(cleanupTimer);
-    await Promise.all([
-      imageWorker.close(),
-      videoWorker.close(),
-      audioWorker.close(),
-      avatarWorker.close(),
-    ]);
-    process.exit(0);
-  });
 }
+
+process.on("SIGTERM", async () => {
+  clearTimeout(watchdogTimer);
+  clearTimeout(cleanupTimer);
+  if (balanceTimer) clearInterval(balanceTimer);
+  if (usageReportTimer) clearInterval(usageReportTimer);
+  await Promise.all([
+    imageWorker.close(),
+    videoWorker.close(),
+    audioWorker.close(),
+    avatarWorker.close(),
+  ]);
+  process.exit(0);
+});

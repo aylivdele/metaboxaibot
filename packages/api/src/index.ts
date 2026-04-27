@@ -25,6 +25,8 @@ import { stateRoutes } from "./routes/state.js";
 import { modelsRoutes } from "./routes/models.js";
 import { adminRoutes } from "./routes/admin.js";
 import { adminKeysRoutes } from "./routes/admin-keys.js";
+import { adminPricingRoutes } from "./routes/admin-pricing.js";
+import { initPricingConfig } from "./services/pricing-config.service.js";
 import { paymentsRoutes } from "./routes/payments.js";
 import { galleryRoutes } from "./routes/gallery.js";
 import { slidesRoutes } from "./routes/slides.js";
@@ -194,6 +196,7 @@ await server.register(stateRoutes);
 await server.register(modelsRoutes);
 await server.register(adminRoutes);
 await server.register(adminKeysRoutes);
+await server.register(adminPricingRoutes);
 await server.register(paymentsRoutes);
 await server.register(galleryRoutes);
 await server.register(slidesRoutes);
@@ -218,6 +221,10 @@ await server.register(downloadRoutes);
 startRateScheduler();
 // Expire subscription tokens for users whose subscriptions have ended
 startSubscriptionScheduler();
+// Load runtime price overrides into in-memory cache + subscribe to invalidation pubsub.
+// Должен быть до server.listen() — иначе первые запросы получат пустой кэш и
+// формула usdToTokens возьмёт config-default targetMargin до первого DB-hit.
+await initPricingConfig();
 
 const port = config.api.port;
 await server.listen({ port, host: "0.0.0.0" });
