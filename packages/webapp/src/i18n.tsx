@@ -174,6 +174,15 @@ const translations = {
     "referral.step3": "You both receive bonus tokens",
     "referral.rewardFrom": "from",
 
+    // Avatars page
+    "profile.tabAvatars": "Avatars",
+    "avatars.filterAll": "All",
+    "avatars.filterHeyGen": "HeyGen",
+    "avatars.filterSoul": "Soul",
+    "avatars.empty": "No avatars yet",
+    "avatars.confirmDeleteTitle": "Delete avatar?",
+    "avatars.confirmDeleteText": "The avatar will be permanently removed.",
+
     // Gallery model filter
     "gallery.allModels": "All models",
 
@@ -257,9 +266,7 @@ const translations = {
     "gallery.prompt": "Prompt",
     "gallery.settings": "Settings",
     "gallery.noSettings": "No additional settings",
-    "gallery.cost": "Cost",
-    "gallery.costTokens": "tokens",
-    "gallery.costUnknown": "—",
+
     "gallery.morePhotos": "+{n}",
     "gallery.emptyModel": "You haven't generated anything with this AI yet",
     "gallery.tryModel": "Try it",
@@ -636,6 +643,15 @@ const translations = {
     "referral.step3": "Вы оба получаете бонусные токены",
     "referral.rewardFrom": "от",
 
+    // Avatars page
+    "profile.tabAvatars": "Аватары",
+    "avatars.filterAll": "Все",
+    "avatars.filterHeyGen": "HeyGen",
+    "avatars.filterSoul": "Soul",
+    "avatars.empty": "Аватаров пока нет",
+    "avatars.confirmDeleteTitle": "Удалить аватар?",
+    "avatars.confirmDeleteText": "Аватар будет удалён без возможности восстановления.",
+
     // Gallery model filter
     "gallery.allModels": "Все модели",
 
@@ -718,9 +734,7 @@ const translations = {
     "gallery.prompt": "Промпт",
     "gallery.settings": "Настройки",
     "gallery.noSettings": "Дополнительных настроек нет",
-    "gallery.cost": "Стоимость",
-    "gallery.costTokens": "токенов",
-    "gallery.costUnknown": "—",
+
     "gallery.morePhotos": "+{n}",
     "gallery.emptyModel": "Вы ещё ничего не генерировали с этой нейросетью",
     "gallery.tryModel": "Попробовать",

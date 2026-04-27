@@ -15,8 +15,9 @@ import type {
 import { openExternalLink } from "../utils/telegram.js";
 import { SETTING_TRANSLATIONS } from "@metabox/shared-browser";
 import { StyledSelect } from "../components/management/StyledSelect.js";
+import { AvatarsPage } from "./AvatarsPage.js";
 
-export type ProfileTab = "overview" | "gallery" | "account";
+export type ProfileTab = "overview" | "gallery" | "account" | "avatars";
 
 /**
  * Format a token amount with dynamic precision so small values never show as 0.00.
@@ -103,11 +104,18 @@ export function ProfilePage({
         >
           {t("profile.tabAccount")}
         </button>
+        <button
+          className={`profile-tabs__btn${activeTab === "avatars" ? " profile-tabs__btn--active" : ""}`}
+          onClick={() => setActiveTab("avatars")}
+        >
+          {t("profile.tabAvatars")}
+        </button>
       </div>
 
       {activeTab === "overview" && <OverviewTab profile={profile} />}
       {activeTab === "gallery" && <GalleryTab onGoToManagement={onGoToManagement} />}
       {activeTab === "account" && <AccountTab profile={profile} />}
+      {activeTab === "avatars" && <AvatarsPage />}
     </div>
   );
 }
@@ -752,36 +760,34 @@ function FolderPickerModal({
           ×
         </button>
         <div className="modal-title">{t("gallery.folder.addToFolder")}</div>
-        {folders.length === 0 ? (
-          <div className="gallery-modal__no-folders">
-            <p className="gallery-modal__no-folders-text">{t("gallery.folder.noFolders")}</p>
-            <button type="button" className="btn btn--primary" onClick={onCreateFolder}>
-              {t("gallery.folder.createFirst")}
-            </button>
-          </div>
-        ) : (
-          <ul className="folder-picker__list">
-            {folders.map((folder) => {
-              const checked = job.folderIds.includes(folder.id);
-              return (
-                <li key={folder.id}>
-                  <button
-                    type="button"
-                    className={`folder-picker__item${checked ? " folder-picker__item--checked" : ""}`}
-                    onClick={() => void toggle(folder)}
-                    disabled={pending === folder.id}
-                  >
-                    <span className="folder-picker__check">{checked ? "✓" : ""}</span>
-                    <span className="folder-picker__name">
-                      {folder.isDefault ? `♥ ${folder.name}` : folder.name}
-                    </span>
-                    {pending === folder.id && <span className="folder-picker__spinner">…</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <ul className="folder-picker__list">
+          {folders.map((folder) => {
+            const checked = job.folderIds.includes(folder.id);
+            return (
+              <li key={folder.id}>
+                <button
+                  type="button"
+                  className={`folder-picker__item${checked ? " folder-picker__item--checked" : ""}`}
+                  onClick={() => void toggle(folder)}
+                  disabled={pending === folder.id}
+                >
+                  <span className="folder-picker__check">{checked ? "✓" : ""}</span>
+                  <span className="folder-picker__name">
+                    {folder.isDefault ? `♥ ${folder.name}` : folder.name}
+                  </span>
+                  {pending === folder.id && <span className="folder-picker__spinner">…</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <button
+          type="button"
+          className="btn btn--ghost folder-picker__create"
+          onClick={onCreateFolder}
+        >
+          + {t("gallery.folder.createFirst")}
+        </button>
         <div className="modal-actions">
           <button type="button" className="btn btn--primary" onClick={onClose}>
             {t("gallery.folder.done")}
@@ -950,14 +956,6 @@ function FolderEditModal({
       </div>
     </div>
   );
-}
-
-function formatGalleryTokens(raw: string | null): string | null {
-  if (!raw) return null;
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return null;
-  // Up to 2 decimals, trim trailing zeros so whole numbers show as "5", not "5.00".
-  return n.toFixed(2).replace(/\.?0+$/, "");
 }
 
 /**
@@ -1149,8 +1147,6 @@ function GalleryCard({
     }
   };
 
-  const tokens = formatGalleryTokens(job.tokensSpent);
-  const tokensLabel = tokens ? `${tokens} ${t("gallery.costTokens")}` : t("gallery.costUnknown");
   const collageOutputs = outputs.slice(0, 4);
 
   const [favLoading, setFavLoading] = useState(false);
@@ -1293,13 +1289,12 @@ function GalleryCard({
       <div className="gallery-card__body">
         {isImage ? (
           // Design cards run two-up in a grid, so the single-row meta strip
-          // overflows. Stack model / cost / date vertically and drop the
+          // overflows. Stack model / date vertically and drop the
           // prompt preview entirely — it's available in the details modal.
           <div className="gallery-card__meta gallery-card__meta--stacked">
             <span className="gallery-card__model" title={job.modelName}>
               {job.modelName}
             </span>
-            <span className="gallery-card__cost">{tokensLabel}</span>
             {job.completedAt && (
               <span className="gallery-card__date">
                 {new Date(job.completedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
@@ -1313,7 +1308,6 @@ function GalleryCard({
                 <span className="gallery-card__model" title={job.modelName}>
                   {job.modelName}
                 </span>
-                <span className="gallery-card__cost">{tokensLabel}</span>
               </div>
               {job.completedAt && (
                 <span className="gallery-card__date">
