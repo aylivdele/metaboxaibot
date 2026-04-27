@@ -68,6 +68,8 @@ export default {
       attach: "✦ You can attach images, files (PDF, DOCX, XLSX, etc.).",
       thinkingWarning:
         "✦ If thinking mode is enabled, the response may take up to 10 minutes depending on dialog size and thinking depth.",
+      filesWarning:
+        "<blockquote>💡Text neural networks don't generate images or create files.</blockquote>",
     },
   },
   design: {

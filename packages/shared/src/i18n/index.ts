@@ -58,6 +58,7 @@ export interface Translations {
       prompt: string;
       attach: string;
       thinkingWarning: string;
+      filesWarning: string;
     };
   };
   design: {
@@ -528,6 +529,8 @@ export function buildDialogHint(
   if (model.supportsThinking) {
     lines.push(t.gpt.dialogHint.thinkingWarning);
   }
+
+  lines.push(t.gpt.dialogHint.filesWarning);
 
   return lines.join("\n");
 }
