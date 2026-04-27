@@ -1302,7 +1302,11 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
             return;
           }
         }
-        const violation = validateMediaAgainstSlot(targetSlot, { durationSec, fileSizeBytes }, ctx.t);
+        const violation = validateMediaAgainstSlot(
+          targetSlot,
+          { durationSec, fileSizeBytes },
+          ctx.t,
+        );
         if (violation) {
           await ctx.reply(violation);
           return;

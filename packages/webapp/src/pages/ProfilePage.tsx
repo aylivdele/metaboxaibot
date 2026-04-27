@@ -459,7 +459,10 @@ function GalleryTab({
     const familyCountMap = new Map<string, number>();
     for (const m of allModels) {
       if (m.familyId) {
-        familyCountMap.set(m.familyId, (familyCountMap.get(m.familyId) ?? 0) + (modelCounts[m.id] ?? 0));
+        familyCountMap.set(
+          m.familyId,
+          (familyCountMap.get(m.familyId) ?? 0) + (modelCounts[m.id] ?? 0),
+        );
       }
     }
     const seenFamilies = new Set<string>();
@@ -752,11 +755,7 @@ function FolderPickerModal({
         {folders.length === 0 ? (
           <div className="gallery-modal__no-folders">
             <p className="gallery-modal__no-folders-text">{t("gallery.folder.noFolders")}</p>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={onCreateFolder}
-            >
+            <button type="button" className="btn btn--primary" onClick={onCreateFolder}>
               {t("gallery.folder.createFirst")}
             </button>
           </div>
