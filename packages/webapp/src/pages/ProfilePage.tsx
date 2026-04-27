@@ -946,14 +946,6 @@ function FolderEditModal({
   );
 }
 
-function formatGalleryTokens(raw: string | null): string | null {
-  if (!raw) return null;
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return null;
-  // Up to 2 decimals, trim trailing zeros so whole numbers show as "5", not "5.00".
-  return n.toFixed(2).replace(/\.?0+$/, "");
-}
-
 /**
  * Module-level handle to the single audio element currently playing across all
  * gallery cards. Starting a new playback invokes `stop` on the previous one so
@@ -1143,8 +1135,6 @@ function GalleryCard({
     }
   };
 
-  const tokens = formatGalleryTokens(job.tokensSpent);
-  const tokensLabel = tokens ? `${tokens} ${t("gallery.costTokens")}` : t("gallery.costUnknown");
   const collageOutputs = outputs.slice(0, 4);
 
   const [favLoading, setFavLoading] = useState(false);
@@ -1287,13 +1277,12 @@ function GalleryCard({
       <div className="gallery-card__body">
         {isImage ? (
           // Design cards run two-up in a grid, so the single-row meta strip
-          // overflows. Stack model / cost / date vertically and drop the
+          // overflows. Stack model / date vertically and drop the
           // prompt preview entirely — it's available in the details modal.
           <div className="gallery-card__meta gallery-card__meta--stacked">
             <span className="gallery-card__model" title={job.modelName}>
               {job.modelName}
             </span>
-            <span className="gallery-card__cost">{tokensLabel}</span>
             {job.completedAt && (
               <span className="gallery-card__date">
                 {new Date(job.completedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : "en-US")}
@@ -1307,7 +1296,6 @@ function GalleryCard({
                 <span className="gallery-card__model" title={job.modelName}>
                   {job.modelName}
                 </span>
-                <span className="gallery-card__cost">{tokensLabel}</span>
               </div>
               {job.completedAt && (
                 <span className="gallery-card__date">

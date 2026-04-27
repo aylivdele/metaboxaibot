@@ -2349,12 +2349,7 @@ textarea::placeholder {
 }
 
 /* ── Gallery: multi-output cards, modal ───────────────────────────────────── */
-.gallery-card__cost {
-  font-size: 11px;
-  color: var(--text-hint);
-  margin-left: 6px;
-  white-space: nowrap;
-}
+
 .gallery-card__model-row {
   display: flex;
   align-items: center;
@@ -2372,9 +2367,6 @@ textarea::placeholder {
 }
 .gallery-card__meta--stacked .gallery-card__model {
   max-width: 100%;
-}
-.gallery-card__meta--stacked .gallery-card__cost {
-  margin-left: 0;
 }
 
 .gallery-card__outputs {
