@@ -1286,6 +1286,28 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
     const current = await userStateService.getMediaInputs(userId, modelId);
     const targetSlot = pickAutoSlot(activeModeSlots, current, "video");
     if (targetSlot) {
+      if (targetSlot.constraints) {
+        let durationSec: number | undefined = videoMsg?.duration;
+        let fileSizeBytes: number | undefined = fileSize || undefined;
+        if (isVideoDoc) {
+          try {
+            const file = await ctx.api.getFile(fileId);
+            const probeUrl = `https://api.telegram.org/file/bot${config.bot.token}/${file.file_path}`;
+            const meta = await probeVideoMetadata(probeUrl);
+            if (meta.durationSec !== null) durationSec = meta.durationSec;
+            fileSizeBytes = meta.fileSizeBytes;
+          } catch (err) {
+            logger.warn({ err }, "probeVideoMetadata failed in auto-slot");
+            await ctx.reply(ctx.t.errors.mediaSlotReadMetadataFailed);
+            return;
+          }
+        }
+        const violation = validateMediaAgainstSlot(targetSlot, { durationSec, fileSizeBytes }, ctx.t);
+        if (violation) {
+          await ctx.reply(violation);
+          return;
+        }
+      }
       await userStateService.addMediaInput(userId, modelId, targetSlot.slotKey, tgSlotValue);
       debounceSlotReply(
         userId,

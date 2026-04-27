@@ -469,7 +469,7 @@ export default {
     motionImageSlotHint:
       "📸 Character Image (required): character should have clear body proportions, no occlusion, and occupy more than 5% of the image area.",
     motionVideoSlotHint:
-      "🎬 Reference Video (required): video with movements to transfer. Should contain a realistic-style character with entire body or upper body visible, including head, without obstruction. Max 30 s.",
+      "🎬 Reference Video (required): video with movements to transfer. Should contain a realistic-style character with entire body or upper body visible, including head, without obstruction. Duration: 3 to 30 s.",
     motionElementHint:
       "Optional element for facial consistency binding. Upload a facial element to enhance identity preservation in the generated video. Only 1 element is supported. Reference in prompt as @Element1. Element binding is only supported when 'Character orientation' is 'video'.",
     uploadPromptVideo: 'Send a video for "{slot}".',
