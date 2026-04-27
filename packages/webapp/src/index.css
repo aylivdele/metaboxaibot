@@ -2171,6 +2171,10 @@ textarea::placeholder {
   color: var(--text-hint);
   font-size: 13px;
 }
+.folder-picker__create {
+  width: 100%;
+  margin-top: 8px;
+}
 
 /* ── Folder Edit Modal ───────────────────────────────────────────────────── */
 .folder-edit__input {

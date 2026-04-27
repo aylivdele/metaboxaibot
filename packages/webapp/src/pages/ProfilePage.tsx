@@ -752,36 +752,30 @@ function FolderPickerModal({
           ×
         </button>
         <div className="modal-title">{t("gallery.folder.addToFolder")}</div>
-        {folders.length === 0 ? (
-          <div className="gallery-modal__no-folders">
-            <p className="gallery-modal__no-folders-text">{t("gallery.folder.noFolders")}</p>
-            <button type="button" className="btn btn--primary" onClick={onCreateFolder}>
-              {t("gallery.folder.createFirst")}
-            </button>
-          </div>
-        ) : (
-          <ul className="folder-picker__list">
-            {folders.map((folder) => {
-              const checked = job.folderIds.includes(folder.id);
-              return (
-                <li key={folder.id}>
-                  <button
-                    type="button"
-                    className={`folder-picker__item${checked ? " folder-picker__item--checked" : ""}`}
-                    onClick={() => void toggle(folder)}
-                    disabled={pending === folder.id}
-                  >
-                    <span className="folder-picker__check">{checked ? "✓" : ""}</span>
-                    <span className="folder-picker__name">
-                      {folder.isDefault ? `♥ ${folder.name}` : folder.name}
-                    </span>
-                    {pending === folder.id && <span className="folder-picker__spinner">…</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <ul className="folder-picker__list">
+          {folders.map((folder) => {
+            const checked = job.folderIds.includes(folder.id);
+            return (
+              <li key={folder.id}>
+                <button
+                  type="button"
+                  className={`folder-picker__item${checked ? " folder-picker__item--checked" : ""}`}
+                  onClick={() => void toggle(folder)}
+                  disabled={pending === folder.id}
+                >
+                  <span className="folder-picker__check">{checked ? "✓" : ""}</span>
+                  <span className="folder-picker__name">
+                    {folder.isDefault ? `♥ ${folder.name}` : folder.name}
+                  </span>
+                  {pending === folder.id && <span className="folder-picker__spinner">…</span>}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <button type="button" className="btn btn--ghost folder-picker__create" onClick={onCreateFolder}>
+          + {t("gallery.folder.createFirst")}
+        </button>
         <div className="modal-actions">
           <button type="button" className="btn btn--primary" onClick={onClose}>
             {t("gallery.folder.done")}
