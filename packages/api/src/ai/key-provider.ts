@@ -90,6 +90,8 @@ export function envKeyForProvider(provider: string): string | undefined {
       return config.ai.minimax;
     case "kie":
       return config.ai.kie;
+    case "evolink":
+      return config.ai.evolink;
     default:
       return undefined;
   }

@@ -9,6 +9,7 @@ import { RecraftAdapter } from "./recraft.adapter.js";
 import { GptImageAdapter } from "./gpt-image.adapter.js";
 import { HiggsFieldSoulImageAdapter } from "./higgsfield.soul.adapter.js";
 import { KieImageAdapter } from "./kie.adapter.js";
+import { EvolinkImageAdapter } from "./evolink.adapter.js";
 import type { AdapterContext } from "../with-pool.js";
 import { buildProxyFetch } from "../transport/proxy-fetch.js";
 
@@ -34,10 +35,9 @@ export function createImageAdapter(
 
   switch (model.provider) {
     case "openai":
-      // gpt-image-2 временно роутится через KIE (см. case "kie" ниже).
-      // Чтобы вернуть прямую интеграцию с OpenAI — вернуть provider:"openai"
-      // в design.models.ts и расширить условие до `|| modelId === "gpt-image-2"`.
-      if (modelId === "gpt-image-1.5") {
+      // gpt-image-1.5 + gpt-image-2 (последний — fallback на прямую OpenAI Images API
+      // когда KIE и evolink недоступны; primary для gpt-image-2 — KIE через case "kie").
+      if (modelId === "gpt-image-1.5" || modelId === "gpt-image-2") {
         return new GptImageAdapter(modelId, apiKey, fetchFn);
       }
       return new DalleAdapter(apiKey, fetchFn);
@@ -58,6 +58,8 @@ export function createImageAdapter(
       return new HiggsFieldSoulImageAdapter(apiKey, undefined, fetchFn);
     case "kie":
       return new KieImageAdapter(modelId, apiKey, fetchFn);
+    case "evolink":
+      return new EvolinkImageAdapter(modelId, apiKey, fetchFn);
     default:
       throw new Error(`No image adapter for provider: ${model.provider} (model: ${modelId})`);
   }

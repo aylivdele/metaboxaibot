@@ -14,7 +14,9 @@ import {
   calculateCost,
   computeVideoTokens,
   translatePromptIfNeeded,
+  usdToTokens,
 } from "@metabox/api/services";
+import { getModelMultiplier } from "@metabox/api/services/pricing-config";
 import type { DeductResult } from "@metabox/api/services";
 import {
   buildS3Key,
@@ -60,6 +62,24 @@ import { UserFacingError } from "@metabox/shared";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
 
+/**
+ * Seedance 2.0 evolink: per-second rates, применяемые ТОЛЬКО когда у задачи
+ * есть `ref_videos` (r2v режим с input video). При наличии input video
+ * provider использует пониженный rate, но дополнительно билит входное видео:
+ *   billable_seconds = output + max(input_total_duration, output)
+ *
+ * No-video rates остаются в `costMatrix`/`costVariants` AIModel — corresponding
+ * preview в mini-app для типичного случая корректен. Этот override применяется
+ * только в runtime billing path video processor'а.
+ *
+ * Fast variant не имеет 1080p — попытка использовать выпадет к calculateCost
+ * fallback (no-video matrix) с warning.
+ */
+const SEEDANCE2_RATES_WITH_VIDEO: Record<string, Record<string, number>> = {
+  "seedance-2": { "480p": 0.056, "720p": 0.121, "1080p": 0.302 },
+  "seedance-2-fast": { "480p": 0.045, "720p": 0.096 },
+};
+
 const telegram = new Api(config.bot.token);
 
 export async function processVideoJob(job: Job<VideoJobData>, token?: string): Promise<void> {
@@ -92,8 +112,14 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
   // Fallback кандидаты: если у задачи есть mediaInputs (image-to-video и т.п.),
   // fallback должен поддерживать те же слоты. HeyGen с user avatar и аналогичные
   // sticky-провайдеры не получают fallback (их fallback массив пуст).
+  // Передаём duration чтобы isFallbackCompatible мог отсечь fallback'ов с
+  // меньшим durationRange.max (e.g. FAL grok-imagine 1-10s, primary KIE 6-30s).
+  const requestedDuration =
+    typeof modelSettings?.duration === "number" ? modelSettings.duration : duration;
   const fallbackCandidates: AIModel[] = modelMeta
-    ? getFallbackCandidates(modelId, "video").filter((m) => isFallbackCompatible(m, mediaInputs))
+    ? getFallbackCandidates(modelId, "video").filter((m) =>
+        isFallbackCompatible(m, mediaInputs, requestedDuration),
+      )
     : [];
 
   /** Подобрать AIModel по provider строке (primary или один из fallback'ов). */
@@ -551,17 +577,58 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
           : undefined;
         const refVideos = (mediaInputs as Record<string, string[]> | undefined)?.ref_videos ?? [];
         const hasVideoInputs = refVideos.length > 0;
-        const internalCost = calculateCost(
-          model,
-          0,
-          0,
-          undefined,
-          videoTokens,
-          modelSettings,
-          effectiveDuration,
-          undefined,
-          { hasVideoInputs },
-        );
+
+        // Seedance 2.0 evolink: с video input меняется ВСЯ per-second rate
+        // (ниже базовой no-video) И billable_seconds = output + max(input_total, output).
+        // costMatrix/costVariants отражают только no-video rates (для preview).
+        // Здесь — runtime override когда ref_videos непусты.
+        let internalCost: number;
+        const isSeedance2Evolink =
+          (modelId === "seedance-2" || modelId === "seedance-2-fast") &&
+          model.provider === "evolink";
+
+        if (isSeedance2Evolink && hasVideoInputs) {
+          const inputDurations = await Promise.all(
+            refVideos.map((u) => fetchClipDurationSec(u).catch(() => 0)),
+          );
+          const totalInputDuration = inputDurations.reduce((sum, d) => sum + d, 0);
+          // "Minimum billable input duration = output duration"
+          const billableInput = Math.max(totalInputDuration, effectiveDuration);
+          const totalSec = effectiveDuration + billableInput;
+
+          const resolution = (modelSettings?.resolution as string | undefined) ?? "720p";
+          const rate = SEEDANCE2_RATES_WITH_VIDEO[modelId]?.[resolution];
+          if (rate !== undefined) {
+            const usd = rate * totalSec;
+            internalCost = usdToTokens(usd) * getModelMultiplier(modelId);
+          } else {
+            // Неизвестное разрешение — fallback на calculateCost (no-video matrix).
+            internalCost = calculateCost(
+              model,
+              0,
+              0,
+              undefined,
+              videoTokens,
+              modelSettings,
+              effectiveDuration,
+              undefined,
+              { hasVideoInputs },
+            );
+          }
+        } else {
+          internalCost = calculateCost(
+            model,
+            0,
+            0,
+            undefined,
+            videoTokens,
+            modelSettings,
+            effectiveDuration,
+            undefined,
+            { hasVideoInputs },
+          );
+        }
+
         deductResult = await deductTokens(BigInt(userIdStr), internalCost, modelId);
         await db.generationJob.update({
           where: { id: dbJobId },

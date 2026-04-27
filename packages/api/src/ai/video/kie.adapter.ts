@@ -213,7 +213,9 @@ export class KieVideoAdapter implements VideoAdapter {
       inputPayload.resolution = resolution;
 
       inputPayload.generate_audio = ms.generate_audio !== undefined ? ms.generate_audio : true;
-      inputPayload.web_search = false;
+      // Primary evolink seedance-2 экспонирует enable_web_search setting (только t2v).
+      // Когда KIE — fallback, прокидываем выбор юзера (вместо хардкода false).
+      inputPayload.web_search = !!ms.enable_web_search;
       inputPayload.nsfw_checker = false;
 
       // first_frame / last_frame

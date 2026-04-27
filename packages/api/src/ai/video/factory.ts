@@ -12,6 +12,7 @@ import { HiggsFieldAdapter } from "./higgsfield.adapter.js";
 import { AlibabaVideoAdapter } from "./alibaba.adapter.js";
 import { MinimaxVideoAdapter } from "./minimax.adapter.js";
 import { KieVideoAdapter } from "./kie.adapter.js";
+import { EvolinkVideoAdapter } from "./evolink.adapter.js";
 import { buildProxyFetch } from "../transport/proxy-fetch.js";
 import type { AdapterContext } from "../with-pool.js";
 
@@ -69,6 +70,8 @@ export function createVideoAdapter(
       return new HiggsFieldAdapter(modelId, apiKey, undefined, fetchFn);
     case "kie":
       return new KieVideoAdapter(modelId, apiKey, fetchFn);
+    case "evolink":
+      return new EvolinkVideoAdapter(modelId, apiKey, fetchFn);
     default:
       throw new Error(`No video adapter for provider: ${model.provider} (model: ${modelId})`);
   }

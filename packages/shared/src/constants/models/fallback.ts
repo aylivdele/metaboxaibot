@@ -19,28 +19,54 @@ export function getFallbackCandidates(primaryModelId: string, section: FallbackS
 }
 
 /**
- * Проверяет что fallback-модель поддерживает все media-input слоты задачи И
- * вмещает количество медиа в каждом слоте (`maxImages`).
+ * Проверяет совместимость fallback-модели с конкретной задачей.
  *
- * Семантика:
- * - Задача без media (`jobMediaInputs` пуст / undefined) → совместимо.
- * - Для каждого slotKey с непустым массивом urls'ов: у fallback должен быть
- *   слот с тем же `slotKey`, и его `maxImages` (default 1) должен быть
- *   >= количества загруженных медиа.
+ * Три уровня проверок:
  *
- * `modelSettings` адаптеры фильтруют сами (unknown ключи игнорируются), поэтому
- * проверяем только media-слоты.
+ * 1. **Required-slot check**: если у fallback есть слот с `required: true`,
+ *    задача обязана его заполнить (e.g. FAL grok-imagine требует ≥1 reference
+ *    image — pure t2v через этот endpoint невозможен).
+ *
+ * 2. **Slot capacity check**: для каждого slotKey с непустым массивом urls'ов:
+ *    у fallback должен быть слот с тем же `slotKey`, и его `maxImages`
+ *    (default 1) должен быть >= количества загруженных медиа.
+ *
+ * 3. **Duration check** (опционально): если у fallback задан `durationRange`
+ *    и `jobDuration` известен — duration должна попадать в [min, max].
+ *    Используется когда fallback-провайдер поддерживает короче, чем primary
+ *    (e.g. FAL grok-imagine max 10s vs primary KIE max 30s — на больших duration
+ *    fallback пропускается и processor пробует следующего кандидата).
+ *
+ * `modelSettings` адаптеры фильтруют сами (unknown ключи игнорируются),
+ * поэтому проверяем только media-слоты + duration.
  */
 export function isFallbackCompatible(
   fallback: AIModel,
   jobMediaInputs: Record<string, string[]> | undefined,
+  jobDuration?: number,
 ): boolean {
+  // Duration check — независимо от media inputs.
+  if (jobDuration !== undefined && fallback.durationRange) {
+    if (jobDuration < fallback.durationRange.min || jobDuration > fallback.durationRange.max) {
+      return false;
+    }
+  }
+
+  // Required-slot check — должны быть заполнены даже при пустом jobMediaInputs.
+  const fallbackSlots = new Map((fallback.mediaInputs ?? []).map((s) => [s.slotKey, s] as const));
+  for (const slot of fallbackSlots.values()) {
+    if (slot.required) {
+      const provided = jobMediaInputs?.[slot.slotKey];
+      if (!provided || provided.length === 0) return false;
+    }
+  }
+
+  // Slot capacity check — для существующих media inputs.
   if (!jobMediaInputs) return true;
   const usedSlots = Object.entries(jobMediaInputs).filter(
     ([, urls]) => Array.isArray(urls) && urls.length > 0,
   );
   if (usedSlots.length === 0) return true;
-  const fallbackSlots = new Map((fallback.mediaInputs ?? []).map((s) => [s.slotKey, s] as const));
   return usedSlots.every(([slotKey, urls]) => {
     const slot = fallbackSlots.get(slotKey);
     if (!slot) return false;

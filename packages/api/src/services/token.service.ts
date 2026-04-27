@@ -242,6 +242,11 @@ interface MediaOpts {
  *   4. per-second  (includes baseRequest flat fee)
  *   5. per-kchar   (includes baseRequest flat fee)
  *   6. fallback    — baseRequest
+ *
+ * Per-input-image surcharge (`costUsdPerMPixelInput`) применяется ОТДЕЛЬНО в
+ * `computeInputImageSurcharge` — независимо от режима базовой цены, чтобы
+ * модели с per-call/quality-variant биллингом тоже могли тарифицировать
+ * referenced images (например, nano-banana через evolink).
  */
 function computeMediaBaseUsd(model: AIModel, rates: ResolvedRates, opts: MediaOpts): number {
   const { megapixels, videoTokens, charCount, modelSettings } = opts;
@@ -268,28 +273,7 @@ function computeMediaBaseUsd(model: AIModel, rates: ResolvedRates, opts: MediaOp
 
   // 2. Per-megapixel
   if (model.costUsdPerMPixel && megapixels) {
-    let cost = (model.costUsdPerMPixelBase ?? 0) + Math.ceil(megapixels) * model.costUsdPerMPixel;
-    // Optional image-to-image input surcharge
-    if (model.costUsdPerMPixelInput) {
-      const perImage = opts.inputImagesMegapixels;
-      if (perImage && perImage.length > 0) {
-        if (model.costUsdPerMPixelInputFixed) {
-          // Flat fee per image (provider normalizes each input to 1 MP).
-          cost += perImage.length * model.costUsdPerMPixelInput;
-        } else {
-          // Sum of ceil(MP) per image.
-          const totalCeil = perImage.reduce((sum, mp) => sum + Math.ceil(mp), 0);
-          cost += totalCeil * model.costUsdPerMPixelInput;
-        }
-      } else if (opts.hasInputImage) {
-        if (model.costUsdPerMPixelInputFixed) {
-          cost += model.costUsdPerMPixelInput;
-        } else if (opts.inputMegapixels !== undefined && opts.inputMegapixels > 0) {
-          cost += Math.ceil(opts.inputMegapixels) * model.costUsdPerMPixelInput;
-        }
-      }
-    }
-    return cost;
+    return (model.costUsdPerMPixelBase ?? 0) + Math.ceil(megapixels) * model.costUsdPerMPixel;
   }
 
   // 3. Per-video-token
@@ -311,6 +295,41 @@ function computeMediaBaseUsd(model: AIModel, rates: ResolvedRates, opts: MediaOp
 
   // 6. Fallback: fixed per-request
   return rates.baseRequest;
+}
+
+/**
+ * Доплата за reference images (img2img / image editing): применяется поверх
+ * любой базовой цены — per-megapixel, per-call, costVariants и т.д. Раньше
+ * surcharge был встроен в per-megapixel ветку, поэтому модели с
+ * `costUsdPerRequest`/`costVariants` и referenced images не могли его
+ * учитывать (например, nano-banana через evolink).
+ *
+ * Логика идентична старой:
+ *   - `inputImagesMegapixels` (массив N изображений):
+ *     • fixed=true → N × costUsdPerMPixelInput
+ *     • fixed=false → sum(ceil(mp_i)) × costUsdPerMPixelInput
+ *   - `hasInputImage=true` без массива (legacy single-image):
+ *     • fixed=true → costUsdPerMPixelInput
+ *     • fixed=false → ceil(inputMegapixels) × costUsdPerMPixelInput
+ */
+function computeInputImageSurcharge(model: AIModel, opts: MediaOpts): number {
+  if (!model.costUsdPerMPixelInput) return 0;
+  const rate = model.costUsdPerMPixelInput;
+  const fixed = !!model.costUsdPerMPixelInputFixed;
+
+  const perImage = opts.inputImagesMegapixels;
+  if (perImage && perImage.length > 0) {
+    if (fixed) return perImage.length * rate;
+    const totalCeil = perImage.reduce((sum, mp) => sum + Math.ceil(mp), 0);
+    return totalCeil * rate;
+  }
+  if (opts.hasInputImage) {
+    if (fixed) return rate;
+    if (opts.inputMegapixels !== undefined && opts.inputMegapixels > 0) {
+      return Math.ceil(opts.inputMegapixels) * rate;
+    }
+  }
+  return 0;
 }
 
 /**
@@ -393,7 +412,7 @@ export function calculateCost(
   },
 ): number {
   const rates = resolveRates(model, inputTokens, modelSettings);
-  const mediaUsd = computeMediaBaseUsd(model, rates, {
+  const mediaOpts: MediaOpts = {
     megapixels,
     inputMegapixels: extra?.inputMegapixels,
     inputImagesMegapixels: extra?.inputImagesMegapixels,
@@ -403,14 +422,16 @@ export function calculateCost(
     charCount,
     modelSettings,
     hasVideoInputs: extra?.hasVideoInputs,
-  });
+  };
+  const mediaUsd = computeMediaBaseUsd(model, rates, mediaOpts);
+  const inputImageUsd = computeInputImageSurcharge(model, mediaOpts);
   const addonUsd = computeAddonUsd(model, modelSettings);
   const llmUsd = computeLlmUsd(rates, inputTokens, outputTokens, extra?.cachedInputTokens ?? 0);
   // Применяем per-model multiplier (по умолчанию 1.0) на финальные токены.
   // НЕ округляем — для LLM-моделей одно сообщение часто стоит долю токена
   // (например, 0.05 ✦), и Math.ceil превращало бы это в 1 ✦ (×20 overcharge).
   // Внутренние токены — Decimal в БД, fractional accepted в deductTokens.
-  return usdToTokens(mediaUsd + addonUsd + llmUsd) * getModelMultiplier(model.id);
+  return usdToTokens(mediaUsd + inputImageUsd + addonUsd + llmUsd) * getModelMultiplier(model.id);
 }
 
 /** Convert a USD cost to internal tokens using the billing config. */

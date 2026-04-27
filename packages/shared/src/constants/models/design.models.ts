@@ -340,10 +340,11 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     section: "design",
     provider: "kie",
     familyId: "nano-banana",
-    versionLabel: "1",
+    versionLabel: "pro",
     variantLabel: "Pro",
     costVariants: { settingKey: "resolution", map: { "1K": 0.09, "2K": 0.09, "4K": 0.12 } },
     costUsdPerRequest: 0.09,
+    maxVirtualBatch: 4,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -367,6 +368,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       "9:16",
     ],
     settings: [
+      NUM_IMAGES_SETTING,
       mkAspectRatio([
         "auto",
         "21:9",
@@ -423,6 +425,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       map: { "1K": 0.04, "2K": 0.06, "4K": 0.09 },
     },
     costUsdPerRequest: 0.04,
+    maxVirtualBatch: 4,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -457,6 +460,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       "1:8",
     ],
     settings: [
+      NUM_IMAGES_SETTING,
       mkAspectRatio([
         "auto",
         "21:9",
@@ -513,6 +517,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     versionLabel: "1",
     variantLabel: "Standard",
     costUsdPerRequest: 0.02,
+    maxVirtualBatch: 4,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -543,6 +548,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       "9:16",
     ],
     settings: [
+      NUM_IMAGES_SETTING,
       mkAspectRatio([
         "auto",
         "21:9",
@@ -850,159 +856,9 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-  /*
-  // ── ОТКАТ к прямой интеграции с OpenAI Images API ───────────────────────────
-  // Чтобы вернуть прямой OpenAI: заменить блок "gpt-image-2" выше на этот
-  // (снять обрамляющие комменты), и расширить условие в image/factory.ts
-  // (case "openai":  if (modelId === "gpt-image-1.5" || modelId === "gpt-image-2")).
-  "gpt-image-2": {
-    id: "gpt-image-2",
-    name: "🖼️ GPT Image 2",
-    description:
-      "Новейшая версия GPT Image. Лучше предыдущей в рендеринге текста и точности следования промпту, ниже стоимость на крупных размерах.",
-    section: "design",
-    provider: "openai",
-    // Точная цена определяется адаптером на основе quality × size. Базовое значение: medium 1024×1024.
-    costUsdPerRequest: 0.053,
-    // Цены за 1024×1024, 1536×1024, 1024×1536 — из доков OpenAI.
-    // Для 2K/4K (экспериментальные) цены оценены линейно по площади относительно
-    // соответствующего базового разрешения (квадрат / альбом). Без учёта input-токенов.
-    costMatrix: {
-      dims: ["quality", "size"],
-      table: {
-        low__1024x1024: 0.006,
-        low__1536x1024: 0.005,
-        low__1024x1536: 0.005,
-        low__2048x2048: 0.012,
-        low__2048x1152: 0.005,
-        low__1152x2048: 0.005,
-        low__3840x2160: 0.011,
-        low__2160x3840: 0.011,
-        low__auto: 0.006,
-        medium__1024x1024: 0.053,
-        medium__1536x1024: 0.041,
-        medium__1024x1536: 0.041,
-        medium__2048x2048: 0.107,
-        medium__2048x1152: 0.042,
-        medium__1152x2048: 0.042,
-        medium__3840x2160: 0.1,
-        medium__2160x3840: 0.1,
-        medium__auto: 0.053,
-        high__1024x1024: 0.211,
-        high__1536x1024: 0.165,
-        high__1024x1536: 0.165,
-        high__2048x2048: 0.428,
-        high__2048x1152: 0.17,
-        high__1152x2048: 0.17,
-        high__3840x2160: 0.4,
-        high__2160x3840: 0.4,
-        high__auto: 0.211,
-        auto__1024x1024: 0.053,
-        auto__1536x1024: 0.041,
-        auto__1024x1536: 0.041,
-        auto__2048x2048: 0.212,
-        auto__2048x1152: 0.062,
-        auto__1152x2048: 0.062,
-        auto__3840x2160: 0.216,
-        auto__2160x3840: 0.216,
-        auto__auto: 0.053,
-      },
-    },
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    mediaInputs: [MI_EDIT_4],
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: null,
-    settings: [
-      {
-        key: "size",
-        label: "Размер",
-        description:
-          "1024×1024 — квадрат, 1536×1024 — альбом, 1024×1536 — портрет. 2K/3840 — экспериментальные. Auto — модель сама подберёт. Влияет на цену.",
-        type: "select",
-        options: [
-          { value: "1024x1024", label: "1024 × 1024" },
-          { value: "1536x1024", label: "1536 × 1024 (16:9)" },
-          { value: "1024x1536", label: "1024 × 1536 (9:16)" },
-          { value: "2048x2048", label: "2048 × 2048 (2K)" },
-          { value: "2048x1152", label: "2048 × 1152 (2K 16:9)" },
-          { value: "1152x2048", label: "1152 × 2048 (2K 9:16)" },
-          { value: "3840x2160", label: "3840 × 2160 (4K 16:9)" },
-          { value: "2160x3840", label: "2160 × 3840 (4K 9:16)" },
-          { value: "auto", label: "Auto" },
-        ],
-        default: "1024x1024",
-      },
-      {
-        key: "quality",
-        label: "Качество",
-        description: "Low — быстро, Medium — баланс, High — максимум. Влияет на цену",
-        type: "select",
-        options: [
-          { value: "low", label: "Low" },
-          { value: "medium", label: "Medium" },
-          { value: "high", label: "High" },
-          { value: "auto", label: "Auto" },
-        ],
-        default: "medium",
-      },
-      {
-        key: "output_format",
-        label: "Формат",
-        description: "Формат сохраняемого изображения. PNG поддерживает прозрачность.",
-        type: "select",
-        options: [
-          { value: "png", label: "PNG" },
-          { value: "jpeg", label: "JPEG" },
-          { value: "webp", label: "WebP" },
-        ],
-        default: "png",
-        advanced: true,
-      },
-      {
-        key: "output_compression",
-        label: "Сжатие",
-        description:
-          "Степень сжатия для JPEG и WebP (0 — без потерь, 100 — максимальное сжатие). Не влияет на PNG.",
-        type: "slider",
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 100,
-        advanced: true,
-      },
-      {
-        key: "background",
-        label: "Фон",
-        description:
-          "opaque — непрозрачный фон. Прозрачный фон в GPT Image 2 пока не поддерживается.",
-        type: "select",
-        options: [
-          { value: "auto", label: "Auto" },
-          { value: "opaque", label: "Opaque" },
-        ],
-        default: "auto",
-      },
-      {
-        key: "moderation",
-        label: "Модерация",
-        description: "low — ослабленная фильтрация контента, auto — стандартная.",
-        type: "select",
-        options: [
-          { value: "auto", label: "Auto" },
-          { value: "low", label: "Low" },
-        ],
-        default: "auto",
-        advanced: true,
-      },
-    ],
-  },
-  */
+  // OpenAI gpt-image-2 версия перенесена в FALLBACK_DESIGN_MODELS как последний
+  // fallback (после evolink). Срабатывает когда KIE primary и evolink fallback
+  // оба недоступны.
   "gpt-image-1.5": {
     id: "gpt-image-1.5",
     name: "🖼️ GPT Image 1.5",
@@ -2219,5 +2075,487 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
  *
  * Пустой массив = fallback выключен. Цена для биллинга всегда берётся
  * из primary, независимо от того, какой fallback сработал.
+ *
+ * Записи здесь НЕ попадают в AI_MODELS (там id'ы уникальны = primary).
+ * Используются только image processor'ом для подбора альтернативного
+ * адаптера; fields name/description/settings игнорируются UX-уровнем.
+ * Минимально нужны: id, provider, mediaInputs (для isFallbackCompatible).
  */
-export const FALLBACK_DESIGN_MODELS: AIModel[] = [];
+export const FALLBACK_DESIGN_MODELS: AIModel[] = [
+  // ── Nano Banana семейство через evolink (https://api.evolink.ai) ────────────
+  // KIE primary'и роутятся на evolink-аналоги:
+  //   nano-banana-1   → nano-banana-beta
+  //   nano-banana-2   → gemini-3.1-flash-image-preview
+  //   nano-banana-pro → gemini-3-pro-image-preview
+  // Биллинг всегда по primary (KIE-цена), при fallback'е providerUsdCost не учитывается.
+  // ── Nano Banana PRO (evolink: gemini-3-pro-image-preview) ──────────────────
+  // Pricing (per evolink docs):
+  //   - Output image: $0.125 (1K/2K), $0.224 (4K)
+  //   - Reference image: $0.0010/image (charged per uploaded image)
+  //   - Web search: $0.013/request when enabled
+  //   - Input text: $0.0019/1K tokens, output+thinking: $0.011/1K tokens
+  // Text tokens не биллятся в image processor (он передаёт 0,0 в calculateCost) —
+  // зашиты в AIModel для документации/будущей интеграции через providerUsdCost.
+  {
+    id: "nano-banana-pro",
+    name: "Nano Banana PRO (evolink fallback)",
+    description: "Fallback на evolink при недоступности KIE.",
+    section: "design",
+    provider: "evolink",
+    costUsdPerRequest: 0.125, // base = output 1K/2K
+    costVariants: {
+      settingKey: "resolution",
+      map: { "1K": 0.125, "2K": 0.125, "4K": 0.224 },
+    },
+    costUsdPerMPixelInput: 0.001, // $0.0010 per reference image (Fixed=true)
+    costUsdPerMPixelInputFixed: true,
+    costAddons: [{ settingKey: "enable_web_search", map: { true: 0.013 } }],
+    inputCostUsdPerMToken: 1.9, // $0.0019/1K = $1.9/1M (документация)
+    outputCostUsdPerMToken: 11, // $0.011/1K = $11/1M (документация)
+    supportsImages: true,
+    mediaInputs: [{ slotKey: "edit", mode: "edit", labelKey: "multiple_edit", maxImages: 14 }],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: [
+      "auto",
+      "21:9",
+      "16:9",
+      "3:2",
+      "4:3",
+      "5:4",
+      "1:1",
+      "4:5",
+      "3:4",
+      "2:3",
+      "9:16",
+    ],
+    // Settings — отображаются только если модель промоутится в primary (т.е.
+    // запись попадает в DESIGN_MODELS / AI_MODELS). В fallback состоянии
+    // settings игнорируются UI'ем (FALLBACK_DESIGN_MODELS не сериализуется
+    // через /models route). Преbuild'нуты для plug-and-play promotion.
+    settings: [
+      mkAspectRatio([
+        "auto",
+        "21:9",
+        "16:9",
+        "3:2",
+        "4:3",
+        "5:4",
+        "1:1",
+        "4:5",
+        "3:4",
+        "2:3",
+        "9:16",
+      ]),
+      {
+        key: "resolution",
+        label: "Разрешение",
+        description: "1K/2K — стандарт, 4K — максимальные детали (дороже).",
+        type: "select",
+        options: [
+          { value: "1K", label: "1K" },
+          { value: "2K", label: "2K" },
+          { value: "4K", label: "4K" },
+        ],
+        default: "1K",
+      },
+      {
+        key: "enable_web_search",
+        label: "Web search",
+        description: "Подключить веб-поиск к генерации (учитывается актуальный контекст).",
+        type: "toggle",
+        default: false,
+        advanced: true,
+      },
+    ],
+  },
+  // ── Nano Banana 2 (evolink: gemini-3.1-flash-image-preview) ─────────────────
+  // Pricing:
+  //   - Output image varies by quality:
+  //     0.5K=$0.042, 1K=$0.063, 2K=$0.094, 4K=$0.141
+  //   - Reference image: $0.0005/image
+  //   - Web search: $0.013/request, Image search: $0.013/request
+  //   - Input text: $0.0005/1K, output+thinking: $0.0028/1K
+  {
+    id: "nano-banana-2",
+    name: "Nano Banana 2 (evolink fallback)",
+    description: "Fallback на evolink при недоступности KIE.",
+    section: "design",
+    provider: "evolink",
+    costUsdPerRequest: 0.063, // base = output 1K
+    costVariants: {
+      settingKey: "resolution",
+      map: { "0.5K": 0.042, "1K": 0.063, "2K": 0.094, "4K": 0.141 },
+    },
+    costUsdPerMPixelInput: 0.0005,
+    costUsdPerMPixelInputFixed: true,
+    costAddons: [
+      { settingKey: "enable_web_search", map: { true: 0.013 } },
+      { settingKey: "image_search", map: { true: 0.013 } },
+    ],
+    inputCostUsdPerMToken: 0.5, // $0.0005/1K = $0.5/1M
+    outputCostUsdPerMToken: 2.8, // $0.0028/1K = $2.8/1M
+    supportsImages: true,
+    mediaInputs: [{ slotKey: "edit", mode: "edit", labelKey: "multiple_edit", maxImages: 14 }],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: [
+      "auto",
+      "21:9",
+      "16:9",
+      "4:3",
+      "3:2",
+      "5:4",
+      "1:1",
+      "4:5",
+      "2:3",
+      "3:4",
+      "9:16",
+      "8:1",
+      "4:1",
+      "1:4",
+      "1:8",
+    ],
+    settings: [
+      mkAspectRatio([
+        "auto",
+        "21:9",
+        "16:9",
+        "4:3",
+        "3:2",
+        "5:4",
+        "1:1",
+        "4:5",
+        "2:3",
+        "3:4",
+        "9:16",
+        "8:1",
+        "4:1",
+        "1:4",
+        "1:8",
+      ]),
+      {
+        key: "resolution",
+        label: "Разрешение",
+        description: "0.5K — самый дешёвый, 4K — максимальные детали.",
+        type: "select",
+        options: [
+          { value: "0.5K", label: "0.5K" },
+          { value: "1K", label: "1K" },
+          { value: "2K", label: "2K" },
+          { value: "4K", label: "4K" },
+        ],
+        default: "1K",
+      },
+      {
+        key: "enable_web_search",
+        label: "Web search",
+        description: "Подключить веб-поиск к генерации.",
+        type: "toggle",
+        default: false,
+        advanced: true,
+      },
+      {
+        key: "image_search",
+        label: "Image search",
+        description: "Подключить поиск референсных изображений в вебе.",
+        type: "toggle",
+        default: false,
+        advanced: true,
+      },
+      {
+        key: "thinking_level",
+        label: "Глубина рассуждений",
+        description: "min — быстрее, high — качественнее.",
+        type: "select",
+        options: [
+          { value: "auto", label: "auto" },
+          { value: "min", label: "min" },
+          { value: "high", label: "high" },
+        ],
+        default: "auto",
+        advanced: true,
+      },
+    ],
+  },
+  // ── Nano Banana v1 (evolink: nano-banana-beta) ──────────────────────────────
+  // Pricing: $0.024/image flat (no quality / search / per-input charges).
+  {
+    id: "nano-banana-1",
+    name: "Nano Banana (evolink fallback)",
+    description: "Fallback на evolink при недоступности KIE.",
+    section: "design",
+    provider: "evolink",
+    costUsdPerRequest: 0.024,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    // evolink nano-banana-beta: до 5 reference images. Primary KIE — 10.
+    // Если user загрузил 6-10 картинок, isFallbackCompatible вернёт false и
+    // fallback не сработает — это корректное consrative-поведение.
+    mediaInputs: [{ slotKey: "edit", mode: "edit", labelKey: "multiple_edit", maxImages: 5 }],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["auto", "16:9", "3:2", "4:3", "1:1", "3:4", "2:3", "9:16"],
+    settings: [mkAspectRatio(["auto", "16:9", "3:2", "4:3", "1:1", "3:4", "2:3", "9:16"])],
+  },
+  // ── GPT Image 2 via evolink (fallback к KIE primary) ─────────────────────────
+  // Pricing — копия OpenAI costMatrix × 0.9 (10% дешевле). Структура dims/keys
+  // совпадает с OpenAI fallback ниже, чтобы при промоушене любого из этих
+  // fallback'ов в primary settings + cost оставались согласованными.
+  //
+  // Адаптер EvolinkImageAdapter принимает оба формата settings:
+  //   - KIE-style: aspect_ratio (ratio) + resolution (1K/2K/4K)
+  //   - OpenAI-style: size (pixel format) + quality (low/medium/high)
+  // — это позволяет fallback'у работать прозрачно при текущем KIE primary.
+  {
+    id: "gpt-image-2",
+    name: "GPT Image 2 (evolink fallback)",
+    description: "Fallback на evolink при недоступности KIE.",
+    section: "design",
+    provider: "evolink",
+    costUsdPerRequest: 0.0477, // base = medium 1024×1024 (openai $0.053 × 0.9)
+    costMatrix: {
+      dims: ["quality", "size"],
+      table: {
+        // openai × 0.9
+        low__1024x1024: 0.0054,
+        low__1536x1024: 0.0045,
+        low__1024x1536: 0.0045,
+        low__2048x2048: 0.0108,
+        low__2048x1152: 0.0045,
+        low__1152x2048: 0.0045,
+        low__3840x2160: 0.0099,
+        low__2160x3840: 0.0099,
+        low__auto: 0.0054,
+        medium__1024x1024: 0.0477,
+        medium__1536x1024: 0.0369,
+        medium__1024x1536: 0.0369,
+        medium__2048x2048: 0.0963,
+        medium__2048x1152: 0.0378,
+        medium__1152x2048: 0.0378,
+        medium__3840x2160: 0.09,
+        medium__2160x3840: 0.09,
+        medium__auto: 0.0477,
+        high__1024x1024: 0.1899,
+        high__1536x1024: 0.1485,
+        high__1024x1536: 0.1485,
+        high__2048x2048: 0.3852,
+        high__2048x1152: 0.153,
+        high__1152x2048: 0.153,
+        high__3840x2160: 0.36,
+        high__2160x3840: 0.36,
+        high__auto: 0.1899,
+        auto__1024x1024: 0.0477,
+        auto__1536x1024: 0.0369,
+        auto__1024x1536: 0.0369,
+        auto__2048x2048: 0.1908,
+        auto__2048x1152: 0.0558,
+        auto__1152x2048: 0.0558,
+        auto__3840x2160: 0.1944,
+        auto__2160x3840: 0.1944,
+        auto__auto: 0.0477,
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_EDIT_4],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: null,
+    settings: [
+      {
+        key: "size",
+        label: "Размер",
+        description:
+          "1024×1024 — квадрат, 1536×1024 — альбом, 1024×1536 — портрет. 2K/3840 — экспериментальные. Auto — модель сама подберёт. Влияет на цену.",
+        type: "select",
+        options: [
+          { value: "1024x1024", label: "1024 × 1024" },
+          { value: "1536x1024", label: "1536 × 1024 (16:9)" },
+          { value: "1024x1536", label: "1024 × 1536 (9:16)" },
+          { value: "2048x2048", label: "2048 × 2048 (2K)" },
+          { value: "2048x1152", label: "2048 × 1152 (2K 16:9)" },
+          { value: "1152x2048", label: "1152 × 2048 (2K 9:16)" },
+          { value: "3840x2160", label: "3840 × 2160 (4K 16:9)" },
+          { value: "2160x3840", label: "2160 × 3840 (4K 9:16)" },
+          { value: "auto", label: "Auto" },
+        ],
+        default: "1024x1024",
+      },
+      {
+        key: "quality",
+        label: "Качество",
+        description: "Low — быстро, Medium — баланс, High — максимум. Влияет на цену.",
+        type: "select",
+        options: [
+          { value: "low", label: "Low" },
+          { value: "medium", label: "Medium" },
+          { value: "high", label: "High" },
+          { value: "auto", label: "Auto" },
+        ],
+        default: "medium",
+      },
+    ],
+  },
+  // ── GPT Image 2 via прямой OpenAI Images API (последний fallback) ────────────
+  // Срабатывает когда KIE primary и evolink fallback оба недоступны.
+  // Pricing — оригинальные тарифы OpenAI (см. выше evolink × 0.9 — обратная
+  // операция: openai = evolink / 0.9, но мы храним оригинальные значения).
+  // Адаптер: GptImageAdapter (factory routes provider="openai" + modelId="gpt-image-2").
+  {
+    id: "gpt-image-2",
+    name: "GPT Image 2 (openai fallback)",
+    description: "Fallback на прямой OpenAI Images API при недоступности KIE и evolink.",
+    section: "design",
+    provider: "openai",
+    costUsdPerRequest: 0.053,
+    costMatrix: {
+      dims: ["quality", "size"],
+      table: {
+        low__1024x1024: 0.006,
+        low__1536x1024: 0.005,
+        low__1024x1536: 0.005,
+        low__2048x2048: 0.012,
+        low__2048x1152: 0.005,
+        low__1152x2048: 0.005,
+        low__3840x2160: 0.011,
+        low__2160x3840: 0.011,
+        low__auto: 0.006,
+        medium__1024x1024: 0.053,
+        medium__1536x1024: 0.041,
+        medium__1024x1536: 0.041,
+        medium__2048x2048: 0.107,
+        medium__2048x1152: 0.042,
+        medium__1152x2048: 0.042,
+        medium__3840x2160: 0.1,
+        medium__2160x3840: 0.1,
+        medium__auto: 0.053,
+        high__1024x1024: 0.211,
+        high__1536x1024: 0.165,
+        high__1024x1536: 0.165,
+        high__2048x2048: 0.428,
+        high__2048x1152: 0.17,
+        high__1152x2048: 0.17,
+        high__3840x2160: 0.4,
+        high__2160x3840: 0.4,
+        high__auto: 0.211,
+        auto__1024x1024: 0.053,
+        auto__1536x1024: 0.041,
+        auto__1024x1536: 0.041,
+        auto__2048x2048: 0.212,
+        auto__2048x1152: 0.062,
+        auto__1152x2048: 0.062,
+        auto__3840x2160: 0.216,
+        auto__2160x3840: 0.216,
+        auto__auto: 0.053,
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_EDIT_4],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: null,
+    settings: [
+      {
+        key: "size",
+        label: "Размер",
+        description:
+          "1024×1024 — квадрат, 1536×1024 — альбом, 1024×1536 — портрет. 2K/3840 — экспериментальные. Auto — модель сама подберёт. Влияет на цену.",
+        type: "select",
+        options: [
+          { value: "1024x1024", label: "1024 × 1024" },
+          { value: "1536x1024", label: "1536 × 1024 (16:9)" },
+          { value: "1024x1536", label: "1024 × 1536 (9:16)" },
+          { value: "2048x2048", label: "2048 × 2048 (2K)" },
+          { value: "2048x1152", label: "2048 × 1152 (2K 16:9)" },
+          { value: "1152x2048", label: "1152 × 2048 (2K 9:16)" },
+          { value: "3840x2160", label: "3840 × 2160 (4K 16:9)" },
+          { value: "2160x3840", label: "2160 × 3840 (4K 9:16)" },
+          { value: "auto", label: "Auto" },
+        ],
+        default: "1024x1024",
+      },
+      {
+        key: "quality",
+        label: "Качество",
+        description: "Low — быстро, Medium — баланс, High — максимум. Влияет на цену",
+        type: "select",
+        options: [
+          { value: "low", label: "Low" },
+          { value: "medium", label: "Medium" },
+          { value: "high", label: "High" },
+          { value: "auto", label: "Auto" },
+        ],
+        default: "medium",
+      },
+      {
+        key: "output_format",
+        label: "Формат",
+        description: "Формат сохраняемого изображения. PNG поддерживает прозрачность.",
+        type: "select",
+        options: [
+          { value: "png", label: "PNG" },
+          { value: "jpeg", label: "JPEG" },
+          { value: "webp", label: "WebP" },
+        ],
+        default: "png",
+        advanced: true,
+      },
+      {
+        key: "output_compression",
+        label: "Сжатие",
+        description:
+          "Степень сжатия для JPEG и WebP (0 — без потерь, 100 — максимальное сжатие). Не влияет на PNG.",
+        type: "slider",
+        min: 0,
+        max: 100,
+        step: 1,
+        default: 100,
+        advanced: true,
+      },
+      {
+        key: "background",
+        label: "Фон",
+        description:
+          "opaque — непрозрачный фон. Прозрачный фон в GPT Image 2 пока не поддерживается.",
+        type: "select",
+        options: [
+          { value: "auto", label: "Auto" },
+          { value: "opaque", label: "Opaque" },
+        ],
+        default: "auto",
+      },
+      {
+        key: "moderation",
+        label: "Модерация",
+        description: "low — ослабленная фильтрация контента, auto — стандартная.",
+        type: "select",
+        options: [
+          { value: "auto", label: "Auto" },
+          { value: "low", label: "Low" },
+        ],
+        default: "auto",
+        advanced: true,
+      },
+    ],
+  },
+];

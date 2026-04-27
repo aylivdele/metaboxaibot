@@ -210,6 +210,7 @@ export const config = {
     recraft: opt("RECRAFT_API_KEY"),
     minimax: opt("MINIMAX_API_KEY"),
     kie: opt("KIE_API_KEY"),
+    evolink: opt("EVOLINK_API_KEY"),
   },
 } as const;
 
