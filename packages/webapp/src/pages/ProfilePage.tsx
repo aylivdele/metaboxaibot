@@ -773,7 +773,11 @@ function FolderPickerModal({
             );
           })}
         </ul>
-        <button type="button" className="btn btn--ghost folder-picker__create" onClick={onCreateFolder}>
+        <button
+          type="button"
+          className="btn btn--ghost folder-picker__create"
+          onClick={onCreateFolder}
+        >
           + {t("gallery.folder.createFirst")}
         </button>
         <div className="modal-actions">

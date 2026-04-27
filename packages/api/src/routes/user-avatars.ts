@@ -71,7 +71,9 @@ export const userAvatarsRoutes: FastifyPluginAsync = async (fastify) => {
             chat_id: telegramChatId,
             text: t.video.soulCreatePrompt,
             reply_markup: {
-              inline_keyboard: [[{ text: t.video.soulCancelButton, callback_data: "soul_create_cancel" }]],
+              inline_keyboard: [
+                [{ text: t.video.soulCancelButton, callback_data: "soul_create_cancel" }],
+              ],
             },
           }),
         });
