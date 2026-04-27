@@ -34,3 +34,33 @@ export function resolveUserFacingMessage(err: unknown, t: Translations): string 
 export function shouldNotifyOps(err: unknown): boolean {
   return err instanceof UserFacingError && err.notifyOps === true;
 }
+
+/**
+ * Resolve a sub-job error в form для virtual batch'а.
+ *
+ *   - userText: что показываем пользователю в footer'е batchPartialFooter /
+ *     batchAllFailed. Сначала пробуем `resolveUserFacingMessage` (mapping
+ *     UserFacingError → локализованный текст, hardcoded provider helpers,
+ *     плюс AI-classified errors через UserFacingError("aiClassifiedError")).
+ *     Если ничего не подошло — generic шаблон t.errors.generationFailed.
+ *   - rawText: сырое err.message для логов и notifyTechError.
+ *   - isUserFacing: true если userText резолвился из UserFacingError /
+ *     provider-helper'а; false если упали на generic шаблон. Помогает
+ *     решить надо ли алертить ops (генерик = unknown тех ошибка).
+ *
+ * Mirror'ит поведение single-shot path'а (см. catch в processImageJob /
+ * processVideoJob), просто формализованное в helper для batch контекста.
+ */
+export function resolveSubJobError(
+  err: unknown,
+  t: Translations,
+  modelName: string,
+): { userText: string; rawText: string; isUserFacing: boolean } {
+  const rawText = err instanceof Error ? err.message : String(err);
+  const mapped = resolveUserFacingMessage(err, t);
+  if (mapped !== null) {
+    return { userText: mapped, rawText, isUserFacing: true };
+  }
+  const userText = t.errors.generationFailed.replace("{modelName}", modelName);
+  return { userText, rawText, isUserFacing: false };
+}

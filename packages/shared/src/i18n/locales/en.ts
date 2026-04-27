@@ -256,8 +256,7 @@ export default {
       "❌ The provider failed to generate audio. Please try modifying your request.",
     audioCreateTaskFailed: "❌ Failed to create a generation task. Please try again later.",
     generationTimeout: "❌ Generation took too long. Please try again.",
-    generationFailed:
-      "❌ {modelName}: generation failed. Please try again later or contact support.",
+    generationFailed: "❌ {modelName}: AI model error.",
     generationStillRunning: "{modelName}\nStill generating, please wait...",
     generationTimedOut24h:
       "❌ {modelName}: generation did not finish within 24 hours and was cancelled. Please try again.",

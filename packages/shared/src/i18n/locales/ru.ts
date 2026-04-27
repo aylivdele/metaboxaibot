@@ -255,8 +255,7 @@ export default {
     audioGenerateFailed: "❌ Провайдер не смог сгенерировать аудио. Попробуйте изменить запрос.",
     audioCreateTaskFailed: "❌ Не удалось создать задачу генерации. Попробуйте позже.",
     generationTimeout: "❌ Генерация заняла слишком долго. Попробуйте снова.",
-    generationFailed:
-      "❌ {modelName}: ошибка при генерации, попробуйте позже или обратитесь в поддержку.",
+    generationFailed: "❌ {modelName}: ошибка нейросети.",
     generationStillRunning: "{modelName}\nВсё ещё генерирую, ожидайте...",
     generationTimedOut24h:
       "❌ {modelName}: генерация не завершилась за 24 часа и была отменена. Попробуйте снова.",
