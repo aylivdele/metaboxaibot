@@ -4,7 +4,12 @@ import { Api } from "grammy";
 import type { AvatarJobData } from "@metabox/api/queues";
 import { getAvatarQueue } from "@metabox/api/queues";
 import { userAvatarService } from "@metabox/api/services/user-avatar";
-import { getFileUrl } from "@metabox/api/services/s3";
+import {
+  getFileUrl,
+  generateThumbnail,
+  buildThumbnailKey,
+  uploadBuffer,
+} from "@metabox/api/services/s3";
 import { HeyGenAvatarAdapter } from "@metabox/api/ai/avatar/heygen";
 import { HiggsFieldSoulAdapter } from "@metabox/api/ai/avatar/higgsfield-soul";
 import { logger } from "../logger.js";
@@ -35,6 +40,35 @@ function buildHeyGenAdapter(acquired: AcquiredKey): HeyGenAvatarAdapter {
 function buildSoulAdapter(acquired: AcquiredKey): HiggsFieldSoulAdapter {
   const fetchFn = buildProxyFetch(acquired.proxy) ?? undefined;
   return new HiggsFieldSoulAdapter(acquired.apiKey, fetchFn);
+}
+
+/**
+ * Создаёт WebP-thumbnail из ПЕРВОГО фото Soul-персонажа и заливает его рядом
+ * с оригиналом по `buildThumbnailKey` (e.g. `..._thumb.webp`). Возвращает
+ * S3-ключ thumbnail'а или `null` если что-то пошло не так — caller должен
+ * обработать null как "нет preview" и не падать (preview — best-effort).
+ *
+ * Причина существования: HiggsField's API возвращает `previewUrl` ТОЛЬКО на
+ * стадии poll'а после `status: ready`, и у юзера в мини-аппе пустая карточка
+ * персонажа все 5-15 минут пока он создаётся. Делаем preview из исходного
+ * фото сразу — UX гораздо лучше.
+ */
+async function buildSoulPreviewThumbnail(s3Key: string): Promise<string | null> {
+  try {
+    const url = await getFileUrl(s3Key);
+    if (!url) return null;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const contentType = res.headers.get("content-type") ?? "image/jpeg";
+    const thumb = await generateThumbnail(buf, contentType);
+    if (!thumb) return null;
+    const thumbKey = buildThumbnailKey(s3Key);
+    const uploaded = await uploadBuffer(thumbKey, thumb, "image/webp").catch(() => null);
+    return uploaded ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function processAvatarJob(job: Job<AvatarJobData>, token?: string): Promise<void> {
@@ -89,10 +123,17 @@ export async function processAvatarJob(job: Job<AvatarJobData>, token?: string):
 
         const { externalId } = await soulAdapter.create(characterName ?? "My Character", imageUrls);
 
+        // Best-effort preview thumbnail из первого исходного фото — чтобы юзер
+        // видел картинку в мини-аппе пока персонаж процессится. На poll'е
+        // `previewUrl` перетрётся реальным provider preview'ом если HiggsField
+        // его отдаст; иначе наш thumbnail остаётся постоянным.
+        const previewKey = s3Keys[0] ? await buildSoulPreviewThumbnail(s3Keys[0]) : null;
+
         await userAvatarService.updateStatus(userAvatarId, {
           status: "creating",
           externalId,
           providerKeyId: acquired.keyId,
+          ...(previewKey ? { previewUrl: previewKey } : {}),
         });
 
         logger.info(
@@ -152,9 +193,13 @@ export async function processAvatarJob(job: Job<AvatarJobData>, token?: string):
         const result = await soulAdapter.poll(avatar.externalId);
 
         if (result.status === "ready") {
+          // previewUrl от HiggsField'а игнорируем — наш own thumbnail из
+          // первого исходного фото уже выставлен на стадии create. Если
+          // create-thumbnail почему-то не сгенерировался, фолбэчимся на
+          // provider preview (если он его отдал).
           await userAvatarService.updateStatus(userAvatarId, {
             status: "ready",
-            previewUrl: result.previewUrl,
+            ...(avatar.previewUrl ? {} : { previewUrl: result.previewUrl }),
           });
           await telegram
             .sendMessage(
