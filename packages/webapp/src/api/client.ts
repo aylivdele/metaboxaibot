@@ -236,13 +236,15 @@ export const api = {
       page?: number;
       limit?: number;
       modelId?: string;
+      modelIds?: string;
       folderId?: string;
     }) => {
       const qs = new URLSearchParams();
       if (params.section) qs.set("section", params.section);
       if (params.page) qs.set("page", String(params.page));
       if (params.limit) qs.set("limit", String(params.limit));
-      if (params.modelId) qs.set("modelId", params.modelId);
+      if (params.modelIds) qs.set("modelIds", params.modelIds);
+      else if (params.modelId) qs.set("modelId", params.modelId);
       if (params.folderId) qs.set("folderId", params.folderId);
       return request<GalleryResponse>(`/gallery?${qs.toString()}`);
     },

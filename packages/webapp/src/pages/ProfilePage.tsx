@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
@@ -248,6 +248,19 @@ function OverviewTab({ profile }: { profile: UserProfile }) {
 const SECTIONS = ["image", "audio", "video"] as const;
 type Section = (typeof SECTIONS)[number];
 
+function sortFolders(arr: GalleryFolder[]): GalleryFolder[] {
+  return [...arr].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+    if (a.isPinned && b.isPinned) {
+      const pa = a.pinnedAt ?? "";
+      const pb = b.pinnedAt ?? "";
+      if (pa !== pb) return pa < pb ? -1 : 1;
+    }
+    if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 function GalleryTab({
   onGoToManagement,
 }: {
@@ -273,7 +286,9 @@ function GalleryTab({
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [folderModalJob, setFolderModalJob] = useState<GalleryJob | null>(null);
   const [editFolder, setEditFolder] = useState<GalleryFolder | null>(null);
+  const [folderSelectOpen, setFolderSelectOpen] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const pendingFolderJobRef = useRef<GalleryJob | null>(null);
 
   const LIMIT = 20;
 
@@ -294,16 +309,32 @@ function GalleryTab({
     loadFolders();
   }, [loadFolders]);
 
+  const resolveModelIdsForFilter = useCallback(
+    (filter: string | null): { modelId?: string; modelIds?: string } => {
+      if (!filter) return {};
+      if (filter.startsWith("family:")) {
+        const familyId = filter.slice(7);
+        const ids = Object.values(modelsById)
+          .filter((m) => m.familyId === familyId)
+          .map((m) => m.id);
+        return ids.length > 0 ? { modelIds: ids.join(",") } : {};
+      }
+      return { modelId: filter };
+    },
+    [modelsById],
+  );
+
   const load = useCallback(
     (sec: Section, pg: number, mid: string | null, folderId: string | null) => {
       setLoading(true);
       setError(null);
+      const modelParams = resolveModelIdsForFilter(mid);
       api.gallery
         .list({
           section: sec,
           page: pg,
           limit: LIMIT,
-          modelId: mid ?? undefined,
+          ...modelParams,
           folderId: folderId ?? undefined,
         })
         .then((res) => {
@@ -313,7 +344,7 @@ function GalleryTab({
         .catch((err: Error) => setError(err.message))
         .finally(() => setLoading(false));
     },
-    [],
+    [resolveModelIdsForFilter],
   );
 
   useEffect(() => {
@@ -351,7 +382,6 @@ function GalleryTab({
   const handleSectionChange = (sec: Section) => {
     setSection(sec);
     setModelFilter(null);
-    setActiveFolderId(null);
     setPage(1);
   };
 
@@ -423,9 +453,36 @@ function GalleryTab({
   const favFolder = folders.find((f) => f.isDefault);
 
   const activeSectionKey = section === "image" ? "design" : section;
-  const sectionModels = Object.values(modelsById)
-    .filter((m) => m.section === activeSectionKey)
-    .sort((a, b) => (modelCounts[b.id] ?? 0) - (modelCounts[a.id] ?? 0));
+
+  const pickerOptions = useMemo(() => {
+    const allModels = Object.values(modelsById).filter((m) => m.section === activeSectionKey);
+    const familyCountMap = new Map<string, number>();
+    for (const m of allModels) {
+      if (m.familyId) {
+        familyCountMap.set(
+          m.familyId,
+          (familyCountMap.get(m.familyId) ?? 0) + (modelCounts[m.id] ?? 0),
+        );
+      }
+    }
+    const seenFamilies = new Set<string>();
+    const opts: { value: string; label: string; count: number }[] = [];
+    for (const m of allModels) {
+      if (m.familyId) {
+        if (!seenFamilies.has(m.familyId)) {
+          seenFamilies.add(m.familyId);
+          opts.push({
+            value: `family:${m.familyId}`,
+            label: m.familyName ?? m.familyId,
+            count: familyCountMap.get(m.familyId) ?? 0,
+          });
+        }
+      } else {
+        opts.push({ value: m.id, label: m.name, count: modelCounts[m.id] ?? 0 });
+      }
+    }
+    return opts.sort((a, b) => b.count - a.count);
+  }, [modelsById, modelCounts, activeSectionKey]);
 
   return (
     <>
@@ -473,25 +530,25 @@ function GalleryTab({
         >
           +
         </button>
-        {activeFolderId && folders.find((f) => f.id === activeFolderId && !f.isDefault) && (
+        {folders.some((f) => !f.isDefault) && (
           <button
-            className="gallery-folders__edit-btn"
-            onClick={() => setEditFolder(folders.find((f) => f.id === activeFolderId) ?? null)}
-            aria-label={t("gallery.folder.editTitle")}
+            className="chip gallery-folders__add"
+            onClick={() => setFolderSelectOpen(true)}
+            aria-label={t("gallery.folder.selectTitle")}
           >
-            ✎
+            ⚙
           </button>
         )}
       </div>
 
-      {sectionModels.length > 0 && (
+      {pickerOptions.length > 0 && (
         <StyledSelect
           style={{ display: "inline-block" }}
           value={modelFilter ?? ""}
           onChange={(v) => handleModelFilterChange(v === "" ? null : v)}
           options={[
             { value: "", label: t("gallery.allModels") },
-            ...sectionModels.map((m) => ({ value: m.id, label: m.name })),
+            ...pickerOptions.map((opt) => ({ value: opt.value, label: opt.label })),
           ]}
         />
       )}
@@ -579,6 +636,11 @@ function GalleryTab({
               setItems((prev) => prev.map((j) => (j.id === updatedJob.id ? updatedJob : j)));
               loadFolders();
             }}
+            onCreateFolder={() => {
+              pendingFolderJobRef.current = folderModalJob;
+              setFolderModalJob(null);
+              setCreateFolderOpen(true);
+            }}
           />,
           document.body,
         )}
@@ -587,11 +649,31 @@ function GalleryTab({
         createPortal(
           <FolderEditModal
             folder={null}
-            onClose={() => setCreateFolderOpen(false)}
+            onClose={() => {
+              pendingFolderJobRef.current = null;
+              setCreateFolderOpen(false);
+            }}
             onSave={async (name) => {
               const created = await api.gallery.folders.create(name);
-              setFolders((prev) => [...prev, created]);
+              setFolders((prev) => sortFolders([...prev, created]));
               setCreateFolderOpen(false);
+              if (pendingFolderJobRef.current) {
+                setFolderModalJob(pendingFolderJobRef.current);
+                pendingFolderJobRef.current = null;
+              }
+            }}
+          />,
+          document.body,
+        )}
+
+      {folderSelectOpen &&
+        createPortal(
+          <FolderSelectModal
+            folders={folders.filter((f) => !f.isDefault)}
+            onClose={() => setFolderSelectOpen(false)}
+            onSelect={(folder: GalleryFolder) => {
+              setFolderSelectOpen(false);
+              setEditFolder(folder);
             }}
           />,
           document.body,
@@ -605,8 +687,10 @@ function GalleryTab({
             onSave={async (name, isPinned) => {
               const updated = await api.gallery.folders.update(editFolder.id, { name, isPinned });
               setFolders((prev) =>
-                prev.map((f) =>
-                  f.id === updated.id ? { ...f, ...updated, itemCount: f.itemCount } : f,
+                sortFolders(
+                  prev.map((f) =>
+                    f.id === updated.id ? { ...f, ...updated, itemCount: f.itemCount } : f,
+                  ),
                 ),
               );
               setEditFolder(null);
@@ -631,11 +715,13 @@ function FolderPickerModal({
   folders,
   onClose,
   onUpdate,
+  onCreateFolder,
 }: {
   job: GalleryJob;
   folders: GalleryFolder[];
   onClose: () => void;
   onUpdate: (job: GalleryJob) => void;
+  onCreateFolder: () => void;
 }) {
   const { t } = useI18n();
   const [pending, setPending] = useState<string | null>(null);
@@ -667,7 +753,12 @@ function FolderPickerModal({
         </button>
         <div className="modal-title">{t("gallery.folder.addToFolder")}</div>
         {folders.length === 0 ? (
-          <div className="gallery-modal__settings">{t("gallery.folder.empty")}</div>
+          <div className="gallery-modal__no-folders">
+            <p className="gallery-modal__no-folders-text">{t("gallery.folder.noFolders")}</p>
+            <button type="button" className="btn btn--primary" onClick={onCreateFolder}>
+              {t("gallery.folder.createFirst")}
+            </button>
+          </div>
         ) : (
           <ul className="folder-picker__list">
             {folders.map((folder) => {
@@ -696,6 +787,46 @@ function FolderPickerModal({
             {t("gallery.folder.done")}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Folder Select Modal ───────────────────────────────────────────────────── */
+
+function FolderSelectModal({
+  folders,
+  onClose,
+  onSelect,
+}: {
+  folders: GalleryFolder[];
+  onClose: () => void;
+  onSelect: (folder: GalleryFolder) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="modal-close" onClick={onClose} aria-label="close">
+          ×
+        </button>
+        <div className="modal-title">{t("gallery.folder.selectTitle")}</div>
+        <ul className="folder-picker__list">
+          {folders.map((folder) => (
+            <li key={folder.id}>
+              <button
+                type="button"
+                className="folder-picker__item"
+                onClick={() => onSelect(folder)}
+              >
+                <span className="folder-picker__name">
+                  {folder.isPinned ? `⭐ ${folder.name}` : folder.name}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
@@ -786,7 +917,6 @@ function FolderEditModal({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("gallery.folder.namePlaceholder")}
-          autoFocus
           onKeyDown={(e) => e.key === "Enter" && void handleSave()}
         />
         {!isCreate && (
@@ -950,6 +1080,8 @@ function GalleryCard({
   const [deleting, setDeleting] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [lightboxOutput, setLightboxOutput] = useState<GalleryOutput | null>(null);
+  const [downloadingLightbox, setDownloadingLightbox] = useState(false);
 
   const isImage = job.section === "image";
   const isVideo = job.section === "video";
@@ -992,6 +1124,18 @@ function GalleryCard({
     if (!previewOutput) throw new Error("No output");
     const res = await api.gallery.previewUrl(previewOutput.id);
     return res.url;
+  };
+
+  const downloadLightboxOriginal = async (outputId: string) => {
+    setDownloadingLightbox(true);
+    try {
+      const { url } = await api.gallery.originalUrl(outputId);
+      openExternalLink(url);
+    } catch {
+      // silent
+    } finally {
+      setDownloadingLightbox(false);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -1070,7 +1214,12 @@ function GalleryCard({
             const loaded = imgLoaded[out.id];
             const src = out.thumbnailUrl ?? out.previewUrl ?? out.outputUrl ?? "";
             return (
-              <div key={out.id} className="gallery-card__output-tile">
+              <div
+                key={out.id}
+                className="gallery-card__output-tile"
+                onClick={() => setLightboxOutput(out)}
+                style={{ cursor: "zoom-in" }}
+              >
                 {!loaded && src && <div className="gallery-skeleton" />}
                 {!errored && src && (
                   <img
@@ -1091,7 +1240,11 @@ function GalleryCard({
           })}
         </div>
       ) : isImage && previewOutput ? (
-        <div className="gallery-card__preview">
+        <div
+          className="gallery-card__preview"
+          onClick={() => setLightboxOutput(previewOutput)}
+          style={{ cursor: "zoom-in" }}
+        >
           {!imgLoaded[previewOutput.id] && <div className="gallery-skeleton" />}
           {!imgErrors[previewOutput.id] && (
             <img
@@ -1233,6 +1386,51 @@ function GalleryCard({
                 ×
               </button>
               <video src={videoUrl} controls autoPlay playsInline className="video-modal__player" />
+            </div>
+          </div>,
+          document.body,
+        )}
+      {lightboxOutput &&
+        createPortal(
+          <div
+            className="modal-overlay gallery-lightbox-overlay"
+            onClick={() => setLightboxOutput(null)}
+          >
+            <div className="gallery-lightbox" onClick={(e) => e.stopPropagation()}>
+              <div className="gallery-lightbox__header">
+                <button
+                  type="button"
+                  className="gallery-lightbox__close"
+                  onClick={() => setLightboxOutput(null)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <img
+                src={lightboxOutput.previewUrl ?? lightboxOutput.outputUrl ?? ""}
+                alt={job.prompt}
+                className="gallery-lightbox__img"
+              />
+              {error && <p className="gallery-card__error">{error}</p>}
+              <div className="gallery-lightbox__actions">
+                <button
+                  type="button"
+                  className={`gallery-card__btn${sent ? " gallery-card__btn--sent" : ""}`}
+                  onClick={handleSend}
+                  disabled={loading || sent}
+                >
+                  {loading ? "…" : sent ? t("gallery.sent") : t("gallery.download")}
+                </button>
+                <button
+                  type="button"
+                  className="gallery-card__btn"
+                  onClick={() => void downloadLightboxOriginal(lightboxOutput.id)}
+                  disabled={downloadingLightbox}
+                >
+                  {downloadingLightbox ? "…" : t("gallery.downloadOriginal")}
+                </button>
+              </div>
             </div>
           </div>,
           document.body,

@@ -281,8 +281,11 @@ const translations = {
     "gallery.folder.addToFolder": "Add to folder",
     "gallery.folder.done": "Done",
     "gallery.folder.empty": "This folder is empty",
+    "gallery.folder.noFolders": "You haven't created any folders yet",
+    "gallery.folder.createFirst": "Create folder",
     "gallery.folder.deleteConfirmTitle": "Delete folder?",
     "gallery.folder.deleteConfirmText": "Generations will not be deleted.",
+    "gallery.folder.selectTitle": "Select folder to edit",
 
     // Settings
     "settings.title": "Account Settings",
@@ -739,8 +742,11 @@ const translations = {
     "gallery.folder.addToFolder": "Добавить в папку",
     "gallery.folder.done": "Готово",
     "gallery.folder.empty": "В этой папке пусто",
+    "gallery.folder.noFolders": "У вас пока нет ни одной папки",
+    "gallery.folder.createFirst": "Создать папку",
     "gallery.folder.deleteConfirmTitle": "Удалить папку?",
     "gallery.folder.deleteConfirmText": "Генерации удалены не будут.",
+    "gallery.folder.selectTitle": "Выберите папку",
 
     // Settings
     "settings.title": "Настройки аккаунта",

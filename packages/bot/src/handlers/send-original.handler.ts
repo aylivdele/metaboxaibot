@@ -57,6 +57,7 @@ export async function handleSendOriginal(ctx: BotContext): Promise<void> {
   const url = (output.s3Key ? await getFileUrl(output.s3Key) : null) ?? output.outputUrl;
 
   if (!url) {
+    await releaseLock(lockKey);
     await ctx.answerCallbackQuery();
     return;
   }
