@@ -286,6 +286,7 @@ function GalleryTab({
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [folderModalJob, setFolderModalJob] = useState<GalleryJob | null>(null);
   const [editFolder, setEditFolder] = useState<GalleryFolder | null>(null);
+  const [folderSelectOpen, setFolderSelectOpen] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const pendingFolderJobRef = useRef<GalleryJob | null>(null);
 
@@ -526,13 +527,13 @@ function GalleryTab({
         >
           +
         </button>
-        {activeFolderId && folders.find((f) => f.id === activeFolderId && !f.isDefault) && (
+        {folders.some((f) => !f.isDefault) && (
           <button
-            className="gallery-folders__edit-btn"
-            onClick={() => setEditFolder(folders.find((f) => f.id === activeFolderId) ?? null)}
-            aria-label={t("gallery.folder.editTitle")}
+            className="chip gallery-folders__add"
+            onClick={() => setFolderSelectOpen(true)}
+            aria-label={t("gallery.folder.selectTitle")}
           >
-            ✎
+            ⚙
           </button>
         )}
       </div>
@@ -662,6 +663,19 @@ function GalleryTab({
           document.body,
         )}
 
+      {folderSelectOpen &&
+        createPortal(
+          <FolderSelectModal
+            folders={folders.filter((f) => !f.isDefault)}
+            onClose={() => setFolderSelectOpen(false)}
+            onSelect={(folder: GalleryFolder) => {
+              setFolderSelectOpen(false);
+              setEditFolder(folder);
+            }}
+          />,
+          document.body,
+        )}
+
       {editFolder &&
         createPortal(
           <FolderEditModal
@@ -779,6 +793,46 @@ function FolderPickerModal({
   );
 }
 
+/* ── Folder Select Modal ───────────────────────────────────────────────────── */
+
+function FolderSelectModal({
+  folders,
+  onClose,
+  onSelect,
+}: {
+  folders: GalleryFolder[];
+  onClose: () => void;
+  onSelect: (folder: GalleryFolder) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="modal-close" onClick={onClose} aria-label="close">
+          ×
+        </button>
+        <div className="modal-title">{t("gallery.folder.selectTitle")}</div>
+        <ul className="folder-picker__list">
+          {folders.map((folder) => (
+            <li key={folder.id}>
+              <button
+                type="button"
+                className="folder-picker__item"
+                onClick={() => onSelect(folder)}
+              >
+                <span className="folder-picker__name">
+                  {folder.isPinned ? `⭐ ${folder.name}` : folder.name}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 /* ── Folder Edit / Create Modal ────────────────────────────────────────────── */
 
 function FolderEditModal({
@@ -864,7 +918,6 @@ function FolderEditModal({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("gallery.folder.namePlaceholder")}
-          autoFocus
           onKeyDown={(e) => e.key === "Enter" && void handleSave()}
         />
         {!isCreate && (

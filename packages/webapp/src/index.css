@@ -2125,20 +2125,6 @@ textarea::placeholder {
   flex-shrink: 0;
   border-radius: 50% !important;
 }
-.gallery-folders__edit-btn {
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  color: var(--text-hint);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 6px;
-  transition: color 0.15s;
-}
-.gallery-folders__edit-btn:hover {
-  color: var(--text-primary);
-}
 
 /* ── Folder Picker ────────────────────────────────────────────────────────── */
 .folder-picker__list {
