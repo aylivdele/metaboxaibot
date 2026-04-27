@@ -1081,6 +1081,8 @@ function GalleryCard({
   const [deleting, setDeleting] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [lightboxOutput, setLightboxOutput] = useState<GalleryOutput | null>(null);
+  const [downloadingLightbox, setDownloadingLightbox] = useState(false);
 
   const isImage = job.section === "image";
   const isVideo = job.section === "video";
@@ -1123,6 +1125,18 @@ function GalleryCard({
     if (!previewOutput) throw new Error("No output");
     const res = await api.gallery.previewUrl(previewOutput.id);
     return res.url;
+  };
+
+  const downloadLightboxOriginal = async (outputId: string) => {
+    setDownloadingLightbox(true);
+    try {
+      const { url } = await api.gallery.originalUrl(outputId);
+      openExternalLink(url);
+    } catch {
+      // silent
+    } finally {
+      setDownloadingLightbox(false);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -1201,7 +1215,12 @@ function GalleryCard({
             const loaded = imgLoaded[out.id];
             const src = out.thumbnailUrl ?? out.previewUrl ?? out.outputUrl ?? "";
             return (
-              <div key={out.id} className="gallery-card__output-tile">
+              <div
+                key={out.id}
+                className="gallery-card__output-tile"
+                onClick={() => setLightboxOutput(out)}
+                style={{ cursor: "zoom-in" }}
+              >
                 {!loaded && src && <div className="gallery-skeleton" />}
                 {!errored && src && (
                   <img
@@ -1222,7 +1241,11 @@ function GalleryCard({
           })}
         </div>
       ) : isImage && previewOutput ? (
-        <div className="gallery-card__preview">
+        <div
+          className="gallery-card__preview"
+          onClick={() => setLightboxOutput(previewOutput)}
+          style={{ cursor: "zoom-in" }}
+        >
           {!imgLoaded[previewOutput.id] && <div className="gallery-skeleton" />}
           {!imgErrors[previewOutput.id] && (
             <img
@@ -1364,6 +1387,51 @@ function GalleryCard({
                 ×
               </button>
               <video src={videoUrl} controls autoPlay playsInline className="video-modal__player" />
+            </div>
+          </div>,
+          document.body,
+        )}
+      {lightboxOutput &&
+        createPortal(
+          <div
+            className="modal-overlay gallery-lightbox-overlay"
+            onClick={() => setLightboxOutput(null)}
+          >
+            <div className="gallery-lightbox" onClick={(e) => e.stopPropagation()}>
+              <div className="gallery-lightbox__header">
+                <button
+                  type="button"
+                  className="gallery-lightbox__close"
+                  onClick={() => setLightboxOutput(null)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <img
+                src={lightboxOutput.previewUrl ?? lightboxOutput.outputUrl ?? ""}
+                alt={job.prompt}
+                className="gallery-lightbox__img"
+              />
+              {error && <p className="gallery-card__error">{error}</p>}
+              <div className="gallery-lightbox__actions">
+                <button
+                  type="button"
+                  className={`gallery-card__btn${sent ? " gallery-card__btn--sent" : ""}`}
+                  onClick={handleSend}
+                  disabled={loading || sent}
+                >
+                  {loading ? "…" : sent ? t("gallery.sent") : t("gallery.download")}
+                </button>
+                <button
+                  type="button"
+                  className="gallery-card__btn"
+                  onClick={() => void downloadLightboxOriginal(lightboxOutput.id)}
+                  disabled={downloadingLightbox}
+                >
+                  {downloadingLightbox ? "…" : t("gallery.downloadOriginal")}
+                </button>
+              </div>
             </div>
           </div>,
           document.body,
