@@ -287,6 +287,7 @@ function GalleryTab({
   const [folderModalJob, setFolderModalJob] = useState<GalleryJob | null>(null);
   const [editFolder, setEditFolder] = useState<GalleryFolder | null>(null);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const pendingFolderJobRef = useRef<GalleryJob | null>(null);
 
   const LIMIT = 20;
 
@@ -631,6 +632,11 @@ function GalleryTab({
               setItems((prev) => prev.map((j) => (j.id === updatedJob.id ? updatedJob : j)));
               loadFolders();
             }}
+            onCreateFolder={() => {
+              pendingFolderJobRef.current = folderModalJob;
+              setFolderModalJob(null);
+              setCreateFolderOpen(true);
+            }}
           />,
           document.body,
         )}
@@ -639,11 +645,18 @@ function GalleryTab({
         createPortal(
           <FolderEditModal
             folder={null}
-            onClose={() => setCreateFolderOpen(false)}
+            onClose={() => {
+              pendingFolderJobRef.current = null;
+              setCreateFolderOpen(false);
+            }}
             onSave={async (name) => {
               const created = await api.gallery.folders.create(name);
-              setFolders((prev) => [...prev, created]);
+              setFolders((prev) => sortFolders([...prev, created]));
               setCreateFolderOpen(false);
+              if (pendingFolderJobRef.current) {
+                setFolderModalJob(pendingFolderJobRef.current);
+                pendingFolderJobRef.current = null;
+              }
             }}
           />,
           document.body,
@@ -685,11 +698,13 @@ function FolderPickerModal({
   folders,
   onClose,
   onUpdate,
+  onCreateFolder,
 }: {
   job: GalleryJob;
   folders: GalleryFolder[];
   onClose: () => void;
   onUpdate: (job: GalleryJob) => void;
+  onCreateFolder: () => void;
 }) {
   const { t } = useI18n();
   const [pending, setPending] = useState<string | null>(null);
@@ -721,7 +736,16 @@ function FolderPickerModal({
         </button>
         <div className="modal-title">{t("gallery.folder.addToFolder")}</div>
         {folders.length === 0 ? (
-          <div className="gallery-modal__settings">{t("gallery.folder.empty")}</div>
+          <div className="gallery-modal__no-folders">
+            <p className="gallery-modal__no-folders-text">{t("gallery.folder.noFolders")}</p>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={onCreateFolder}
+            >
+              {t("gallery.folder.createFirst")}
+            </button>
+          </div>
         ) : (
           <ul className="folder-picker__list">
             {folders.map((folder) => {
