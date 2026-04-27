@@ -257,9 +257,7 @@ const translations = {
     "gallery.prompt": "Prompt",
     "gallery.settings": "Settings",
     "gallery.noSettings": "No additional settings",
-    "gallery.cost": "Cost",
-    "gallery.costTokens": "tokens",
-    "gallery.costUnknown": "—",
+
     "gallery.morePhotos": "+{n}",
     "gallery.emptyModel": "You haven't generated anything with this AI yet",
     "gallery.tryModel": "Try it",
@@ -718,9 +716,7 @@ const translations = {
     "gallery.prompt": "Промпт",
     "gallery.settings": "Настройки",
     "gallery.noSettings": "Дополнительных настроек нет",
-    "gallery.cost": "Стоимость",
-    "gallery.costTokens": "токенов",
-    "gallery.costUnknown": "—",
+
     "gallery.morePhotos": "+{n}",
     "gallery.emptyModel": "Вы ещё ничего не генерировали с этой нейросетью",
     "gallery.tryModel": "Попробовать",
