@@ -312,26 +312,17 @@ export async function getActiveModelSlots(
  * if all required inputs are present.
  *
  * Beyond the intrinsic `slot.required` flag, this also enforces conditional
- * requirements: for kling/kling-pro the `first_frame` slot becomes required
- * whenever any `ref_element_*` is filled (KIE's @element references can only
- * be resolved against an explicit first frame).
+ * requirements derived from the model definition (e.g. required slots added
+ * dynamically based on mode). See `exclusiveGroup` on MediaInputSlot for
+ * mutual-exclusion hiding (e.g. KIE kling frames vs elements).
  */
 export function findMissingRequiredSlot(
-  modelId: string,
+  _modelId: string,
   activeSlots: MediaInputSlot[],
   filledInputs: Record<string, string[]>,
 ): MediaInputSlot | null {
   for (const slot of activeSlots) {
     if (slot.required && !filledInputs[slot.slotKey]?.length) return slot;
-  }
-  if (modelId === "kling" || modelId === "kling-pro") {
-    const anyRefFilled = Object.entries(filledInputs).some(
-      ([key, vals]) => key.startsWith("ref_element_") && vals?.length,
-    );
-    if (anyRefFilled && !filledInputs["first_frame"]?.length) {
-      const firstFrameSlot = activeSlots.find((s) => s.slotKey === "first_frame");
-      if (firstFrameSlot) return { ...firstFrameSlot, required: true };
-    }
   }
   return null;
 }
