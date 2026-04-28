@@ -1,5 +1,6 @@
 import type { Section } from "./user.js";
 import type { ContextStrategy } from "./dialog.js";
+import type { PromptRefCapabilities } from "../prompt-refs/canonical.js";
 
 // ── Model settings condition types ───────────────────────────────────────────
 
@@ -135,12 +136,26 @@ export interface MediaInputSlot {
    */
   exclusiveGroup?: string;
   /**
+   * When true, only photos are accepted — videos are rejected immediately with
+   * a user-facing error. Overrides the default `reference_element` behaviour
+   * which normally allows a single video in place of images.
+   */
+  imagesOnly?: boolean;
+  /**
    * Upload-time validation rules (duration, file size). When a constraint is
    * violated, the upload is rejected with a user-facing error built from
    * `t.errors.mediaSlot*` strings. Reusable across models — e.g. Kling motion
    * enforces 3–30 s on `motion_video`.
    */
   constraints?: MediaInputConstraints;
+  /**
+   * Прогрессивный reveal: кнопка слота скрыта в slot keyboard'е до тех пор,
+   * пока слот с `slotKey === revealAfter` не заполнен. Нужно для случаев когда
+   * provider'у нельзя передать «последний» без «первого» (например KIE Kling
+   * принимает first_frame и last_frame одним массивом image_urls — last
+   * standalone не имеет смысла).
+   */
+  revealAfter?: string;
 }
 
 // ── Model family types ───────────────────────────────────────────────────────
@@ -444,6 +459,12 @@ export interface AIModel {
     inputMultiplier: number;
     outputMultiplier: number;
   };
+  /**
+   * Declares which @-reference kinds the model accepts in its prompt.
+   * Used by the pre-flight validator to catch wrong references before submission.
+   * Models without this field do not support any @-references.
+   */
+  promptRefs?: PromptRefCapabilities;
   /**
    * Configurable generation parameters exposed in the Management mini-app.
    * The frontend renders controls dynamically based on these definitions.

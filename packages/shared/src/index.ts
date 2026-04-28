@@ -26,6 +26,8 @@ export type {
   GenerationInput,
   GenerationOutput,
 } from "./types/ai.js";
+export type { PromptRefCapabilities } from "./prompt-refs/canonical.js";
+export { AT_TOKEN_RE, ELEMENT_CI_RE, IMAGE_CI_RE, VIDEO_CI_RE } from "./prompt-refs/canonical.js";
 
 // Constants
 export { SUPPORTED_LANGUAGES, LANGUAGE_LABELS, RTL_LANGUAGES } from "./constants/languages.js";
@@ -45,7 +47,11 @@ export type { Plan } from "./constants/plans.js";
 export { ONE_SHOT_SETTING_KEYS } from "./constants/model-settings-keys.js";
 
 // Errors
-export { UserFacingError, resolveUserFacingError } from "./errors.js";
+export {
+  UserFacingError,
+  resolveUserFacingError,
+  ProviderInputIncompatibleError,
+} from "./errors.js";
 
 // Web token (URL-based auth for KeyboardButtonWebApp where initData is unavailable)
 export { generateWebToken, verifyWebToken } from "./webtoken.js";

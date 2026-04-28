@@ -61,6 +61,7 @@ import {
   handleRefineUseActive,
   handleRefineChooseModel,
   handleRefineSection,
+  handleRefineFamily,
   handleRefineModel,
   handleRefineSlot,
 } from "./scenes/refine.js";
@@ -259,6 +260,7 @@ export function createBot(token: string): Bot<BotContext> {
   bot.callbackQuery(/^ref_use:/, handleRefineUseActive);
   bot.callbackQuery(/^ref_choose:/, handleRefineChooseModel);
   bot.callbackQuery(/^ref_sec:/, handleRefineSection);
+  bot.callbackQuery(/^ref_fam:/, handleRefineFamily);
   bot.callbackQuery(/^ref_mdl:/, handleRefineModel);
   bot.callbackQuery(/^ref_slt:/, handleRefineSlot);
 

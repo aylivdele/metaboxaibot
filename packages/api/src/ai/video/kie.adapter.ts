@@ -4,10 +4,11 @@ import type {
   VideoValidationError,
   VideoResult,
 } from "./base.adapter.js";
-import { config, UserFacingError } from "@metabox/shared";
+import { config, UserFacingError, ProviderInputIncompatibleError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { uploadFileUrl } from "../../utils/kie-upload.js";
 import { classifyAIError } from "../../services/ai-error-classifier.service.js";
+import { translatePromptRefs } from "../../services/prompt-ref-translator.service.js";
 
 const KIE_BASE = "https://api.kie.ai";
 
@@ -105,14 +106,6 @@ export class KieVideoAdapter implements VideoAdapter {
       return { key: "promptTooLong", params: { limit } };
     }
 
-    if (KLING_MODEL_MAP[this.modelId] && input.prompt && /@element_\w+/.test(input.prompt)) {
-      const mi = input.mediaInputs ?? {};
-      const hasElements = Object.keys(mi).some(
-        (k) => k.startsWith("ref_element_") && mi[k]?.length,
-      );
-      if (!hasElements) return { key: "klingElementsRequired" };
-    }
-
     return null;
   }
 
@@ -159,10 +152,22 @@ export class KieVideoAdapter implements VideoAdapter {
 
       const firstFrame = mi.first_frame?.[0] ?? input.imageUrl;
       const lastFrame = mi.last_frame?.[0];
+
+      // KIE cannot process image_urls (i2v) and kling_elements simultaneously.
+      // Check before any uploads so we don't waste KIE file-upload API calls.
+      // submitWithFallback catches this and routes to evolink, which separates
+      // them into image_start and image_urls and handles both correctly.
+      const hasFrame = !!(firstFrame || lastFrame);
+      const hasElements = [1, 2, 3].some((i) => mi[`ref_element_${i}`]?.length);
+      if (hasFrame && hasElements) {
+        throw new ProviderInputIncompatibleError(
+          "KIE kling: image_urls + kling_elements combination is not supported — routing to fallback",
+        );
+      }
+
       const imageUrls: string[] = [];
       if (firstFrame) imageUrls.push(await uploadFileUrl(this.apiKey, firstFrame));
       if (lastFrame) imageUrls.push(await uploadFileUrl(this.apiKey, lastFrame));
-      if (imageUrls.length) inputPayload.image_urls = imageUrls;
 
       inputPayload.mode = klingMode;
       inputPayload.aspect_ratio =
@@ -197,8 +202,16 @@ export class KieVideoAdapter implements VideoAdapter {
           description: `reference element ${i}`,
           element_input_urls: elementUrls,
         });
+        // KIE requires image_urls to have an entry for each element when
+        // role references (@element1, @element2) appear in the prompt.
+        imageUrls.push(elementUrls[0]!);
       }
       if (klingElements.length) inputPayload.kling_elements = klingElements;
+      if (imageUrls.length) inputPayload.image_urls = imageUrls;
+
+      if (input.prompt) {
+        inputPayload.prompt = translatePromptRefs(input.prompt, { dialect: "kie" });
+      }
     } else if (seedanceModel) {
       // ── Seedance 2.0 / 2.0 Fast ────────────────────────────────────────────
       model = seedanceModel;
@@ -314,9 +327,15 @@ export class KieVideoAdapter implements VideoAdapter {
       const failCode = task.failCode;
       const technicalMessage = `KIE ${this.modelId} generation failed: ${failCode ?? ""} ${failMsg}`;
       const isCopyright = failCode === "501" || /copyright/i.test(failMsg);
+      // KIE/evolink content moderation: "Request blocked: ... prominent public figure"
+      const isPublicFigure = /public figure|public person|prominent figure|celebrity/i.test(
+        failMsg,
+      );
       const isPolicy =
         failCode === "430" ||
         /sensitive|restricted|policy|prohibited|nsfw|violat|inappropriate/i.test(failMsg);
+      if (isPublicFigure)
+        throw new UserFacingError(technicalMessage, { key: "publicFigureViolation" });
       if (isCopyright) throw new UserFacingError(technicalMessage, { key: "copyrightViolation" });
       if (isPolicy) throw new UserFacingError(technicalMessage, { key: "contentPolicyViolation" });
 

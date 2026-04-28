@@ -33,14 +33,15 @@ export function truncateStrings(value: unknown, maxLen = 20): unknown {
  * undici fetch с ProxyAgent — см. `ai/transport/proxy-fetch.ts`). Если не
  * передан — используется глобальный `fetch`.
  */
-export function fetchWithLog(
+export async function fetchWithLog(
   url: string | URL | Request,
   init?: RequestInit,
   customFetch?: typeof globalThis.fetch,
 ): Promise<Response> {
+  const method = init?.method ?? "GET";
+  const urlStr = url instanceof Request ? url.url : String(url);
+
   if (logger.isLevelEnabled("debug")) {
-    const method = init?.method ?? "GET";
-    const urlStr = url instanceof Request ? url.url : String(url);
     const body = init?.body;
 
     let bodyLog: unknown;
@@ -74,7 +75,46 @@ export function fetchWithLog(
   }
 
   const f = customFetch ?? fetch;
-  return f(url as Parameters<typeof fetch>[0], init);
+  try {
+    return await f(url as Parameters<typeof fetch>[0], init);
+  } catch (err) {
+    // Undici выбрасывает `TypeError: fetch failed` без контекста — реальная
+    // причина прячется в err.cause (.code: "ECONNRESET" и т.п.). Заворачиваем
+    // в Error с понятным префиксом + сохраняем оригинал как cause, чтобы
+    // isTransientNetworkError (walk через cause) и serializeError (тоже walk)
+    // подобрали правильный код и напечатали URL/method/host в alert'е.
+    const causeCode = extractErrorCode(err);
+    const baseMsg = err instanceof Error ? err.message : String(err);
+    const tagged = new Error(
+      `fetch ${method} ${truncateUrl(urlStr)} failed${causeCode ? ` (${causeCode})` : ""}: ${baseMsg}`,
+      { cause: err },
+    );
+    throw tagged;
+  }
+}
+
+/** Walks err.cause до 5 уровней вглубь и возвращает первый найденный `code`. */
+function extractErrorCode(err: unknown): string | null {
+  let cur: unknown = err;
+  for (let i = 0; i < 5 && cur; i++) {
+    if (typeof cur === "object" && cur !== null) {
+      const code = (cur as { code?: unknown }).code;
+      if (typeof code === "string") return code;
+      cur = (cur as { cause?: unknown }).cause;
+    } else break;
+  }
+  return null;
+}
+
+/** Обрезает query string и длинный path для алертов. Хранит host + первые 80 символов path. */
+function truncateUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const path = u.pathname.length > 80 ? u.pathname.slice(0, 77) + "..." : u.pathname;
+    return `${u.host}${path}`;
+  } catch {
+    return url.length > 100 ? url.slice(0, 97) + "..." : url;
+  }
 }
 
 /**

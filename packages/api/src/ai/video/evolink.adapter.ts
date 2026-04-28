@@ -2,6 +2,10 @@ import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { classifyAIError } from "../../services/ai-error-classifier.service.js";
+import {
+  translatePromptRefs,
+  buildEvolinkElementPositions,
+} from "../../services/prompt-ref-translator.service.js";
 
 const EVOLINK_BASE = "https://api.evolink.ai";
 
@@ -64,19 +68,6 @@ function hasAnyKlingImageInput(mi: Record<string, string[]>, legacyImageUrl?: st
 function flattenRefElementsFirstOnly(mi: Record<string, string[]>): string[] {
   const slots = ["ref_element_1", "ref_element_2", "ref_element_3"];
   return slots.map((key) => mi[key]?.[0]).filter((url): url is string => !!url);
-}
-
-/**
- * Replace primary KIE element references `@elementN` with evolink's
- * `<<<image_N>>>` syntax. Только для индексов 1..count чтобы не оставлять
- * dangling-ссылки на несуществующие image_urls.
- */
-function remapElementSyntax(prompt: string | undefined, count: number): string | undefined {
-  if (!prompt) return prompt;
-  return prompt.replace(/@element(\d+)/g, (match, idx) => {
-    const i = Number(idx);
-    return i >= 1 && i <= count ? `<<<image_${i}>>>` : match;
-  });
 }
 
 interface EvolinkSubmitResponse {
@@ -263,7 +254,10 @@ export class EvolinkVideoAdapter implements VideoAdapter {
     const imageStart = mi.first_frame?.[0] ?? input.imageUrl;
     const imageEnd = mi.last_frame?.[0];
     const refImages = flattenRefElementsFirstOnly(mi);
-    const remappedPrompt = remapElementSyntax(input.prompt, refImages.length);
+    const elementPositions = buildEvolinkElementPositions(mi);
+    const remappedPrompt = input.prompt
+      ? translatePromptRefs(input.prompt, { dialect: "evolink", elementPositions })
+      : undefined;
 
     const aspectRatio = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio;
     const rawDuration = ms.duration ?? input.duration ?? 5;
@@ -508,6 +502,9 @@ export class EvolinkVideoAdapter implements VideoAdapter {
 
     switch (code) {
       case "content_policy_violation": {
+        if (/public figure|public person|prominent figure|celebrity/i.test(message)) {
+          throw new UserFacingError(technicalMessage, { key: "publicFigureViolation" });
+        }
         if (/copyright|trademark|third-party|logo/i.test(message)) {
           throw new UserFacingError(technicalMessage, { key: "copyrightViolation" });
         }
@@ -544,6 +541,9 @@ export class EvolinkVideoAdapter implements VideoAdapter {
       }
 
       case "generation_failed_no_content": {
+        if (/public figure|public person|prominent figure|celebrity/i.test(message)) {
+          throw new UserFacingError(technicalMessage, { key: "publicFigureViolation" });
+        }
         if (/copyright|trademark|logo|watermark/i.test(message)) {
           throw new UserFacingError(technicalMessage, { key: "copyrightViolation" });
         }

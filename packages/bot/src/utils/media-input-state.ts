@@ -154,7 +154,7 @@ export function getSlotMediaTypes(slot: MediaInputSlot): readonly SlotMediaType[
     case "driving_audio":
       return ["audio"];
     case "reference_element":
-      return ["image", "video"];
+      return slot.imagesOnly ? ["image"] : ["image", "video"];
     default:
       return ["image"];
   }
@@ -311,27 +311,16 @@ export async function getActiveModelSlots(
  * Returns the first slot that's required-but-missing for this model, or null
  * if all required inputs are present.
  *
- * Beyond the intrinsic `slot.required` flag, this also enforces conditional
- * requirements: for kling/kling-pro the `first_frame` slot becomes required
- * whenever any `ref_element_*` is filled (KIE's @element references can only
- * be resolved against an explicit first frame).
+ * Beyond the intrinsic `slot.required` flag this can be extended with
+ * conditional requirements derived from mode or model definition.
  */
 export function findMissingRequiredSlot(
-  modelId: string,
+  _modelId: string,
   activeSlots: MediaInputSlot[],
   filledInputs: Record<string, string[]>,
 ): MediaInputSlot | null {
   for (const slot of activeSlots) {
     if (slot.required && !filledInputs[slot.slotKey]?.length) return slot;
-  }
-  if (modelId === "kling" || modelId === "kling-pro") {
-    const anyRefFilled = Object.entries(filledInputs).some(
-      ([key, vals]) => key.startsWith("ref_element_") && vals?.length,
-    );
-    if (anyRefFilled && !filledInputs["first_frame"]?.length) {
-      const firstFrameSlot = activeSlots.find((s) => s.slotKey === "first_frame");
-      if (firstFrameSlot) return { ...firstFrameSlot, required: true };
-    }
   }
   return null;
 }
@@ -423,6 +412,13 @@ export function buildMediaInputStatusMenu(
       filledGroups.size > 0 &&
       !filledGroups.has(slot.exclusiveGroup)
     ) {
+      continue;
+    }
+
+    // Прогрессивный reveal: скрываем кнопку пока зависимый слот не заполнен.
+    // (Если данный слот уже заполнен — показываем как обычно, чтобы можно было
+    // снять.)
+    if (slot.revealAfter && !isFilled && !filledInputs[slot.revealAfter]?.length) {
       continue;
     }
 

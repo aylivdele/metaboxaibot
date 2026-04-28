@@ -8,7 +8,8 @@
  *   design_ref_{outputId}          — entry point
  *   ref_use:{outputId}             — use in active model
  *   ref_choose:{outputId}          — show section chooser
- *   ref_sec:{d|v}:{outputId}       — show models for section
+ *   ref_sec:{d|v}:{outputId}       — show families+singles for section
+ *   ref_fam:{familyId}:{outputId}  — show family members submenu
  *   ref_mdl:{modelId}:{outputId}   — activate model
  *   ref_slt:{slotKey}:{outputId}   — pick slot (when model has multiple)
  */
@@ -17,6 +18,8 @@ import { generationService, userStateService } from "@metabox/api/services";
 import {
   AI_MODELS,
   MODELS_BY_SECTION,
+  FAMILIES_BY_SECTION,
+  MODEL_FAMILIES,
   resolveModelDisplay,
   type MediaInputSlot,
 } from "@metabox/shared";
@@ -39,22 +42,87 @@ function getCompatibleSlots(
   return slots.filter((s) => modes.has(s.mode));
 }
 
-/** Build a model-list keyboard for models in `section` that have compatible slots. */
-function buildRefineModelKeyboard(
+/**
+ * Top-level refine keyboard: families (с хотя бы одним совместимым членом) +
+ * standalone модели (без familyId, со совместимыми слотами). Layout — 2 в ряд,
+ * как на обычном экране выбора модели. Family-кнопка ведёт в подменю
+ * (`ref_fam:`), standalone — сразу активирует (`ref_mdl:`).
+ */
+function buildRefineFamilyOrModelKeyboard(
   section: "design" | "video",
   jobId: string,
   lang: string,
 ): InlineKeyboard {
   const allModels = MODELS_BY_SECTION[section] ?? [];
-  const kb = new InlineKeyboard();
-  const seen = new Set<string>();
+  const families = FAMILIES_BY_SECTION[section] ?? [];
+  const familyModelIds = new Set(families.flatMap((f) => f.members.map((m) => m.modelId)));
+
+  const buttons: Array<[string, string]> = [];
+
+  // Families — добавляем только те, у которых есть compatible-член.
+  for (const family of families) {
+    const hasCompatibleMember = family.members.some((m) => {
+      const model = AI_MODELS[m.modelId];
+      return getCompatibleSlots(model?.mediaInputs, section).length > 0;
+    });
+    if (!hasCompatibleMember) continue;
+    buttons.push([family.name, `ref_fam:${family.id}:${jobId}`]);
+  }
+
+  // Standalone — модели без familyId с compatible-слотами.
   for (const model of allModels) {
-    if (seen.has(model.id)) continue;
-    const compatible = getCompatibleSlots(model.mediaInputs, section);
-    if (compatible.length === 0) continue;
-    seen.add(model.id);
+    if (familyModelIds.has(model.id)) continue;
+    if (getCompatibleSlots(model.mediaInputs, section).length === 0) continue;
     const { name } = resolveModelDisplay(model.id, lang, model);
-    kb.text(name, `ref_mdl:${model.id}:${jobId}`).row();
+    buttons.push([name, `ref_mdl:${model.id}:${jobId}`]);
+  }
+
+  const kb = new InlineKeyboard();
+  for (let i = 0; i < buttons.length; i += 2) {
+    kb.text(buttons[i][0], buttons[i][1]);
+    if (buttons[i + 1]) kb.text(buttons[i + 1][0], buttons[i + 1][1]);
+    kb.row();
+  }
+  return kb;
+}
+
+/** Подпись для кнопки члена семьи: версия+вариант, либо одно из, либо имя модели. */
+function familyMemberLabel(
+  member: { modelId: string; versionLabel?: string; variantLabel?: string },
+  lang: string,
+): string {
+  if (member.versionLabel && member.variantLabel) {
+    return `${member.versionLabel} ${member.variantLabel}`;
+  }
+  if (member.variantLabel) return member.variantLabel;
+  if (member.versionLabel) return member.versionLabel;
+  const model = AI_MODELS[member.modelId];
+  return model ? resolveModelDisplay(member.modelId, lang, model).name : member.modelId;
+}
+
+/** Подменю членов семьи с compatible-слотами. Layout 2 в ряд. */
+function buildRefineFamilyMembersKeyboard(
+  familyId: string,
+  section: "design" | "video",
+  jobId: string,
+  lang: string,
+): InlineKeyboard {
+  const family = MODEL_FAMILIES[familyId];
+  const kb = new InlineKeyboard();
+  if (!family) return kb;
+
+  const buttons: Array<[string, string]> = [];
+  for (const member of family.members) {
+    const model = AI_MODELS[member.modelId];
+    if (!model) continue;
+    if (getCompatibleSlots(model.mediaInputs, section).length === 0) continue;
+    buttons.push([familyMemberLabel(member, lang), `ref_mdl:${member.modelId}:${jobId}`]);
+  }
+
+  for (let i = 0; i < buttons.length; i += 2) {
+    kb.text(buttons[i][0], buttons[i][1]);
+    if (buttons[i + 1]) kb.text(buttons[i + 1][0], buttons[i + 1][1]);
+    kb.row();
   }
   return kb;
 }
@@ -186,7 +254,7 @@ export async function handleRefineChooseModel(ctx: BotContext): Promise<void> {
   await ctx.editMessageText(ctx.t.mediaInput.refineNoSupport, { reply_markup: kb });
 }
 
-// ── ref_sec:{d|v}:{jobId} — show models for section ────────────────────────
+// ── ref_sec:{d|v}:{jobId} — show families+singles for section ───────────────
 
 export async function handleRefineSection(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
@@ -197,10 +265,36 @@ export async function handleRefineSection(ctx: BotContext): Promise<void> {
 
   const section: "design" | "video" = sectionCode === "v" ? "video" : "design";
   const lang = ctx.user.language ?? "en";
-  const kb = buildRefineModelKeyboard(section, jobId, lang);
+  const kb = buildRefineFamilyOrModelKeyboard(section, jobId, lang);
 
   if (!kb.inline_keyboard.length) {
-    // No models with compatible slots — shouldn't happen, but handle gracefully
+    // No families/standalone models with compatible slots — shouldn't happen.
+    await ctx.editMessageText(ctx.t.mediaInput.refineNoSupport);
+    return;
+  }
+  await ctx.editMessageText(ctx.t.mediaInput.refineChooseModel, { reply_markup: kb });
+}
+
+// ── ref_fam:{familyId}:{jobId} — show family members submenu ────────────────
+
+export async function handleRefineFamily(ctx: BotContext): Promise<void> {
+  if (!ctx.user) return;
+  const data = (ctx.callbackQuery?.data ?? "").replace("ref_fam:", "");
+  const sepIdx = data.lastIndexOf(":");
+  const familyId = data.slice(0, sepIdx);
+  const jobId = data.slice(sepIdx + 1);
+  await ctx.answerCallbackQuery();
+
+  const family = MODEL_FAMILIES[familyId];
+  if (!family) {
+    await ctx.editMessageText(ctx.t.mediaInput.refineNoSupport);
+    return;
+  }
+  const section = family.section as "design" | "video";
+  const lang = ctx.user.language ?? "en";
+  const kb = buildRefineFamilyMembersKeyboard(familyId, section, jobId, lang);
+
+  if (!kb.inline_keyboard.length) {
     await ctx.editMessageText(ctx.t.mediaInput.refineNoSupport);
     return;
   }

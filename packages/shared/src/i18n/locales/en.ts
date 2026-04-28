@@ -68,6 +68,8 @@ export default {
       attach: "✦ You can attach images, files (PDF, DOCX, XLSX, etc.).",
       thinkingWarning:
         "✦ If thinking mode is enabled, the response may take up to 10 minutes depending on dialog size and thinking depth.",
+      filesWarning:
+        "\n<blockquote>💡Text neural networks don't generate images or create files.</blockquote>",
     },
   },
   design: {
@@ -163,6 +165,26 @@ export default {
       "❌ Prompt is too long — this model supports up to {limit} characters. Please shorten your text and try again.",
     klingElementsRequired:
       "❌ Your prompt contains element references (like @element_dog) but no element images were uploaded. Use the element slots below to attach reference images, or remove the @element references from your prompt.",
+    promptRefElementWordName:
+      "❌ Named element references (@{raw}) are not supported. Use numeric references instead: @Element1..@Element{max}.",
+    promptRefElementMissing:
+      "❌ Your prompt contains @Element{n} but the Element {n} slot is empty. Upload an image to that slot or remove the reference from your prompt.",
+    promptRefElementOutOfRange:
+      "❌ @Element{n}: this model supports a maximum of {max} element(s). Use @Element1..@Element{max}.",
+    promptRefImageMissing:
+      "❌ Your prompt contains @Image{n} but reference image #{n} has not been uploaded. Add an image to the slot or remove the reference.",
+    promptRefImageOutOfRange:
+      "❌ @Image{n}: this model supports a maximum of {max} reference images. Use @Image1..@Image{max}.",
+    promptRefVideoMissing:
+      "❌ Your prompt contains @Video but no reference video has been uploaded. Add a video to the slot or remove @Video from your prompt.",
+    promptRefVideoIndexed:
+      "❌ Use @Video (without a number) — this model supports a single reference video.",
+    promptRefVideoUseElements:
+      "❌ Reference elements in your prompt using @Element1, @Element2, @Element3 — exactly in this form.",
+    promptRefUnsupportedByModel:
+      '❌ This model does not support @-references in the prompt. Remove "{raw}" or switch to a compatible model.',
+    promptRefUnknownToken:
+      '❌ Unrecognised reference "{raw}". Available for this model: {available}.',
     runwayRequiresImage:
       "❌ Runway requires an image to generate video. Please send a photo first, then your text prompt.",
     heygenNeedsVoice:
@@ -205,8 +227,7 @@ export default {
     sendOriginalFailed: "Failed to send the file. Please try again later or contact support.",
     noToolGpt:
       "💡 You are in the GPT section.\n\nTo get started, create or select a dialog in the Management section 👇",
-    noToolDesign:
-      "🎨 You are in the Design section.\n\nChoose a model to generate an image 👇\nDescribe what you want to create.",
+    noToolDesign: "🎨 You are in the Design section.\n\nChoose a model to generate an image 👇",
     noToolAudio: "🎧 You are in the Audio section.\n\nChoose a tool to work with audio 👇",
     noToolVideo:
       "🎬 You are in the Video section.\n\nChoose a model to generate a video 👇\nDescribe what you want to create.",
@@ -233,10 +254,14 @@ export default {
     mediaSlotImageTooLarge:
       "❌ The image is too large ({actualW}×{actualH} px). Maximum size is {maxW}×{maxH} px.",
     mediaSlotReadMetadataFailed: "❌ Failed to read file metadata. Check the format and try again.",
+    mediaSlotImagesOnly:
+      "❌ This slot only accepts photos. Videos are not supported — please send a photo.",
     contentPolicyViolation:
       "❌ Your request was rejected due to a content policy violation. Please modify your prompt and try again.",
     copyrightViolation:
       "❌ The output looks similar to copyrighted material (recognizable characters, brands, celebrities). Please rephrase your prompt and try again.",
+    publicFigureViolation:
+      "❌ Request blocked: the model detected a prominent public figure in your description or image. Provider policy disallows generating with celebrities — modify your description or use a different photo.",
     aiClassifiedError: "❌ {messageEn}",
     recraftImg2imgSvgUnsupported:
       "❌ SVG images cannot be used as a reference for Recraft img2img. Please send a raster image (PNG, JPEG, or WebP) instead.",
@@ -254,8 +279,7 @@ export default {
       "❌ The provider failed to generate audio. Please try modifying your request.",
     audioCreateTaskFailed: "❌ Failed to create a generation task. Please try again later.",
     generationTimeout: "❌ Generation took too long. Please try again.",
-    generationFailed:
-      "❌ {modelName}: generation failed. Please try again later or contact support.",
+    generationFailed: "❌ {modelName}: AI model error.",
     generationStillRunning: "{modelName}\nStill generating, please wait...",
     generationTimedOut24h:
       "❌ {modelName}: generation did not finish within 24 hours and was cancelled. Please try again.",
@@ -443,7 +467,7 @@ export default {
     refElement4: "Element 4",
     refElement5: "Element 5",
     refElementHint:
-      "An element is an object/character you can reference in the prompt.\n• 2–4 photos of the same object from different angles (JPG/PNG, up to 10 MB each)\n• Up to 3 elements per generation\n\nReference them in the prompt as @element1, @element2, @element3 — exactly like that.\n\nSend photos now.",
+      "An element is an object/character you can reference in the prompt.\n• 2–4 photos of the same object from different angles (JPG/PNG, up to 10 MB each)\n• Up to 3 elements per generation\n\nReference them in the prompt as @Element1, @Element2, @Element3 — exactly like that.\n\nSend photos now.",
     referenceImages: "Reference Images",
     referenceVideos: "Reference Videos",
     referenceAudios: "Reference Audios",
@@ -489,7 +513,7 @@ export default {
     uploadPromptVideoRefVideos: "Send up to {max} reference videos.",
     uploadPromptVideoRefAudios: "Send up to {max} reference audio files.",
     uploadPromptElement:
-      'Send 1–4 photos or 1 video for "{slot}". First photo = frontal view; the rest (up to 3) = reference views.',
+      'Send 1–4 photos for "{slot}". First photo = frontal view; the rest (up to 3) = reference views.',
     imageSaved: "✅ {slot}: image {n}/{max} saved.",
     tooManyMedia:
       "<b>❌ You uploaded extra files — they were skipped.</b>\n\n{modelName} accepts up to {totalMax} files:\n{breakdown}.\n\nTap the buttons below to view the contents.",
@@ -518,7 +542,8 @@ export default {
   },
   modelModes: {
     pickerTitle: "Choose mode:",
-    activated: "Mode «{mode}» activated.",
+    activated:
+      "Mode «{mode}» activated.\n✉️ Send a text prompt to start generation.\n🖼 To attach images — use the slot buttons below.",
     activatedTextOnly: "Mode «{mode}» activated. Send a text prompt to start generation.",
     change: "🔄 Change mode",
     t2v: "Text → video",

@@ -130,6 +130,26 @@ const REASONING_EFFORT_GPT5: ModelSettingDef = {
 };
 
 /**
+ * Reasoning effort for gpt-5.5 / gpt-5.5-pro — supports none/low/medium/high/xhigh.
+ * `none` отключает reasoning (модель отвечает сразу без chain-of-thought).
+ */
+const REASONING_EFFORT_GPT55: ModelSettingDef = {
+  key: "reasoning_effort",
+  label: "Глубина рассуждений",
+  description:
+    "Без — мгновенный ответ без рассуждений, Низкая/Средняя — баланс, Высокая/Макс. — точнее для сложных задач (дольше).",
+  type: "select",
+  options: [
+    { value: "none", label: "Без" },
+    { value: "low", label: "Низкая" },
+    { value: "medium", label: "Средняя" },
+    { value: "high", label: "Высокая" },
+    { value: "xhigh", label: "Макс." },
+  ],
+  default: "medium",
+};
+
+/**
  * Reasoning effort for gpt-5-pro — only "high" is supported.
  */
 const REASONING_EFFORT_GPT5_PRO: ModelSettingDef = {
@@ -256,6 +276,45 @@ export const GPT_MODELS: Record<string, AIModel> = {
   // Order matches the mini-app display order.
 
   // ── GPT 5 ─────────────────────────────────────────────────────────────────
+  "gpt-5.5-pro": {
+    id: "gpt-5.5-pro",
+    name: "🧠 GPT 5.5 Pro",
+    description:
+      "Новейшая флагманская модель OpenAI. Максимальная точность и глубокие рассуждения с расширенным контекстом 1M+ токенов. Дороже GPT 5.5 — для задач, где важна безупречная точность.",
+    section: "gpt",
+    provider: "openai",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 30, // long context: ×2 = $60/M
+    outputCostUsdPerMToken: 180, // long context: ×1.5 = $270/M
+    contextPricingTiers: { thresholdTokens: 272_000, inputMultiplier: 2, outputMultiplier: 1.5 },
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "provider_chain",
+    contextMaxMessages: 0,
+    settings: [REASONING_EFFORT_GPT55, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
+  },
+  "gpt-5.5": {
+    id: "gpt-5.5",
+    name: "💬 GPT 5.5",
+    description:
+      "Новейший флагман OpenAI с контекстом 1M+ токенов и поддержкой reasoning-режима (от выкл. до максимального). Лучший баланс интеллекта, скорости и цены в линейке.",
+    section: "gpt",
+    provider: "openai",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 5, // long context: ×2 = $10/M
+    cachedInputCostUsdPerMToken: 0.5, // OpenAI prompt cache: 90% off; long context: ×2 = $1/M
+    outputCostUsdPerMToken: 30, // long context: ×1.5 = $45/M
+    contextPricingTiers: { thresholdTokens: 272_000, inputMultiplier: 2, outputMultiplier: 1.5 },
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "provider_chain",
+    contextMaxMessages: 0,
+    settings: [REASONING_EFFORT_GPT55, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
+  },
   "gpt-5.4-pro": {
     id: "gpt-5.4-pro",
     name: "🧠 GPT 5.4 Pro",
@@ -765,6 +824,9 @@ export const GPT_MODELS: Record<string, AIModel> = {
 // Physical context windows per provider/model. Used by token-aware truncation
 // in chat.service and the user-configurable `context_window` setting.
 const CONTEXT_WINDOWS: Record<string, number> = {
+  // OpenAI gpt-5.5 family: 1.05M
+  "gpt-5.5-pro": 1_050_000,
+  "gpt-5.5": 1_050_000,
   // OpenAI gpt-5 family: 400K
   "gpt-5.4-pro": 400_000,
   "gpt-5.4": 400_000,
@@ -823,6 +885,8 @@ const THINKING_MODEL_IDS = new Set([
   "o4-mini",
   "o3-mini",
   // GPT-5 family (all have reasoning_effort)
+  "gpt-5.5-pro",
+  "gpt-5.5",
   "gpt-5.4-pro",
   "gpt-5.4",
   "gpt-5-pro",

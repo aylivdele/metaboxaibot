@@ -304,15 +304,22 @@ jobs:
               echo "No services rebuilt — keeping existing IMAGE_TAG"
             fi
 
-            # Pull only services that were actually rebuilt
+            # Pull only services that were actually rebuilt.
+            # Порядок: api → worker → bot. Bot тянем ПОСЛЕДНИМ, чтобы во время
+            # его pull'а свободного канала уже не нужно (он сразу после идёт в
+            # restart). Также pull'им СТРОГО последовательно (по одному сервису),
+            # а не одной командой `pull a b c` — параллельные слои насыщают
+            # канал time4vps и бот деградирует на отвечах.
             SERVICES=""
             [ "$BUILT_API" = "true" ] && SERVICES="$SERVICES api"
-            [ "$BUILT_BOT" = "true" ] && SERVICES="$SERVICES bot"
             [ "$BUILT_WORKER" = "true" ] && SERVICES="$SERVICES worker"
+            [ "$BUILT_BOT" = "true" ] && SERVICES="$SERVICES bot"
 
             if [ -n "$SERVICES" ]; then
-              echo "Pulling new images:$SERVICES"
-              docker compose -f docker-compose.test.yml pull $SERVICES
+              for svc in $SERVICES; do
+                echo "Pulling $svc..."
+                docker compose -f docker-compose.test.yml pull "$svc"
+              done
 
               echo "Restarting updated services:$SERVICES"
               docker compose -f docker-compose.test.yml up -d --no-build $SERVICES

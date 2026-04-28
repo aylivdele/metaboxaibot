@@ -58,6 +58,7 @@ export interface Translations {
       prompt: string;
       attach: string;
       thinkingWarning: string;
+      filesWarning: string;
     };
   };
   design: {
@@ -179,8 +180,10 @@ export interface Translations {
     mediaSlotImageTooSmall: string;
     mediaSlotImageTooLarge: string;
     mediaSlotReadMetadataFailed: string;
+    mediaSlotImagesOnly: string;
     contentPolicyViolation: string;
     copyrightViolation: string;
+    publicFigureViolation: string;
     aiClassifiedError: string;
     recraftImg2imgSvgUnsupported: string;
     recraftImg2imgFileTooLarge: string;
@@ -463,11 +466,29 @@ function formatTokens(n: number): string {
 }
 
 /**
+ * Telegram caption limit (sendPhoto / sendVideo / sendDocument / sendAudio /
+ * media group items). Считается ПО РЕНДЕР-длине после parse_mode: HTML — теги
+ * `<blockquote>` и `<b>` не учитываются, видимый текст да.
+ */
+const TELEGRAM_CAPTION_MAX = 1024;
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
  * Builds the standard caption shown with a generation result:
- *   ✅ {modelName}: {prompt}{suffix}
+ *   ✅ <b>{modelName}</b>{suffix}
+ *   <blockquote expandable>{full prompt}</blockquote>
  *
  *   💸 Spent: {cost} ✦
  *   💳 Balance: {total} ✦
+ *
+ * Промпт идёт целиком в `<blockquote expandable>` — по умолчанию свёрнут, юзер
+ * раскрывает тапом. При длинном промпте обрезаем по бюджету Telegram-caption'а
+ * (1024 рендер-символов минус header + cost line).
+ *
+ * **ВАЖНО:** caller должен слать сообщение с `parse_mode: "HTML"`.
  *
  * `cost`/`sub`/`regular` may be undefined when deduction context is unavailable
  * (e.g. crash recovery) — the cost block is then omitted.
@@ -481,21 +502,17 @@ export function buildResultCaption(
     subscriptionBalance?: number;
     tokenBalance?: number;
     suffix?: string;
+    /** Игнорируется (legacy parameter — раньше задавал точку обрезки). */
     maxPromptLen?: number;
     emptyPromptLabel?: string;
   },
 ): string {
-  const maxLen = opts?.maxPromptLen ?? 200;
   const hasPrompt = !!prompt && prompt.trim().length > 0;
-  let sliced: string;
-  if (hasPrompt) {
-    sliced = prompt.slice(0, maxLen);
-    if (prompt.length > maxLen) sliced += "...";
-  } else {
-    sliced = opts?.emptyPromptLabel ?? "";
-  }
-  const suffix = opts?.suffix ? ` ${opts.suffix}` : "";
-  let caption = sliced ? `✅ ${displayName}: ${sliced}${suffix}` : `✅ ${displayName}${suffix}`;
+  const safeName = escapeHtml(displayName);
+  const safeSuffix = opts?.suffix ? ` ${escapeHtml(opts.suffix)}` : "";
+
+  // Cost block считаем заранее — размер фиксированный, нужен для бюджета промпта.
+  let costBlock = "";
   const cost = opts?.cost;
   const sub = opts?.subscriptionBalance;
   const reg = opts?.tokenBalance;
@@ -504,9 +521,33 @@ export function buildResultCaption(
     const line = t.common.generationCostLine
       .replace("{cost}", formatTokens(cost))
       .replace("{total}", formatTokens(total));
-    caption += `\n\n${line}`;
+    costBlock = `\n\n${line}`;
   }
-  return caption;
+
+  if (!hasPrompt) {
+    const empty = opts?.emptyPromptLabel ?? "";
+    if (!empty) return `✅ <b>${safeName}</b>${safeSuffix}${costBlock}`;
+    return `✅ <b>${safeName}</b>: ${escapeHtml(empty)}${safeSuffix}${costBlock}`;
+  }
+
+  // Header без промпта; промпт идёт отдельной строкой в <blockquote expandable>.
+  const header = `✅ <b>${safeName}</b>${safeSuffix}\n`;
+
+  // Бюджет рендер-символов для промпта = TELEGRAM_CAPTION_MAX − header − cost
+  // − safety. Header/cost содержат HTML-теги (<b>), но они НЕ учитываются
+  // Telegram'ом — для расчёта оцениваем рендер-длину (без тегов).
+  const headerRenderLen = header.replace(/<\/?b>/g, "").length;
+  const costRenderLen = costBlock.length; // costBlock без HTML-тегов
+  const safety = 16;
+  const promptBudget = TELEGRAM_CAPTION_MAX - headerRenderLen - costRenderLen - safety;
+
+  let promptToShow = prompt;
+  if (promptToShow.length > promptBudget) {
+    promptToShow = promptToShow.slice(0, Math.max(0, promptBudget - 3)) + "...";
+  }
+  const safePrompt = escapeHtml(promptToShow);
+
+  return `${header}<blockquote expandable>${safePrompt}</blockquote>${costBlock}`;
 }
 
 /**
@@ -528,6 +569,8 @@ export function buildDialogHint(
   if (model.supportsThinking) {
     lines.push(t.gpt.dialogHint.thinkingWarning);
   }
+
+  lines.push(t.gpt.dialogHint.filesWarning);
 
   return lines.join("\n");
 }

@@ -43,6 +43,7 @@ async function sendAudio(
   if (buf) {
     await telegram.sendAudio(chatId, new InputFile(buf, `audio.${result.ext}`), {
       caption,
+      parse_mode: "HTML",
     });
   } else {
     throw new Error("Audio result has neither buffer nor URL");

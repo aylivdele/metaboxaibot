@@ -34,6 +34,10 @@ services:
     image: ${GHCR_IMAGE_PREFIX}/metabox-bot:${IMAGE_TAG:-latest}
     container_name: aibot_bot
     restart: always
+    # Graceful shutdown: даём боту до 5 минут на завершение текущих
+    # handler'ов (LLM streaming на thinking-моделях может занимать ~3 мин).
+    # Bot сам ставит SHUTDOWN_TIMEOUT_MS=4m → форс-exit раньше Docker SIGKILL.
+    stop_grace_period: 5m
     env_file: .env
     environment:
       NODE_ENV: production

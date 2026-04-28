@@ -1,7 +1,11 @@
 import { UnrecoverableError, DelayedError } from "bullmq";
 import type { Job } from "bullmq";
 import { delayJob } from "../utils/delay-job.js";
-import { resolveUserFacingMessage, shouldNotifyOps } from "../utils/user-facing-error.js";
+import {
+  resolveUserFacingMessage,
+  shouldNotifyOps,
+  resolveSubJobError,
+} from "../utils/user-facing-error.js";
 import { getIntervalForElapsed } from "../utils/poll-schedule.js";
 import { Api } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
@@ -84,7 +88,18 @@ interface VirtualBatchSubJob {
   effectiveProvider?: string;
   /** Sync-адаптер: результат, чтобы restart не сабмитил повторно. */
   result?: ImageResult;
+  /**
+   * User-facing локализованный текст ошибки (из resolveSubJobError).
+   * Идёт в batchPartialFooter / batchAllFailed как bullet-point. Никогда
+   * не содержит сырых provider-string'ов вроде "KIE 500 ...".
+   */
   error?: string;
+  /**
+   * Сырое err.message — для notifyTechError и логов. Не показывается юзеру.
+   * Заполняется только если sub-job упал на unknown / generic ошибке (когда
+   * userText был fallback'ом на t.errors.generationFailed).
+   */
+  errorRaw?: string;
 }
 interface VirtualBatchState {
   n: number;
@@ -113,6 +128,41 @@ const INITIAL_POLL_INTERVAL_MS = 5000;
 const TELEGRAM_DOC_MAX_BYTES = 50 * 1024 * 1024;
 
 const telegram = new Api(config.bot.token);
+
+/**
+ * Форматирует structured-report для notifyTechError при failure'ах в virtual
+ * batch. Без этого в alert приходит только склеенный `errorRaw.join("---")`
+ * без понимания: на какой sub-job упало, какой provider использовался, на
+ * какой стадии (submit vs poll). С контекстом ops видит сразу:
+ *
+ *   stage: poll, primary: kie, total sub-jobs: 4, failed: 2
+ *   [0] provider=kie:
+ *       fetch GET kie.ai/api/v1/jobs/recordInfo failed (ECONNRESET): ...
+ *       caused by: socket hang up [code: ECONNRESET]
+ *   [2] provider=evolink (FALLBACK):
+ *       HTTP 502 ...
+ */
+function formatSubJobErrorReport(
+  subJobs: VirtualBatchSubJob[],
+  stage: "submit" | "poll",
+  primaryProvider: string,
+): string {
+  const failed = subJobs.filter((s) => s.status === "failed" && s.errorRaw);
+  const header = `stage: ${stage}, primary: ${primaryProvider}, total sub-jobs: ${subJobs.length}, failed: ${failed.length}`;
+  const lines: string[] = [header];
+  for (let i = 0; i < subJobs.length; i++) {
+    const s = subJobs[i];
+    if (s.status !== "failed" || !s.errorRaw) continue;
+    const provider = s.effectiveProvider ?? "unknown";
+    const fbMark = provider !== primaryProvider ? " (FALLBACK)" : "";
+    const indented = s.errorRaw
+      .split("\n")
+      .map((l) => `    ${l}`)
+      .join("\n");
+    lines.push(`[${i}] provider=${provider}${fbMark}:\n${indented}`);
+  }
+  return lines.join("\n");
+}
 
 /** Upload an image to S3 and generate a thumbnail. Returns { s3Key, thumbnailS3Key }. */
 async function uploadImageToS3(
@@ -525,9 +575,12 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             : [modelMeta, ...fallbackCandidates];
 
           if (subCandidates.length === 0) {
+            const synth = new Error(`Locked provider ${lockedProvider} not found`);
+            const resolved = resolveSubJobError(synth, t, modelName);
             state.subJobs[i] = {
               status: "failed",
-              error: `Locked provider ${lockedProvider} not found`,
+              error: resolved.userText,
+              errorRaw: resolved.isUserFacing ? undefined : resolved.rawText,
             };
             await writeBatchState(state);
             continue;
@@ -548,6 +601,12 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
           const allowFiveXxFallback = job.attemptsMade >= 2;
           let subSettled = false;
           let lastSubError = "";
+          // Сырая ошибка с последнего candidate — нужна чтобы при failure
+          // sub-job'а резолвить user-facing message (UserFacingError, FAL/HeyGen
+          // helpers, AI-classified). Synthetic-кейсы (pool exhausted /
+          // long cooldown) оставляют lastSubErr = null, и финализатор
+          // подставит generic шаблон t.errors.generationFailed.
+          let lastSubErr: unknown = null;
 
           for (const candidate of subCandidates) {
             const candidateProvider = candidate.provider;
@@ -609,6 +668,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
               subSettled = true;
               break;
             } catch (err) {
+              lastSubErr = err;
               const cls = classifyRateLimit(err, candidateKeyProvider);
               const message = err instanceof Error ? err.message : String(err);
               if (cls.isRateLimit) {
@@ -651,9 +711,16 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
           }
 
           if (!subSettled) {
+            // Если был реальный err от submit'а — резолвим через user-facing
+            // mapping. Если все candidate'ы skip'нулись (pool exhausted /
+            // long cooldown) — synthetic Error → generic шаблон.
+            const errToResolve =
+              lastSubErr ?? new Error(lastSubError || "Pool exhausted: no provider keys available");
+            const resolved = resolveSubJobError(errToResolve, t, modelName);
             state.subJobs[i] = {
               status: "failed",
-              error: lastSubError || "Pool exhausted: no provider keys available",
+              error: resolved.userText,
+              errorRaw: resolved.isUserFacing ? undefined : resolved.rawText,
             };
           }
           await writeBatchState(state);
@@ -664,9 +731,31 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         if (!stillPending) {
           // Все sync или все failed. Собираем successes и финализируем.
           const successResults: ImageResult[] = [];
+          const techRawErrors: string[] = [];
           for (const s of state.subJobs) {
             if (s.status === "succeeded" && s.result) successResults.push(s.result);
-            else if (s.status === "failed" && s.error) batchErrors.push(s.error);
+            else if (s.status === "failed" && s.error) {
+              batchErrors.push(s.error);
+              if (s.errorRaw) techRawErrors.push(s.errorRaw);
+            }
+          }
+          // Один alert на batch со списком всех unknown/tech-ошибок sub-job'ов
+          // (mirror'ит single-shot notifyTechError на финальной попытке).
+          // Structured-report содержит per-sub-job: index, provider, fallback-маркер,
+          // полный error message + cause-chain.
+          if (techRawErrors.length > 0) {
+            const report = formatSubJobErrorReport(
+              state.subJobs,
+              "submit",
+              modelMeta?.provider ?? "unknown",
+            );
+            await notifyTechError(new Error(report), {
+              jobId: dbJobId,
+              modelId,
+              section: "image",
+              userId: userIdStr,
+              attempt: job.attemptsMade,
+            });
           }
           if (successResults.length === 0) {
             // K=0 — все провалились. Помечаем job failed и идём в Stage 3 для
@@ -851,10 +940,16 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
               const subAcquired = await acquireForPoll(sub.providerKeyId ?? null, effKeyProvider);
               const subAdapter = createImageAdapter(effModel, subAcquired);
               if (!subAdapter.poll) {
+                const resolved = resolveSubJobError(
+                  new Error(`Adapter ${modelId} has no poll()`),
+                  t,
+                  modelName,
+                );
                 state.subJobs[i] = {
                   ...sub,
                   status: "failed",
-                  error: `Adapter ${modelId} has no poll()`,
+                  error: resolved.userText,
+                  errorRaw: resolved.rawText,
                 };
                 return;
               }
@@ -866,7 +961,13 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err);
               if (sub.providerKeyId) void recordError(sub.providerKeyId, message.slice(0, 500));
-              state.subJobs[i] = { ...sub, status: "failed", error: message.slice(0, 200) };
+              const resolved = resolveSubJobError(err, t, modelName);
+              state.subJobs[i] = {
+                ...sub,
+                status: "failed",
+                error: resolved.userText,
+                errorRaw: resolved.isUserFacing ? undefined : resolved.rawText,
+              };
             }
           }),
         );
@@ -902,9 +1003,27 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
 
         // All settled — собираем successes + errors.
         const successResults: ImageResult[] = [];
+        const techRawErrors: string[] = [];
         for (const s of state.subJobs) {
           if (s.status === "succeeded" && s.result) successResults.push(s.result);
-          else if (s.status === "failed" && s.error) batchErrors.push(s.error);
+          else if (s.status === "failed" && s.error) {
+            batchErrors.push(s.error);
+            if (s.errorRaw) techRawErrors.push(s.errorRaw);
+          }
+        }
+        if (techRawErrors.length > 0) {
+          const report = formatSubJobErrorReport(
+            state.subJobs,
+            "poll",
+            modelMeta?.provider ?? "unknown",
+          );
+          await notifyTechError(new Error(report), {
+            jobId: dbJobId,
+            modelId,
+            section: "image",
+            userId: userIdStr,
+            attempt: job.attemptsMade,
+          });
         }
         if (successResults.length === 0) {
           await db.generationJob.update({
@@ -1015,6 +1134,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         type: "photo";
         media: string | InstanceType<typeof InputFile>;
         caption?: string;
+        parse_mode?: "HTML";
       }> = [];
 
       const batchCaption = buildCaption();
@@ -1028,7 +1148,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         mediaGroup.push({
           type: "photo",
           media: source,
-          ...(i === 0 ? { caption: batchCaption } : {}),
+          ...(i === 0 ? { caption: batchCaption, parse_mode: "HTML" as const } : {}),
         });
       }
 
@@ -1161,11 +1281,13 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
     if (isSvg) {
       await telegram.sendDocument(telegramChatId, tgImageSource, {
         caption: singleCaption,
+        parse_mode: "HTML",
         reply_markup: replyMarkup,
       });
     } else {
       await telegram.sendPhoto(telegramChatId, tgImageSource, {
         caption: singleCaption,
+        parse_mode: "HTML",
         reply_markup: replyMarkup,
       });
     }

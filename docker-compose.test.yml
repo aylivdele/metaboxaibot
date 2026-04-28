@@ -35,6 +35,9 @@ services:
     image: ${GHCR_IMAGE_PREFIX:-ghcr.io/aylivdele}/metabox-bot:${IMAGE_TAG:-test}
     container_name: aibot_test_bot
     restart: always
+    # Graceful shutdown: даём боту до 5 минут на завершение текущих
+    # handler'ов (LLM streaming на thinking-моделях может занимать ~3 мин).
+    stop_grace_period: 5m
     env_file: .env
     environment:
       NODE_ENV: production

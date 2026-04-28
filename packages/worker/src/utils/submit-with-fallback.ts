@@ -29,6 +29,7 @@
 
 import type { Job } from "bullmq";
 import type { AIModel } from "@metabox/shared";
+import { ProviderInputIncompatibleError } from "@metabox/shared";
 import {
   acquireKey,
   markRateLimited,
@@ -98,7 +99,8 @@ export interface FallbackCandidateAttempt {
     | "skipped_long_cooldown"
     | "pool_exhausted"
     | "long_window"
-    | "persistent_5xx";
+    | "persistent_5xx"
+    | "incompatible_input";
   error?: string;
 }
 
@@ -322,6 +324,17 @@ export async function submitWithFallback<T, D extends object>(
         );
         await delayJob(opts.job, opts.job.data as Record<string, unknown>, delay, opts.token);
         throw new Error("unreachable: delayJob did not throw");
+      }
+
+      // Adapter signals this input is structurally incompatible with the provider
+      // but another candidate can handle it — skip immediately, no key penalty.
+      if (err instanceof ProviderInputIncompatibleError) {
+        attempts.push({ provider: candidateProvider, outcome: "incompatible_input" });
+        logger.info(
+          { jobId: opts.jobId, provider: candidateProvider, reason: err.message },
+          "submitWithFallback: provider incompatible with input — skipping to next candidate",
+        );
+        continue;
       }
 
       // 5xx — fallback только если этот BullMQ job уже несколько раз пытался.

@@ -301,58 +301,59 @@ export async function activateVideoModel(
       model,
     );
     const inlineKb = kb.inline_keyboard.length ? kb : undefined;
-    let sectionReplyMarkup:
-      | {
-          keyboard: { text: string; web_app?: { url: string } }[][];
-          resize_keyboard: boolean;
-          is_persistent: boolean;
+    // Description-сообщение никогда не несёт inline kb (inline уезжает на хинт
+    // или mode-activated). Раз reply_markup-слот свободен — всегда привязываем
+    // нижнюю persistent-клавиатуру со СВЕЖИМ wtoken для кнопки «Управление»
+    // (web_app). Без обновления токены протухают через ~24ч.
+    const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
+    const managementBtn = webappUrl
+      ? {
+          text: ctx.t.video.management,
+          web_app: { url: `${webappUrl}?page=management&section=video&wtoken=${token}` },
         }
-      | undefined;
-    if (options.sectionReplyKeyboard) {
-      const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
-      const managementBtn = webappUrl
-        ? {
-            text: ctx.t.video.management,
-            web_app: { url: `${webappUrl}?page=management&section=video&wtoken=${token}` },
-          }
-        : { text: ctx.t.video.management };
-      sectionReplyMarkup = {
-        keyboard: [
-          [{ text: ctx.t.video.newDialog }],
-          [{ text: ctx.t.video.avatars }, { text: ctx.t.video.lipSync }],
-          [managementBtn],
-          [{ text: ctx.t.common.backToMain }],
-        ],
-        resize_keyboard: true,
-        is_persistent: true,
-      };
-    }
+      : { text: ctx.t.video.management };
+    const sectionReplyMarkup = {
+      keyboard: [
+        [{ text: ctx.t.video.newDialog }],
+        [{ text: ctx.t.video.avatars }, { text: ctx.t.video.lipSync }],
+        [managementBtn],
+        [{ text: ctx.t.common.backToMain }],
+      ],
+      resize_keyboard: true,
+      is_persistent: true,
+    };
 
     // Description goes first; attach the persistent section reply keyboard here
-    // (if any), so the inline model menu can live on the final hint message.
+    // (если она нужна), inline для кнопок модели уезжает на хинт-сообщение.
     await ctx.reply(`${modelName}\n\n${modelDesc}\n\n${costLine}`, {
       reply_markup: sectionReplyMarkup,
     });
 
-    let hint = ctx.t.video.hintVideoDefault;
-    let appendVoiceHint = true;
-    switch (modelId) {
-      case "heygen":
-        hint = ctx.t.video.hintHeygen;
-        appendVoiceHint = false; // avatar hints already mention voice
-        break;
-      case "d-id":
-        hint = ctx.t.video.hintDid;
-        appendVoiceHint = false;
-        break;
-      case "higgsfield-lite":
-      case "higgsfield":
-      case "higgsfield-preview":
-        hint = ctx.t.video.hintHiggsfield;
+    // Для modes-aware моделей generic-хинт лишний — он не отражает режим и
+    // дублирует информацию в активационном сообщении после выбора режима
+    // (см. mode-select.ts handleModeSet → t.modelModes.activated). Хинт со
+    // слотами шлём только если модель single-mode.
+    if (!modes) {
+      let hint = ctx.t.video.hintVideoDefault;
+      let appendVoiceHint = true;
+      switch (modelId) {
+        case "heygen":
+          hint = ctx.t.video.hintHeygen;
+          appendVoiceHint = false; // avatar hints already mention voice
+          break;
+        case "d-id":
+          hint = ctx.t.video.hintDid;
+          appendVoiceHint = false;
+          break;
+        case "higgsfield-lite":
+        case "higgsfield":
+        case "higgsfield-preview":
+          hint = ctx.t.video.hintHiggsfield;
+      }
+      await ctx.reply(appendVoiceHint ? `${hint}\n\n${ctx.t.voice.inputHint}` : hint, {
+        reply_markup: inlineKb,
+      });
     }
-    await ctx.reply(appendVoiceHint ? `${hint}\n\n${ctx.t.voice.inputHint}` : hint, {
-      reply_markup: modes ? undefined : inlineKb,
-    });
 
     // For modes-aware models, send a mode picker. The picker click handler
     // (`mode:` callback) will follow up with the mode-activated message and
@@ -1221,6 +1222,10 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
     const userId = ctx.user.id;
     const mediaGroupId = ctx.message?.media_group_id;
     if (slot?.mode === "reference_element") {
+      if (slot.imagesOnly) {
+        await ctx.reply(ctx.t.errors.mediaSlotImagesOnly);
+        return;
+      }
       await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
       await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
       debounceSlotReply(userId, mediaGroupId, async () => {
@@ -1782,8 +1787,9 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
       return;
     }
 
-    // Deduct tokens only after we have enough usable photos
-    await deductTokens(userId, costTokens, "higgsfield_soul", undefined, "soul_creation");
+    // Списание токенов происходит ПОСЛЕ успешного создания персонажа
+    // (в avatar.processor.ts на стадии poll status="ready"). Здесь только
+    // checkBalance как гейт — если баланс не пройдёт, возврата фото не делаем.
 
     // Create UserAvatar record
     const avatar = await userAvatarService.create(userId, {
