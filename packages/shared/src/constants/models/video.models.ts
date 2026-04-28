@@ -41,7 +41,14 @@ const MI_REF_ELEMENTS: MediaInputSlot[] = [1, 2, 3].map((i) => ({
   maxImages: 4,
 }));
 
-const KLING_MEDIA_INPUTS: MediaInputSlot[] = [MI_FIRST_FRAME, MI_LAST_FRAME, ...MI_REF_ELEMENTS];
+// KIE Kling принимает first/last frame одним массивом image_urls, поэтому
+// last_frame standalone не имеет смысла — кнопка появляется только после
+// загрузки first_frame.
+const KLING_MEDIA_INPUTS: MediaInputSlot[] = [
+  MI_FIRST_FRAME,
+  { ...MI_LAST_FRAME, revealAfter: "first_frame" },
+  ...MI_REF_ELEMENTS,
+];
 
 /** Kling Motion: required reference image (image_url). */
 const MI_MOTION_IMAGE: MediaInputSlot = {

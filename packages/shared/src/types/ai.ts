@@ -141,6 +141,14 @@ export interface MediaInputSlot {
    * enforces 3–30 s on `motion_video`.
    */
   constraints?: MediaInputConstraints;
+  /**
+   * Прогрессивный reveal: кнопка слота скрыта в slot keyboard'е до тех пор,
+   * пока слот с `slotKey === revealAfter` не заполнен. Нужно для случаев когда
+   * provider'у нельзя передать «последний» без «первого» (например KIE Kling
+   * принимает first_frame и last_frame одним массивом image_urls — last
+   * standalone не имеет смысла).
+   */
+  revealAfter?: string;
 }
 
 // ── Model family types ───────────────────────────────────────────────────────

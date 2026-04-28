@@ -426,6 +426,13 @@ export function buildMediaInputStatusMenu(
       continue;
     }
 
+    // Прогрессивный reveal: скрываем кнопку пока зависимый слот не заполнен.
+    // (Если данный слот уже заполнен — показываем как обычно, чтобы можно было
+    // снять.)
+    if (slot.revealAfter && !isFilled && !filledInputs[slot.revealAfter]?.length) {
+      continue;
+    }
+
     // Progressive reveal for element slots: show filled + one next empty slot.
     if (slot.mode === "reference_element") {
       if (isFilled) {
