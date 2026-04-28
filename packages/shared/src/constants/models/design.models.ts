@@ -340,7 +340,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     section: "design",
     provider: "kie",
     familyId: "nano-banana",
-    versionLabel: "pro",
+    versionLabel: "PRO",
     variantLabel: "Pro",
     costVariants: { settingKey: "resolution", map: { "1K": 0.09, "2K": 0.09, "4K": 0.12 } },
     costUsdPerRequest: 0.09,
