@@ -168,7 +168,6 @@ export class KieVideoAdapter implements VideoAdapter {
       const imageUrls: string[] = [];
       if (firstFrame) imageUrls.push(await uploadFileUrl(this.apiKey, firstFrame));
       if (lastFrame) imageUrls.push(await uploadFileUrl(this.apiKey, lastFrame));
-      if (imageUrls.length) inputPayload.image_urls = imageUrls;
 
       inputPayload.mode = klingMode;
       inputPayload.aspect_ratio =
@@ -203,8 +202,12 @@ export class KieVideoAdapter implements VideoAdapter {
           description: `reference element ${i}`,
           element_input_urls: elementUrls,
         });
+        // KIE requires image_urls to have an entry for each element when
+        // role references (@element1, @element2) appear in the prompt.
+        imageUrls.push(elementUrls[0]!);
       }
       if (klingElements.length) inputPayload.kling_elements = klingElements;
+      if (imageUrls.length) inputPayload.image_urls = imageUrls;
 
       if (input.prompt) {
         inputPayload.prompt = translatePromptRefs(input.prompt, { dialect: "kie" });
