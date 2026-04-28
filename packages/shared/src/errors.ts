@@ -39,6 +39,23 @@ export class UserFacingError extends Error {
 }
 
 /**
+ * Thrown by an adapter's submit() when the input combination is structurally
+ * incompatible with the provider, but another provider in the fallback chain
+ * can handle it. submitWithFallback catches this and skips to the next candidate
+ * without marking the key as errored or waiting for BullMQ retries.
+ *
+ * Example: KIE kling-3.0/video cannot accept image_urls + kling_elements
+ * simultaneously, but evolink's kling-o3-image-to-video separates them into
+ * image_start and image_urls and handles the combination correctly.
+ */
+export class ProviderInputIncompatibleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProviderInputIncompatibleError";
+  }
+}
+
+/**
  * Resolve a `UserFacingError` to a localised string.
  * `errorStrings` should be the `t.errors` object from the active locale.
  */
