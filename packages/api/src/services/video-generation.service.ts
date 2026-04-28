@@ -7,6 +7,7 @@ import { createVideoAdapter } from "../ai/video/factory.js";
 import { getFileUrl } from "./s3.service.js";
 import { probeAudioDurationSec } from "../utils/audio-transcode.js";
 import { logger } from "../logger.js";
+import { validatePromptRefs } from "./prompt-ref.service.js";
 import type {
   VideoInput,
   VideoValidationContext,
@@ -98,14 +99,27 @@ export interface ValidateVideoParams {
 
 export const videoGenerationService = {
   /**
-   * Runs adapter-level pre-generation checks (e.g. Veo image→8s, HeyGen avatar+voice,
-   * Runway requires image). Returns a `VideoValidationError` when the request should
-   * be aborted, or `null` when it can proceed. Safe to call before `submitVideo`.
+   * Runs pre-generation checks before any API call is made:
+   *   1. @-reference validation (prompt-ref.service): catches wrong element/image/video
+   *      syntax and missing media slots immediately with a clear, localised message.
+   *   2. Adapter-level checks (e.g. Veo image→8s, HeyGen avatar+voice, Runway requires image).
+   * Returns a `VideoValidationError` when the request should be aborted, or `null` when
+   * it can proceed. Safe to call before `submitVideo`.
    */
   validateVideoRequest(
     params: ValidateVideoParams,
     ctx?: VideoValidationContext,
   ): VideoValidationError | null {
+    const model = AI_MODELS[params.modelId];
+    const mediaInputs = params.mediaInputs ?? {};
+
+    const refError = validatePromptRefs({
+      prompt: params.prompt,
+      mediaInputs,
+      capabilities: model?.promptRefs,
+    });
+    if (refError) return refError;
+
     const adapter = createVideoAdapter(params.modelId);
     if (!adapter.validateRequest) return null;
     const input: VideoInput = {
@@ -114,7 +128,7 @@ export const videoGenerationService = {
       aspectRatio: params.aspectRatio,
       duration: params.duration,
       modelSettings: params.modelSettings,
-      mediaInputs: params.mediaInputs,
+      mediaInputs,
       userId: params.userId,
     };
     return adapter.validateRequest(input, ctx);

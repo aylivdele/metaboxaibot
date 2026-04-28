@@ -2,6 +2,7 @@ import { fal } from "@fal-ai/client";
 import type { VideoAdapter, VideoInput, VideoResult } from "./base.adapter.js";
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
+import { translatePromptRefs } from "../../services/prompt-ref-translator.service.js";
 
 /**
  * Text-to-video endpoint for each model.
@@ -47,24 +48,6 @@ const FAL_MOTION_ENDPOINTS: Record<string, string> = {
 /** True если modelId — это kling-o3 семейство (kling или kling-pro). */
 function isKlingO3(modelId: string): boolean {
   return modelId === "kling" || modelId === "kling-pro";
-}
-
-/**
- * Remap primary KIE element references `@elementN` (lowercase) → FAL's
- * `@ElementN` (capitalized) per kling-o3 schema. Безопасно вызывать для любого
- * prompt'а — если совпадений нет, возвращает строку как есть.
- */
-function remapKlingElementSyntax(prompt: string): string {
-  return prompt.replace(/@element(\d+)/gi, (_m, idx) => `@Element${idx}`);
-}
-
-/**
- * Remap primary KIE image references `@imageN` (lowercase) → FAL's `@ImageN`
- * (capitalized) per grok-imagine r2v schema. Same pattern as Kling's element
- * remap. KIE example: "@image1 running"; FAL example: "@Image1 running".
- */
-function remapImageRefSyntax(prompt: string): string {
-  return prompt.replace(/@image(\d+)/gi, (_m, idx) => `@Image${idx}`);
 }
 
 const FAL_GROK_IMAGINE_T2V_ENDPOINT = "xai/grok-imagine-video/text-to-video";
@@ -150,7 +133,7 @@ export class FalVideoAdapter implements VideoAdapter {
       const endpoint = isR2V ? FAL_GROK_IMAGINE_R2V_ENDPOINT : FAL_GROK_IMAGINE_T2V_ENDPOINT;
 
       const grokBody: Record<string, unknown> = {
-        prompt: remapImageRefSyntax(input.prompt ?? ""),
+        prompt: translatePromptRefs(input.prompt ?? "", { dialect: "fal" }),
       };
 
       if (isR2V) {
@@ -188,7 +171,7 @@ export class FalVideoAdapter implements VideoAdapter {
       const endUrl = input.mediaInputs?.last_frame?.[0];
 
       const klingBody: Record<string, unknown> = {};
-      if (input.prompt) klingBody.prompt = remapKlingElementSyntax(input.prompt);
+      if (input.prompt) klingBody.prompt = translatePromptRefs(input.prompt, { dialect: "fal" });
 
       // duration: STRING enum "3"-"15" по схеме FAL.
       const rawDuration = (ms.duration as number | undefined) ?? input.duration ?? 5;
