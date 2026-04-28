@@ -54,6 +54,16 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
   const basicSettings = settings.filter((s) => !s.advanced);
   const advancedSettings = settings.filter((s) => s.advanced);
 
+  // Batch-picker (num_images) визуально живёт ближе к кнопке генерации —
+  // переносим его в конец basic-блока (прямо перед "Расширенные настройки"),
+  // чтобы юзер сначала видел параметры самой генерации, а уже потом — сколько
+  // экземпляров получить.
+  const numImagesIdx = basicSettings.findIndex((s) => s.key === "num_images");
+  if (numImagesIdx >= 0 && numImagesIdx < basicSettings.length - 1) {
+    const [numImages] = basicSettings.splice(numImagesIdx, 1);
+    basicSettings.push(numImages);
+  }
+
   function renderSetting(def: ModelSettingDef) {
     if (def.unavailableIf && evalRule(def.unavailableIf, effectiveValues)) return null;
     const val = effectiveValues[def.key];
