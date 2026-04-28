@@ -39,6 +39,7 @@ const MI_REF_ELEMENTS: MediaInputSlot[] = [1, 2, 3].map((i) => ({
   mode: "reference_element",
   labelKey: `refElement${i}`,
   maxImages: 4,
+  imagesOnly: true,
 }));
 
 const KLING_MEDIA_INPUTS: MediaInputSlot[] = [MI_FIRST_FRAME, MI_LAST_FRAME, ...MI_REF_ELEMENTS];

@@ -154,7 +154,7 @@ export function getSlotMediaTypes(slot: MediaInputSlot): readonly SlotMediaType[
     case "driving_audio":
       return ["audio"];
     case "reference_element":
-      return ["image", "video"];
+      return slot.imagesOnly ? ["image"] : ["image", "video"];
     default:
       return ["image"];
   }

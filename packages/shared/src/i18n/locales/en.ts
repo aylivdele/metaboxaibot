@@ -179,6 +179,8 @@ export default {
       "❌ Your prompt contains @Video but no reference video has been uploaded. Add a video to the slot or remove @Video from your prompt.",
     promptRefVideoIndexed:
       "❌ Use @Video (without a number) — this model supports a single reference video.",
+    promptRefVideoUseElements:
+      "❌ Reference elements in your prompt using @Element1, @Element2, @Element3 — exactly in this form.",
     promptRefUnsupportedByModel:
       '❌ This model does not support @-references in the prompt. Remove "{raw}" or switch to a compatible model.',
     promptRefUnknownToken:
@@ -253,6 +255,8 @@ export default {
     mediaSlotImageTooLarge:
       "❌ The image is too large ({actualW}×{actualH} px). Maximum size is {maxW}×{maxH} px.",
     mediaSlotReadMetadataFailed: "❌ Failed to read file metadata. Check the format and try again.",
+    mediaSlotImagesOnly:
+      "❌ This slot only accepts photos. Videos are not supported — please send a photo.",
     contentPolicyViolation:
       "❌ Your request was rejected due to a content policy violation. Please modify your prompt and try again.",
     copyrightViolation:
@@ -508,7 +512,7 @@ export default {
     uploadPromptVideoRefVideos: "Send up to {max} reference videos.",
     uploadPromptVideoRefAudios: "Send up to {max} reference audio files.",
     uploadPromptElement:
-      'Send 1–4 photos or 1 video for "{slot}". First photo = frontal view; the rest (up to 3) = reference views.',
+      'Send 1–4 photos for "{slot}". First photo = frontal view; the rest (up to 3) = reference views.',
     imageSaved: "✅ {slot}: image {n}/{max} saved.",
     tooManyMedia:
       "<b>❌ You uploaded extra files — they were skipped.</b>\n\n{modelName} accepts up to {totalMax} files:\n{breakdown}.\n\nTap the buttons below to view the contents.",
