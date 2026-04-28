@@ -16,6 +16,7 @@ import { logger } from "../logger.js";
 import { config, getT } from "@metabox/shared";
 import type { Language } from "@metabox/shared";
 import { db } from "@metabox/api/db";
+import { deductTokens, usdToTokens } from "@metabox/api/services";
 import { notifyTechError } from "../utils/notify-error.js";
 import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
@@ -41,6 +42,12 @@ function buildSoulAdapter(acquired: AcquiredKey): HiggsFieldSoulAdapter {
   const fetchFn = buildProxyFetch(acquired.proxy) ?? undefined;
   return new HiggsFieldSoulAdapter(acquired.apiKey, fetchFn);
 }
+
+/**
+ * USD-стоимость создания Soul-персонажа. Должна совпадать со значением в
+ * bot/src/scenes/video.ts (там используется для checkBalance на сабмите).
+ */
+const SOUL_COST_USD = 2.5;
 
 /**
  * Создаёт WebP-thumbnail из ПЕРВОГО фото Soul-персонажа и заливает его рядом
@@ -193,6 +200,22 @@ export async function processAvatarJob(job: Job<AvatarJobData>, token?: string):
         const result = await soulAdapter.poll(avatar.externalId);
 
         if (result.status === "ready") {
+          // Списываем токены ТОЛЬКО при успешном создании (зеркалит pattern
+          // обычной генерации: deductTokens на стадии finalize, не submit).
+          // checkBalance на сабмите в bot/scenes/video.ts уже отгейтил кейс
+          // "не хватает на момент клика"; здесь полагаемся на тот контракт.
+          // Если за 5-15 минут пока шла обработка юзер потратил баланс в другом
+          // месте — deductTokens декрементит до отрицательного значения, как и
+          // для обычной генерации (мы съедаем стоимость за HiggsField API,
+          // но даём готового персонажа).
+          await deductTokens(
+            BigInt(userIdStr),
+            usdToTokens(SOUL_COST_USD),
+            "higgsfield_soul",
+            undefined,
+            "soul_creation",
+          );
+
           // previewUrl от HiggsField'а игнорируем — наш own thumbnail из
           // первого исходного фото уже выставлен на стадии create. Если
           // create-thumbnail почему-то не сгенерировался, фолбэчимся на

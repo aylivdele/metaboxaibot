@@ -225,8 +225,7 @@ export default {
     sendOriginalFailed: "Failed to send the file. Please try again later or contact support.",
     noToolGpt:
       "💡 You are in the GPT section.\n\nTo get started, create or select a dialog in the Management section 👇",
-    noToolDesign:
-      "🎨 You are in the Design section.\n\nChoose a model to generate an image 👇",
+    noToolDesign: "🎨 You are in the Design section.\n\nChoose a model to generate an image 👇",
     noToolAudio: "🎧 You are in the Audio section.\n\nChoose a tool to work with audio 👇",
     noToolVideo:
       "🎬 You are in the Video section.\n\nChoose a model to generate a video 👇\nDescribe what you want to create.",

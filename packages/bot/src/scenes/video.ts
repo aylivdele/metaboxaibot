@@ -1788,8 +1788,9 @@ export async function handleSoulCreateSubmit(ctx: BotContext): Promise<void> {
       return;
     }
 
-    // Deduct tokens only after we have enough usable photos
-    await deductTokens(userId, costTokens, "higgsfield_soul", undefined, "soul_creation");
+    // Списание токенов происходит ПОСЛЕ успешного создания персонажа
+    // (в avatar.processor.ts на стадии poll status="ready"). Здесь только
+    // checkBalance как гейт — если баланс не пройдёт, возврата фото не делаем.
 
     // Create UserAvatar record
     const avatar = await userAvatarService.create(userId, {
