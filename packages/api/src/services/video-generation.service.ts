@@ -120,17 +120,6 @@ export const videoGenerationService = {
     });
     if (refError) return refError;
 
-    // KIE kling-3.0/video cannot accept image_urls and kling_elements simultaneously.
-    if (params.modelId === "kling" || params.modelId === "kling-pro") {
-      const hasFrame = !!(mediaInputs["first_frame"]?.length || mediaInputs["last_frame"]?.length);
-      const hasElements = Object.keys(mediaInputs).some(
-        (k) => k.startsWith("ref_element_") && mediaInputs[k]?.length,
-      );
-      if (hasFrame && hasElements) {
-        return { key: "klingElementFrameConflict" };
-      }
-    }
-
     const adapter = createVideoAdapter(params.modelId);
     if (!adapter.validateRequest) return null;
     const input: VideoInput = {

@@ -311,10 +311,8 @@ export async function getActiveModelSlots(
  * Returns the first slot that's required-but-missing for this model, or null
  * if all required inputs are present.
  *
- * Beyond the intrinsic `slot.required` flag, this also enforces conditional
- * requirements derived from the model definition (e.g. required slots added
- * dynamically based on mode). See `exclusiveGroup` on MediaInputSlot for
- * mutual-exclusion hiding (e.g. KIE kling frames vs elements).
+ * Beyond the intrinsic `slot.required` flag this can be extended with
+ * conditional requirements derived from mode or model definition.
  */
 export function findMissingRequiredSlot(
   _modelId: string,

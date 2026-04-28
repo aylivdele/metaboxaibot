@@ -41,31 +41,7 @@ const MI_REF_ELEMENTS: MediaInputSlot[] = [1, 2, 3].map((i) => ({
   maxImages: 4,
 }));
 
-/**
- * Fallback/shared kling media inputs — no exclusive groups, so FAL r2v and
- * evolink can accept first_frame alongside elements without UI interference.
- */
 const KLING_MEDIA_INPUTS: MediaInputSlot[] = [MI_FIRST_FRAME, MI_LAST_FRAME, ...MI_REF_ELEMENTS];
-
-/**
- * Primary KIE kling media inputs — first_frame/last_frame and ref_element_*
- * slots are mutually exclusive: KIE's kling-3.0/video cannot accept image_urls
- * and kling_elements in the same request. Exclusive groups hide the incompatible
- * group from the keyboard as soon as the other side is filled.
- */
-const KLING_KIE_MEDIA_INPUTS: MediaInputSlot[] = [
-  { ...MI_FIRST_FRAME, exclusiveGroup: "kling_frames" },
-  { ...MI_LAST_FRAME, exclusiveGroup: "kling_frames" },
-  ...[1, 2, 3].map(
-    (i): MediaInputSlot => ({
-      slotKey: `ref_element_${i}`,
-      mode: "reference_element",
-      labelKey: `refElement${i}`,
-      maxImages: 4,
-      exclusiveGroup: "kling_elems",
-    }),
-  ),
-];
 
 /** Kling Motion: required reference image (image_url). */
 const MI_MOTION_IMAGE: MediaInputSlot = {
@@ -273,7 +249,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    mediaInputs: KLING_KIE_MEDIA_INPUTS,
+    mediaInputs: KLING_MEDIA_INPUTS,
     promptRefs: { elements: { max: 3 } },
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
@@ -304,7 +280,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
-    mediaInputs: KLING_KIE_MEDIA_INPUTS,
+    mediaInputs: KLING_MEDIA_INPUTS,
     promptRefs: { elements: { max: 3 } },
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
