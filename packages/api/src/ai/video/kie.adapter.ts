@@ -8,6 +8,7 @@ import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { uploadFileUrl } from "../../utils/kie-upload.js";
 import { classifyAIError } from "../../services/ai-error-classifier.service.js";
+import { translatePromptRefs } from "../../services/prompt-ref-translator.service.js";
 
 const KIE_BASE = "https://api.kie.ai";
 
@@ -105,14 +106,6 @@ export class KieVideoAdapter implements VideoAdapter {
       return { key: "promptTooLong", params: { limit } };
     }
 
-    if (KLING_MODEL_MAP[this.modelId] && input.prompt && /@element_\w+/.test(input.prompt)) {
-      const mi = input.mediaInputs ?? {};
-      const hasElements = Object.keys(mi).some(
-        (k) => k.startsWith("ref_element_") && mi[k]?.length,
-      );
-      if (!hasElements) return { key: "klingElementsRequired" };
-    }
-
     return null;
   }
 
@@ -199,6 +192,10 @@ export class KieVideoAdapter implements VideoAdapter {
         });
       }
       if (klingElements.length) inputPayload.kling_elements = klingElements;
+
+      if (input.prompt) {
+        inputPayload.prompt = translatePromptRefs(input.prompt, { dialect: "kie" });
+      }
     } else if (seedanceModel) {
       // ── Seedance 2.0 / 2.0 Fast ────────────────────────────────────────────
       model = seedanceModel;

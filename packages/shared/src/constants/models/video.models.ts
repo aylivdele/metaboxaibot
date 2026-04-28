@@ -32,7 +32,7 @@ const MI_REFERENCE_VEO: MediaInputSlot = {
 
 /**
  * Kling 3.0 element slots (KIE): up to 3 elements per task, each 2-4 JPG/PNG
- * images (max 10 MB). Referenced in prompt via @element1 / @element2 / @element3.
+ * images (max 10 MB). Referenced in prompt via @Element1 / @Element2 / @Element3.
  */
 const MI_REF_ELEMENTS: MediaInputSlot[] = [1, 2, 3].map((i) => ({
   slotKey: `ref_element_${i}`,
@@ -250,6 +250,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     mediaInputs: KLING_MEDIA_INPUTS,
+    promptRefs: { elements: { max: 3 } },
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
@@ -280,6 +281,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     mediaInputs: KLING_MEDIA_INPUTS,
+    promptRefs: { elements: { max: 3 } },
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
@@ -728,7 +730,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "grok-imagine",
     name: "🔮 Grok Imagine",
     description:
-      "Видеомодель от xAI (Grok). Text-to-video и image-to-video с длительностью 6–30 секунд. Поддержка до 7 входных изображений — ссылайтесь на них в промпте через @image1, @image2 и т.д.",
+      "Видеомодель от xAI (Grok). Text-to-video и image-to-video с длительностью 6–30 секунд. Поддержка до 7 входных изображений — ссылайтесь на них в промпте через @Image1, @Image2 и т.д.",
     section: "video",
     provider: "kie",
     // Resolution-based: 480p $0.008/s, 720p $0.015/s
@@ -745,6 +747,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     outputCostUsdPerMToken: 0,
     supportsImages: true,
     mediaInputs: [MI_GROK_IMAGINE_REFS],
+    promptRefs: { images: { max: 7 } },
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
@@ -1756,6 +1759,7 @@ export const FALLBACK_VIDEO_MODELS: AIModel[] = [
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     mediaInputs: KLING_MEDIA_INPUTS,
+    promptRefs: { elements: { max: 3 } },
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
@@ -1784,6 +1788,7 @@ export const FALLBACK_VIDEO_MODELS: AIModel[] = [
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     mediaInputs: KLING_MEDIA_INPUTS,
+    promptRefs: { elements: { max: 3 } },
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
@@ -1825,6 +1830,7 @@ export const FALLBACK_VIDEO_MODELS: AIModel[] = [
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     mediaInputs: KLING_MEDIA_INPUTS,
+    promptRefs: { elements: { max: 3 } },
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
@@ -1853,6 +1859,7 @@ export const FALLBACK_VIDEO_MODELS: AIModel[] = [
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16", "1:1"],
     mediaInputs: KLING_MEDIA_INPUTS,
+    promptRefs: { elements: { max: 3 } },
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
