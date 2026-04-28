@@ -4,7 +4,7 @@ import type {
   VideoValidationError,
   VideoResult,
 } from "./base.adapter.js";
-import { config, UserFacingError } from "@metabox/shared";
+import { config, UserFacingError, ProviderInputIncompatibleError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { uploadFileUrl } from "../../utils/kie-upload.js";
 import { classifyAIError } from "../../services/ai-error-classifier.service.js";
@@ -152,6 +152,19 @@ export class KieVideoAdapter implements VideoAdapter {
 
       const firstFrame = mi.first_frame?.[0] ?? input.imageUrl;
       const lastFrame = mi.last_frame?.[0];
+
+      // KIE cannot process image_urls (i2v) and kling_elements simultaneously.
+      // Check before any uploads so we don't waste KIE file-upload API calls.
+      // submitWithFallback catches this and routes to evolink, which separates
+      // them into image_start and image_urls and handles both correctly.
+      const hasFrame = !!(firstFrame || lastFrame);
+      const hasElements = [1, 2, 3].some((i) => mi[`ref_element_${i}`]?.length);
+      if (hasFrame && hasElements) {
+        throw new ProviderInputIncompatibleError(
+          "KIE kling: image_urls + kling_elements combination is not supported — routing to fallback",
+        );
+      }
+
       const imageUrls: string[] = [];
       if (firstFrame) imageUrls.push(await uploadFileUrl(this.apiKey, firstFrame));
       if (lastFrame) imageUrls.push(await uploadFileUrl(this.apiKey, lastFrame));

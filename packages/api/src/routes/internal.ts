@@ -298,6 +298,64 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
+   * POST /internal/decrement-subscription-tokens
+   * Called by Metabox admin when rolling back a bundle purchase that had
+   * a granted bonus subscription. Decrements subscriptionTokenBalance by
+   * `tokens`, FLOORED at 0.
+   *
+   * НЕ удаляет LocalSubscription — у юзера могут быть другие активные
+   * подписки. Для полного экспайра подписки используется /revoke-tokens.
+   *
+   * Body: { telegramId: string, tokens: number, description?: string }
+   */
+  fastify.post("/decrement-subscription-tokens", async (request, reply) => {
+    const { telegramId, tokens, description } = request.body as {
+      telegramId: string;
+      tokens: number;
+      description?: string;
+    };
+
+    if (!telegramId || typeof tokens !== "number" || tokens <= 0) {
+      return reply.code(400).send({ error: "telegramId and positive tokens are required" });
+    }
+
+    const userId = BigInt(telegramId);
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return { ok: true, deducted: 0, newBalance: 0 };
+    }
+
+    const currentBalance = Number(user.subscriptionTokenBalance);
+    const actualDeduct = Math.min(currentBalance, tokens);
+
+    if (actualDeduct === 0) {
+      return { ok: true, deducted: 0, newBalance: currentBalance };
+    }
+
+    await db.$transaction([
+      db.user.update({
+        where: { id: userId },
+        data: { subscriptionTokenBalance: { decrement: actualDeduct } },
+      }),
+      db.tokenTransaction.create({
+        data: {
+          userId,
+          amount: -actualDeduct,
+          type: "debit",
+          reason: "metabox_bundle_rollback",
+          description: description || null,
+        },
+      }),
+    ]);
+
+    return {
+      ok: true,
+      deducted: actualDeduct,
+      newBalance: currentBalance - actualDeduct,
+    };
+  });
+
+  /**
    * POST /internal/reset-token-balance
    * Sets user token balance to exactly 0. Used when admin disconnects TG
    * and transfers all tokens to site. More reliable than decrement.
