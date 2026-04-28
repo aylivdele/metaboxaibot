@@ -3,7 +3,7 @@ import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { db } from "../db.js";
 import { getFileUrl, deleteFile, compressForTelegramPhoto } from "../services/s3.service.js";
 import { buildDownloadButton, generateDownloadToken } from "../utils/download-token.js";
-import { AI_MODELS, config, getT } from "@metabox/shared";
+import { AI_MODELS, config, getT, buildResultCaption } from "@metabox/shared";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
@@ -68,7 +68,10 @@ async function sendBufferToUser(
   const paramKey = methodParamKey(method);
   const form = new FormData();
   form.append("chat_id", userId.toString());
-  if (caption) form.append("caption", caption);
+  if (caption) {
+    form.append("caption", caption);
+    form.append("parse_mode", "HTML");
+  }
   if (replyMarkup) form.append("reply_markup", JSON.stringify(replyMarkup));
   form.append(paramKey, new Blob([new Uint8Array(buffer)]), filename);
 
@@ -99,7 +102,7 @@ async function sendMediaGroupBuffers(
     return {
       type: "photo" as const,
       media: `attach://${attachName}`,
-      ...(item.caption ? { caption: item.caption } : {}),
+      ...(item.caption ? { caption: item.caption, parse_mode: "HTML" as const } : {}),
     };
   });
   form.append("media", JSON.stringify(media));
@@ -314,7 +317,9 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     }
     if (resolved.length === 0) return reply.code(422).send({ error: "No deliverable outputs" });
 
-    const caption = `${job.modelId}: ${job.prompt.slice(0, 200)}`;
+    // Caption формат идентичен worker'овскому — `<blockquote expandable>`
+    // c полным промптом + parse_mode: HTML на всех sendXxx-вызовах ниже.
+    const caption = buildResultCaption(t, AI_MODELS[job.modelId]?.name ?? job.modelId, job.prompt);
     const botUrl = `https://api.telegram.org/bot${config.bot.token}`;
     const isImageJob = job.section === "image";
 
@@ -468,6 +473,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           body: JSON.stringify({
             chat_id: userId.toString(),
             text: `${isFirst ? caption : ""}\n\n${t.errors.fileTooLargeForTelegram}`,
+            parse_mode: "HTML",
             ...(downloadMarkup ? { reply_markup: downloadMarkup } : {}),
           }),
         });
@@ -507,6 +513,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
             body: JSON.stringify({
               chat_id: userId.toString(),
               text: `${isFirst ? caption : ""}\n\n${t.errors.fileTooLargeForTelegram}`,
+              parse_mode: "HTML",
               ...(downloadMarkup ? { reply_markup: downloadMarkup } : {}),
             }),
           });

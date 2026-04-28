@@ -652,10 +652,15 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
     });
 
     if (tooLargeForTelegram) {
+      // t.errors.fileTooLargeForTelegram — i18n-строка без HTML-спецсимволов,
+      // безопасно склеивать с HTML-caption'ом без экранирования.
       await telegram.sendMessage(
         telegramChatId,
         `${caption}\n\n${t.errors.fileTooLargeForTelegram}`,
-        replyMarkup ? { reply_markup: replyMarkup } : undefined,
+        {
+          parse_mode: "HTML",
+          ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+        },
       );
     } else {
       // Probe the remuxed buffer so the values we pass to Telegram match the
@@ -664,6 +669,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
       const jpegThumb = await generateVideoJpegThumbnail(videoBuf);
       await telegram.sendVideo(telegramChatId, new InputFile(videoBuf, "video.mp4"), {
         caption,
+        parse_mode: "HTML",
         reply_markup: replyMarkup,
         supports_streaming: true,
         ...(info.width ? { width: info.width } : {}),

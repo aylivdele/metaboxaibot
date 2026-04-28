@@ -1087,6 +1087,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         type: "photo";
         media: string | InstanceType<typeof InputFile>;
         caption?: string;
+        parse_mode?: "HTML";
       }> = [];
 
       const batchCaption = buildCaption();
@@ -1100,7 +1101,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
         mediaGroup.push({
           type: "photo",
           media: source,
-          ...(i === 0 ? { caption: batchCaption } : {}),
+          ...(i === 0 ? { caption: batchCaption, parse_mode: "HTML" as const } : {}),
         });
       }
 
@@ -1233,11 +1234,13 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
     if (isSvg) {
       await telegram.sendDocument(telegramChatId, tgImageSource, {
         caption: singleCaption,
+        parse_mode: "HTML",
         reply_markup: replyMarkup,
       });
     } else {
       await telegram.sendPhoto(telegramChatId, tgImageSource, {
         caption: singleCaption,
+        parse_mode: "HTML",
         reply_markup: replyMarkup,
       });
     }
