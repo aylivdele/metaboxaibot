@@ -148,14 +148,25 @@ function buildActivationCostLine(
   return t.common.costPerRequest.replace("{cost}", cost.toFixed(2));
 }
 
-/** Send a section-entry message with the appropriate reply keyboard (mirrors bot menu.ts). */
-async function sendSectionMessage(
+/**
+ * Структура persistent reply-keyboard'а для раздела с СВЕЖИМ wtoken для
+ * кнопки «Управление» (web_app). Используется для refresh'а wtoken'а на
+ * любом сообщении без inline-кнопок — без этого token'ы протухают через ~24ч
+ * и юзер видит "ссылка устарела" при клике на mgmt.
+ *
+ * Возвращает null если section не имеет persistent-keyboard'а (gpt и т.п.).
+ */
+function buildSectionReplyMarkup(
   userId: bigint,
   section: string,
   t: Translations,
   token: string,
   webappUrl: string | undefined,
-): Promise<void> {
+): {
+  keyboard: { text: string; web_app?: { url: string } }[][];
+  resize_keyboard: boolean;
+  is_persistent: boolean;
+} | null {
   const wtoken = webappUrl ? generateWebToken(userId, token) : "";
   const makeMgmtBtn = (label: string) =>
     webappUrl
@@ -167,11 +178,8 @@ async function sendSectionMessage(
         }
       : { text: label };
 
-  let text: string;
   let keyboard: { text: string; web_app?: { url: string } }[][];
-
   if (section === "audio") {
-    text = t.audio.sectionTitle;
     keyboard = [
       [{ text: t.audio.tts }, { text: t.audio.voiceClone }],
       [{ text: t.audio.music }, { text: t.audio.sounds }],
@@ -179,14 +187,12 @@ async function sendSectionMessage(
       [{ text: t.common.backToMain }],
     ];
   } else if (section === "design") {
-    text = t.design.sectionTitle;
     keyboard = [
       [{ text: t.design.chooseModel }],
       [makeMgmtBtn(t.design.management)],
       [{ text: t.common.backToMain }],
     ];
   } else if (section === "video") {
-    text = t.video.sectionTitle;
     keyboard = [
       [{ text: t.video.newDialog }],
       [{ text: t.video.avatars }, { text: t.video.lipSync }],
@@ -194,8 +200,28 @@ async function sendSectionMessage(
       [{ text: t.common.backToMain }],
     ];
   } else {
-    return;
+    return null;
   }
+  return { keyboard, resize_keyboard: true, is_persistent: true };
+}
+
+/** Send a section-entry message with the appropriate reply keyboard (mirrors bot menu.ts). */
+async function sendSectionMessage(
+  userId: bigint,
+  section: string,
+  t: Translations,
+  token: string,
+  webappUrl: string | undefined,
+): Promise<void> {
+  const replyMarkup = buildSectionReplyMarkup(userId, section, t, token, webappUrl);
+  if (!replyMarkup) return;
+
+  const text =
+    section === "audio"
+      ? t.audio.sectionTitle
+      : section === "design"
+        ? t.design.sectionTitle
+        : t.video.sectionTitle;
 
   await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
@@ -203,7 +229,7 @@ async function sendSectionMessage(
     body: JSON.stringify({
       chat_id: String(userId),
       text,
-      reply_markup: { keyboard, resize_keyboard: true, is_persistent: true },
+      reply_markup: replyMarkup,
     }),
   }).catch((reason) => logger.warn(reason, `Could not send section switch message`));
 }
@@ -266,13 +292,22 @@ async function sendModelActivatedNotification(
   if (section === "audio") {
     const audioHint = audioHints[modelId] ?? t.audio.activated;
     if (modelId === "voice-clone") {
-      // voice-clone: plain label + hint, no inline kb
+      // voice-clone: plain label + hint, no inline kb. Раз нет inline —
+      // прикрепляем нижнюю persistent клавиатуру со свежим wtoken.
+      const bottomKb = buildSectionReplyMarkup(
+        userId,
+        section,
+        t,
+        config.bot.token,
+        config.bot.webappUrl,
+      );
       await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: String(userId),
           text: `${t.audio.voiceClone}\n\n${audioHint}`,
+          ...(bottomKb ? { reply_markup: bottomKb } : {}),
         }),
       }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
       return;
@@ -357,27 +392,42 @@ async function sendModelActivatedNotification(
   }
   const replyMarkup = inlineKeyboard.length ? { inline_keyboard: inlineKeyboard } : undefined;
 
+  // Bottom persistent keyboard со свежим wtoken — для сообщений БЕЗ inline kb,
+  // чтобы юзер при следующем клике на «Управление» использовал не протухший token.
+  const bottomKb = buildSectionReplyMarkup(
+    userId,
+    section,
+    t,
+    config.bot.token,
+    config.bot.webappUrl,
+  );
+
   // Send description first (no inline kb — it goes on the final message).
   // If there's a hint, send it after the description with the inline kb.
   // If there's no hint, attach the inline kb to the description.
+  // Когда у description нет inline kb (есть hint, либо replyMarkup пустой) —
+  // прикрепляем нижнюю persistent kb для refresh wtoken.
+  const descriptionMarkup = hint ? bottomKb : (replyMarkup ?? bottomKb);
   await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: String(userId),
       text,
-      ...(hint ? {} : replyMarkup ? { reply_markup: replyMarkup } : {}),
+      ...(descriptionMarkup ? { reply_markup: descriptionMarkup } : {}),
     }),
   }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
 
   if (hint) {
+    // Hint-сообщение: inline kb если есть, иначе bottom persistent для wtoken-refresh.
+    const hintMarkup = replyMarkup ?? bottomKb;
     await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: String(userId),
         text: hint,
-        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+        ...(hintMarkup ? { reply_markup: hintMarkup } : {}),
       }),
     }).catch((reason) => logger.warn(reason, `Could not send model hint`));
   }

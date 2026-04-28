@@ -301,35 +301,30 @@ export async function activateVideoModel(
       model,
     );
     const inlineKb = kb.inline_keyboard.length ? kb : undefined;
-    let sectionReplyMarkup:
-      | {
-          keyboard: { text: string; web_app?: { url: string } }[][];
-          resize_keyboard: boolean;
-          is_persistent: boolean;
+    // Description-сообщение никогда не несёт inline kb (inline уезжает на хинт
+    // или mode-activated). Раз reply_markup-слот свободен — всегда привязываем
+    // нижнюю persistent-клавиатуру со СВЕЖИМ wtoken для кнопки «Управление»
+    // (web_app). Без обновления токены протухают через ~24ч.
+    const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
+    const managementBtn = webappUrl
+      ? {
+          text: ctx.t.video.management,
+          web_app: { url: `${webappUrl}?page=management&section=video&wtoken=${token}` },
         }
-      | undefined;
-    if (options.sectionReplyKeyboard) {
-      const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
-      const managementBtn = webappUrl
-        ? {
-            text: ctx.t.video.management,
-            web_app: { url: `${webappUrl}?page=management&section=video&wtoken=${token}` },
-          }
-        : { text: ctx.t.video.management };
-      sectionReplyMarkup = {
-        keyboard: [
-          [{ text: ctx.t.video.newDialog }],
-          [{ text: ctx.t.video.avatars }, { text: ctx.t.video.lipSync }],
-          [managementBtn],
-          [{ text: ctx.t.common.backToMain }],
-        ],
-        resize_keyboard: true,
-        is_persistent: true,
-      };
-    }
+      : { text: ctx.t.video.management };
+    const sectionReplyMarkup = {
+      keyboard: [
+        [{ text: ctx.t.video.newDialog }],
+        [{ text: ctx.t.video.avatars }, { text: ctx.t.video.lipSync }],
+        [managementBtn],
+        [{ text: ctx.t.common.backToMain }],
+      ],
+      resize_keyboard: true,
+      is_persistent: true,
+    };
 
     // Description goes first; attach the persistent section reply keyboard here
-    // (if any), so the inline model menu can live on the final hint message.
+    // (если она нужна), inline для кнопок модели уезжает на хинт-сообщение.
     await ctx.reply(`${modelName}\n\n${modelDesc}\n\n${costLine}`, {
       reply_markup: sectionReplyMarkup,
     });

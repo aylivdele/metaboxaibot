@@ -165,7 +165,11 @@ export async function activateDesignModel(
         ? M | undefined
         : never
       : never = kb.inline_keyboard.length ? kb : undefined;
-    if (!replyMarkup && options.sectionReplyKeyboard) {
+    // Когда у сообщения нет inline kb — слот reply_markup свободен, привязываем
+    // нижнюю persistent-клавиатуру раздела. Это переопределяет/обновляет её
+    // у пользователя со СВЕЖИМ wtoken для кнопки «Управление» (web_app).
+    // Без этого token'ы протухают через ~24ч и юзер видит "ссылка устарела".
+    if (!replyMarkup) {
       const token = webappUrl ? generateWebToken(ctx.user.id, config.bot.token) : "";
       const managementBtn = webappUrl
         ? {
