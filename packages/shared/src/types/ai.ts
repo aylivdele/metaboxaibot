@@ -1,5 +1,6 @@
 import type { Section } from "./user.js";
 import type { ContextStrategy } from "./dialog.js";
+import type { PromptRefCapabilities } from "../prompt-refs/canonical.js";
 
 // ── Model settings condition types ───────────────────────────────────────────
 
@@ -452,6 +453,12 @@ export interface AIModel {
     inputMultiplier: number;
     outputMultiplier: number;
   };
+  /**
+   * Declares which @-reference kinds the model accepts in its prompt.
+   * Used by the pre-flight validator to catch wrong references before submission.
+   * Models without this field do not support any @-references.
+   */
+  promptRefs?: PromptRefCapabilities;
   /**
    * Configurable generation parameters exposed in the Management mini-app.
    * The frontend renders controls dynamically based on these definitions.

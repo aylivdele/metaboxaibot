@@ -165,6 +165,24 @@ export default {
       "❌ Prompt is too long — this model supports up to {limit} characters. Please shorten your text and try again.",
     klingElementsRequired:
       "❌ Your prompt contains element references (like @element_dog) but no element images were uploaded. Use the element slots below to attach reference images, or remove the @element references from your prompt.",
+    promptRefElementWordName:
+      "❌ Named element references (@{raw}) are not supported. Use numeric references instead: @Element1..@Element{max}.",
+    promptRefElementMissing:
+      "❌ Your prompt contains @Element{n} but the Element {n} slot is empty. Upload an image to that slot or remove the reference from your prompt.",
+    promptRefElementOutOfRange:
+      "❌ @Element{n}: this model supports a maximum of {max} element(s). Use @Element1..@Element{max}.",
+    promptRefImageMissing:
+      "❌ Your prompt contains @Image{n} but reference image #{n} has not been uploaded. Add an image to the slot or remove the reference.",
+    promptRefImageOutOfRange:
+      "❌ @Image{n}: this model supports a maximum of {max} reference images. Use @Image1..@Image{max}.",
+    promptRefVideoMissing:
+      "❌ Your prompt contains @Video but no reference video has been uploaded. Add a video to the slot or remove @Video from your prompt.",
+    promptRefVideoIndexed:
+      "❌ Use @Video (without a number) — this model supports a single reference video.",
+    promptRefUnsupportedByModel:
+      '❌ This model does not support @-references in the prompt. Remove "{raw}" or switch to a compatible model.',
+    promptRefUnknownToken:
+      '❌ Unrecognised reference "{raw}". Available for this model: {available}.',
     runwayRequiresImage:
       "❌ Runway requires an image to generate video. Please send a photo first, then your text prompt.",
     heygenNeedsVoice:
@@ -444,7 +462,7 @@ export default {
     refElement4: "Element 4",
     refElement5: "Element 5",
     refElementHint:
-      "An element is an object/character you can reference in the prompt.\n• 2–4 photos of the same object from different angles (JPG/PNG, up to 10 MB each)\n• Up to 3 elements per generation\n\nReference them in the prompt as @element1, @element2, @element3 — exactly like that.\n\nSend photos now.",
+      "An element is an object/character you can reference in the prompt.\n• 2–4 photos of the same object from different angles (JPG/PNG, up to 10 MB each)\n• Up to 3 elements per generation\n\nReference them in the prompt as @Element1, @Element2, @Element3 — exactly like that.\n\nSend photos now.",
     referenceImages: "Reference Images",
     referenceVideos: "Reference Videos",
     referenceAudios: "Reference Audios",
