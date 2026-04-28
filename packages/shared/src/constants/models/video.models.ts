@@ -39,6 +39,7 @@ const MI_REF_ELEMENTS: MediaInputSlot[] = [1, 2, 3].map((i) => ({
   mode: "reference_element",
   labelKey: `refElement${i}`,
   maxImages: 4,
+  imagesOnly: true,
 }));
 
 // KIE Kling принимает first/last frame одним массивом image_urls, поэтому

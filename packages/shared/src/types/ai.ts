@@ -136,6 +136,12 @@ export interface MediaInputSlot {
    */
   exclusiveGroup?: string;
   /**
+   * When true, only photos are accepted — videos are rejected immediately with
+   * a user-facing error. Overrides the default `reference_element` behaviour
+   * which normally allows a single video in place of images.
+   */
+  imagesOnly?: boolean;
+  /**
    * Upload-time validation rules (duration, file size). When a constraint is
    * violated, the upload is rejected with a user-facing error built from
    * `t.errors.mediaSlot*` strings. Reusable across models — e.g. Kling motion

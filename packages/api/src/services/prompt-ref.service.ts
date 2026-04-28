@@ -74,6 +74,7 @@ export function validatePromptRefs(params: ValidatePromptRefsParams): VideoValid
     }
 
     if (parsed.kind === "indexed_video") {
+      if (capabilities.elements && !capabilities.video) return { key: "promptRefVideoUseElements" };
       return { key: "promptRefVideoIndexed", params: { raw } };
     }
 
@@ -118,6 +119,7 @@ export function validatePromptRefs(params: ValidatePromptRefsParams): VideoValid
 
     if (parsed.kind === "video") {
       if (!capabilities?.video) {
+        if (capabilities?.elements) return { key: "promptRefVideoUseElements" };
         return { key: "promptRefUnsupportedByModel", params: { raw } };
       }
       const hasVideo =

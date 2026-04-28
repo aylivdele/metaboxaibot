@@ -1227,6 +1227,10 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
     const userId = ctx.user.id;
     const mediaGroupId = ctx.message?.media_group_id;
     if (slot?.mode === "reference_element") {
+      if (slot.imagesOnly) {
+        await ctx.reply(ctx.t.errors.mediaSlotImagesOnly);
+        return;
+      }
       await userStateService.clearMediaInputSlot(userId, slotModelId, activeSlot.slotKey);
       await userStateService.addMediaInput(userId, slotModelId, activeSlot.slotKey, tgSlotValue);
       debounceSlotReply(userId, mediaGroupId, async () => {
