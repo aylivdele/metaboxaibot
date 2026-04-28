@@ -502,6 +502,9 @@ export class EvolinkVideoAdapter implements VideoAdapter {
 
     switch (code) {
       case "content_policy_violation": {
+        if (/public figure|public person|prominent figure|celebrity/i.test(message)) {
+          throw new UserFacingError(technicalMessage, { key: "publicFigureViolation" });
+        }
         if (/copyright|trademark|third-party|logo/i.test(message)) {
           throw new UserFacingError(technicalMessage, { key: "copyrightViolation" });
         }
@@ -538,6 +541,9 @@ export class EvolinkVideoAdapter implements VideoAdapter {
       }
 
       case "generation_failed_no_content": {
+        if (/public figure|public person|prominent figure|celebrity/i.test(message)) {
+          throw new UserFacingError(technicalMessage, { key: "publicFigureViolation" });
+        }
         if (/copyright|trademark|logo|watermark/i.test(message)) {
           throw new UserFacingError(technicalMessage, { key: "copyrightViolation" });
         }

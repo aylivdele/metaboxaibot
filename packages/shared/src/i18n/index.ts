@@ -183,6 +183,7 @@ export interface Translations {
     mediaSlotImagesOnly: string;
     contentPolicyViolation: string;
     copyrightViolation: string;
+    publicFigureViolation: string;
     aiClassifiedError: string;
     recraftImg2imgSvgUnsupported: string;
     recraftImg2imgFileTooLarge: string;

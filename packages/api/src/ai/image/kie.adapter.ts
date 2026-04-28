@@ -237,9 +237,17 @@ export class KieImageAdapter implements ImageAdapter {
       const failCode = task.failCode;
       const technicalMessage = `KIE ${this.modelId} generation failed: ${failCode ?? ""} ${failMsg}`;
       const isCopyright = failCode === "501" || /copyright/i.test(failMsg);
+      // KIE/evolink content moderation: "Request blocked: ... prominent public figure"
+      // → отдельный мессадж про публичные лица (юзер часто пытается грузить фото
+      // знаменитостей или просит их в промпте — copyright-сообщение неточно).
+      const isPublicFigure = /public figure|public person|prominent figure|celebrity/i.test(
+        failMsg,
+      );
       const isPolicy =
         failCode === "430" ||
         /sensitive|restricted|policy|prohibited|nsfw|violat|inappropriate/i.test(failMsg);
+      if (isPublicFigure)
+        throw new UserFacingError(technicalMessage, { key: "publicFigureViolation" });
       if (isCopyright) throw new UserFacingError(technicalMessage, { key: "copyrightViolation" });
       if (isPolicy) throw new UserFacingError(technicalMessage, { key: "contentPolicyViolation" });
 

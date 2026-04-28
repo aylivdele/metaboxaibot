@@ -243,7 +243,11 @@ export class EvolinkImageAdapter implements ImageAdapter {
       // ── Client errors (user-fixable, no retry) ─────────────────────────────
       case "content_policy_violation": {
         // Sub-types: photorealistic people, celebrity, copyright, NSFW, violence...
-        // Distinguish copyright (separate i18n key) vs general policy.
+        // Distinguish copyright / public-figure / general policy для точного
+        // user-facing мессаджа.
+        if (/public figure|public person|prominent figure|celebrity/i.test(message)) {
+          throw new UserFacingError(technicalMessage, { key: "publicFigureViolation" });
+        }
         if (/copyright|trademark|third-party|logo/i.test(message)) {
           throw new UserFacingError(technicalMessage, { key: "copyrightViolation" });
         }
@@ -286,6 +290,9 @@ export class EvolinkImageAdapter implements ImageAdapter {
 
       // ── Generation issues (often content-related, but vague) ──────────────
       case "generation_failed_no_content": {
+        if (/public figure|public person|prominent figure|celebrity/i.test(message)) {
+          throw new UserFacingError(technicalMessage, { key: "publicFigureViolation" });
+        }
         if (/copyright|trademark|logo|watermark/i.test(message)) {
           throw new UserFacingError(technicalMessage, { key: "copyrightViolation" });
         }
