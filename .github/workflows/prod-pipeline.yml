@@ -309,14 +309,22 @@ jobs:
 
             # Pull only services that were actually rebuilt — avoids fetching
             # stale `:latest` tags for sibling services that didn't change.
+            # Порядок api → worker → bot. Bot тянем ПОСЛЕДНИМ — бот наиболее
+            # чувствителен к насыщению канала (long-polling к api.telegram.org),
+            # так что пусть его pull идёт когда остальные уже скачаны и канал
+            # полностью свободен. Также pull'им СТРОГО последовательно (по
+            # одному сервису) вместо `pull a b c` — параллельные слои съедают
+            # канал и юзеры видят бот "зависшим".
             SERVICES=""
             [ "$BUILT_API" = "true" ]    && SERVICES="$SERVICES api"
-            [ "$BUILT_BOT" = "true" ]    && SERVICES="$SERVICES bot"
             [ "$BUILT_WORKER" = "true" ] && SERVICES="$SERVICES worker"
+            [ "$BUILT_BOT" = "true" ]    && SERVICES="$SERVICES bot"
 
             if [ -n "$SERVICES" ]; then
-              echo "Pulling new images:$SERVICES"
-              docker compose -f docker-compose.prod.yml pull $SERVICES
+              for svc in $SERVICES; do
+                echo "Pulling $svc..."
+                docker compose -f docker-compose.prod.yml pull "$svc"
+              done
 
               echo "Restarting updated services:$SERVICES"
               docker compose -f docker-compose.prod.yml up -d --no-build --remove-orphans $SERVICES

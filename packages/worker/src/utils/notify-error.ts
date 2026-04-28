@@ -25,6 +25,11 @@ export interface ErrorContext {
 /**
  * Serializes an error into a full diagnostic string, including nested cause chain,
  * structured fal error detail, and stack trace.
+ *
+ * Specifically для undici-style ошибок: `TypeError: fetch failed` несёт
+ * реальную причину в `cause` (с полем `code` типа "ECONNRESET"). Walk'аем
+ * cause-chain, на каждом уровне выводим code/errno/syscall/address если есть —
+ * без этого alert получается бесполезным "fetch failed".
  */
 function serializeError(err: unknown): string {
   if (err === null || err === undefined) return String(err);
@@ -39,6 +44,16 @@ function serializeError(err: unknown): string {
     if (typeof e.status === "number" || typeof e.statusCode === "number") {
       parts.push(`HTTP ${e.status ?? e.statusCode}`);
     }
+
+    // Network-уровень: code/errno/syscall/host (undici, libuv, dns).
+    const code = e.code ?? e.errno;
+    if (typeof code === "string" || typeof code === "number") {
+      parts.push(`code: ${code}`);
+    }
+    if (typeof e.syscall === "string") parts.push(`syscall: ${e.syscall}`);
+    if (typeof e.address === "string") parts.push(`address: ${e.address}`);
+    if (typeof e.hostname === "string") parts.push(`hostname: ${e.hostname}`);
+    if (typeof e.port === "number") parts.push(`port: ${e.port}`);
 
     // fal structured body
     if (e.body !== undefined) {

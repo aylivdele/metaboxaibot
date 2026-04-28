@@ -56,11 +56,38 @@ export function resolveSubJobError(
   t: Translations,
   modelName: string,
 ): { userText: string; rawText: string; isUserFacing: boolean } {
-  const rawText = err instanceof Error ? err.message : String(err);
+  // rawText включает cause-chain — без этого undici-ошибки выглядят как
+  // абстрактное "fetch failed" в notifyTechError. Видим: сообщение, code,
+  // syscall/host из каждого уровня cause до 4 шагов.
+  const rawText = formatErrorWithCauseChain(err);
   const mapped = resolveUserFacingMessage(err, t);
   if (mapped !== null) {
     return { userText: mapped, rawText, isUserFacing: true };
   }
   const userText = t.errors.generationFailed.replace("{modelName}", modelName);
   return { userText, rawText, isUserFacing: false };
+}
+
+/**
+ * Распаковывает err.message + cause-chain в одну строку. Для каждого уровня
+ * выводит message + .code если есть. Используется для записи в `errorRaw`
+ * sub-job'а — потом этот текст идёт в notifyTechError.
+ */
+function formatErrorWithCauseChain(err: unknown): string {
+  const lines: string[] = [];
+  let cur: unknown = err;
+  for (let depth = 0; depth < 4 && cur; depth++) {
+    if (typeof cur !== "object" || cur === null) {
+      lines.push(String(cur));
+      break;
+    }
+    const e = cur as Record<string, unknown>;
+    const msg = typeof e.message === "string" ? e.message : "[no message]";
+    const code = e.code ?? e.errno;
+    const codeStr = typeof code === "string" || typeof code === "number" ? ` [code: ${code}]` : "";
+    const prefix = depth === 0 ? "" : `caused by: `;
+    lines.push(`${prefix}${msg}${codeStr}`);
+    cur = e.cause;
+  }
+  return lines.join("\n  ");
 }

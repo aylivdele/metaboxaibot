@@ -129,6 +129,41 @@ const TELEGRAM_DOC_MAX_BYTES = 50 * 1024 * 1024;
 
 const telegram = new Api(config.bot.token);
 
+/**
+ * Форматирует structured-report для notifyTechError при failure'ах в virtual
+ * batch. Без этого в alert приходит только склеенный `errorRaw.join("---")`
+ * без понимания: на какой sub-job упало, какой provider использовался, на
+ * какой стадии (submit vs poll). С контекстом ops видит сразу:
+ *
+ *   stage: poll, primary: kie, total sub-jobs: 4, failed: 2
+ *   [0] provider=kie:
+ *       fetch GET kie.ai/api/v1/jobs/recordInfo failed (ECONNRESET): ...
+ *       caused by: socket hang up [code: ECONNRESET]
+ *   [2] provider=evolink (FALLBACK):
+ *       HTTP 502 ...
+ */
+function formatSubJobErrorReport(
+  subJobs: VirtualBatchSubJob[],
+  stage: "submit" | "poll",
+  primaryProvider: string,
+): string {
+  const failed = subJobs.filter((s) => s.status === "failed" && s.errorRaw);
+  const header = `stage: ${stage}, primary: ${primaryProvider}, total sub-jobs: ${subJobs.length}, failed: ${failed.length}`;
+  const lines: string[] = [header];
+  for (let i = 0; i < subJobs.length; i++) {
+    const s = subJobs[i];
+    if (s.status !== "failed" || !s.errorRaw) continue;
+    const provider = s.effectiveProvider ?? "unknown";
+    const fbMark = provider !== primaryProvider ? " (FALLBACK)" : "";
+    const indented = s.errorRaw
+      .split("\n")
+      .map((l) => `    ${l}`)
+      .join("\n");
+    lines.push(`[${i}] provider=${provider}${fbMark}:\n${indented}`);
+  }
+  return lines.join("\n");
+}
+
 /** Upload an image to S3 and generate a thumbnail. Returns { s3Key, thumbnailS3Key }. */
 async function uploadImageToS3(
   url: string,
@@ -706,8 +741,15 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
           }
           // Один alert на batch со списком всех unknown/tech-ошибок sub-job'ов
           // (mirror'ит single-shot notifyTechError на финальной попытке).
+          // Structured-report содержит per-sub-job: index, provider, fallback-маркер,
+          // полный error message + cause-chain.
           if (techRawErrors.length > 0) {
-            await notifyTechError(new Error(techRawErrors.join("\n---\n")), {
+            const report = formatSubJobErrorReport(
+              state.subJobs,
+              "submit",
+              modelMeta?.provider ?? "unknown",
+            );
+            await notifyTechError(new Error(report), {
               jobId: dbJobId,
               modelId,
               section: "image",
@@ -970,7 +1012,12 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
           }
         }
         if (techRawErrors.length > 0) {
-          await notifyTechError(new Error(techRawErrors.join("\n---\n")), {
+          const report = formatSubJobErrorReport(
+            state.subJobs,
+            "poll",
+            modelMeta?.provider ?? "unknown",
+          );
+          await notifyTechError(new Error(report), {
             jobId: dbJobId,
             modelId,
             section: "image",
