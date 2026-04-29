@@ -291,7 +291,7 @@ export default {
     generationTimedOut24h:
       "❌ {modelName}: generation did not finish within 24 hours and was cancelled. Please try again.",
     modelTemporarilyUnavailable:
-      "❌ {modelName} is temporarily unavailable due to provider limits. Please try later or choose another model.",
+      "❌ {modelName} is temporarily unavailable. Please try later or choose another model.",
     soulProviderUnavailable: "❌ Character creation is temporarily unavailable. Please try later.",
     soulMissingAvatar:
       "⚠️ To generate with Higgsfield Soul, select your character in the Management menu.",

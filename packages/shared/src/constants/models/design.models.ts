@@ -1996,65 +1996,66 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-  "dall-e-3": {
-    id: "dall-e-3",
-    name: "🎯 DALL-E 3 Turbo",
-    description:
-      "Простой и понятный генератор от OpenAI. Хорошо понимает запросы на любом языке, отлично для быстрых идей.",
-    section: "design",
-    provider: "openai",
-    // Base: standard 1024×1024. Exact cost = quality × size (see costMatrix).
-    costUsdPerRequest: 0.04,
-    costMatrix: {
-      dims: ["quality", "aspect_ratio"],
-      table: {
-        "standard__1:1": 0.04,
-        "standard__16:9": 0.08,
-        "standard__9:16": 0.08,
-        "hd__1:1": 0.08,
-        "hd__16:9": 0.12,
-        "hd__9:16": 0.12,
-      },
-    },
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: false,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    maxVirtualBatch: 4,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    // DALL-E 3 only supports exactly 3 sizes
-    supportedAspectRatios: ["1:1", "16:9", "9:16"],
-    settings: [
-      NUM_IMAGES_SETTING,
-      mkAspectRatio(["1:1", "16:9", "9:16"]),
-      {
-        key: "quality",
-        label: "Качество",
-        description: "Standard — быстрее и дешевле, HD — более детальная и сложная картинка.",
-        type: "select",
-        options: [
-          { value: "standard", label: "Standard" },
-          { value: "hd", label: "HD" },
-        ],
-        default: "standard",
-      },
-      {
-        key: "style",
-        label: "Стиль",
-        description:
-          "Vivid — насыщенные цвета, яркий и выразительный результат. Natural — более спокойный и реалистичный.",
-        type: "select",
-        options: [
-          { value: "vivid", label: "Vivid" },
-          { value: "natural", label: "Natural" },
-        ],
-        default: "vivid",
-      },
-    ],
-  },
+  // DALL-E 3 DEPRECATED
+  // "dall-e-3": {
+  //   id: "dall-e-3",
+  //   name: "🎯 DALL-E 3 Turbo",
+  //   description:
+  //     "Простой и понятный генератор от OpenAI. Хорошо понимает запросы на любом языке, отлично для быстрых идей.",
+  //   section: "design",
+  //   provider: "openai",
+  //   // Base: standard 1024×1024. Exact cost = quality × size (see costMatrix).
+  //   costUsdPerRequest: 0.04,
+  //   costMatrix: {
+  //     dims: ["quality", "aspect_ratio"],
+  //     table: {
+  //       "standard__1:1": 0.04,
+  //       "standard__16:9": 0.08,
+  //       "standard__9:16": 0.08,
+  //       "hd__1:1": 0.08,
+  //       "hd__16:9": 0.12,
+  //       "hd__9:16": 0.12,
+  //     },
+  //   },
+  //   inputCostUsdPerMToken: 0,
+  //   outputCostUsdPerMToken: 0,
+  //   supportsImages: false,
+  //   supportsVoice: false,
+  //   supportsWeb: false,
+  //   isAsync: false,
+  //   maxVirtualBatch: 4,
+  //   contextStrategy: "db_history",
+  //   contextMaxMessages: 0,
+  //   // DALL-E 3 only supports exactly 3 sizes
+  //   supportedAspectRatios: ["1:1", "16:9", "9:16"],
+  //   settings: [
+  //     NUM_IMAGES_SETTING,
+  //     mkAspectRatio(["1:1", "16:9", "9:16"]),
+  //     {
+  //       key: "quality",
+  //       label: "Качество",
+  //       description: "Standard — быстрее и дешевле, HD — более детальная и сложная картинка.",
+  //       type: "select",
+  //       options: [
+  //         { value: "standard", label: "Standard" },
+  //         { value: "hd", label: "HD" },
+  //       ],
+  //       default: "standard",
+  //     },
+  //     {
+  //       key: "style",
+  //       label: "Стиль",
+  //       description:
+  //         "Vivid — насыщенные цвета, яркий и выразительный результат. Natural — более спокойный и реалистичный.",
+  //       type: "select",
+  //       options: [
+  //         { value: "vivid", label: "Vivid" },
+  //         { value: "natural", label: "Natural" },
+  //       ],
+  //       default: "vivid",
+  //     },
+  //   ],
+  // },
 };
 
 /**

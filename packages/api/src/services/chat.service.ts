@@ -345,14 +345,14 @@ export const chatService = {
 
         if (!canKeyRetry) {
           await dialogService.markMessageFailed(userMessage.id);
-          // Convert raw 429 into a user-facing message; pool selection already gave us
-          // the best available key, so a 429 here means the picked key is now also
-          // throttled — the user can retry shortly and a different key may be free.
-          if (cls.isRateLimit) {
-            // Оригинальный err (raw 429 + body провайдера) пробрасываем через cause —
-            // notifyTechError развернёт его через `caused by:` в alert'е, чтобы
-            // on-call видел не «Rate-limited on kie», а реальный response от провайдера.
-            throw new UserFacingError(`Rate-limited on ${keyProvider}`, {
+          // Convert raw 429/5xx into a user-facing message. Для 429 — все ключи
+          // в throttle, юзеру стоит попробовать позже. Для 5xx — провайдер
+          // отдаёт transient ошибку ("server is currently being maintained,
+          // please try again later" и т.п.), пользы от raw stack trace ноль.
+          // Оригинальный err идёт через cause — notifyTechError развернёт его.
+          if (cls.isRateLimit || is5xx) {
+            const reason = cls.isRateLimit ? "Rate-limited" : "5xx error";
+            throw new UserFacingError(`${reason} on ${keyProvider}`, {
               key: "modelTemporarilyUnavailable",
               params: { modelName: model?.name ?? dialog.modelId },
               notifyOps: true,
@@ -370,8 +370,9 @@ export const chatService = {
           if (isPoolExhaustedError(poolErr)) {
             // Все ключи throttled — terminal failure для текущего цикла.
             await dialogService.markMessageFailed(userMessage.id);
-            if (cls.isRateLimit) {
-              throw new UserFacingError(`Rate-limited on ${keyProvider}`, {
+            if (cls.isRateLimit || is5xx) {
+              const reason = cls.isRateLimit ? "Rate-limited" : "5xx error";
+              throw new UserFacingError(`${reason} on ${keyProvider}`, {
                 key: "modelTemporarilyUnavailable",
                 params: { modelName: model?.name ?? dialog.modelId },
                 notifyOps: true,
