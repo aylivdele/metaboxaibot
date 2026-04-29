@@ -358,7 +358,8 @@ const translations = {
     "linkMetabox.verify.sentSuccess":
       "Email sent. Check your inbox — and make sure the address above is correct.",
     "linkMetabox.verify.sent": "Confirmation email sent.",
-    "linkMetabox.verify.alreadyVerified": "Email is already verified. You can sign in on the website.",
+    "linkMetabox.verify.alreadyVerified":
+      "Email is already verified. You can sign in on the website.",
     "linkMetabox.verify.sendError": "Couldn't send the email. Try again later.",
     "linkMetabox.verify.limitExhausted":
       "You've hit the resend limit. Please wait a bit, or change the email address below.",
