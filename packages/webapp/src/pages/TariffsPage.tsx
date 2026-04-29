@@ -129,16 +129,25 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
     }
     // SSO redirect to shop subscriptions tab
     try {
-      const { ssoUrl } = await api.profile.metaboxSso();
-      // encodeURIComponent чтобы query внутри redirect (?tab=subscriptions)
-      // не сливался с query самого ssoUrl и не парсился сервером криво.
-      const redirect = encodeURIComponent("/shop?tab=subscriptions");
-      const shopUrl = ssoUrl.includes("?")
-        ? `${ssoUrl}&redirect=${redirect}`
-        : `${ssoUrl}?redirect=${redirect}`;
-      const tg = getTgWebApp();
-      if (tg?.openLink) tg.openLink(shopUrl);
-      else window.open(shopUrl, "_blank");
+      const result = await api.profile.metaboxSso();
+      // Email ещё не подтверждён — переводим юзера на pending-экран
+      // в LinkMetaboxPage вместо невозможного авто-логина.
+      if ("requiresVerification" in result && result.requiresVerification) {
+        setModal(null);
+        onLinkMetabox();
+        return;
+      }
+      if ("ssoUrl" in result && result.ssoUrl) {
+        // encodeURIComponent чтобы query внутри redirect (?tab=subscriptions)
+        // не сливался с query самого ssoUrl и не парсился сервером криво.
+        const redirect = encodeURIComponent("/shop?tab=subscriptions");
+        const shopUrl = result.ssoUrl.includes("?")
+          ? `${result.ssoUrl}&redirect=${redirect}`
+          : `${result.ssoUrl}?redirect=${redirect}`;
+        const tg = getTgWebApp();
+        if (tg?.openLink) tg.openLink(shopUrl);
+        else window.open(shopUrl, "_blank");
+      }
     } catch {
       onLinkMetabox();
     }

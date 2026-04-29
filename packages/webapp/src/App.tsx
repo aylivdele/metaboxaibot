@@ -84,13 +84,22 @@ function AppContent() {
       const fresh = await api.profile.get();
       setProfile(fresh);
       if (fresh?.metaboxUserId) {
-        const { ssoUrl } = await api.profile.metaboxSso();
-        const tg = (
-          window as Window & { Telegram?: { WebApp?: { openLink?: (u: string) => void } } }
-        ).Telegram?.WebApp;
-        if (tg?.openLink) tg.openLink(ssoUrl);
-        else window.open(ssoUrl, "_blank");
-        return;
+        const result = await api.profile.metaboxSso();
+        // Если email на сайте ещё не подтверждён — backend возвращает
+        // requiresVerification вместо ssoUrl. Показываем pending-экран
+        // в LinkMetaboxPage [он сам подтянет статус через metaboxStatus].
+        if ("requiresVerification" in result && result.requiresVerification) {
+          setPage("linkMetabox");
+          return;
+        }
+        if ("ssoUrl" in result && result.ssoUrl) {
+          const tg = (
+            window as Window & { Telegram?: { WebApp?: { openLink?: (u: string) => void } } }
+          ).Telegram?.WebApp;
+          if (tg?.openLink) tg.openLink(result.ssoUrl);
+          else window.open(result.ssoUrl, "_blank");
+          return;
+        }
       }
     } catch {
       // SSO failed or profile refresh failed

@@ -74,12 +74,19 @@ export function ReferralPage({ onLinkMetabox }: { onLinkMetabox: () => void }) {
       return;
     }
     try {
-      const { ssoUrl } = await api.profile.metaboxSso();
-      // Redirect to finance page
-      const financeUrl = ssoUrl.includes("?")
-        ? `${ssoUrl}&redirect=/partner/finance`
-        : `${ssoUrl}?redirect=/partner/finance`;
-      window.open(financeUrl, "_blank");
+      const result = await api.profile.metaboxSso();
+      // Email ещё не подтверждён — отправляем юзера на pending-экран
+      // в LinkMetaboxPage [там кнопки «Отправить повторно» / «Изменить»].
+      if ("requiresVerification" in result && result.requiresVerification) {
+        onLinkMetabox();
+        return;
+      }
+      if ("ssoUrl" in result && result.ssoUrl) {
+        const financeUrl = result.ssoUrl.includes("?")
+          ? `${result.ssoUrl}&redirect=/partner/finance`
+          : `${result.ssoUrl}?redirect=/partner/finance`;
+        window.open(financeUrl, "_blank");
+      }
     } catch {
       // Fallback
       onLinkMetabox();
