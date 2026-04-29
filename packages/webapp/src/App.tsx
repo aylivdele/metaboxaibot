@@ -6,7 +6,7 @@ import { ManagementPage } from "./pages/ManagementPage.js";
 import { TariffsPage } from "./pages/TariffsPage.js";
 import { ReferralPage } from "./pages/ReferralPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
-import { LinkMetaboxPage } from "./pages/LinkMetaboxPage.js";
+import { LinkMetaboxPage, type LinkMetaboxReason } from "./pages/LinkMetaboxPage.js";
 import { DownloadRedirectPage } from "./pages/DownloadRedirectPage.js";
 import { I18nProvider, useI18n } from "./i18n.js";
 import { AiboxLogo } from "./components/AiboxLogo.js";
@@ -57,6 +57,13 @@ function AppContent() {
     section: string;
     modelId: string;
   } | null>(null);
+  // Контекст редиректа на LinkMetaboxPage. Дефолт "learning" для legacy-вызовов
+  // (handleLearning из BottomNav). Tariffs/Referral передают свои значения.
+  const [linkMetaboxReason, setLinkMetaboxReason] = useState<LinkMetaboxReason>("learning");
+  const goToLinkMetabox = (reason: LinkMetaboxReason): void => {
+    setLinkMetaboxReason(reason);
+    setPage("linkMetabox");
+  };
   const { ready, error, warning } = useTelegramInit();
   const { t } = useI18n();
 
@@ -84,18 +91,27 @@ function AppContent() {
       const fresh = await api.profile.get();
       setProfile(fresh);
       if (fresh?.metaboxUserId) {
-        const { ssoUrl } = await api.profile.metaboxSso();
-        const tg = (
-          window as Window & { Telegram?: { WebApp?: { openLink?: (u: string) => void } } }
-        ).Telegram?.WebApp;
-        if (tg?.openLink) tg.openLink(ssoUrl);
-        else window.open(ssoUrl, "_blank");
-        return;
+        const result = await api.profile.metaboxSso();
+        // Если email на сайте ещё не подтверждён — backend возвращает
+        // requiresVerification вместо ssoUrl. Показываем pending-экран
+        // в LinkMetaboxPage [он сам подтянет статус через metaboxStatus].
+        if ("requiresVerification" in result && result.requiresVerification) {
+          goToLinkMetabox("learning");
+          return;
+        }
+        if ("ssoUrl" in result && result.ssoUrl) {
+          const tg = (
+            window as Window & { Telegram?: { WebApp?: { openLink?: (u: string) => void } } }
+          ).Telegram?.WebApp;
+          if (tg?.openLink) tg.openLink(result.ssoUrl);
+          else window.open(result.ssoUrl, "_blank");
+          return;
+        }
       }
     } catch {
       // SSO failed or profile refresh failed
     }
-    setPage("linkMetabox");
+    goToLinkMetabox("learning");
   };
 
   if (error) {
@@ -164,14 +180,17 @@ function AppContent() {
           />
         )}
         {page === "tariffs" && (
-          <TariffsPage profile={profile} onLinkMetabox={() => setPage("linkMetabox")} />
+          <TariffsPage profile={profile} onLinkMetabox={() => goToLinkMetabox("subscription")} />
         )}
-        {page === "referral" && <ReferralPage onLinkMetabox={() => setPage("linkMetabox")} />}
+        {page === "referral" && (
+          <ReferralPage onLinkMetabox={() => goToLinkMetabox("withdrawal")} />
+        )}
         {page === "admin" && <AdminPage />}
         {page === "linkMetabox" && (
           <LinkMetaboxPage
             firstName={profile?.firstName}
             username={profile?.username}
+            reason={linkMetaboxReason}
             onBack={() => setPage("profile")}
             onSuccess={() => api.profile.get().then(setProfile).catch(console.error)}
           />

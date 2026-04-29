@@ -43,7 +43,8 @@ import {
   isFallbackCompatible,
 } from "@metabox/shared";
 import type { AIModel } from "@metabox/shared";
-import { notifyTechError } from "../utils/notify-error.js";
+import { notifyTechError, notifyFallback } from "../utils/notify-error.js";
+import { isKieFiveXxError } from "@metabox/api/utils/kie-error";
 import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import { submitWithFallback } from "../utils/submit-with-fallback.js";
 import { computeSeedance2BillableUsd } from "../utils/seedance2-billing.js";
@@ -311,6 +312,14 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
           submittedKeyId = acquired.keyId;
         } else if (modelMeta && fallbackCandidates.length > 0) {
           // У модели зарегистрированы fallback'и — идём через submitWithFallback.
+          // Если jobs приехала после poll-stage re-submit'а (KIE 5xx terminal failure),
+          // в inputData.fallback.attemptedProviders уже лежит primary — пропускаем
+          // его и сразу берём fallback.
+          const prevFallbackState = readFallbackState();
+          const skipProviders =
+            prevFallbackState.attemptedProviders && prevFallbackState.attemptedProviders.length > 0
+              ? new Set(prevFallbackState.attemptedProviders)
+              : undefined;
           const fbResult = await submitWithFallback<string, VideoJobData>({
             primaryModel: modelMeta,
             fallbacks: fallbackCandidates,
@@ -320,6 +329,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
             allowFiveXxFallback: job.attemptsMade >= 2,
             jobId: dbJobId,
             userId: userIdStr,
+            skipProviders,
             submit: async (model, acquired) => {
               const adapter = createVideoAdapter(model, acquired);
               return adapter.submit({
@@ -336,10 +346,17 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
           providerJobId = fbResult.result;
           submittedKeyId = fbResult.acquired.keyId;
           effectiveProvider = fbResult.effectiveProvider;
+          // Накопительно: prev attempted (из poll-fallback re-submit'а) + fresh
+          // attempts из этого вызова. Без union теряем primary-marker и поллер
+          // может попробовать его снова на следующей итерации.
+          const accumulated = new Set([
+            ...(prevFallbackState.attemptedProviders ?? []),
+            ...fbResult.attempts.map((a) => a.provider),
+          ]);
           await writeFallbackState({
             primaryProvider: modelMeta.provider,
             effectiveProvider,
-            attemptedProviders: fbResult.attempts.map((a) => a.provider),
+            attemptedProviders: Array.from(accumulated),
           });
         } else {
           // Нет fallback'ов — обычный путь через submitWithThrottle.
@@ -733,6 +750,80 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
     logger.error({ dbJobId, err }, "Video job failed");
 
     const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 1) - 1;
+
+    // ── Poll-stage fallback на KIE 5xx ──────────────────────────────────
+    // KIE при 5xx terminal failure НЕ перезапускает генерацию у себя. Если
+    // BullMQ retry'и исчерпаны и есть неиспользованный fallback-кандидат —
+    // пере-enqueue через delayJob: stage сбрасываем на "generate", чистим
+    // providerJobId, в attemptedProviders добавляем текущий effective
+    // provider. Submit-stage прочтёт attemptedProviders и через skipProviders
+    // пропустит primary, сразу возьмёт fallback.
+    if (stage === "poll" && isLastAttempt && isKieFiveXxError(err) && modelMeta) {
+      // readFallbackState/writeFallbackState — closures внутри try-блока,
+      // в catch недоступны. Refetch'аем напрямую.
+      const dbJob = await db.generationJob.findUnique({
+        where: { id: dbJobId },
+        select: { inputData: true },
+      });
+      const inputData = (dbJob?.inputData as Record<string, unknown> | null | undefined) ?? {};
+      const fbStateNow =
+        (inputData.fallback as
+          | { effectiveProvider?: string; attemptedProviders?: string[] }
+          | undefined) ?? {};
+      const currentEff = fbStateNow.effectiveProvider ?? modelMeta.provider;
+      const alreadyAttempted = new Set(fbStateNow.attemptedProviders ?? []);
+      alreadyAttempted.add(currentEff);
+
+      const nextCandidate = fallbackCandidates.find((m) => !alreadyAttempted.has(m.provider));
+
+      if (nextCandidate) {
+        logger.warn(
+          { dbJobId, modelId, currentEff, next: nextCandidate.provider },
+          "Video poll: KIE 5xx terminal — re-enqueuing on fallback",
+        );
+        await notifyFallback({
+          section: "video",
+          modelId,
+          primaryProvider: modelMeta.provider,
+          fallbackProvider: nextCandidate.provider,
+          reason: "persistent_5xx",
+          jobId: dbJobId,
+          userId: userIdStr,
+        });
+
+        // Чистим providerJobId + мерджим обновлённый fallback в одном update'е.
+        const merged = {
+          ...inputData,
+          fallback: {
+            primaryProvider: modelMeta.provider,
+            attemptedProviders: Array.from(alreadyAttempted),
+          },
+        };
+        await db.generationJob.update({
+          where: { id: dbJobId },
+          data: {
+            providerJobId: null,
+            providerKeyId: null,
+            inputData: merged as unknown as Prisma.InputJsonValue,
+          },
+        });
+
+        // delayJob = updateData + moveToDelayed (НЕ инкрементит attemptsMade)
+        // → throws DelayedError → BullMQ просыпается мгновенно и заходит
+        // в processVideoJob с stage="generate" (default) → submit-fallback.
+        await delayJob(
+          job,
+          {
+            ...job.data,
+            stage: undefined,
+            pollStartedAt: undefined,
+            lastIntervalMs: undefined,
+          },
+          1000,
+          token,
+        );
+      }
+    }
 
     if (isLastAttempt) {
       await db.generationJob.update({

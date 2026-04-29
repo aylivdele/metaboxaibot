@@ -43,7 +43,8 @@ import {
 } from "@metabox/shared";
 import type { AIModel } from "@metabox/shared";
 import type { DeductResult } from "@metabox/api/services";
-import { notifyTechError, notifyRateLimit } from "../utils/notify-error.js";
+import { notifyTechError, notifyRateLimit, notifyFallback } from "../utils/notify-error.js";
+import { isKieFiveXxError } from "@metabox/api/utils/kie-error";
 import { isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import { submitWithFallback } from "../utils/submit-with-fallback.js";
 import { deriveLockedProvider, detectUsedFallback } from "../utils/fallback-state.js";
@@ -804,6 +805,14 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
 
         if (!isAsync) {
           // Sync adapter (DALL-E, gpt-image, recraft) — generate inline, then finalize.
+          // Если приехали после poll-stage re-submit'а — attemptedProviders уже
+          // содержит primary, передаём в skipProviders.
+          const prevFallbackStateSync = readFallbackState();
+          const skipProvidersSync =
+            prevFallbackStateSync.attemptedProviders &&
+            prevFallbackStateSync.attemptedProviders.length > 0
+              ? new Set(prevFallbackStateSync.attemptedProviders)
+              : undefined;
           const fbResult = await submitWithFallback<ImageResult | ImageResult[], ImageJobData>({
             primaryModel: modelMeta,
             fallbacks: fallbackCandidates,
@@ -813,6 +822,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             allowFiveXxFallback: job.attemptsMade >= 2,
             jobId: dbJobId,
             userId: userIdStr,
+            skipProviders: skipProvidersSync,
             submit: async (model, acquired) => {
               const adapter = createImageAdapter(model, acquired);
               if (!adapter.generate) {
@@ -829,10 +839,14 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             },
           });
 
+          const accumulatedSync = new Set([
+            ...(prevFallbackStateSync.attemptedProviders ?? []),
+            ...fbResult.attempts.map((a) => a.provider),
+          ]);
           await writeFallbackState({
             primaryProvider: modelMeta.provider,
             effectiveProvider: fbResult.effectiveProvider,
-            attemptedProviders: fbResult.attempts.map((a) => a.provider),
+            attemptedProviders: Array.from(accumulatedSync),
           });
 
           const imageResults: ImageResult[] = Array.isArray(fbResult.result)
@@ -858,6 +872,12 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             providerJobId = existingJob.providerJobId;
             logger.info({ dbJobId, providerJobId }, "Resuming poll for existing provider job");
           } else {
+            const prevFallbackStateAsync = readFallbackState();
+            const skipProvidersAsync =
+              prevFallbackStateAsync.attemptedProviders &&
+              prevFallbackStateAsync.attemptedProviders.length > 0
+                ? new Set(prevFallbackStateAsync.attemptedProviders)
+                : undefined;
             const fbResult = await submitWithFallback<string, ImageJobData>({
               primaryModel: modelMeta,
               fallbacks: fallbackCandidates,
@@ -867,6 +887,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
               allowFiveXxFallback: job.attemptsMade >= 2,
               jobId: dbJobId,
               userId: userIdStr,
+              skipProviders: skipProvidersAsync,
               submit: async (model, acquired) => {
                 const adapter = createImageAdapter(model, acquired);
                 if (!adapter.submit) {
@@ -884,10 +905,14 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             });
             providerJobId = fbResult.result;
 
+            const accumulatedAsync = new Set([
+              ...(prevFallbackStateAsync.attemptedProviders ?? []),
+              ...fbResult.attempts.map((a) => a.provider),
+            ]);
             await writeFallbackState({
               primaryProvider: modelMeta.provider,
               effectiveProvider: fbResult.effectiveProvider,
-              attemptedProviders: fbResult.attempts.map((a) => a.provider),
+              attemptedProviders: Array.from(accumulatedAsync),
             });
             await db.generationJob.update({
               where: { id: dbJobId },
@@ -1342,6 +1367,84 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
     logger.error({ dbJobId, err }, "Image job failed");
 
     const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 1) - 1;
+
+    // ── Poll-stage fallback на KIE 5xx (single-shot path) ───────────────
+    // KIE при 5xx terminal не перезапускает генерацию у себя. Если retry'и
+    // BullMQ исчерпаны и есть неиспользованный fallback — пере-enqueue:
+    // stage→generate, providerJobId→null, attemptedProviders ← +effective.
+    // Virtual batch path тут не покрыт (там per-sub-job state'ы — отдельная
+    // задача).
+    if (stage === "poll" && isLastAttempt && isKieFiveXxError(err) && modelMeta) {
+      const requestedN = job.data.numImages ?? 1;
+      const isVirtualBatchNow = requestedN > 1 && (modelMeta?.nativeBatchMax ?? 1) === 1;
+      // Virtual batch не покрыт — там per-sub-job state'ы, отдельная задача.
+      if (!isVirtualBatchNow) {
+        // readFallbackState/writeFallbackState — closures внутри try-блока.
+        // В catch refetch'аем напрямую: получаем свежий inputData и мерджим.
+        const dbJob = await db.generationJob.findUnique({
+          where: { id: dbJobId },
+          select: { inputData: true },
+        });
+        const inputData = (dbJob?.inputData as Record<string, unknown> | null | undefined) ?? {};
+        const fbStateNow =
+          (inputData.fallback as
+            | { effectiveProvider?: string; attemptedProviders?: string[] }
+            | undefined) ?? {};
+        const currentEff = fbStateNow.effectiveProvider ?? modelMeta.provider;
+        const alreadyAttempted = new Set(fbStateNow.attemptedProviders ?? []);
+        alreadyAttempted.add(currentEff);
+
+        const fallbackCandidatesNow = getFallbackCandidates(modelId, "design").filter((m) =>
+          isFallbackCompatible(m, job.data.mediaInputs),
+        );
+        const nextCandidate = fallbackCandidatesNow.find((m) => !alreadyAttempted.has(m.provider));
+
+        if (nextCandidate) {
+          logger.warn(
+            { dbJobId, modelId, currentEff, next: nextCandidate.provider },
+            "Image poll: KIE 5xx terminal — re-enqueuing on fallback",
+          );
+          await notifyFallback({
+            section: "image",
+            modelId,
+            primaryProvider: modelMeta.provider,
+            fallbackProvider: nextCandidate.provider,
+            reason: "persistent_5xx",
+            jobId: dbJobId,
+            userId: userIdStr,
+          });
+
+          // Чистим providerJobId + мерджим обновлённый fallback.attemptedProviders.
+          const merged = {
+            ...inputData,
+            fallback: {
+              primaryProvider: modelMeta.provider,
+              attemptedProviders: Array.from(alreadyAttempted),
+            },
+          };
+          await db.generationJob.update({
+            where: { id: dbJobId },
+            data: {
+              providerJobId: null,
+              providerKeyId: null,
+              inputData: merged as unknown as Prisma.InputJsonValue,
+            },
+          });
+
+          await delayJob(
+            job,
+            {
+              ...job.data,
+              stage: undefined,
+              pollStartedAt: undefined,
+              lastIntervalMs: undefined,
+            },
+            1000,
+            token,
+          );
+        }
+      }
+    }
 
     if (isLastAttempt) {
       await db.generationJob.update({

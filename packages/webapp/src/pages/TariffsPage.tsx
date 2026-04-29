@@ -129,16 +129,25 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
     }
     // SSO redirect to shop subscriptions tab
     try {
-      const { ssoUrl } = await api.profile.metaboxSso();
-      // encodeURIComponent чтобы query внутри redirect (?tab=subscriptions)
-      // не сливался с query самого ssoUrl и не парсился сервером криво.
-      const redirect = encodeURIComponent("/shop?tab=subscriptions");
-      const shopUrl = ssoUrl.includes("?")
-        ? `${ssoUrl}&redirect=${redirect}`
-        : `${ssoUrl}?redirect=${redirect}`;
-      const tg = getTgWebApp();
-      if (tg?.openLink) tg.openLink(shopUrl);
-      else window.open(shopUrl, "_blank");
+      const result = await api.profile.metaboxSso();
+      // Email ещё не подтверждён — переводим юзера на pending-экран
+      // в LinkMetaboxPage вместо невозможного авто-логина.
+      if ("requiresVerification" in result && result.requiresVerification) {
+        setModal(null);
+        onLinkMetabox();
+        return;
+      }
+      if ("ssoUrl" in result && result.ssoUrl) {
+        // encodeURIComponent чтобы query внутри redirect (?tab=subscriptions)
+        // не сливался с query самого ssoUrl и не парсился сервером криво.
+        const redirect = encodeURIComponent("/shop?tab=subscriptions");
+        const shopUrl = result.ssoUrl.includes("?")
+          ? `${result.ssoUrl}&redirect=${redirect}`
+          : `${result.ssoUrl}?redirect=${redirect}`;
+        const tg = getTgWebApp();
+        if (tg?.openLink) tg.openLink(shopUrl);
+        else window.open(shopUrl, "_blank");
+      }
     } catch {
       onLinkMetabox();
     }
@@ -320,7 +329,13 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
                     style={locked ? { cursor: "not-allowed" } : undefined}
                     title={locked ? t("tariffs.pkgLockedTitle") : undefined}
                   >
-                    {locked ? t("tariffs.pkgLockedBtn") : t("tariffs.buy")}
+                    {/* В locked-состоянии оставляем короткий лейбл «Купить»,
+                        чтобы не разносить layout карточки длинным текстом
+                        вроде «Нужна подписка». disabled + opacity 0.5
+                        в .plan-card__btn:disabled и так визуально показывают,
+                        что кнопка неактивна; причину объясняет title-тултип
+                        и плашка pkgLockedNote выше. */}
+                    {t("tariffs.buy")}
                   </button>
                 </div>
               );

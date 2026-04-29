@@ -68,24 +68,30 @@ export const userService = {
       }),
     ]);
 
-    // Create Trial subscription in LocalSubscription (source of truth)
-    await db.localSubscription.upsert({
-      where: { userId },
-      create: {
-        userId,
-        planName: "Trial",
-        period: "M1",
-        tokensGranted: WELCOME_BONUS_TOKENS,
-        startDate: new Date(),
-        endDate: trialEndDate,
-        isActive: true,
-      },
-      update: {
-        planName: "Trial",
-        tokensGranted: WELCOME_BONUS_TOKENS,
-        endDate: trialEndDate,
-        isActive: true,
-      },
-    });
+    // Create Trial subscription ТОЛЬКО если у юзера ещё нет LocalSubscription.
+    //
+    // Кейс который чиним: юзер сначала купил бандл с бонус-подпиской на сайте,
+    // потом перешёл по ссылке в бота. handleStart успел дёрнуть verifyLinkToken,
+    // metabox через reconcileSubscription Case 2 создал LocalSubscription с
+    // planName="PRO" в боте. После этого юзер выбирает язык — и здесь раньше
+    // upsert.update перезаписывал planName на "Trial", из-за чего в профиле
+    // отображалась триал-подписка вместо подарочной.
+    //
+    // Welcome-бонус токены [WELCOME_BONUS_TOKENS] всё равно начисляем — это
+    // отдельный приветственный подарок, не связанный с подпиской.
+    const existing = await db.localSubscription.findUnique({ where: { userId } });
+    if (!existing) {
+      await db.localSubscription.create({
+        data: {
+          userId,
+          planName: "Trial",
+          period: "M1",
+          tokensGranted: WELCOME_BONUS_TOKENS,
+          startDate: new Date(),
+          endDate: trialEndDate,
+          isActive: true,
+        },
+      });
+    }
   },
 };

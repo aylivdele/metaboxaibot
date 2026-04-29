@@ -62,10 +62,18 @@ vi.mock("@metabox/api/utils/rate-limit-error", () => ({
     const e = err as { status?: number; message?: string };
     const status = e.status;
     const message = e.message ?? "";
-    const isRateLimit = status === 429 || /rate limit|too many|quota|throttl/i.test(message);
+    const isRateLimit =
+      status === 429 ||
+      status === 402 ||
+      /rate limit|too many|quota|throttl|insufficient credits/i.test(message);
     if (!isRateLimit) return { isRateLimit: false, cooldownMs: 0, isLongWindow: false, reason: "" };
-    const isLongWindow = /daily quota|monthly|out of credits|tier limit/i.test(message);
-    const cooldownMs = isLongWindow ? 2 * 60 * 60 * 1000 : 60_000;
+    // "insufficient credits" — pattern-matched long-window с КОРОТКИМ cooldown
+    // (per-account ошибка одного ключа, не длинный quota-reset). Используется
+    // для теста что markProviderLongCooldown НЕ вызывается в этом случае.
+    const isPerAccountQuota = /insufficient credits/i.test(message);
+    const isLongWindow =
+      isPerAccountQuota || /daily quota|monthly|out of credits|tier limit/i.test(message);
+    const cooldownMs = isPerAccountQuota ? 60_000 : isLongWindow ? 2 * 60 * 60 * 1000 : 60_000;
     return {
       isRateLimit: true,
       cooldownMs,
@@ -241,6 +249,45 @@ describe("submitWithFallback — trigger conditions", () => {
     );
     expect(mocks.notifyFallback).toHaveBeenCalledWith(
       expect.objectContaining({ reason: "long_window_rate_limit" }),
+    );
+  });
+
+  test("isLongWindow с КОРОТКИМ cooldown (per-account quota) → fallback, но БЕЗ markProviderLongCooldown", async () => {
+    // Кейс: evolink 402 "Insufficient credits" — одному ключу не хватает $$,
+    // у других ключей могут быть деньги. Provider-wide marker блокировал бы
+    // их зря на 60с. Только per-key markRateLimited.
+    mocks.acquireKey
+      .mockResolvedValueOnce(makeAcquiredKey("k-primary"))
+      .mockResolvedValueOnce(makeAcquiredKey("k-fb"));
+    const perAccountErr = Object.assign(new Error("insufficient credits: need 200"), {
+      status: 402,
+    });
+    const submit = vi
+      .fn()
+      .mockRejectedValueOnce(perAccountErr)
+      .mockResolvedValueOnce("fallback-ok");
+
+    const res = await submitWithFallback({
+      primaryModel: PRIMARY,
+      fallbacks: [FALLBACK_1],
+      section: "design",
+      job: makeJob(),
+      allowFiveXxFallback: false,
+      submit,
+    });
+
+    expect(res.usedFallback).toBe(true);
+    // Per-key throttle — да.
+    expect(mocks.markRateLimited).toHaveBeenCalledWith(
+      "k-primary",
+      expect.any(Number),
+      expect.any(String),
+    );
+    // Provider-wide marker — НЕТ (cooldownMs 60s ≤ LONG_WINDOW_THRESHOLD_MS 1ч).
+    expect(mocks.markProviderLongCooldown).not.toHaveBeenCalled();
+    // notifyRateLimit зовётся (юзер-видимый алерт сохраняется).
+    expect(mocks.notifyRateLimit).toHaveBeenCalledWith(
+      expect.objectContaining({ isLongWindow: true }),
     );
   });
 

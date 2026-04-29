@@ -327,7 +327,14 @@ jobs:
               done
 
               echo "Restarting updated services:$SERVICES"
-              docker compose -f docker-compose.prod.yml up -d --no-build --remove-orphans $SERVICES
+              # Передаём ОБА compose-файла (prod + observability) чтобы
+              # `--remove-orphans` не снёс promtail/node-exporter/cadvisor:
+              # они живут в том же compose project'е (имя папки), и без
+              # объявления в -f аргументах docker считает их orphan'ами.
+              docker compose \
+                -f docker-compose.prod.yml \
+                -f docker-compose.observability.yml \
+                up -d --no-build --remove-orphans $SERVICES
             else
               echo "No new images to pull — skipping restart"
             fi

@@ -325,6 +325,15 @@ const translations = {
     // Link Metabox
     "linkMetabox.title": "Metabox Learning",
     "linkMetabox.subtitle": "Link your Metabox account to access the learning section.",
+    // Reason-specific titles/subtitles for the same flow (account linking).
+    // The action is the same (register or login on Metabox), but the trigger
+    // differs — a subscription card-payment user shouldn't see "learning" copy.
+    "linkMetabox.titleSubscription": "Subscription payment",
+    "linkMetabox.subtitleSubscription":
+      "To pay for the subscription by card, link your Metabox account.",
+    "linkMetabox.titleWithdrawal": "Withdrawal request",
+    "linkMetabox.subtitleWithdrawal":
+      "To request a withdrawal of referral earnings, link your Metabox account.",
     "linkMetabox.newAccount": "Create account",
     "linkMetabox.existingAccount": "I already have an account",
     "linkMetabox.registerHint": "Enter an email and password to create your Metabox account.",
@@ -343,6 +352,39 @@ const translations = {
     "linkMetabox.error.emailNotVerified":
       "Email is not verified. Please verify it on the Metabox website.",
     "linkMetabox.error.passwordTooShort": "Password must be at least 6 characters.",
+
+    // Link Metabox — verify-email flow
+    "linkMetabox.verify.title": "Verify your email",
+    "linkMetabox.verify.subtitle": "We sent a confirmation link to:",
+    "linkMetabox.verify.followLink":
+      "Open the link in the email, then sign in on the website with your email and password.",
+    "linkMetabox.verify.checkSpam":
+      "Didn't get the email? Check your Spam folder or request a new one below.",
+    "linkMetabox.verify.resend": "Resend email",
+    "linkMetabox.verify.resendAgain": "Resend again",
+    "linkMetabox.verify.resendCooldown": "Available in {n}s",
+    "linkMetabox.verify.changeEmail": "Change email",
+    "linkMetabox.verify.sentSuccess":
+      "Email sent. Check your inbox — and make sure the address above is correct.",
+    "linkMetabox.verify.sent": "Confirmation email sent.",
+    "linkMetabox.verify.alreadyVerified":
+      "Email is already verified. You can sign in on the website.",
+    "linkMetabox.verify.sendError": "Couldn't send the email. Try again later.",
+    "linkMetabox.verify.limitExhausted":
+      "You've hit the resend limit. Please wait a bit, or change the email address below.",
+
+    // Link Metabox — change-email flow
+    "linkMetabox.changeEmail.title": "Change email",
+    "linkMetabox.changeEmail.subtitle":
+      "Enter a new address — we'll update it and send a new confirmation email.",
+    "linkMetabox.changeEmail.label": "New email",
+    "linkMetabox.changeEmail.save": "Save and send email",
+    "linkMetabox.changeEmail.error.exists": "This email is already used by another account.",
+    "linkMetabox.changeEmail.error.same": "That's the same email as before.",
+    "linkMetabox.changeEmail.error.invalid": "Invalid email format.",
+    "linkMetabox.changeEmail.error.alreadyVerified":
+      "Email is already verified — changing it through this flow isn't available.",
+    "linkMetabox.changeEmail.error.generic": "Couldn't change the email.",
 
     // Image settings
     "imageSettings.title": "Image Settings",
@@ -793,6 +835,14 @@ const translations = {
     // Link Metabox
     "linkMetabox.title": "Обучение Metabox",
     "linkMetabox.subtitle": "Привяжите аккаунт Metabox, чтобы открыть раздел обучения.",
+    // Reason-specific titles/subtitles — действие то же (привязка аккаунта),
+    // но контекст отличается. Юзер платит картой не должен видеть "обучение".
+    "linkMetabox.titleSubscription": "Оплата подписки",
+    "linkMetabox.subtitleSubscription":
+      "Чтобы оплатить подписку картой, привяжите аккаунт Metabox.",
+    "linkMetabox.titleWithdrawal": "Заявка на вывод",
+    "linkMetabox.subtitleWithdrawal":
+      "Чтобы оформить заявку на вывод реферальных средств, привяжите аккаунт Metabox.",
     "linkMetabox.newAccount": "Создать аккаунт",
     "linkMetabox.existingAccount": "Уже есть аккаунт",
     "linkMetabox.registerHint": "Введите email и пароль для создания аккаунта Metabox.",
@@ -809,6 +859,38 @@ const translations = {
     "linkMetabox.error.invalidPassword": "Неверный пароль.",
     "linkMetabox.error.emailNotVerified": "Email не подтверждён. Подтвердите его на сайте Metabox.",
     "linkMetabox.error.passwordTooShort": "Пароль должен быть не менее 6 символов.",
+
+    // Link Metabox — verify-email flow
+    "linkMetabox.verify.title": "Подтвердите email",
+    "linkMetabox.verify.subtitle": "Мы отправили письмо со ссылкой для подтверждения на адрес:",
+    "linkMetabox.verify.followLink":
+      "Перейдите по ссылке в письме, затем войдите на сайте по email и паролю.",
+    "linkMetabox.verify.checkSpam":
+      "Не получили письмо? Проверьте папку «Спам» или запросите повторную отправку ниже.",
+    "linkMetabox.verify.resend": "Отправить повторно",
+    "linkMetabox.verify.resendAgain": "Отправить ещё раз",
+    "linkMetabox.verify.resendCooldown": "Повторно через {n} с",
+    "linkMetabox.verify.changeEmail": "Изменить почту",
+    "linkMetabox.verify.sentSuccess":
+      "Письмо отправлено. Проверьте почту и убедитесь, что email выше указан верно.",
+    "linkMetabox.verify.sent": "Письмо с подтверждением отправлено.",
+    "linkMetabox.verify.alreadyVerified": "Email уже подтверждён. Можно входить на сайте.",
+    "linkMetabox.verify.sendError": "Не удалось отправить письмо. Попробуйте позже.",
+    "linkMetabox.verify.limitExhausted":
+      "Превышен лимит повторных отправок. Подождите немного или измените email ниже.",
+
+    // Link Metabox — change-email flow
+    "linkMetabox.changeEmail.title": "Изменить email",
+    "linkMetabox.changeEmail.subtitle":
+      "Введите новый адрес — мы заменим его в системе и отправим письмо с подтверждением.",
+    "linkMetabox.changeEmail.label": "Новый email",
+    "linkMetabox.changeEmail.save": "Сохранить и отправить письмо",
+    "linkMetabox.changeEmail.error.exists": "Этот email уже занят другим аккаунтом.",
+    "linkMetabox.changeEmail.error.same": "Это тот же email, что был указан.",
+    "linkMetabox.changeEmail.error.invalid": "Некорректный формат email.",
+    "linkMetabox.changeEmail.error.alreadyVerified":
+      "Email уже подтверждён — изменение через этот flow недоступно.",
+    "linkMetabox.changeEmail.error.generic": "Не удалось сменить email.",
 
     // Image settings
     "imageSettings.title": "Настройки изображений",

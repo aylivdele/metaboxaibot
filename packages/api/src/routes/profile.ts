@@ -26,6 +26,89 @@ type AuthRequest = FastifyRequest & {
   };
 };
 
+// ── Rate limit для metabox-resend-verification ────────────────────────────
+// Хранится в памяти процесса. При рестарте бота сбрасывается — это OK.
+const RESEND_MAX_ATTEMPTS = 3;
+const RESEND_COOLDOWN_SEC = 60;
+const RESEND_WINDOW_MS = 60 * 60 * 1000; // окно учёта 1 час
+
+interface ResendState {
+  attempts: number;
+  lastAttemptAt: number;
+  windowStartedAt: number;
+}
+const resendState = new Map<string, ResendState>();
+
+function getResendAttempts(userId: bigint): number {
+  return resendState.get(userId.toString())?.attempts ?? 0;
+}
+
+function checkResendLimit(userId: bigint): {
+  allowed: boolean;
+  reason?: string;
+  retryAfterSec?: number;
+  attemptsLeft?: number;
+} {
+  const key = userId.toString();
+  const now = Date.now();
+  const state = resendState.get(key);
+
+  if (!state) {
+    return { allowed: true, attemptsLeft: RESEND_MAX_ATTEMPTS };
+  }
+
+  // Окно протекло — лимит сбрасывается при следующей попытке.
+  if (now - state.windowStartedAt > RESEND_WINDOW_MS) {
+    return { allowed: true, attemptsLeft: RESEND_MAX_ATTEMPTS };
+  }
+
+  // Превышен общий лимит в окне.
+  if (state.attempts >= RESEND_MAX_ATTEMPTS) {
+    const retryAfterMs = RESEND_WINDOW_MS - (now - state.windowStartedAt);
+    return {
+      allowed: false,
+      reason: "Превышен лимит повторных отправок. Попробуйте позже.",
+      retryAfterSec: Math.ceil(retryAfterMs / 1000),
+      attemptsLeft: 0,
+    };
+  }
+
+  // Cooldown между отправками.
+  const sinceLast = now - state.lastAttemptAt;
+  if (sinceLast < RESEND_COOLDOWN_SEC * 1000) {
+    return {
+      allowed: false,
+      reason: "Подождите перед повторной отправкой.",
+      retryAfterSec: Math.ceil((RESEND_COOLDOWN_SEC * 1000 - sinceLast) / 1000),
+      attemptsLeft: RESEND_MAX_ATTEMPTS - state.attempts,
+    };
+  }
+
+  return { allowed: true, attemptsLeft: RESEND_MAX_ATTEMPTS - state.attempts };
+}
+
+function recordResendAttempt(userId: bigint): void {
+  const key = userId.toString();
+  const now = Date.now();
+  const state = resendState.get(key);
+
+  if (!state || now - state.windowStartedAt > RESEND_WINDOW_MS) {
+    resendState.set(key, {
+      attempts: 1,
+      lastAttemptAt: now,
+      windowStartedAt: now,
+    });
+    return;
+  }
+
+  state.attempts += 1;
+  state.lastAttemptAt = now;
+}
+
+function resetResendLimit(userId: bigint): void {
+  resendState.delete(userId.toString());
+}
+
 export const profileRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", telegramAuthHook);
 
@@ -144,7 +227,12 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * GET /profile/metabox-sso — get SSO redirect URL for linked Metabox account.
-   * Returns { ssoUrl } for already-linked users, 409 if not linked.
+   *
+   * Если аккаунт привязан, но email НЕ подтверждён — возвращаем
+   * { requiresVerification: true, email } вместо ssoUrl. UI покажет
+   * pending-экран с кнопками «Отправить повторно» / «Изменить почту»
+   * вместо попытки авто-логина [который всё равно отвалится из-за
+   * проверки emailVerified в SSO-провайдере metabox].
    */
   fastify.get("/profile/metabox-sso", async (request, reply) => {
     const { userId } = request as AuthRequest;
@@ -155,6 +243,22 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     if (!user?.metaboxUserId) {
       return reply.code(409).send({ error: "Metabox account not linked" });
     }
+
+    const { getMetaboxUserStatus } = await import("../services/metabox-bridge.service.js");
+    try {
+      const status = await getMetaboxUserStatus(user.metaboxUserId);
+      if (!status.emailVerified) {
+        return {
+          requiresVerification: true,
+          email: status.email,
+        };
+      }
+    } catch (err) {
+      // Если статус вытащить не удалось — продолжим как раньше [SSO
+      // провайдер metabox сам отрежет невалидированных].
+      console.error("[metabox-sso] failed to check user status:", err);
+    }
+
     const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
     let ssoToken: string;
     if (config.metabox.ssoSecret) {
@@ -164,6 +268,118 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       ssoToken = result.ssoToken;
     }
     return { ssoUrl: `${metaboxUrl}/auth/sso?token=${ssoToken}` };
+  });
+
+  /**
+   * GET /profile/metabox-status — статус metabox-аккаунта юзера.
+   * Используется UI чтобы понять — показывать pending-экран или открывать
+   * полный профиль.
+   */
+  fastify.get("/profile/metabox-status", async (request, reply) => {
+    const { userId } = request as AuthRequest;
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { metaboxUserId: true },
+    });
+    if (!user?.metaboxUserId) {
+      return { linked: false };
+    }
+    const { getMetaboxUserStatus } = await import("../services/metabox-bridge.service.js");
+    try {
+      const status = await getMetaboxUserStatus(user.metaboxUserId);
+      return {
+        linked: true,
+        emailVerified: status.emailVerified,
+        email: status.email,
+      };
+    } catch (err) {
+      console.error("[metabox-status] failed:", err);
+      return reply.code(502).send({ error: "Failed to fetch status" });
+    }
+  });
+
+  /**
+   * POST /profile/metabox-resend-verification — заново отправить
+   * verification-email на текущий адрес.
+   *
+   * Rate limit: максимум RESEND_MAX_ATTEMPTS отправок в час, между
+   * отправками минимум RESEND_COOLDOWN_SEC секунд. Защита от спама
+   * на стороне бота — иначе юзер мог бы задрачить кнопку и завалить
+   * SMTP-провайдера / попасть в спам-листы.
+   */
+  fastify.post("/profile/metabox-resend-verification", async (request, reply) => {
+    const { userId } = request as AuthRequest;
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { metaboxUserId: true },
+    });
+    if (!user?.metaboxUserId) {
+      return reply.code(409).send({ error: "Metabox account not linked" });
+    }
+
+    const check = checkResendLimit(userId);
+    if (!check.allowed) {
+      return reply.code(429).send({
+        code: "RATE_LIMITED",
+        error: check.reason,
+        retryAfterSec: check.retryAfterSec,
+        attemptsLeft: check.attemptsLeft,
+      });
+    }
+
+    const { resendMetaboxVerification } = await import("../services/metabox-bridge.service.js");
+    try {
+      const result = await resendMetaboxVerification(user.metaboxUserId);
+      // Если main-app сказал что email уже подтверждён — лимит не списываем.
+      if (!result.alreadyVerified) {
+        recordResendAttempt(userId);
+      }
+      return {
+        ...result,
+        attemptsLeft: result.alreadyVerified
+          ? RESEND_MAX_ATTEMPTS
+          : Math.max(0, RESEND_MAX_ATTEMPTS - getResendAttempts(userId)),
+        cooldownSec: RESEND_COOLDOWN_SEC,
+      };
+    } catch (err) {
+      if (err instanceof MetaboxApiError) {
+        return reply.code(err.status).send({ error: err.body, code: err.code });
+      }
+      throw err;
+    }
+  });
+
+  /**
+   * POST /profile/metabox-change-email — поменять email на pending-аккаунте
+   * [когда юзер ошибся при регистрации] и переотправить верификацию.
+   * Body: { newEmail: string }
+   */
+  fastify.post("/profile/metabox-change-email", async (request, reply) => {
+    const { userId } = request as AuthRequest;
+    const { newEmail } = request.body as { newEmail?: string };
+    if (!newEmail) {
+      return reply.code(400).send({ error: "newEmail is required" });
+    }
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { metaboxUserId: true },
+    });
+    if (!user?.metaboxUserId) {
+      return reply.code(409).send({ error: "Metabox account not linked" });
+    }
+    const { changeMetaboxEmailPending } = await import("../services/metabox-bridge.service.js");
+    try {
+      const result = await changeMetaboxEmailPending(user.metaboxUserId, newEmail);
+      // Сбрасываем resend-лимит — у юзера новый адрес, начинаем счётчик
+      // заново [иначе он бы сразу упёрся в потолок старых попыток].
+      resetResendLimit(userId);
+      return result;
+    } catch (err) {
+      if (err instanceof MetaboxApiError) {
+        return reply.code(err.status).send({ error: err.body, code: err.code });
+      }
+      throw err;
+    }
   });
 
   /**
@@ -204,6 +420,18 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: userId },
         data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
       });
+
+      // Если на сайте email НЕ подтверждён — не выдаём ssoUrl. Юзер
+      // должен сначала кликнуть по верификационной ссылке в письме и
+      // затем войти на сайте вручную. Иначе любой, кто получил bot-
+      // session, сразу логинился бы в metabox без верификации почты.
+      if (result.requiresVerification) {
+        return {
+          requiresVerification: true,
+          email: result.email ?? email,
+        };
+      }
+
       const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
       return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
     } catch (err) {

@@ -135,6 +135,13 @@ interface SubmitWithFallbackOptions<T, D extends object> {
   /** User ID для алертов. */
   userId?: string;
   /**
+   * Set provider'ов для пропуска. Используется при poll-stage re-submit'е, когда
+   * primary уже доказал что с ним проблема (KIE 5xx terminal failure) — в новой
+   * BullMQ-задаче submit-stage должен скипнуть его и сразу взять fallback.
+   * Передаётся через `inputData.fallback.attemptedProviders`.
+   */
+  skipProviders?: Set<string>;
+  /**
    * Реальный submit-вызов. Принимает acquired key + модель для инстанцирования
    * адаптера. Должен либо вернуть результат, либо бросить ошибку (PoolExhausted,
    * 429, 5xx, etc.) — НЕ дефёрить и НЕ оборачивать ошибки.
@@ -163,7 +170,12 @@ interface SubmitWithFallbackOptions<T, D extends object> {
 export async function submitWithFallback<T, D extends object>(
   opts: SubmitWithFallbackOptions<T, D>,
 ): Promise<SubmitWithFallbackResult<T>> {
-  const candidates = [opts.primaryModel, ...opts.fallbacks];
+  const allCandidates = [opts.primaryModel, ...opts.fallbacks];
+  // Skip provider'ы из opts.skipProviders (poll-stage re-submit pattern: primary
+  // уже терминально упал, в новой задаче не пробуем его повторно).
+  const candidates = opts.skipProviders
+    ? allCandidates.filter((m) => !opts.skipProviders!.has(m.provider))
+    : allCandidates;
   const attempts: FallbackCandidateAttempt[] = [];
   let lastError: unknown;
   // Минимальный delay из всех кандидатов, готовых defer'нуть. MIN (а не MAX),
@@ -279,8 +291,21 @@ export async function submitWithFallback<T, D extends object>(
         const isLong = cls.isLongWindow || cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS;
 
         if (isLong) {
-          // Provider-wide маркер: на TTL=cooldownMs провайдер заблокирован для всех job'ов.
-          void markProviderLongCooldown(keyProvider, cls.cooldownMs, cls.reason);
+          // Provider-wide marker блокирует ВСЕ ключи провайдера на cooldownMs.
+          // Ставим его ТОЛЬКО когда cooldownMs действительно длинный (>1ч) —
+          // это надёжный signal что провайдер реально лежит (например, вернул
+          // Retry-After: 3600+).
+          //
+          // Pattern-matched isLongWindow ("insufficient credits", "trial limit",
+          // "out of credits", "account suspended" и т.п.) с коротким cooldown
+          // (60с дефолт) — это per-account ошибка одного ключа, НЕ отказ всего
+          // провайдера. У соседних ключей того же провайдера деньги/доступ
+          // могут быть в порядке. Не блокируем их ради per-key проблемы —
+          // markRateLimited на конкретный keyId уже изолирует "плохой" ключ,
+          // следующий submit acquireKey'ем подберёт здоровый.
+          if (cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS) {
+            void markProviderLongCooldown(keyProvider, cls.cooldownMs, cls.reason);
+          }
           if (shouldNotify) {
             void notifyRateLimit({
               section: opts.section,
