@@ -153,9 +153,11 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       // При регистрации backend может вернуть requiresVerification — это
       // значит письмо с подтверждением отправлено, SSO-логин НЕ выдан.
       // Показываем pending-экран «Проверьте почту», не открываем SSO.
+      // Toast «письмо отправлено» здесь НЕ показываем — он дублирует
+      // содержимое самого экрана [«We sent a confirmation link to: …»].
+      // Алерт оставляем только для явных действий юзера: resend / change-email.
       if ("requiresVerification" in result && result.requiresVerification) {
         setPending({ email: result.email, view: "view" });
-        setPendingMessage(t("linkMetabox.verify.sent"));
         onSuccess?.();
         return;
       }
