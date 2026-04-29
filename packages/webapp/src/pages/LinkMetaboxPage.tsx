@@ -47,6 +47,32 @@ const ERROR_MAP: Record<string, TranslationKey> = {
   PASSWORD_TOO_SHORT: "linkMetabox.error.passwordTooShort",
 };
 
+// Сообщения в state хранятся не как уже переведённые строки, а как
+// description: либо ключ перевода [+ опциональные template-vars], либо
+// raw-строка от сервера. Иначе при переключении языка сообщения "застывают"
+// в той локали, где их сетили — пользователь видит русский текст в
+// английской UI и наоборот.
+type LocalizedMsg =
+  | { kind: "key"; key: TranslationKey }
+  | { kind: "template"; key: TranslationKey; vars: Record<string, string> }
+  | { kind: "raw"; text: string };
+
+function resolveMsg(msg: LocalizedMsg, t: (k: TranslationKey) => string): string {
+  switch (msg.kind) {
+    case "key":
+      return t(msg.key);
+    case "template": {
+      let out = t(msg.key);
+      for (const [name, value] of Object.entries(msg.vars)) {
+        out = out.replace(`{${name}}`, value);
+      }
+      return out;
+    }
+    case "raw":
+      return msg.text;
+  }
+}
+
 // Inline SVG envelope. На macOS Telegram unicode-символ ✉ не рендерится
 // в веб-вьюхе [нет нужного шрифта/глифа], поэтому используем SVG —
 // он одинаково работает на всех платформах.
@@ -77,7 +103,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LocalizedMsg | null>(null);
   const [mergeBlockedModal, setMergeBlockedModal] = useState<{
     siteMentor: { name: string; contact: string };
     botMentor: { name: string; contact: string };
@@ -86,7 +112,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
   // экран «Проверьте почту» с кнопками «Отправить повторно» / «Изменить».
   const [pending, setPending] = useState<PendingState | null>(null);
   const [pendingNewEmail, setPendingNewEmail] = useState("");
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<LocalizedMsg | null>(null);
   const [pendingMessageType, setPendingMessageType] = useState<"info" | "success" | "error">(
     "info",
   );
@@ -132,7 +158,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
     if (!email.trim() || !password) return;
     if (mode === "register") {
       if (password !== confirmPassword) {
-        setError(t("linkMetabox.passwordMismatch"));
+        setError({ kind: "key", key: "linkMetabox.passwordMismatch" });
         return;
       }
     }
@@ -179,36 +205,55 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
           botMentor: { name: bm.name || unknown, contact: bm.contact || "" },
         });
       } else if (code === "MENTOR_CONFLICT") {
+        // Здесь нельзя просто хранить уже сформированную строку — сами
+        // mentor-name'ы динамические, но шаблон вокруг них надо переводить
+        // при смене языка. Поэтому передаём mentor info в vars, а ключ
+        // template'a резолвится в render time.
         const sm = err?.siteMentor || {};
         const bm = err?.botMentor || {};
-        const unknown = t("linkMetabox.merge.unknown");
-        const siteInfo = sm.contact ? `${sm.name} (${sm.contact})` : sm.name || unknown;
-        const botInfo = bm.contact ? `${bm.name} (${bm.contact})` : bm.name || unknown;
-        setError(
-          t("linkMetabox.error.mentorConflict")
-            .replace("{site}", siteInfo)
-            .replace("{bot}", botInfo),
-        );
+        const siteInfoFn = (unknown: string) =>
+          sm.contact ? `${sm.name} (${sm.contact})` : sm.name || unknown;
+        const botInfoFn = (unknown: string) =>
+          bm.contact ? `${bm.name} (${bm.contact})` : bm.name || unknown;
+        setError({
+          kind: "template",
+          key: "linkMetabox.error.mentorConflict",
+          // Имена наставников вшиваем "как есть" — они языко-нейтральны,
+          // unknown-плейсхолдер берём в render-time через separate key,
+          // но для простоты подставляем сейчас текущим переводом — при
+          // смене языка наставник останется тем же текстом, но шаблон
+          // переведётся. Это компромисс: 99% сценариев имеется реальное имя.
+          vars: {
+            site: siteInfoFn(t("linkMetabox.merge.unknown")),
+            bot: botInfoFn(t("linkMetabox.merge.unknown")),
+          },
+        });
       } else if (code === "TELEGRAM_MISMATCH" && err?.linkedTo) {
         const lt = err.linkedTo;
         const tgInfo = lt.telegramUsername ? `@${lt.telegramUsername}` : lt.telegramPhone || "";
-        setError(
-          t("linkMetabox.error.telegramMismatch")
-            .replace("{info}", tgInfo ? ` (${tgInfo})` : "")
-            .replace("{support}", supportTg),
-        );
+        setError({
+          kind: "template",
+          key: "linkMetabox.error.telegramMismatch",
+          vars: {
+            info: tgInfo ? ` (${tgInfo})` : "",
+            support: supportTg,
+          },
+        });
       } else if (code === "TELEGRAM_LINKED" && err?.linkedTo) {
         const lt = err.linkedTo;
         const tgInfo = lt.telegramUsername ? `@${lt.telegramUsername}` : lt.telegramPhone || "";
-        setError(
-          t("linkMetabox.error.telegramLinkedOther")
-            .replace("{name}", lt.name || email)
-            .replace("{info}", tgInfo ? ` (${tgInfo})` : "")
-            .replace("{support}", supportTg),
-        );
+        setError({
+          kind: "template",
+          key: "linkMetabox.error.telegramLinkedOther",
+          vars: {
+            name: lt.name || email,
+            info: tgInfo ? ` (${tgInfo})` : "",
+            support: supportTg,
+          },
+        });
       } else {
         const key = code ? ERROR_MAP[code] : undefined;
-        setError(key ? t(key) : t("linkMetabox.error"));
+        setError({ kind: "key", key: key ?? "linkMetabox.error" });
       }
     } finally {
       setLoading(false);
@@ -227,12 +272,12 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
         // Email уже подтверждён [юзер кликнул по ссылке после того как
         // открыл pending] — закрываем pending-стадию.
         setPending(null);
-        setPendingMessage(t("linkMetabox.verify.alreadyVerified"));
+        setPendingMessage({ kind: "key", key: "linkMetabox.verify.alreadyVerified" });
         setPendingMessageType("success");
       } else {
         // Просим юзера сразу проверить, что email указан верно — это
         // частая причина "не пришло письмо": опечатка в адресе.
-        setPendingMessage(t("linkMetabox.verify.sentSuccess"));
+        setPendingMessage({ kind: "key", key: "linkMetabox.verify.sentSuccess" });
         setPendingMessageType("success");
         setResentOnce(true);
         // cooldownSec приходит с сервера, fallback 60.
@@ -248,7 +293,13 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
         if (retryAfter > 0) setCooldown(retryAfter);
         if (typeof err?.attemptsLeft === "number") setAttemptsLeft(err.attemptsLeft);
       }
-      setPendingMessage(err?.error || t("linkMetabox.verify.sendError"));
+      // err.error — текст от сервера [может прийти на любом языке],
+      // оборачиваем в "raw" чтобы не пытаться его переводить.
+      setPendingMessage(
+        err?.error
+          ? { kind: "raw", text: err.error }
+          : { kind: "key", key: "linkMetabox.verify.sendError" },
+      );
       setPendingMessageType("error");
     } finally {
       setLoading(false);
@@ -266,7 +317,11 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       const result = await api.profile.metaboxChangeEmail(newEmail);
       setPending({ email: result.email, view: "view" });
       setPendingNewEmail("");
-      setPendingMessage(result.warning ?? t("linkMetabox.verify.sent"));
+      setPendingMessage(
+        result.warning
+          ? { kind: "raw", text: result.warning }
+          : { kind: "key", key: "linkMetabox.verify.sent" },
+      );
       setPendingMessageType(result.warning ? "error" : "success");
       setResentOnce(true);
       // После change-email сервер сбросил счётчик попыток. Возвращаем
@@ -279,15 +334,19 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
     } catch (err: any) {
       const code = err?.code;
       if (code === "EMAIL_EXISTS") {
-        setError(t("linkMetabox.changeEmail.error.exists"));
+        setError({ kind: "key", key: "linkMetabox.changeEmail.error.exists" });
       } else if (code === "SAME_EMAIL") {
-        setError(t("linkMetabox.changeEmail.error.same"));
+        setError({ kind: "key", key: "linkMetabox.changeEmail.error.same" });
       } else if (code === "INVALID_EMAIL") {
-        setError(t("linkMetabox.changeEmail.error.invalid"));
+        setError({ kind: "key", key: "linkMetabox.changeEmail.error.invalid" });
       } else if (code === "ALREADY_VERIFIED") {
-        setError(t("linkMetabox.changeEmail.error.alreadyVerified"));
+        setError({ kind: "key", key: "linkMetabox.changeEmail.error.alreadyVerified" });
       } else {
-        setError(err?.error || t("linkMetabox.changeEmail.error.generic"));
+        setError(
+          err?.error
+            ? { kind: "raw", text: err.error }
+            : { kind: "key", key: "linkMetabox.changeEmail.error.generic" },
+        );
       }
     } finally {
       setLoading(false);
@@ -326,11 +385,11 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
 
           {pendingMessage && (
             <div className={`verify-card__alert verify-card__alert--${pendingMessageType}`}>
-              {pendingMessage}
+              {resolveMsg(pendingMessage, t)}
             </div>
           )}
 
-          {error && <div className="form-error">{error}</div>}
+          {error && <div className="form-error">{resolveMsg(error, t)}</div>}
 
           {attemptsLeft === 0 ? (
             // Лимит resend исчерпан — кнопку убираем целиком, оставляем
@@ -392,7 +451,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
             />
           </div>
 
-          {error && <div className="form-error">{error}</div>}
+          {error && <div className="form-error">{resolveMsg(error, t)}</div>}
 
           <button
             className="primary-btn"
@@ -470,7 +529,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
             </div>
           )}
 
-          {error && <div className="form-error">{error}</div>}
+          {error && <div className="form-error">{resolveMsg(error, t)}</div>}
 
           <button className="primary-btn" onClick={() => void submit()} disabled={loading}>
             {loading ? t("common.loading") : t("linkMetabox.submit")}
