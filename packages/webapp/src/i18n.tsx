@@ -325,6 +325,15 @@ const translations = {
     // Link Metabox
     "linkMetabox.title": "Metabox Learning",
     "linkMetabox.subtitle": "Link your Metabox account to access the learning section.",
+    // Reason-specific titles/subtitles for the same flow (account linking).
+    // The action is the same (register or login on Metabox), but the trigger
+    // differs — a subscription card-payment user shouldn't see "learning" copy.
+    "linkMetabox.titleSubscription": "Subscription payment",
+    "linkMetabox.subtitleSubscription":
+      "To pay for the subscription by card, link your Metabox account.",
+    "linkMetabox.titleWithdrawal": "Withdrawal request",
+    "linkMetabox.subtitleWithdrawal":
+      "To request a withdrawal of referral earnings, link your Metabox account.",
     "linkMetabox.newAccount": "Create account",
     "linkMetabox.existingAccount": "I already have an account",
     "linkMetabox.registerHint": "Enter an email and password to create your Metabox account.",
@@ -793,6 +802,14 @@ const translations = {
     // Link Metabox
     "linkMetabox.title": "Обучение Metabox",
     "linkMetabox.subtitle": "Привяжите аккаунт Metabox, чтобы открыть раздел обучения.",
+    // Reason-specific titles/subtitles — действие то же (привязка аккаунта),
+    // но контекст отличается. Юзер платит картой не должен видеть "обучение".
+    "linkMetabox.titleSubscription": "Оплата подписки",
+    "linkMetabox.subtitleSubscription":
+      "Чтобы оплатить подписку картой, привяжите аккаунт Metabox.",
+    "linkMetabox.titleWithdrawal": "Заявка на вывод",
+    "linkMetabox.subtitleWithdrawal":
+      "Чтобы оформить заявку на вывод реферальных средств, привяжите аккаунт Metabox.",
     "linkMetabox.newAccount": "Создать аккаунт",
     "linkMetabox.existingAccount": "Уже есть аккаунт",
     "linkMetabox.registerHint": "Введите email и пароль для создания аккаунта Metabox.",

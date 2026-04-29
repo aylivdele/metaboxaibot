@@ -6,7 +6,7 @@ import { ManagementPage } from "./pages/ManagementPage.js";
 import { TariffsPage } from "./pages/TariffsPage.js";
 import { ReferralPage } from "./pages/ReferralPage.js";
 import { AdminPage } from "./pages/AdminPage.js";
-import { LinkMetaboxPage } from "./pages/LinkMetaboxPage.js";
+import { LinkMetaboxPage, type LinkMetaboxReason } from "./pages/LinkMetaboxPage.js";
 import { DownloadRedirectPage } from "./pages/DownloadRedirectPage.js";
 import { I18nProvider, useI18n } from "./i18n.js";
 import { AiboxLogo } from "./components/AiboxLogo.js";
@@ -57,6 +57,13 @@ function AppContent() {
     section: string;
     modelId: string;
   } | null>(null);
+  // Контекст редиректа на LinkMetaboxPage. Дефолт "learning" для legacy-вызовов
+  // (handleLearning из BottomNav). Tariffs/Referral передают свои значения.
+  const [linkMetaboxReason, setLinkMetaboxReason] = useState<LinkMetaboxReason>("learning");
+  const goToLinkMetabox = (reason: LinkMetaboxReason): void => {
+    setLinkMetaboxReason(reason);
+    setPage("linkMetabox");
+  };
   const { ready, error, warning } = useTelegramInit();
   const { t } = useI18n();
 
@@ -89,7 +96,7 @@ function AppContent() {
         // requiresVerification вместо ssoUrl. Показываем pending-экран
         // в LinkMetaboxPage [он сам подтянет статус через metaboxStatus].
         if ("requiresVerification" in result && result.requiresVerification) {
-          setPage("linkMetabox");
+          goToLinkMetabox("learning");
           return;
         }
         if ("ssoUrl" in result && result.ssoUrl) {
@@ -104,7 +111,7 @@ function AppContent() {
     } catch {
       // SSO failed or profile refresh failed
     }
-    setPage("linkMetabox");
+    goToLinkMetabox("learning");
   };
 
   if (error) {
@@ -173,14 +180,17 @@ function AppContent() {
           />
         )}
         {page === "tariffs" && (
-          <TariffsPage profile={profile} onLinkMetabox={() => setPage("linkMetabox")} />
+          <TariffsPage profile={profile} onLinkMetabox={() => goToLinkMetabox("subscription")} />
         )}
-        {page === "referral" && <ReferralPage onLinkMetabox={() => setPage("linkMetabox")} />}
+        {page === "referral" && (
+          <ReferralPage onLinkMetabox={() => goToLinkMetabox("withdrawal")} />
+        )}
         {page === "admin" && <AdminPage />}
         {page === "linkMetabox" && (
           <LinkMetaboxPage
             firstName={profile?.firstName}
             username={profile?.username}
+            reason={linkMetaboxReason}
             onBack={() => setPage("profile")}
             onSuccess={() => api.profile.get().then(setProfile).catch(console.error)}
           />

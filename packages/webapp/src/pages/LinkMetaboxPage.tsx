@@ -3,9 +3,17 @@ import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { TranslationKey } from "../i18n.js";
 
+/**
+ * Контекст откуда юзер пришёл на экран привязки. Определяет title/subtitle —
+ * действие (зарегаться/залогиниться) одинаковое, но текст должен отражать ЗАЧЕМ
+ * это нужно (юзер, идущий оплачивать подписку, не должен видеть «обучение»).
+ */
+export type LinkMetaboxReason = "learning" | "subscription" | "withdrawal";
+
 interface Props {
   firstName?: string | null;
   username?: string | null;
+  reason?: LinkMetaboxReason;
   onBack: () => void;
   onSuccess?: () => void;
 }
@@ -47,8 +55,26 @@ const ERROR_MAP: Record<string, TranslationKey> = {
   PASSWORD_TOO_SHORT: "linkMetabox.error.passwordTooShort",
 };
 
-export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Props) {
+export function LinkMetaboxPage({
+  firstName,
+  username,
+  reason = "learning",
+  onBack,
+  onSuccess,
+}: Props) {
   const { t } = useI18n();
+  const titleKey: TranslationKey =
+    reason === "subscription"
+      ? "linkMetabox.titleSubscription"
+      : reason === "withdrawal"
+        ? "linkMetabox.titleWithdrawal"
+        : "linkMetabox.title";
+  const subtitleKey: TranslationKey =
+    reason === "subscription"
+      ? "linkMetabox.subtitleSubscription"
+      : reason === "withdrawal"
+        ? "linkMetabox.subtitleWithdrawal"
+        : "linkMetabox.subtitle";
   const [mode, setMode] = useState<Mode>("choose");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -262,7 +288,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
         <button className="chat-back-btn" onClick={onBack}>
           ←
         </button>
-        <h2>{t("linkMetabox.title")}</h2>
+        <h2>{t(titleKey)}</h2>
       </div>
 
       {pending && pending.view === "view" && (
@@ -377,7 +403,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
 
       {!pending && !statusLoading && mode === "choose" && (
         <div className="link-metabox-choose">
-          <p className="page-subtitle">{t("linkMetabox.subtitle")}</p>
+          <p className="page-subtitle">{t(subtitleKey)}</p>
           <button className="primary-btn" onClick={() => setMode("register")}>
             {t("linkMetabox.newAccount")}
           </button>
