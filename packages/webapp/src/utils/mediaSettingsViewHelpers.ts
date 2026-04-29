@@ -74,14 +74,22 @@ export function buildPickerOptions(
   models: Model[],
   modelTranslations: Record<string, { name?: string }>,
 ): PickerOption[] {
-  const { families, standalone } = groupByFamily(models);
+  const seen = new Set<string>();
   const opts: PickerOption[] = [];
-  for (const [fid, members] of families.entries()) {
-    const familyName = members[0]?.familyName ?? fid.charAt(0).toUpperCase() + fid.slice(1);
-    opts.push({ id: `family__${fid}`, label: familyName });
-  }
-  for (const m of standalone) {
-    opts.push({ id: `standalone__${m.id}`, label: modelTranslations[m.id]?.name ?? m.name });
+  for (const m of models) {
+    if (m.familyId) {
+      const key = `family__${m.familyId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        const label = m.familyName ?? m.familyId.charAt(0).toUpperCase() + m.familyId.slice(1);
+        opts.push({ id: key, label });
+      }
+    } else {
+      opts.push({
+        id: `standalone__${m.id}`,
+        label: modelTranslations[m.id]?.name ?? m.name,
+      });
+    }
   }
   return opts;
 }
