@@ -301,6 +301,14 @@ export class KieVideoAdapter implements VideoAdapter {
 
     const data = (await resp.json()) as KieSubmitResponse;
     if (data.code !== 200 || !data.data?.taskId) {
+      const msg = data.msg ?? "";
+      const durationMatch = /video duration must be between (\d+) and (\d+)/i.exec(msg);
+      if (durationMatch) {
+        throw new UserFacingError(`KIE: ${msg}`, {
+          key: "kieVideoDurationOutOfRange",
+          params: { min: durationMatch[1], max: durationMatch[2] },
+        });
+      }
       throw new Error(`KIE submit failed: ${data.code} — ${data.msg}`);
     }
     return data.data.taskId;

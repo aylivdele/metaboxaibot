@@ -254,6 +254,7 @@ export default {
       "❌ Изображение слишком большое ({actualW}×{actualH} пкс). Максимальный размер — {maxW}×{maxH} пкс.",
     mediaSlotReadMetadataFailed:
       "❌ Не удалось прочитать параметры файла. Проверьте формат и попробуйте снова.",
+    kieVideoDurationOutOfRange: "❌ Длительность видео должна быть от {min} до {max} секунд.",
     mediaSlotImagesOnly:
       "❌ Этот слот принимает только фотографии. Видео не поддерживается — отправьте фото.",
     contentPolicyViolation:
