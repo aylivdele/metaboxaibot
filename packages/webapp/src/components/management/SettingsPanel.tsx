@@ -14,41 +14,39 @@ import type { MotionEntry } from "./HiggsFieldMotionPicker.js";
 import { HiggsFieldSoulPicker } from "./HiggsFieldSoulPicker.js";
 import { SoulStylePicker } from "./SoulStylePicker.js";
 
-function AspectRatioPreview({ value }: { value: string }) {
-  const MAX_W = 96;
-  const MAX_H = 62;
-  const isAuto = value === "auto";
-
-  let w = 58;
-  let h = 58;
-  if (!isAuto) {
-    const m = value.match(/^(\d+):(\d+)$/);
-    if (m) {
-      const rw = Number(m[1]);
-      const rh = Number(m[2]);
-      const ratio = rw / rh;
-      if (ratio >= MAX_W / MAX_H) {
-        w = MAX_W;
-        h = Math.max(10, Math.round(MAX_W / ratio));
-      } else {
-        h = MAX_H;
-        w = Math.max(10, Math.round(MAX_H * ratio));
-      }
-    }
-  }
-
-  return (
-    <div className="ar-preview">
-      <div className="ar-preview__frame">
-        {isAuto ? (
-          <span className="ar-preview__auto-text">auto</span>
-        ) : (
-          <div className="ar-preview__rect" style={{ width: w, height: h }} />
-        )}
-      </div>
-    </div>
-  );
-}
+// function AspectRatioPreview({ value }: { value: string }) {
+//   const MAX_W = 96;
+//   const MAX_H = 62;
+//   const isAuto = value === "auto";
+//   let w = 58;
+//   let h = 58;
+//   if (!isAuto) {
+//     const m = value.match(/^(\d+):(\d+)$/);
+//     if (m) {
+//       const rw = Number(m[1]);
+//       const rh = Number(m[2]);
+//       const ratio = rw / rh;
+//       if (ratio >= MAX_W / MAX_H) {
+//         w = MAX_W;
+//         h = Math.max(10, Math.round(MAX_W / ratio));
+//       } else {
+//         h = MAX_H;
+//         w = Math.max(10, Math.round(MAX_H * ratio));
+//       }
+//     }
+//   }
+//   return (
+//     <div className="ar-preview">
+//       <div className="ar-preview__frame">
+//         {isAuto ? (
+//           <span className="ar-preview__auto-text">auto</span>
+//         ) : (
+//           <div className="ar-preview__rect" style={{ width: w, height: h }} />
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
 
 function isPresent(v: unknown): boolean {
   if (v === null || v === undefined || v === false || v === "" || v === 0) return false;
@@ -129,9 +127,9 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
                 );
               })}
             </div>
-            {def.key === "aspect_ratio" && (
+            {/* {def.key === "aspect_ratio" && (
               <AspectRatioPreview value={String(val ?? def.default ?? "auto")} />
-            )}
+            )} */}
           </>
         )}
         {def.type === "dropdown" && (
