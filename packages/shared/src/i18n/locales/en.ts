@@ -263,6 +263,12 @@ export default {
       "❌ The output looks similar to copyrighted material (recognizable characters, brands, celebrities). Please rephrase your prompt and try again.",
     publicFigureViolation:
       "❌ Request blocked: the model detected a prominent public figure in your description or image. Provider policy disallows generating with celebrities — modify your description or use a different photo.",
+    klingMotionImageRecognitionFailed:
+      "❌ Could not recognize the image. Upload a photo where the entire upper body is clearly visible (head, shoulders, torso). Close-up face shots, back views, or cropped figures will not work.",
+    generationNoResult:
+      "❌ The model could not generate a result for this request. Try rephrasing the prompt or adjusting the settings.",
+    modelDoesNotSupportImg2img:
+      "❌ {modelName} does not support image editing or refinement. Choose Nano Banana, FLUX, or another model that supports editing.",
     aiClassifiedError: "❌ {messageEn}",
     recraftImg2imgSvgUnsupported:
       "❌ SVG images cannot be used as a reference for Recraft img2img. Please send a raster image (PNG, JPEG, or WebP) instead.",

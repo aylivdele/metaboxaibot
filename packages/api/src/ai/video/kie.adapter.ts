@@ -341,7 +341,37 @@ export class KieVideoAdapter implements VideoAdapter {
       );
       const isPolicy =
         failCode === "430" ||
-        /sensitive|restricted|policy|prohibited|nsfw|violat|inappropriate/i.test(failMsg);
+        failCode === "431" ||
+        /sensitive|restrict|policy|prohibited|nsfw|violat|inappropriate|safety|content moderation|blocked/i.test(
+          failMsg,
+        );
+      // Kling Motion: "Image recognition failed. ... No complete upper body
+      // detected in the image; ensure the upper body is clearly visible."
+      // Юзер должен загрузить другое фото — детерминированный hardcoded message
+      // лучше чем gpt-5-nano AI-classifier (который варьирует от запуска к запуску
+      // и тригерит лишний ops alert через notifyOps:true).
+      const isKlingImageRecognitionFailed =
+        /image recognition failed|upper body (detected|is clearly visible)|whole body/i.test(
+          failMsg,
+        );
+      if (isKlingImageRecognitionFailed) {
+        throw new UserFacingError(technicalMessage, {
+          key: "klingMotionImageRecognitionFailed",
+        });
+      }
+      // Generic "model couldn't generate for this prompt" — провайдер (Gemini
+      // через KIE и т.п.) шлёт 500 с message о том что нужно переформулировать.
+      // User-facing, не tech 5xx — не попадает в poll-stage fallback re-submit.
+      // Также ловим случаи когда модель вернула chat-style ответ вместо результата
+      // (кириллица в failMsg = upstream chat-режим, легитимные ошибки KIE на английском).
+      const hasCyrillic = /[Ѐ-ӿ]/.test(failMsg);
+      const isNoResult =
+        /could not generate (an? )?(image|video|result)|failed to generate|no image (was )?generated|unable to generate/i.test(
+          failMsg,
+        ) || hasCyrillic;
+      if (isNoResult) {
+        throw new UserFacingError(technicalMessage, { key: "generationNoResult" });
+      }
       if (isPublicFigure)
         throw new UserFacingError(technicalMessage, { key: "publicFigureViolation" });
       if (isCopyright) throw new UserFacingError(technicalMessage, { key: "copyrightViolation" });

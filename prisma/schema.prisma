@@ -120,9 +120,15 @@ model Dialog {
   // "provider_chain"  — OpenAI Responses API: цепочка через previous_response_id
   // "provider_thread" — OpenAI Assistants: сервер хранит всю историю в Thread
   // "db_history"      — Anthropic, Gemini и др.: история из БД, последние N сообщений
-  contextStrategy        String  @default("db_history")
-  providerThreadId       String? // OpenAI Assistants: thread_id
-  providerLastResponseId String? // OpenAI Responses API: последний response_id
+  contextStrategy           String  @default("db_history")
+  providerThreadId          String? // OpenAI Assistants: thread_id
+  providerLastResponseId    String? // OpenAI Responses API: последний response_id
+  // ProviderKey.id, чьим ключом был создан providerLastResponseId. OpenAI
+  // response_id привязан к организации/аккаунту — при смене ключа (другой
+  // org/аккаунт) старый response_id невалиден. Если на следующем turn'е
+  // выбран другой ключ, chat-сервис дропает previousResponseId и шлёт полную
+  // историю. null = env-fallback или ключ удалён.
+  providerLastResponseKeyId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

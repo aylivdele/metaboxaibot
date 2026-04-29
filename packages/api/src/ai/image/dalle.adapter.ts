@@ -1,7 +1,6 @@
 import OpenAI, { type ClientOptions as OpenAIClientOptions } from "openai";
 import type { ImageAdapter, ImageInput, ImageResult } from "./base.adapter.js";
 import { config, UserFacingError } from "@metabox/shared";
-import { fetchWithLog } from "../../utils/fetch.js";
 
 const DALLE_SIZES: Record<string, "1024x1024" | "1792x1024" | "1024x1792"> = {
   "1:1": "1024x1024",
@@ -16,30 +15,38 @@ const DALLE_COST: Record<string, Record<string, number>> = {
 };
 
 /**
- * DALL-E adapter — synchronous, returns URL immediately.
- * When input.imageUrl is provided, uses DALL-E 2 createVariation for img2img.
- * Otherwise uses DALL-E 3 generate.
+ * DALL-E 3 adapter — synchronous text-to-image, returns URL immediately.
+ *
+ * **No img2img support.** OpenAI deprecated DALL-E 2 (`createVariation`
+ * endpoint вернёт 404), а у DALL-E 3 нет own image-edit/variation API.
+ * Если юзер пришёл сюда с `imageUrl` (например, через legacy refine flow),
+ * шлём UserFacingError → юзер выбирает другую модель (Nano Banana, FLUX и т.п.).
  */
 export class DalleAdapter implements ImageAdapter {
   readonly modelId = "dall-e-3";
   readonly isAsync = false;
 
   private client: OpenAI;
-  private fetchFn: typeof globalThis.fetch | undefined;
 
   constructor(apiKey = config.ai.openai, fetchFn?: typeof globalThis.fetch) {
     this.client = new OpenAI({
       apiKey,
       ...(fetchFn ? { fetch: fetchFn as unknown as OpenAIClientOptions["fetch"] } : {}),
     });
-    this.fetchFn = fetchFn;
   }
 
   async generate(input: ImageInput): Promise<ImageResult> {
-    // img2img: use DALL-E 2 variations when a reference image URL is provided
+    // OpenAI DALL-E 3 не имеет img2img endpoint'а; DALL-E 2 createVariation
+    // deprecated (404). Любой image-input → user-facing reject с подсказкой.
     const imageUrl = input.mediaInputs?.edit?.[0] ?? input.imageUrl;
     if (imageUrl) {
-      return this.generateVariation(imageUrl);
+      throw new UserFacingError(
+        "DALL-E 3 does not support img2img — DALL-E 2 variations endpoint is deprecated",
+        {
+          key: "modelDoesNotSupportImg2img",
+          params: { modelName: "DALL-E 3" },
+        },
+      );
     }
 
     const ms = input.modelSettings ?? {};
@@ -73,28 +80,5 @@ export class DalleAdapter implements ImageAdapter {
     const url = response.data?.[0]?.url;
     if (!url) throw new Error("DALL-E returned no image URL");
     return { url, filename: "dalle3.png", providerUsdCost };
-  }
-
-  private async generateVariation(imageUrl: string): Promise<ImageResult> {
-    // Download the reference image as a Buffer for the DALL-E 2 variations API
-    const resp = await fetchWithLog(imageUrl);
-    if (!resp.ok) throw new Error(`Failed to fetch reference image: ${resp.status}`);
-    const arrayBuffer = await resp.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // The SDK accepts a File-like object; we create one from the buffer
-    const file = new File([buffer], "reference.png", { type: "image/png" });
-
-    const response = await this.client.images.createVariation({
-      model: "dall-e-2",
-      image: file,
-      n: 1,
-      size: "1024x1024",
-      response_format: "url",
-    });
-
-    const url = response.data?.[0]?.url;
-    if (!url) throw new Error("DALL-E 2 variation returned no image URL");
-    return { url, filename: "dalle2-variation.png" };
   }
 }

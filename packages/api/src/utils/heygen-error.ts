@@ -69,8 +69,33 @@ const USER_FACING_CODES = new Set([
   400599, // TIER_NOT_SUPPORT
 ]);
 
+/**
+ * Message-pattern fallback для случаев когда HeyGen вернул generic enum
+ * ("invalid_parameter" → numeric code -1), но в message прозрачно указан
+ * корень проблемы. Без этого юзер видел бы heygenRejected ("Запрос
+ * отклонён, попробуйте позже") вместо точной подсказки.
+ *
+ * Возвращает ключ из t.errors.* или null если ни один паттерн не подошёл.
+ */
+const MESSAGE_PATTERNS_KEYS: Record<string, readonly RegExp[]> = {
+  heygenNoFace: [/no face detected/i, /face not detected/i, /face was not found/i],
+  heygenMultipleFaces: [/multiple faces/i, /more than one face/i, /too many faces/i],
+  heygenBadImageQuality: [/image quality/i, /low.?quality/i, /blurry/i],
+};
+
+function matchHeyGenMessageKey(message: string): string | null {
+  for (const [key, patterns] of Object.entries(MESSAGE_PATTERNS_KEYS)) {
+    if (patterns.some((p) => p.test(message))) return key;
+  }
+  return null;
+}
+
 export function isHeyGenUserFacingError(err: unknown): err is HeyGenApiError {
-  return err instanceof HeyGenApiError && USER_FACING_CODES.has(err.code);
+  if (!(err instanceof HeyGenApiError)) return false;
+  if (USER_FACING_CODES.has(err.code)) return true;
+  // Fallback: HeyGen иногда шлёт generic enum ("invalid_parameter") с code=-1,
+  // но message содержит конкретику ("No face detected...").
+  return matchHeyGenMessageKey(err.heygenMessage) !== null;
 }
 
 /**
@@ -148,8 +173,14 @@ export function getHeyGenUserMessage(
       return e.heygenUserBlocked;
     case 400599:
       return e.heygenTierRequired;
-    default:
+    default: {
+      // Fallback: попытка вытащить ключ из message-паттернов (для случаев
+      // generic-enum + конкретики в тексте, e.g. "invalid_parameter: No face
+      // detected ..."). Если ничего не сматчилось — generic heygenRejected.
+      const key = matchHeyGenMessageKey(err.heygenMessage);
+      if (key) return e[key];
       return e.heygenRejected;
+    }
   }
 }
 

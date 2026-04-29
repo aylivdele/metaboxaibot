@@ -168,10 +168,21 @@ export const dialogService = {
     }));
   },
 
-  /** Update provider-side context pointers after a response. */
+  /**
+   * Update provider-side context pointers after a response.
+   *
+   * `providerLastResponseKeyId` фиксирует ключ который создал response_id —
+   * на следующем turn'е chat-сервис проверяет совпадение с acquired keyId
+   * и при mismatch'е дропает previousResponseId (response_id привязан к
+   * организации OpenAI, между разными аккаунтами не работает).
+   */
   async updateProviderContext(
     dialogId: string,
-    updates: { providerLastResponseId?: string; providerThreadId?: string },
+    updates: {
+      providerLastResponseId?: string;
+      providerLastResponseKeyId?: string | null;
+      providerThreadId?: string;
+    },
   ): Promise<void> {
     await db.dialog.update({ where: { id: dialogId }, data: updates });
   },

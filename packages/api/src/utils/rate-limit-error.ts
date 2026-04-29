@@ -68,6 +68,13 @@ const RATE_LIMIT_PATTERNS: RegExp[] = [
   /concurrency/i,
   /concurrent (request|generation)/i,
   /throttl/i,
+  // Provider-side overload (e.g. KIE 422 "Service is currently unavailable
+  // due to high demand. Please try again later. (E003)") — транзиентный отказ
+  // на стороне провайдера, не error в нашем запросе. Применяем backoff
+  // вместо немедленного fail'а.
+  /high demand/i,
+  /service is (currently )?unavailable/i,
+  /service unavailable/i,
 ];
 
 export interface RateLimitClassification {

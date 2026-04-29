@@ -51,6 +51,7 @@ import { deriveLockedProvider, detectUsedFallback } from "../utils/fallback-stat
 import { acquireForPoll } from "../utils/acquire-for-processor.js";
 import { resolveKeyProviderForModel } from "@metabox/api/ai/key-provider";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
+import { deferIfRateLimitOverload } from "../utils/defer-rate-limit.js";
 import {
   acquireKey,
   markRateLimited,
@@ -1341,6 +1342,24 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
       await telegram.sendMessage(telegramChatId, msg).catch(() => void 0);
       throw new UnrecoverableError(msg);
     }
+    // Provider-side rate-limit/overload (например KIE 422 "high demand") —
+    // defer'им job на cooldownMs+jitter, BullMQ retry после паузы. Throws
+    // DelayedError если rescheduled; returns silently если не rate-limit
+    // или budget исчерпан → fall through. existingJob — closure внутри try,
+    // здесь refetch'аем sticky providerKeyId (per-key throttle применится
+    // на ближайший submit'е acquireKey'ем).
+    const dbJobForRl = await db.generationJob
+      .findUnique({ where: { id: dbJobId }, select: { providerKeyId: true } })
+      .catch(() => null);
+    await deferIfRateLimitOverload({
+      err,
+      job,
+      token,
+      section: "image",
+      modelId,
+      provider: modelMeta?.provider,
+      keyId: dbJobForRl?.providerKeyId ?? null,
+    });
     // Throws DelayedError if rescheduled (re-thrown by next iteration of catch).
     // Returns silently otherwise → fall through to user-facing failure handling.
     await deferIfTransientNetworkError({ err, job, token, section: "image" });
