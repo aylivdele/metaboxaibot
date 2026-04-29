@@ -732,6 +732,35 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
     const current = await userStateService.getMediaInputs(userId, modelId);
     const targetSlot = pickAutoSlot(activeModeSlots, current, "image");
     if (targetSlot) {
+      // Constraint validation на upload'е (зеркалит active-slot путь выше).
+      // Без этого юзер получает provider-error мид-генерации.
+      if (targetSlot.constraints) {
+        let widthPx = photoSize?.width;
+        let heightPx = photoSize?.height;
+        let fileSizeBytes: number | undefined = fileSize || undefined;
+        if (isImageDoc) {
+          try {
+            const probeUrl = await getLiveTgUrl();
+            const meta = await probeImageMetadata(probeUrl);
+            widthPx = meta.width;
+            heightPx = meta.height;
+            fileSizeBytes = meta.fileSizeBytes;
+          } catch (err) {
+            logger.warn({ err }, "probeImageMetadata failed in auto-slot");
+            await ctx.reply(ctx.t.errors.mediaSlotReadMetadataFailed);
+            return;
+          }
+        }
+        const violation = validateMediaAgainstSlot(
+          targetSlot,
+          { widthPx, heightPx, fileSizeBytes },
+          ctx.t,
+        );
+        if (violation) {
+          await ctx.reply(violation);
+          return;
+        }
+      }
       await userStateService.addMediaInput(userId, modelId, targetSlot.slotKey, tgSlotValue);
       debounceSlotReply(
         userId,

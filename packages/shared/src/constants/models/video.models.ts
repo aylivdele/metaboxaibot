@@ -51,12 +51,17 @@ const KLING_MEDIA_INPUTS: MediaInputSlot[] = [
   ...MI_REF_ELEMENTS,
 ];
 
-/** Kling Motion: required reference image (image_url). */
+/**
+ * Kling Motion: required reference image (image_url). KIE требует минимум
+ * 300×300 px по обеим сторонам — иначе submit падает с 422
+ * "Image dimensions must be at least 300 pixels". Валидируем на upload'е.
+ */
 const MI_MOTION_IMAGE: MediaInputSlot = {
   slotKey: "first_frame",
   mode: "first_frame",
   labelKey: "motionImage",
   required: true,
+  constraints: { minWidth: 300, minHeight: 300 },
 };
 /** Kling Motion: required reference video (video_url). Provider requires 3–30 s. */
 const MI_MOTION_VIDEO: MediaInputSlot = {

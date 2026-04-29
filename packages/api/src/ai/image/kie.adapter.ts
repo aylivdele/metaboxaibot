@@ -245,7 +245,30 @@ export class KieImageAdapter implements ImageAdapter {
       );
       const isPolicy =
         failCode === "430" ||
-        /sensitive|restricted|policy|prohibited|nsfw|violat|inappropriate/i.test(failMsg);
+        failCode === "431" ||
+        /sensitive|restrict|policy|prohibited|nsfw|violat|inappropriate|safety|content moderation|blocked/i.test(
+          failMsg,
+        );
+      // Generic "model couldn't generate for this prompt" — Gemini (KIE
+      // nano-banana backend) и подобные шлют 500 с message типа
+      // "Gemini could not generate an image with the given prompt. Please
+      // try again with a different prompt." Это user-facing (юзер должен
+      // переформулировать), а НЕ tech 5xx — иначе попало бы в poll-stage
+      // KIE-fallback re-submit логику, которая зря сожгла бы fallback
+      // attempt и user не понял бы что нужно сделать.
+      //
+      // Также сюда попадает случай когда gpt-image-2 (KIE) вместо генерации
+      // возвращает chat-style ответ ассистента ("Вот несколько вариантов на
+      // английском..."). Легитимные upstream-ошибки KIE всегда на английском,
+      // поэтому кириллица в failMsg = модель ушла в clarification-режим.
+      const hasCyrillic = /[Ѐ-ӿ]/.test(failMsg);
+      const isNoResult =
+        /could not generate (an? )?(image|video|result)|failed to generate|no image (was )?generated|unable to generate/i.test(
+          failMsg,
+        ) || hasCyrillic;
+      if (isNoResult) {
+        throw new UserFacingError(technicalMessage, { key: "generationNoResult" });
+      }
       if (isPublicFigure)
         throw new UserFacingError(technicalMessage, { key: "publicFigureViolation" });
       if (isCopyright) throw new UserFacingError(technicalMessage, { key: "copyrightViolation" });

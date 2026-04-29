@@ -16,3 +16,17 @@ export function getRedis(): Redis {
   }
   return _connection;
 }
+
+/**
+ * Закрывает singleton-соединение (для graceful shutdown).
+ * No-op если соединение не было создано.
+ */
+export async function closeRedis(): Promise<void> {
+  if (!_connection) return;
+  try {
+    await _connection.quit();
+  } catch {
+    _connection.disconnect();
+  }
+  _connection = undefined;
+}

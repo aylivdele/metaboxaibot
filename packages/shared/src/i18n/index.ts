@@ -185,6 +185,9 @@ export interface Translations {
     contentPolicyViolation: string;
     copyrightViolation: string;
     publicFigureViolation: string;
+    klingMotionImageRecognitionFailed: string;
+    generationNoResult: string;
+    modelDoesNotSupportImg2img: string;
     aiClassifiedError: string;
     recraftImg2imgSvgUnsupported: string;
     recraftImg2imgFileTooLarge: string;

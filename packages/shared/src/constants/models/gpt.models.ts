@@ -276,25 +276,6 @@ export const GPT_MODELS: Record<string, AIModel> = {
   // Order matches the mini-app display order.
 
   // ── GPT 5 ─────────────────────────────────────────────────────────────────
-  "gpt-5.5-pro": {
-    id: "gpt-5.5-pro",
-    name: "🧠 GPT 5.5 Pro",
-    description:
-      "Новейшая флагманская модель OpenAI. Максимальная точность и глубокие рассуждения с расширенным контекстом 1M+ токенов. Дороже GPT 5.5 — для задач, где важна безупречная точность.",
-    section: "gpt",
-    provider: "openai",
-    costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 30, // long context: ×2 = $60/M
-    outputCostUsdPerMToken: 180, // long context: ×1.5 = $270/M
-    contextPricingTiers: { thresholdTokens: 272_000, inputMultiplier: 2, outputMultiplier: 1.5 },
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    contextStrategy: "provider_chain",
-    contextMaxMessages: 0,
-    settings: [REASONING_EFFORT_GPT55, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
-  },
   "gpt-5.5": {
     id: "gpt-5.5",
     name: "💬 GPT 5.5",
@@ -315,25 +296,6 @@ export const GPT_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     settings: [REASONING_EFFORT_GPT55, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
   },
-  "gpt-5.4-pro": {
-    id: "gpt-5.4-pro",
-    name: "🧠 GPT 5.4 Pro",
-    description:
-      "Самая мощная модель OpenAI. Максимальная точность, глубокие рассуждения. Значительно дороже GPT 5.4 — для задач, где важна безупречная точность.",
-    section: "gpt",
-    provider: "openai",
-    costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 30, // >272k tokens: ×2 = $60/M
-    outputCostUsdPerMToken: 180, // >272k tokens: ×1.5 = $270/M
-    contextPricingTiers: { thresholdTokens: 272_000, inputMultiplier: 2, outputMultiplier: 1.5 },
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    contextStrategy: "provider_chain",
-    contextMaxMessages: 0,
-    settings: [REASONING_EFFORT_GPT5, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
-  },
   "gpt-5.4": {
     id: "gpt-5.4",
     name: "💬 GPT 5.4",
@@ -353,24 +315,6 @@ export const GPT_MODELS: Record<string, AIModel> = {
     contextStrategy: "provider_chain",
     contextMaxMessages: 0,
     settings: [REASONING_EFFORT_GPT5, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
-  },
-  "gpt-5-pro": {
-    id: "gpt-5-pro",
-    name: "💡 GPT 5 Pro",
-    description:
-      "Предыдущее поколение флагмана OpenAI. Только максимальный уровень рассуждений — для самых сложных задач. Дороже GPT 5.4.",
-    section: "gpt",
-    provider: "openai",
-    costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 15.0,
-    outputCostUsdPerMToken: 120.0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    contextStrategy: "provider_chain",
-    contextMaxMessages: 0,
-    settings: [REASONING_EFFORT_GPT5_PRO, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
   },
   // "gpt-5-mini": { //TODO: verify account org
   //   id: "gpt-5-mini",
@@ -818,6 +762,62 @@ export const GPT_MODELS: Record<string, AIModel> = {
   //   contextStrategy: "db_history",
   //   contextMaxMessages: 40,
   // },
+  "gpt-5.5-pro": {
+    id: "gpt-5.5-pro",
+    name: "🧠 GPT 5.5 Pro",
+    description:
+      "Новейшая флагманская модель OpenAI. Максимальная точность и глубокие рассуждения с расширенным контекстом 1M+ токенов. Дороже GPT 5.5 — для задач, где важна безупречная точность.",
+    section: "gpt",
+    provider: "openai",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 30, // long context: ×2 = $60/M
+    outputCostUsdPerMToken: 180, // long context: ×1.5 = $270/M
+    contextPricingTiers: { thresholdTokens: 272_000, inputMultiplier: 2, outputMultiplier: 1.5 },
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "provider_chain",
+    contextMaxMessages: 0,
+    settings: [REASONING_EFFORT_GPT55, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
+  },
+  "gpt-5.4-pro": {
+    id: "gpt-5.4-pro",
+    name: "🧠 GPT 5.4 Pro",
+    description:
+      "Самая мощная модель OpenAI. Максимальная точность, глубокие рассуждения. Значительно дороже GPT 5.4 — для задач, где важна безупречная точность.",
+    section: "gpt",
+    provider: "openai",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 30, // >272k tokens: ×2 = $60/M
+    outputCostUsdPerMToken: 180, // >272k tokens: ×1.5 = $270/M
+    contextPricingTiers: { thresholdTokens: 272_000, inputMultiplier: 2, outputMultiplier: 1.5 },
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "provider_chain",
+    contextMaxMessages: 0,
+    settings: [REASONING_EFFORT_GPT5, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
+  },
+  "gpt-5-pro": {
+    id: "gpt-5-pro",
+    name: "💡 GPT 5 Pro",
+    description:
+      "Предыдущее поколение флагмана OpenAI. Только максимальный уровень рассуждений — для самых сложных задач. Дороже GPT 5.4.",
+    section: "gpt",
+    provider: "openai",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 15.0,
+    outputCostUsdPerMToken: 120.0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "provider_chain",
+    contextMaxMessages: 0,
+    settings: [REASONING_EFFORT_GPT5_PRO, VERBOSITY_SETTING, ...REASONING_MODEL_SETTINGS],
+  },
 };
 
 // ── Apply context window sizes (in tokens) ───────────────────────────────────

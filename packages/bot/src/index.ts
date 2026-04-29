@@ -5,6 +5,8 @@ import { createBot } from "./bot.js";
 import { preloadLocales, SUPPORTED_LANGUAGES, config } from "@metabox/shared";
 import { logger } from "./logger.js";
 import { run } from "@grammyjs/runner";
+import { closeRedis } from "@metabox/api/redis";
+import { closeDb } from "./db.js";
 
 /**
  * Максимум времени, который мы ждём завершения in-flight handler'ов после
@@ -33,9 +35,11 @@ async function main() {
     }
   });
 
-  // Reset webhook and pending updates to ensure allowed_updates takes effect
-  logger.info("Resetting webhook and pending updates...");
-  await bot.api.deleteWebhook({ drop_pending_updates: true });
+  // Reset webhook (we use long polling) but KEEP pending updates so сообщения,
+  // отправленные пока бот был оффлайн (рестарт/деплой), обработаются после старта.
+  // Защита от re-delivery — Redis-дедуп по update_id в bot.ts.
+  logger.info("Resetting webhook (keeping pending updates)...");
+  await bot.api.deleteWebhook({ drop_pending_updates: false });
 
   // Set allowed_updates via a dummy getUpdates call before runner starts
   await bot.api.getUpdates({
@@ -90,7 +94,18 @@ async function main() {
   }
 
   await runner.task();
-  logger.info({ inFlight }, "Bot runner stopped, exiting cleanly");
+  logger.info({ inFlight }, "Bot runner stopped, closing resources...");
+
+  // Явно закрываем долгоживущие соединения, иначе Node не может выйти и виснет
+  // ~минуту до TCP keepalive timeout. Postgres pool, ioredis singleton —
+  // оба держат event loop открытым.
+  await Promise.race([
+    Promise.allSettled([closeRedis(), closeDb()]),
+    new Promise((resolve) => setTimeout(resolve, 5000)),
+  ]);
+
+  logger.info("Resources closed, exiting");
+  process.exit(0);
 }
 
 main().catch((err) => {

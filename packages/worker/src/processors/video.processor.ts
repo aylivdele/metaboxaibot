@@ -60,6 +60,7 @@ import type { Prisma } from "@prisma/client";
 import { userAvatarService } from "@metabox/api/services/user-avatar";
 import { resolveVoiceForTTS } from "@metabox/api/services/user-voice";
 import { deferIfTransientNetworkError } from "../utils/defer-transient.js";
+import { deferIfRateLimitOverload } from "../utils/defer-rate-limit.js";
 import { UserFacingError } from "@metabox/shared";
 
 const INITIAL_POLL_INTERVAL_MS = 5000;
@@ -708,6 +709,21 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
       await telegram.sendMessage(telegramChatId, msg).catch(() => void 0);
       throw new UnrecoverableError(msg);
     }
+    // Provider-side rate-limit/overload (например KIE 422 "high demand") —
+    // defer'им job на cooldownMs+jitter, BullMQ retry после паузы. Throws
+    // DelayedError если rescheduled; иначе fall through.
+    const dbJobForRl = await db.generationJob
+      .findUnique({ where: { id: dbJobId }, select: { providerKeyId: true } })
+      .catch(() => null);
+    await deferIfRateLimitOverload({
+      err,
+      job,
+      token,
+      section: "video",
+      modelId,
+      provider: modelMeta?.provider,
+      keyId: dbJobForRl?.providerKeyId ?? null,
+    });
     // Throws DelayedError if rescheduled (propagates out → BullMQ moves job to delayed).
     // Returns silently otherwise → fall through to user-facing failure handling.
     await deferIfTransientNetworkError({ err, job, token, section: "video" });

@@ -17,7 +17,7 @@ import { logger } from "../logger.js";
 import { acquireKey, markRateLimited, recordSuccess, recordError } from "./key-pool.service.js";
 import { isPoolExhaustedError } from "../utils/pool-exhausted-error.js";
 import { resolveKeyProvider } from "../ai/key-provider.js";
-import { classifyRateLimit } from "../utils/rate-limit-error.js";
+import { classifyRateLimit, isFiveXxError } from "../utils/rate-limit-error.js";
 
 export { ContextOverflowError } from "../ai/llm/truncate.js";
 
@@ -108,8 +108,10 @@ export const chatService = {
       }
       throw err;
     }
-    const acquiredKeyId = acquired.keyId;
-    const adapter = createLLMAdapter(dialog.modelId, acquired);
+    // Mutable: на retry с другим ключом (rate-limit / 5xx до первого chunk'а)
+    // переприсваиваем acquired/keyId/adapter и шлём запрос заново.
+    let acquiredKeyId = acquired.keyId;
+    let adapter = createLLMAdapter(dialog.modelId, acquired);
 
     // Split attachments into two classes:
     //  - text-class (.txt, .csv, .docx, .xlsx, etc.) — always extracted + inlined.
@@ -169,8 +171,9 @@ export const chatService = {
       );
     }
 
-    // Build input based on context strategy
-    const input: LLMInput = {
+    // Build input based on context strategy. `let` because retry-on-fallback-key
+    // path может пересобрать его (drop previousResponseId + наполнить history).
+    let input: LLMInput = {
       prompt: effectivePrompt,
       imageUrl,
       ...(imageUrls?.length ? { imageUrls } : {}),
@@ -208,7 +211,24 @@ export const chatService = {
         ),
       );
     } else if (dialog.contextStrategy === "provider_chain") {
-      input.previousResponseId = dialog.providerLastResponseId ?? undefined;
+      // Привязка response_id к ключу: используем previousResponseId только
+      // если он был создан тем же acquired.keyId. OpenAI response_id привязан
+      // к организации/аккаунту — между разными ключами (разные org'и)
+      // сервер вернёт 404, теряем continuity.
+      // Mismatch (разные keyId, либо legacy-data без сохранённого keyId на DB-key) →
+      // fallback на db_history-flow (history из БД).
+      const keyMatches =
+        !!dialog.providerLastResponseId && dialog.providerLastResponseKeyId === acquired.keyId;
+      if (keyMatches) {
+        input.previousResponseId = dialog.providerLastResponseId ?? undefined;
+      } else if (dialog.providerLastResponseId) {
+        const history = await dialogService.getHistory(dialogId, adapter.contextMaxMessages);
+        input.history = await Promise.all(
+          history.map((m) =>
+            augmentHistoryMessage(m, model?.supportsDocuments === true, extractCache),
+          ),
+        );
+      }
     }
 
     // Save user message — keep the ID so we can mark it failed on error.
@@ -249,8 +269,13 @@ export const chatService = {
         if (next.done) {
           const result = next.value;
           if (result?.newResponseId) {
+            // Сохраняем ключ который создал response_id — на следующем turn'е
+            // chat-сервис сравнит с acquired.keyId и при mismatch'е дропнет
+            // previousResponseId (response_id невалиден между разными OpenAI
+            // org/аккаунтами).
             await dialogService.updateProviderContext(dialogId, {
               providerLastResponseId: result.newResponseId,
+              providerLastResponseKeyId: acquiredKeyId,
             });
           }
           inputTokensUsed = result?.inputTokensUsed;
@@ -264,62 +289,130 @@ export const chatService = {
       }
     };
 
-    try {
+    // Outer retry loop: на rate-limit / 5xx ДО emit'а первого chunk'а пробуем
+    // следующий ключ из пула. previousResponseId дропаем (новый ключ ≠ старый
+    // OpenAI org). Если эмиттнутые chunks > 0 — retry'нуть нельзя
+    // (continuity сломается), throw'аем как раньше.
+    const MAX_KEY_ATTEMPTS = 2;
+    let keyAttempt = 0;
+    while (true) {
       try {
-        yield* runStream(input);
+        try {
+          yield* runStream(input);
+        } catch (err) {
+          const canRetry =
+            dialog.contextStrategy === "provider_chain" &&
+            input.previousResponseId !== undefined &&
+            chunks.length === 0 &&
+            isContextOverflowError(err) &&
+            !(err instanceof ContextOverflowError);
+          if (!canRetry) throw err;
+
+          logger.warn(
+            { dialogId, modelId: dialog.modelId },
+            "chat.sendMessageStream: provider context overflow — retrying with full history",
+          );
+          const history = await dialogService.getHistory(dialogId, 1000);
+          const augmented = await Promise.all(
+            history.map((m) =>
+              augmentHistoryMessage(m, model?.supportsDocuments === true, extractCache),
+            ),
+          );
+          input = {
+            ...input,
+            history: augmented,
+            previousResponseId: undefined,
+          };
+          yield* runStream(input);
+        }
+        break; // success — выходим из retry loop'а
       } catch (err) {
-        const canRetry =
-          dialog.contextStrategy === "provider_chain" &&
-          input.previousResponseId !== undefined &&
-          chunks.length === 0 &&
-          isContextOverflowError(err) &&
-          !(err instanceof ContextOverflowError);
-        if (!canRetry) throw err;
+        // Per-key metrics + throttle on 429-class errors. We only attribute when
+        // the pool actually gave us a DB-tracked key (env-fallback yields keyId=null).
+        const cls = classifyRateLimit(err, keyProvider);
+        const is5xx = isFiveXxError(err);
+        const haveChunks = chunks.length > 0;
+        const canKeyRetry =
+          keyAttempt + 1 < MAX_KEY_ATTEMPTS && !haveChunks && (cls.isRateLimit || is5xx);
+
+        if (acquiredKeyId) {
+          if (cls.isRateLimit) {
+            void markRateLimited(acquiredKeyId, cls.cooldownMs, cls.reason);
+          } else {
+            void recordError(acquiredKeyId, err instanceof Error ? err.message : String(err));
+          }
+        }
+
+        if (!canKeyRetry) {
+          await dialogService.markMessageFailed(userMessage.id);
+          // Convert raw 429/5xx into a user-facing message. Для 429 — все ключи
+          // в throttle, юзеру стоит попробовать позже. Для 5xx — провайдер
+          // отдаёт transient ошибку ("server is currently being maintained,
+          // please try again later" и т.п.), пользы от raw stack trace ноль.
+          // Оригинальный err идёт через cause — notifyTechError развернёт его.
+          if (cls.isRateLimit || is5xx) {
+            const reason = cls.isRateLimit ? "Rate-limited" : "5xx error";
+            throw new UserFacingError(`${reason} on ${keyProvider}`, {
+              key: "modelTemporarilyUnavailable",
+              params: { modelName: model?.name ?? dialog.modelId },
+              notifyOps: true,
+              cause: err,
+            });
+          }
+          throw err;
+        }
+
+        // Try next key from the pool (already-throttled keys excluded).
+        let nextAcquired;
+        try {
+          nextAcquired = await acquireKey(keyProvider);
+        } catch (poolErr) {
+          if (isPoolExhaustedError(poolErr)) {
+            // Все ключи throttled — terminal failure для текущего цикла.
+            await dialogService.markMessageFailed(userMessage.id);
+            if (cls.isRateLimit || is5xx) {
+              const reason = cls.isRateLimit ? "Rate-limited" : "5xx error";
+              throw new UserFacingError(`${reason} on ${keyProvider}`, {
+                key: "modelTemporarilyUnavailable",
+                params: { modelName: model?.name ?? dialog.modelId },
+                notifyOps: true,
+                cause: err,
+              });
+            }
+            throw err;
+          }
+          throw poolErr;
+        }
 
         logger.warn(
-          { dialogId, modelId: dialog.modelId },
-          "chat.sendMessageStream: provider context overflow — retrying with full history",
+          {
+            dialogId,
+            modelId: dialog.modelId,
+            prevKey: acquiredKeyId,
+            newKey: nextAcquired.keyId,
+            reason: cls.isRateLimit ? "rate_limit" : "5xx",
+          },
+          "chat.sendMessageStream: retrying with fallback key",
         );
-        const history = await dialogService.getHistory(dialogId, 1000);
-        const augmented = await Promise.all(
-          history.map((m) =>
-            augmentHistoryMessage(m, model?.supportsDocuments === true, extractCache),
-          ),
-        );
-        const retryInput: LLMInput = {
-          ...input,
-          history: augmented,
-          previousResponseId: undefined,
-        };
-        yield* runStream(retryInput);
-      }
-    } catch (err) {
-      // Per-key metrics + throttle on 429-class errors. We only attribute when
-      // the pool actually gave us a DB-tracked key (env-fallback yields keyId=null).
-      const cls = classifyRateLimit(err, keyProvider);
-      if (acquiredKeyId) {
-        if (cls.isRateLimit) {
-          void markRateLimited(acquiredKeyId, cls.cooldownMs, cls.reason);
-        } else {
-          void recordError(acquiredKeyId, err instanceof Error ? err.message : String(err));
+
+        // Switch state. previousResponseId привязан к старому ключу (другая
+        // OpenAI org) — дропаем и шлём полную историю.
+        acquired = nextAcquired;
+        acquiredKeyId = nextAcquired.keyId;
+        adapter = createLLMAdapter(dialog.modelId, nextAcquired);
+
+        if (input.previousResponseId !== undefined) {
+          const history = await dialogService.getHistory(dialogId, adapter.contextMaxMessages);
+          const augmented = await Promise.all(
+            history.map((m) =>
+              augmentHistoryMessage(m, model?.supportsDocuments === true, extractCache),
+            ),
+          );
+          input = { ...input, history: augmented, previousResponseId: undefined };
         }
+
+        keyAttempt++;
       }
-      await dialogService.markMessageFailed(userMessage.id);
-      // Convert raw 429 into a user-facing message; pool selection already gave us
-      // the best available key, so a 429 here means the picked key is now also
-      // throttled — the user can retry shortly and a different key may be free.
-      if (cls.isRateLimit) {
-        // Оригинальный err (raw 429 + body провайдера) пробрасываем через cause —
-        // notifyTechError развернёт его через `caused by:` в alert'е, чтобы
-        // on-call видел не «Rate-limited on kie», а реальный response от провайдера.
-        throw new UserFacingError(`Rate-limited on ${keyProvider}`, {
-          key: "modelTemporarilyUnavailable",
-          params: { modelName: model?.name ?? dialog.modelId },
-          notifyOps: true,
-          cause: err,
-        });
-      }
-      throw err;
     }
 
     if (acquiredKeyId) void recordSuccess(acquiredKeyId);
