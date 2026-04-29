@@ -135,6 +135,13 @@ interface SubmitWithFallbackOptions<T, D extends object> {
   /** User ID для алертов. */
   userId?: string;
   /**
+   * Set provider'ов для пропуска. Используется при poll-stage re-submit'е, когда
+   * primary уже доказал что с ним проблема (KIE 5xx terminal failure) — в новой
+   * BullMQ-задаче submit-stage должен скипнуть его и сразу взять fallback.
+   * Передаётся через `inputData.fallback.attemptedProviders`.
+   */
+  skipProviders?: Set<string>;
+  /**
    * Реальный submit-вызов. Принимает acquired key + модель для инстанцирования
    * адаптера. Должен либо вернуть результат, либо бросить ошибку (PoolExhausted,
    * 429, 5xx, etc.) — НЕ дефёрить и НЕ оборачивать ошибки.
@@ -163,7 +170,12 @@ interface SubmitWithFallbackOptions<T, D extends object> {
 export async function submitWithFallback<T, D extends object>(
   opts: SubmitWithFallbackOptions<T, D>,
 ): Promise<SubmitWithFallbackResult<T>> {
-  const candidates = [opts.primaryModel, ...opts.fallbacks];
+  const allCandidates = [opts.primaryModel, ...opts.fallbacks];
+  // Skip provider'ы из opts.skipProviders (poll-stage re-submit pattern: primary
+  // уже терминально упал, в новой задаче не пробуем его повторно).
+  const candidates = opts.skipProviders
+    ? allCandidates.filter((m) => !opts.skipProviders!.has(m.provider))
+    : allCandidates;
   const attempts: FallbackCandidateAttempt[] = [];
   let lastError: unknown;
   // Минимальный delay из всех кандидатов, готовых defer'нуть. MIN (а не MAX),

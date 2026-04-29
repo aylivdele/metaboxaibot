@@ -99,6 +99,10 @@
       "types": "./src/utils/rate-limit-error.ts",
       "default": "./dist/utils/rate-limit-error.js"
     },
+    "./utils/kie-error": {
+      "types": "./src/utils/kie-error.ts",
+      "default": "./dist/utils/kie-error.js"
+    },
     "./utils/fetch": {
       "types": "./src/utils/fetch.ts",
       "default": "./dist/utils/fetch.js"
