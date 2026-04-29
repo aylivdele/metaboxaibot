@@ -2972,6 +2972,44 @@ textarea::placeholder {
   pointer-events: none;
 }
 
+/* ── Aspect ratio visual preview ─────────────────────────────────────────── */
+
+.ar-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88px;
+  margin-top: 6px;
+}
+
+.ar-preview__frame {
+  width: 104px;
+  height: 70px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ar-preview__rect {
+  border: 1.5px solid var(--accent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  transition:
+    width 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 8px;
+  min-height: 8px;
+}
+
+.ar-preview__auto-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
 /* ── Family cards (image model selection) ─────────────────────────────────── */
 
 .family-card {
