@@ -47,6 +47,29 @@ const ERROR_MAP: Record<string, TranslationKey> = {
   PASSWORD_TOO_SHORT: "linkMetabox.error.passwordTooShort",
 };
 
+// Inline SVG envelope. На macOS Telegram unicode-символ ✉ не рендерится
+// в веб-вьюхе [нет нужного шрифта/глифа], поэтому используем SVG —
+// он одинаково работает на всех платформах.
+function MailIcon({ size = 28 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m22 7-10 5L2 7" />
+    </svg>
+  );
+}
+
 export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Props) {
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("choose");
@@ -72,6 +95,9 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
   // независимо рейт-лимитит [60 сек между, максимум 3 в час].
   const [cooldown, setCooldown] = useState(0);
   const [resentOnce, setResentOnce] = useState(false);
+  // attemptsLeft: null — ещё не запрашивали, число — пришло с сервера.
+  // Когда сервер сказал 0 — лимит исчерпан, кнопку скрываем целиком.
+  const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -129,7 +155,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       // Показываем pending-экран «Проверьте почту», не открываем SSO.
       if ("requiresVerification" in result && result.requiresVerification) {
         setPending({ email: result.email, view: "view" });
-        setPendingMessage("Письмо с подтверждением отправлено.");
+        setPendingMessage(t("linkMetabox.verify.sent"));
         onSuccess?.();
         return;
       }
@@ -199,22 +225,28 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
         // Email уже подтверждён [юзер кликнул по ссылке после того как
         // открыл pending] — закрываем pending-стадию.
         setPending(null);
-        setPendingMessage("Email уже подтверждён. Можно входить на сайте.");
+        setPendingMessage(t("linkMetabox.verify.alreadyVerified"));
         setPendingMessageType("success");
       } else {
-        setPendingMessage("Письмо отправлено. Проверьте почту.");
+        // Просим юзера сразу проверить, что email указан верно — это
+        // частая причина "не пришло письмо": опечатка в адресе.
+        setPendingMessage(t("linkMetabox.verify.sentSuccess"));
         setPendingMessageType("success");
         setResentOnce(true);
         // cooldownSec приходит с сервера, fallback 60.
         setCooldown(result.cooldownSec ?? 60);
       }
+      if (typeof result.attemptsLeft === "number") {
+        setAttemptsLeft(result.attemptsLeft);
+      }
     } catch (err: any) {
       // 429 RATE_LIMITED или другая ошибка
       const retryAfter = err?.retryAfterSec ?? 0;
-      if (err?.code === "RATE_LIMITED" && retryAfter > 0) {
-        setCooldown(retryAfter);
+      if (err?.code === "RATE_LIMITED") {
+        if (retryAfter > 0) setCooldown(retryAfter);
+        if (typeof err?.attemptsLeft === "number") setAttemptsLeft(err.attemptsLeft);
       }
-      setPendingMessage(err?.error || "Не удалось отправить письмо. Попробуйте позже.");
+      setPendingMessage(err?.error || t("linkMetabox.verify.sendError"));
       setPendingMessageType("error");
     } finally {
       setLoading(false);
@@ -232,24 +264,28 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       const result = await api.profile.metaboxChangeEmail(newEmail);
       setPending({ email: result.email, view: "view" });
       setPendingNewEmail("");
-      setPendingMessage(result.warning ?? "Письмо с подтверждением отправлено.");
+      setPendingMessage(result.warning ?? t("linkMetabox.verify.sent"));
       setPendingMessageType(result.warning ? "error" : "success");
       setResentOnce(true);
-      // После change-email сервер сбросил счётчик попыток, но cooldown
-      // на одно письмо мы всё равно показываем чтобы юзер не кликал часто.
+      // После change-email сервер сбросил счётчик попыток. Возвращаем
+      // attemptsLeft в "неизвестное" состояние [null], чтобы кнопка
+      // resend снова показалась — лимит на этого юзера в новом окне.
+      setAttemptsLeft(null);
+      // Cooldown на одно письмо всё равно показываем — чтобы юзер не
+      // кликал часто и не плодил writes на SMTP.
       setCooldown(60);
     } catch (err: any) {
       const code = err?.code;
       if (code === "EMAIL_EXISTS") {
-        setError("Этот email уже занят другим аккаунтом");
+        setError(t("linkMetabox.changeEmail.error.exists"));
       } else if (code === "SAME_EMAIL") {
-        setError("Это тот же email что был указан");
+        setError(t("linkMetabox.changeEmail.error.same"));
       } else if (code === "INVALID_EMAIL") {
-        setError("Некорректный формат email");
+        setError(t("linkMetabox.changeEmail.error.invalid"));
       } else if (code === "ALREADY_VERIFIED") {
-        setError("Email уже подтверждён, изменение через этот flow недоступно");
+        setError(t("linkMetabox.changeEmail.error.alreadyVerified"));
       } else {
-        setError(err?.error || "Не удалось сменить email");
+        setError(err?.error || t("linkMetabox.changeEmail.error.generic"));
       }
     } finally {
       setLoading(false);
@@ -268,29 +304,23 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       {pending && pending.view === "view" && (
         <div className="verify-card">
           <div className="verify-card__icon" aria-hidden>
-            ✉
+            <MailIcon size={28} />
           </div>
 
-          <h3 className="verify-card__title">Подтвердите email</h3>
+          <h3 className="verify-card__title">{t("linkMetabox.verify.title")}</h3>
 
-          <p className="verify-card__subtitle">
-            Мы отправили письмо со ссылкой для подтверждения на адрес:
-          </p>
+          <p className="verify-card__subtitle">{t("linkMetabox.verify.subtitle")}</p>
 
           <div className="verify-card__email-badge">
             <span className="verify-card__email-icon" aria-hidden>
-              ✉
+              <MailIcon size={14} />
             </span>
             <span className="verify-card__email-text">{pending.email}</span>
           </div>
 
-          <p className="verify-card__subtitle">
-            Перейдите по ссылке в письме, затем войдите на сайте по email и паролю.
-          </p>
+          <p className="verify-card__subtitle">{t("linkMetabox.verify.followLink")}</p>
 
-          <div className="verify-card__hint">
-            Не получили письмо? Проверьте папку «Спам» или запросите повторную отправку ниже.
-          </div>
+          <div className="verify-card__hint">{t("linkMetabox.verify.checkSpam")}</div>
 
           {pendingMessage && (
             <div className={`verify-card__alert verify-card__alert--${pendingMessageType}`}>
@@ -300,19 +330,28 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
 
           {error && <div className="form-error">{error}</div>}
 
-          <button
-            className="primary-btn"
-            onClick={() => void handleResend()}
-            disabled={loading || cooldown > 0}
-          >
-            {loading
-              ? t("common.loading")
-              : cooldown > 0
-                ? `Повторно через ${cooldown} с`
-                : resentOnce
-                  ? "Отправить ещё раз"
-                  : "Отправить повторно"}
-          </button>
+          {attemptsLeft === 0 ? (
+            // Лимит resend исчерпан — кнопку убираем целиком, оставляем
+            // только подсказку и опцию изменить email [через "Изменить почту"
+            // ниже сервер сбросит счётчик].
+            <div className="verify-card__alert verify-card__alert--info">
+              {t("linkMetabox.verify.limitExhausted")}
+            </div>
+          ) : (
+            <button
+              className="primary-btn"
+              onClick={() => void handleResend()}
+              disabled={loading || cooldown > 0}
+            >
+              {loading
+                ? t("common.loading")
+                : cooldown > 0
+                  ? t("linkMetabox.verify.resendCooldown").replace("{n}", String(cooldown))
+                  : resentOnce
+                    ? t("linkMetabox.verify.resendAgain")
+                    : t("linkMetabox.verify.resend")}
+            </button>
+          )}
 
           <button
             className="secondary-btn"
@@ -324,7 +363,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
             }}
             disabled={loading}
           >
-            Изменить почту
+            {t("linkMetabox.verify.changeEmail")}
           </button>
         </div>
       )}
@@ -332,17 +371,15 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       {pending && pending.view === "change" && (
         <div className="verify-card">
           <div className="verify-card__icon" aria-hidden>
-            ✉
+            <MailIcon size={28} />
           </div>
 
-          <h3 className="verify-card__title">Изменить email</h3>
+          <h3 className="verify-card__title">{t("linkMetabox.changeEmail.title")}</h3>
 
-          <p className="verify-card__subtitle">
-            Введите новый адрес — мы заменим его в системе и отправим письмо с подтверждением.
-          </p>
+          <p className="verify-card__subtitle">{t("linkMetabox.changeEmail.subtitle")}</p>
 
           <div className="form-field">
-            <label className="form-label">Новый email</label>
+            <label className="form-label">{t("linkMetabox.changeEmail.label")}</label>
             <input
               className="form-input"
               type="email"
@@ -360,7 +397,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
             onClick={() => void handleChangeEmailSubmit()}
             disabled={loading || !pendingNewEmail.trim()}
           >
-            {loading ? t("common.loading") : "Сохранить и отправить письмо"}
+            {loading ? t("common.loading") : t("linkMetabox.changeEmail.save")}
           </button>
           <button
             className="secondary-btn"
