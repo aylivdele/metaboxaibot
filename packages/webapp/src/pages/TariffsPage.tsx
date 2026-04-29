@@ -329,7 +329,13 @@ export function TariffsPage({ profile, onLinkMetabox }: TariffsProps) {
                     style={locked ? { cursor: "not-allowed" } : undefined}
                     title={locked ? t("tariffs.pkgLockedTitle") : undefined}
                   >
-                    {locked ? t("tariffs.pkgLockedBtn") : t("tariffs.buy")}
+                    {/* В locked-состоянии оставляем короткий лейбл «Купить»,
+                        чтобы не разносить layout карточки длинным текстом
+                        вроде «Нужна подписка». disabled + opacity 0.5
+                        в .plan-card__btn:disabled и так визуально показывают,
+                        что кнопка неактивна; причину объясняет title-тултип
+                        и плашка pkgLockedNote выше. */}
+                    {t("tariffs.buy")}
                   </button>
                 </div>
               );
