@@ -2245,7 +2245,7 @@ textarea::placeholder {
 
 /* ── Image Lightbox ─────────────────────────────────────────────────────────── */
 .gallery-lightbox-overlay {
-  background: rgba(0, 0, 0, 0.92);
+  background: rgba(0, 0, 0, 0.96);
   padding: 16px;
 }
 .gallery-lightbox {
@@ -2255,6 +2255,9 @@ textarea::placeholder {
   max-width: min(92vw, 700px);
   width: 100%;
   gap: 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  padding: 14px;
   animation: fadeInScale 0.15s ease;
 }
 .gallery-lightbox__header {
@@ -2272,7 +2275,7 @@ textarea::placeholder {
 }
 .gallery-lightbox__img {
   max-width: 100%;
-  max-height: calc(90vh - 110px);
+  max-height: calc(90vh - 150px);
   object-fit: contain;
   border-radius: var(--radius);
   display: block;
