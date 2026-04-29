@@ -52,6 +52,9 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
     siteMentor: { name: string; contact: string };
     botMentor: { name: string; contact: string };
   } | null>(null);
+  // После успешной регистрации [когда email требует подтверждения]
+  // показываем экран «Проверьте почту» и НЕ открываем SSO авто-логин.
+  const [verificationSent, setVerificationSent] = useState<{ email: string } | null>(null);
 
   const submit = async () => {
     if (!email.trim() || !password) return;
@@ -74,9 +77,21 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
               username ?? undefined,
             )
           : await api.profile.metaboxLogin(email.trim(), password);
-      openSso(result.ssoUrl);
-      onSuccess?.();
-      onBack();
+
+      // При регистрации backend может вернуть requiresVerification — это
+      // значит письмо с подтверждением отправлено, SSO-логин НЕ выдан.
+      // Показываем экран «Проверьте почту», не пытаемся открывать SSO.
+      if ("requiresVerification" in result && result.requiresVerification) {
+        setVerificationSent({ email: result.email });
+        onSuccess?.();
+        return;
+      }
+
+      if ("ssoUrl" in result && result.ssoUrl) {
+        openSso(result.ssoUrl);
+        onSuccess?.();
+        onBack();
+      }
     } catch (err: any) {
       const code = err?.code;
       const supportTg = import.meta.env.VITE_SUPPORT_TG ?? "metaboxsupport";
@@ -134,7 +149,19 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
         <h2>{t("linkMetabox.title")}</h2>
       </div>
 
-      {mode === "choose" && (
+      {verificationSent && (
+        <div className="link-metabox-verification">
+          <p className="page-subtitle">
+            Аккаунт создан. На <b>{verificationSent.email}</b> отправлено письмо с подтверждением.
+            Перейдите по ссылке из письма, затем войдите на сайте по своим email и паролю.
+          </p>
+          <button className="primary-btn" onClick={onBack}>
+            {t("common.back")}
+          </button>
+        </div>
+      )}
+
+      {!verificationSent && mode === "choose" && (
         <div className="link-metabox-choose">
           <p className="page-subtitle">{t("linkMetabox.subtitle")}</p>
           <button className="primary-btn" onClick={() => setMode("register")}>
@@ -146,7 +173,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
         </div>
       )}
 
-      {(mode === "register" || mode === "login") && (
+      {!verificationSent && (mode === "register" || mode === "login") && (
         <div className="link-metabox-form">
           <p className="page-subtitle">
             {mode === "register" ? t("linkMetabox.registerHint") : t("linkMetabox.loginHint")}

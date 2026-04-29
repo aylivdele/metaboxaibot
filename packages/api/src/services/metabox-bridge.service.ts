@@ -110,9 +110,15 @@ export interface MergedAccountInfo {
 
 export interface RegisterFromBotResult {
   metaboxUserId: string;
-  ssoToken: string;
+  /** Только если аккаунт уже верифицирован [STAGE_MODE]. В обычном
+   * режиме email требует подтверждения, токена не будет. */
+  ssoToken?: string;
   referralCode: string;
   mergedFrom?: MergedAccountInfo;
+  /** Если true — пользователю отправлено письмо с подтверждением,
+   * SSO-логин не выдан. Юзер должен подтвердить email и войти вручную. */
+  requiresVerification?: boolean;
+  email?: string;
 }
 
 /** Register a new Metabox user from the bot (email + password). */

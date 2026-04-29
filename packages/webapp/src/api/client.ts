@@ -138,7 +138,10 @@ export const api = {
       lastName?: string,
       username?: string,
     ) =>
-      request<{ ssoUrl: string }>("/profile/metabox-register", {
+      request<
+        | { ssoUrl: string; requiresVerification?: undefined }
+        | { ssoUrl?: undefined; requiresVerification: true; email: string }
+      >("/profile/metabox-register", {
         method: "POST",
         body: JSON.stringify({ email, password, firstName, lastName, username }),
       }),

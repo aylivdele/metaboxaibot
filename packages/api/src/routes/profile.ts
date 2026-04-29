@@ -204,6 +204,18 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: userId },
         data: { metaboxUserId: result.metaboxUserId, metaboxReferralCode: result.referralCode },
       });
+
+      // Если на сайте email НЕ подтверждён — не выдаём ssoUrl. Юзер
+      // должен сначала кликнуть по верификационной ссылке в письме и
+      // затем войти на сайте вручную. Иначе любой, кто получил bot-
+      // session, сразу логинился бы в metabox без верификации почты.
+      if (result.requiresVerification) {
+        return {
+          requiresVerification: true,
+          email: result.email ?? email,
+        };
+      }
+
       const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
       return { ssoUrl: `${metaboxUrl}/auth/sso?token=${result.ssoToken}` };
     } catch (err) {
