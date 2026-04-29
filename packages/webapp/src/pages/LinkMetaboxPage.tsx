@@ -64,7 +64,20 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
   const [pending, setPending] = useState<PendingState | null>(null);
   const [pendingNewEmail, setPendingNewEmail] = useState("");
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [pendingMessageType, setPendingMessageType] = useState<"info" | "success" | "error">(
+    "info",
+  );
   const [statusLoading, setStatusLoading] = useState(true);
+  // Cooldown между resend-попытками. Отсчёт идёт на UI, а сервер
+  // независимо рейт-лимитит [60 сек между, максимум 3 в час].
+  const [cooldown, setCooldown] = useState(0);
+  const [resentOnce, setResentOnce] = useState(false);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [cooldown]);
 
   // На монтировании проверяем — может юзер уже зарегистрировался ранее
   // и должен видеть pending-экран сразу [не choose].
@@ -176,22 +189,33 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
 
   const handleResend = async () => {
     if (!pending) return;
+    if (cooldown > 0) return;
     setLoading(true);
     setPendingMessage(null);
+    setPendingMessageType("info");
     try {
       const result = await api.profile.metaboxResendVerification();
       if (result.alreadyVerified) {
-        setPendingMessage("Email уже подтверждён.");
-        // Перезагрузить — после verification попадём в основной flow.
-        const status = await api.profile.metaboxStatus();
-        if (status.linked && status.emailVerified) {
-          setPending(null);
-        }
+        // Email уже подтверждён [юзер кликнул по ссылке после того как
+        // открыл pending] — закрываем pending-стадию.
+        setPending(null);
+        setPendingMessage("Email уже подтверждён. Можно входить на сайте.");
+        setPendingMessageType("success");
       } else {
-        setPendingMessage(`Письмо отправлено повторно на ${result.email}.`);
+        setPendingMessage("Письмо отправлено. Проверьте почту.");
+        setPendingMessageType("success");
+        setResentOnce(true);
+        // cooldownSec приходит с сервера, fallback 60.
+        setCooldown(result.cooldownSec ?? 60);
       }
     } catch (err: any) {
+      // 429 RATE_LIMITED или другая ошибка
+      const retryAfter = err?.retryAfterSec ?? 0;
+      if (err?.code === "RATE_LIMITED" && retryAfter > 0) {
+        setCooldown(retryAfter);
+      }
       setPendingMessage(err?.error || "Не удалось отправить письмо. Попробуйте позже.");
+      setPendingMessageType("error");
     } finally {
       setLoading(false);
     }
@@ -208,7 +232,12 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       const result = await api.profile.metaboxChangeEmail(newEmail);
       setPending({ email: result.email, view: "view" });
       setPendingNewEmail("");
-      setPendingMessage(result.warning ?? `Письмо с подтверждением отправлено на ${result.email}.`);
+      setPendingMessage(result.warning ?? "Письмо с подтверждением отправлено.");
+      setPendingMessageType(result.warning ? "error" : "success");
+      setResentOnce(true);
+      // После change-email сервер сбросил счётчик попыток, но cooldown
+      // на одно письмо мы всё равно показываем чтобы юзер не кликал часто.
+      setCooldown(60);
     } catch (err: any) {
       const code = err?.code;
       if (code === "EMAIL_EXISTS") {
@@ -237,21 +266,54 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       </div>
 
       {pending && pending.view === "view" && (
-        <div className="link-metabox-verification">
-          <p className="page-subtitle">
-            Email <b>{pending.email}</b> ещё не подтверждён. Мы отправили вам письмо со ссылкой
-            подтверждения. Откройте письмо и перейдите по ссылке, затем войдите на сайте по email и
-            паролю.
+        <div className="verify-card">
+          <div className="verify-card__icon" aria-hidden>
+            ✉
+          </div>
+
+          <h3 className="verify-card__title">Подтвердите email</h3>
+
+          <p className="verify-card__subtitle">
+            Мы отправили письмо со ссылкой для подтверждения на адрес:
           </p>
+
+          <div className="verify-card__email-badge">
+            <span className="verify-card__email-icon" aria-hidden>
+              ✉
+            </span>
+            <span className="verify-card__email-text">{pending.email}</span>
+          </div>
+
+          <p className="verify-card__subtitle">
+            Перейдите по ссылке в письме, затем войдите на сайте по email и паролю.
+          </p>
+
+          <div className="verify-card__hint">
+            Не получили письмо? Проверьте папку «Спам» или запросите повторную отправку ниже.
+          </div>
+
           {pendingMessage && (
-            <p className="page-subtitle" style={{ color: "var(--color-success)" }}>
+            <div className={`verify-card__alert verify-card__alert--${pendingMessageType}`}>
               {pendingMessage}
-            </p>
+            </div>
           )}
+
           {error && <div className="form-error">{error}</div>}
-          <button className="primary-btn" onClick={() => void handleResend()} disabled={loading}>
-            {loading ? t("common.loading") : "Отправить повторно"}
+
+          <button
+            className="primary-btn"
+            onClick={() => void handleResend()}
+            disabled={loading || cooldown > 0}
+          >
+            {loading
+              ? t("common.loading")
+              : cooldown > 0
+                ? `Повторно через ${cooldown} с`
+                : resentOnce
+                  ? "Отправить ещё раз"
+                  : "Отправить повторно"}
           </button>
+
           <button
             className="secondary-btn"
             onClick={() => {
@@ -268,10 +330,15 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
       )}
 
       {pending && pending.view === "change" && (
-        <div className="link-metabox-form">
-          <p className="page-subtitle">
-            Введите новый email — мы перезапишем его в системе и отправим новое письмо с
-            подтверждением.
+        <div className="verify-card">
+          <div className="verify-card__icon" aria-hidden>
+            ✉
+          </div>
+
+          <h3 className="verify-card__title">Изменить email</h3>
+
+          <p className="verify-card__subtitle">
+            Введите новый адрес — мы заменим его в системе и отправим письмо с подтверждением.
           </p>
 
           <div className="form-field">

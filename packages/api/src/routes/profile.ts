@@ -26,6 +26,89 @@ type AuthRequest = FastifyRequest & {
   };
 };
 
+// ── Rate limit для metabox-resend-verification ────────────────────────────
+// Хранится в памяти процесса. При рестарте бота сбрасывается — это OK.
+const RESEND_MAX_ATTEMPTS = 3;
+const RESEND_COOLDOWN_SEC = 60;
+const RESEND_WINDOW_MS = 60 * 60 * 1000; // окно учёта 1 час
+
+interface ResendState {
+  attempts: number;
+  lastAttemptAt: number;
+  windowStartedAt: number;
+}
+const resendState = new Map<string, ResendState>();
+
+function getResendAttempts(userId: bigint): number {
+  return resendState.get(userId.toString())?.attempts ?? 0;
+}
+
+function checkResendLimit(userId: bigint): {
+  allowed: boolean;
+  reason?: string;
+  retryAfterSec?: number;
+  attemptsLeft?: number;
+} {
+  const key = userId.toString();
+  const now = Date.now();
+  const state = resendState.get(key);
+
+  if (!state) {
+    return { allowed: true, attemptsLeft: RESEND_MAX_ATTEMPTS };
+  }
+
+  // Окно протекло — лимит сбрасывается при следующей попытке.
+  if (now - state.windowStartedAt > RESEND_WINDOW_MS) {
+    return { allowed: true, attemptsLeft: RESEND_MAX_ATTEMPTS };
+  }
+
+  // Превышен общий лимит в окне.
+  if (state.attempts >= RESEND_MAX_ATTEMPTS) {
+    const retryAfterMs = RESEND_WINDOW_MS - (now - state.windowStartedAt);
+    return {
+      allowed: false,
+      reason: "Превышен лимит повторных отправок. Попробуйте позже.",
+      retryAfterSec: Math.ceil(retryAfterMs / 1000),
+      attemptsLeft: 0,
+    };
+  }
+
+  // Cooldown между отправками.
+  const sinceLast = now - state.lastAttemptAt;
+  if (sinceLast < RESEND_COOLDOWN_SEC * 1000) {
+    return {
+      allowed: false,
+      reason: "Подождите перед повторной отправкой.",
+      retryAfterSec: Math.ceil((RESEND_COOLDOWN_SEC * 1000 - sinceLast) / 1000),
+      attemptsLeft: RESEND_MAX_ATTEMPTS - state.attempts,
+    };
+  }
+
+  return { allowed: true, attemptsLeft: RESEND_MAX_ATTEMPTS - state.attempts };
+}
+
+function recordResendAttempt(userId: bigint): void {
+  const key = userId.toString();
+  const now = Date.now();
+  const state = resendState.get(key);
+
+  if (!state || now - state.windowStartedAt > RESEND_WINDOW_MS) {
+    resendState.set(key, {
+      attempts: 1,
+      lastAttemptAt: now,
+      windowStartedAt: now,
+    });
+    return;
+  }
+
+  state.attempts += 1;
+  state.lastAttemptAt = now;
+}
+
+function resetResendLimit(userId: bigint): void {
+  resendState.delete(userId.toString());
+}
+
 export const profileRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", telegramAuthHook);
 
@@ -218,6 +301,11 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * POST /profile/metabox-resend-verification — заново отправить
    * verification-email на текущий адрес.
+   *
+   * Rate limit: максимум RESEND_MAX_ATTEMPTS отправок в час, между
+   * отправками минимум RESEND_COOLDOWN_SEC секунд. Защита от спама
+   * на стороне бота — иначе юзер мог бы задрачить кнопку и завалить
+   * SMTP-провайдера / попасть в спам-листы.
    */
   fastify.post("/profile/metabox-resend-verification", async (request, reply) => {
     const { userId } = request as AuthRequest;
@@ -228,10 +316,31 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     if (!user?.metaboxUserId) {
       return reply.code(409).send({ error: "Metabox account not linked" });
     }
+
+    const check = checkResendLimit(userId);
+    if (!check.allowed) {
+      return reply.code(429).send({
+        code: "RATE_LIMITED",
+        error: check.reason,
+        retryAfterSec: check.retryAfterSec,
+        attemptsLeft: check.attemptsLeft,
+      });
+    }
+
     const { resendMetaboxVerification } = await import("../services/metabox-bridge.service.js");
     try {
       const result = await resendMetaboxVerification(user.metaboxUserId);
-      return result;
+      // Если main-app сказал что email уже подтверждён — лимит не списываем.
+      if (!result.alreadyVerified) {
+        recordResendAttempt(userId);
+      }
+      return {
+        ...result,
+        attemptsLeft: result.alreadyVerified
+          ? RESEND_MAX_ATTEMPTS
+          : Math.max(0, RESEND_MAX_ATTEMPTS - getResendAttempts(userId)),
+        cooldownSec: RESEND_COOLDOWN_SEC,
+      };
     } catch (err) {
       if (err instanceof MetaboxApiError) {
         return reply.code(err.status).send({ error: err.body, code: err.code });
@@ -261,6 +370,9 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     const { changeMetaboxEmailPending } = await import("../services/metabox-bridge.service.js");
     try {
       const result = await changeMetaboxEmailPending(user.metaboxUserId, newEmail);
+      // Сбрасываем resend-лимит — у юзера новый адрес, начинаем счётчик
+      // заново [иначе он бы сразу упёрся в потолок старых попыток].
+      resetResendLimit(userId);
       return result;
     } catch (err) {
       if (err instanceof MetaboxApiError) {

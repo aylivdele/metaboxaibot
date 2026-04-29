@@ -4603,3 +4603,117 @@ textarea::placeholder {
   background: var(--input-bg, var(--card-bg));
   color: var(--text-primary);
 }
+
+/* ── Email verification card (LinkMetaboxPage pending state) ─────────────
+   Копирует структуру с сайта: центрированная карточка с иконкой-конвертом,
+   email-бейдж, желтая плашка-подсказка про спам, primary/secondary кнопки. */
+
+.verify-card {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 28px 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  text-align: center;
+}
+
+.verify-card__icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 4px;
+  border-radius: 50%;
+  background: var(--accent-lighter);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.verify-card__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.verify-card__subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.verify-card__email-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.verify-card__email-icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.verify-card__hint {
+  padding: 12px 14px;
+  background: rgba(245, 197, 73, 0.1);
+  border: 1px solid rgba(245, 197, 73, 0.3);
+  border-radius: 12px;
+  color: #f5c549;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.verify-card__alert {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.verify-card__alert--success {
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  color: #6ee7a3;
+}
+
+.verify-card__alert--info {
+  background: var(--accent-lighter);
+  border: 1px solid rgba(74, 141, 245, 0.3);
+  color: var(--accent-light);
+}
+
+.verify-card__alert--error {
+  background: rgba(224, 92, 92, 0.1);
+  border: 1px solid rgba(224, 92, 92, 0.3);
+  color: #ec7373;
+}
+
+.verify-card .form-field {
+  text-align: left;
+  margin: 0;
+}
+
+.verify-card .primary-btn,
+.verify-card .secondary-btn {
+  width: 100%;
+}

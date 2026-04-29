@@ -140,10 +140,13 @@ export const api = {
         "/profile/metabox-status",
       ),
     metaboxResendVerification: () =>
-      request<{ ok: boolean; email: string; alreadyVerified?: boolean }>(
-        "/profile/metabox-resend-verification",
-        { method: "POST" },
-      ),
+      request<{
+        ok: boolean;
+        email: string;
+        alreadyVerified?: boolean;
+        attemptsLeft?: number;
+        cooldownSec?: number;
+      }>("/profile/metabox-resend-verification", { method: "POST" }),
     metaboxChangeEmail: (newEmail: string) =>
       request<{ ok: boolean; email: string; warning?: string }>("/profile/metabox-change-email", {
         method: "POST",

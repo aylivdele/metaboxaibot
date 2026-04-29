@@ -140,11 +140,14 @@ export async function registerFromBot(params: {
 
 /** Получить статус metabox-юзера: email + emailVerified.
  *  Используется ботом чтобы решить — звать SSO или показать
- *  «Подтвердите почту» pending-экран. */
+ *  «Подтвердите почту» pending-экран.
+ *
+ *  ВАЖНО: helper get() добавляет префикс /api, а нам нужен /api/internal —
+ *  поэтому путь начинаем с /internal. */
 export async function getMetaboxUserStatus(
   metaboxUserId: string,
 ): Promise<{ email: string; emailVerified: boolean; name: string }> {
-  return get(`/user-status?metaboxUserId=${encodeURIComponent(metaboxUserId)}`);
+  return get(`/internal/user-status?metaboxUserId=${encodeURIComponent(metaboxUserId)}`);
 }
 
 /** Перевыпустить verification email — старый не дошёл, юзер потерял или
