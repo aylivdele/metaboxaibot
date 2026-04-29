@@ -168,11 +168,11 @@ export default {
     promptRefElementMissing:
       "❌ В промпте есть @Element{n}, но слот «Элемент {n}» не заполнен. Загрузите изображение в этот слот или уберите ссылку из промпта.",
     promptRefElementOutOfRange:
-      "❌ @Element{n}: эта модель поддерживает максимум {max} элемент(а/ов). Используйте @Element1..@Element{max}.",
+      "❌ @Element{n}: эта модель поддерживает максимум {max} {elementWord}. Используйте @Element1..@Element{max}.",
     promptRefImageMissing:
       "❌ В промпте есть @Image{n}, но {n}-е референсное изображение не загружено. Добавьте изображение в слот или уберите ссылку.",
     promptRefImageOutOfRange:
-      "❌ @Image{n}: эта модель поддерживает максимум {max} референсных изображений. Используйте @Image1..@Image{max}.",
+      "❌ @Image{n}: эта модель поддерживает максимум {max} {imageWord}. Используйте @Image1..@Image{max}.",
     promptRefVideoMissing:
       "❌ В промпте есть @Video, но референсное видео не загружено. Добавьте видео в соответствующий слот или уберите @Video из промпта.",
     promptRefVideoIndexed:

@@ -638,9 +638,32 @@ export async function handleVideoMediaInputRemove(ctx: BotContext): Promise<void
 
 // ── Incoming prompt in VIDEO_ACTIVE state ─────────────────────────────────────
 
-function applyValidationParams(msg: string, params?: Record<string, string | number>): string {
+function ruPlural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+  return many;
+}
+
+function applyValidationParams(
+  msg: string,
+  params?: Record<string, string | number>,
+  lang?: string,
+): string {
   if (!params) return msg;
-  return Object.entries(params).reduce((s, [k, v]) => s.replaceAll(`{${k}}`, String(v)), msg);
+  const enriched: Record<string, string | number> = { ...params };
+  if (lang === "ru" && params.max !== undefined) {
+    const max = Number(params.max);
+    enriched.elementWord = ruPlural(max, "элемент", "элемента", "элементов");
+    enriched.imageWord = ruPlural(
+      max,
+      "референсное изображение",
+      "референсных изображения",
+      "референсных изображений",
+    );
+  }
+  return Object.entries(enriched).reduce((s, [k, v]) => s.replaceAll(`{${k}}`, String(v)), msg);
 }
 
 /**
@@ -711,6 +734,7 @@ export async function executeVideoPrompt(
       applyValidationParams(
         ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string,
         validationError.params,
+        ctx.user.language,
       ),
     );
     return;
@@ -1113,6 +1137,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
         applyValidationParams(
           ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string,
           validationError.params,
+          ctx.user.language,
         ),
       );
       return;
@@ -1626,6 +1651,7 @@ export async function handleVideoAvatarVoiceCallback(ctx: BotContext): Promise<v
       applyValidationParams(
         ctx.t.video[validationError.key as keyof typeof ctx.t.video] as string,
         validationError.params,
+        ctx.user.language,
       ),
     );
     return;
