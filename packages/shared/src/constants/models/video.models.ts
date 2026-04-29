@@ -231,7 +231,6 @@ const KLING_SETTINGS: ModelSettingDef[] = [
 ];
 
 export const VIDEO_MODELS: Record<string, AIModel> = {
-  // ── Видео ─────────────────────────────────────────────────────────────────
   kling: {
     id: "kling",
     name: "🎥 Kling 3.0",
@@ -262,7 +261,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
-
   "kling-pro": {
     id: "kling-pro",
     name: "🎥 Kling 3.0 Pro",
@@ -293,7 +291,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     durationRange: { min: 3, max: 15 },
     settings: [...KLING_SETTINGS],
   },
-
   "kling-motion": {
     id: "kling-motion",
     name: "🎥 Kling Motion",
@@ -317,7 +314,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     mediaInputs: KLING_MOTION_MEDIA_INPUTS,
     settings: [...KLING_MOTION_SETTINGS],
   },
-
   "kling-motion-pro": {
     id: "kling-motion-pro",
     name: "🎥 Kling Motion Pro",
@@ -341,16 +337,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     mediaInputs: KLING_MOTION_MEDIA_INPUTS,
     settings: [...KLING_MOTION_SETTINGS],
   },
-
-  // Seedance 1.5 Pro — primary через evolink (был FAL, перенесён в FALLBACK_VIDEO_MODELS).
-  // Pricing (per-second × quality × generate_audio):
-  //   480p:  $0.012/s (audio off), $0.024/s (audio on)
-  //   720p:  $0.026/s (audio off), $0.052/s (audio on)
-  //   1080p: $0.058/s (audio off), $0.117/s (audio on)
-  //
-  // Mode auto-detected on evolink stороне по image_urls count:
-  //   0 images → text-to-video, 1 image → image-to-video, 2 images → first-last-frame.
-  // EvolinkVideoAdapter формирует image_urls из first_frame[0] (+ last_frame[0]).
   seedance: {
     id: "seedance",
     name: "💃 Seedance 1.5 Pro (ByteDance)",
@@ -411,22 +397,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
-  // Seedance 2.0 — primary через evolink (был KIE, перенесён в FALLBACK_VIDEO_MODELS).
-  // Pricing per evolink (per-second × quality, без аудио-фактора — audio free):
-  //   - Standard 480p:  $0.092/s (no video) | $0.056/s (with video)
-  //   - Standard 720p:  $0.199/s | $0.121/s
-  //   - Standard 1080p: $0.496/s | $0.302/s
-  //   - Fast 480p:      $0.075/s | $0.045/s
-  //   - Fast 720p:      $0.161/s | $0.096/s
-  // Web search: +$0.0006/request (только в t2v режиме).
-  //
-  // costUsdPerSecond + costVariants по resolution отражают NO-VIDEO случай —
-  // это default preview в mini-app. Когда у задачи есть `ref_videos`, video
-  // processor применяет custom billing override:
-  //   - Используется with-video rate (ниже базового)
-  //   - effectiveDuration = output + max(input_total, output)
-  // См. video.processor.ts SEEDANCE2_RATES_WITH_VIDEO.
   "seedance-2": {
     id: "seedance-2",
     name: "💃 Seedance 2.0 (ByteDance)",
@@ -502,7 +472,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
   "seedance-2-fast": {
     id: "seedance-2-fast",
     name: "💃 Seedance 2.0 Fast (ByteDance)",
@@ -572,7 +541,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
   "higgsfield-lite": {
     id: "higgsfield-lite",
     name: "🎬 Higgsfield Lite",
@@ -625,7 +593,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
   higgsfield: {
     id: "higgsfield",
     name: "🎬 Higgsfield Turbo",
@@ -678,7 +645,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
   "higgsfield-preview": {
     id: "higgsfield-preview",
     name: "🎬 Higgsfield Preview",
@@ -733,353 +699,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
-  "grok-imagine": {
-    id: "grok-imagine",
-    name: "🔮 Grok Imagine",
-    description:
-      "Видеомодель от xAI (Grok). Text-to-video и image-to-video с длительностью 6–30 секунд. Поддержка до 7 входных изображений — ссылайтесь на них в промпте через @Image1, @Image2 и т.д.",
-    section: "video",
-    provider: "kie",
-    // Resolution-based: 480p $0.008/s, 720p $0.015/s
-    costUsdPerRequest: 0,
-    costUsdPerSecond: 0.008,
-    costVariants: {
-      settingKey: "resolution",
-      map: {
-        "480p": { costUsdPerSecond: 0.008 },
-        "720p": { costUsdPerSecond: 0.015 },
-      },
-    },
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    mediaInputs: [MI_GROK_IMAGINE_REFS],
-    promptRefs: { images: { max: 7 } },
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["2:3", "3:2", "1:1", "16:9", "9:16"],
-    durationRange: { min: 6, max: 30 },
-    settings: [
-      mkAspectRatio(["16:9", "9:16", "1:1", "2:3", "3:2"]),
-      mkDurationSlider(6, 30),
-      {
-        key: "resolution",
-        label: "Разрешение видео",
-        description: "480p — быстрее и дешевле, 720p — более чёткое видео. Влияет на цену.",
-        type: "select",
-        options: [
-          { value: "480p", label: "480p" },
-          { value: "720p", label: "720p" },
-        ],
-        default: "480p",
-      },
-      {
-        key: "mode",
-        label: "Режим генерации",
-        description:
-          "Fun — более креативная и игривая интерпретация, Normal — сбалансированный подход.",
-        type: "select",
-        options: [
-          { value: "fun", label: "Fun" },
-          { value: "normal", label: "Normal" },
-        ],
-        default: "normal",
-      },
-      // {
-      //   key: "nsfw_checker",
-      //   label: "Фильтр контента",
-      //   description:
-      //     "Включить фильтрацию контента провайдером. При отключении результаты возвращаются напрямую от модели без дополнительной проверки.",
-      //   type: "toggle",
-      //   default: false,
-      // },
-    ],
-  },
-
-  veo: {
-    id: "veo",
-    name: "📽️ Veo 3.1",
-    description:
-      "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Standard — максимальное качество, выше детализация чем Fast. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
-    section: "video",
-    provider: "google",
-    familyId: "veo",
-    variantLabel: "Standard",
-    // $0.40/s (Veo 3.1 Standard, Gemini API)
-    costUsdPerRequest: 0,
-    costUsdPerSecond: 0.4,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
-    modes: VEO_MODES,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9", "9:16"],
-    supportedDurations: [4, 6, 8],
-    settings: [
-      mkAspectRatio(["16:9", "9:16"]),
-      {
-        key: "duration",
-        label: "Длительность",
-        description:
-          "Продолжительность видеоклипа в секундах. При использовании референсных изображений или разрешений 1080p/4K доступен только вариант 8 с.",
-        type: "select",
-        options: [
-          { value: 4, label: "4 с", unavailableIf: { key: "resolution", neq: "720p" } },
-          { value: 6, label: "6 с", unavailableIf: { key: "resolution", neq: "720p" } },
-          { value: 8, label: "8 с" },
-        ],
-        default: 4,
-      },
-      {
-        key: "resolution",
-        label: "Разрешение",
-        description: "Качество видео: 720p — любая длительность, 1080p — только 8 секунд.",
-        type: "select",
-        options: [
-          { value: "720p", label: "720p" },
-          {
-            value: "1080p",
-            label: "1080p",
-            unavailableIf: { key: "duration", neq: 8 },
-          },
-          {
-            value: "4k",
-            label: "4k",
-            unavailableIf: { key: "duration", neq: 8 },
-          },
-        ],
-        default: "720p",
-      },
-      {
-        key: "person_generation",
-        label: "Генерация людей",
-        description: "Разрешить ли появление людей в видео.",
-        type: "select",
-        options: [
-          { value: "dont_allow", label: "Запрещено" },
-          { value: "allow_adult", label: "Разрешены взрослые" },
-        ],
-        default: "allow_adult",
-      },
-      // {
-      //   key: "negative_prompt",
-      //   label: "Негативный промпт",
-      //   description:
-      //     "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
-      //   type: "text",
-      //   default: "",
-      //   advanced: true,
-      // },
-    ],
-  },
-
-  "veo-fast": {
-    id: "veo-fast",
-    name: "📽️ Veo 3.1 Fast",
-    description:
-      "Быстрая и более доступная версия Veo 3.1 от Google. Со звуком и голосами, но чуть ниже детализация чем Standard. Поддерживает 4K. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
-    section: "video",
-    provider: "google",
-    familyId: "veo",
-    variantLabel: "Fast",
-    // Resolution-based: 720p $0.10/s, 1080p $0.12/s, 4k $0.30/s
-    costUsdPerRequest: 0,
-    costUsdPerSecond: 0.1,
-    costVariants: {
-      settingKey: "resolution",
-      map: {
-        "720p": { costUsdPerSecond: 0.1 },
-        "1080p": { costUsdPerSecond: 0.12 },
-        "4k": { costUsdPerSecond: 0.3 },
-      },
-    },
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
-    modes: VEO_MODES,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9", "9:16"],
-    supportedDurations: [4, 6, 8],
-    settings: [
-      mkAspectRatio(["16:9", "9:16"]),
-      {
-        key: "duration",
-        label: "Длительность",
-        description:
-          "Продолжительность видеоклипа в секундах. При использовании референсных изображений или разрешений 1080p/4K доступен только вариант 8 с.",
-        type: "select",
-        options: [
-          { value: 4, label: "4 с", unavailableIf: { key: "resolution", neq: "720p" } },
-          { value: 6, label: "6 с", unavailableIf: { key: "resolution", neq: "720p" } },
-          { value: 8, label: "8 с" },
-        ],
-        default: 4,
-      },
-      {
-        key: "resolution",
-        label: "Разрешение",
-        description: "Качество видео: 720p — любая длительность, 1080p — только 8 секунд.",
-        type: "select",
-        options: [
-          { value: "720p", label: "720p" },
-          {
-            value: "1080p",
-            label: "1080p",
-            unavailableIf: { key: "duration", neq: 8 },
-          },
-          {
-            value: "4k",
-            label: "4k",
-            unavailableIf: { key: "duration", neq: 8 },
-          },
-        ],
-        default: "720p",
-      },
-      // {
-      //   key: "negative_prompt",
-      //   label: "Негативный промпт",
-      //   description:
-      //     "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
-      //   type: "text",
-      //   default: "",
-      //   advanced: true,
-      // },
-    ],
-  },
-
-  sora: {
-    id: "sora",
-    name: "🌌 Sora 2",
-    description:
-      "Устаревшая модель генерации видео от OpenAI. Объекты двигаются как в реальности, со звуком и правильной физикой. Отправьте фото вместе с текстом — оно станет первым кадром видео.",
-    section: "video",
-    provider: "openai",
-    // $0.10/s (via Replicate openai/sora)
-    costUsdPerRequest: 0,
-    costUsdPerSecond: 0.1,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    mediaInputs: [MI_REFERENCE],
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    // Native Replicate values: "portrait" (720×1280) and "landscape" (1280×720)
-    supportedAspectRatios: ["portrait", "landscape"],
-    supportedDurations: [4, 8, 12],
-    settings: [
-      {
-        key: "aspect_ratio",
-        label: "Соотношение сторон",
-        description: "Portrait — вертикальное видео 720×1280, Landscape — горизонтальное 1280×720.",
-        type: "select",
-        options: [
-          { value: "portrait", label: "Portrait (9:16)" },
-          { value: "landscape", label: "Landscape (16:9)" },
-        ],
-        default: "portrait",
-      },
-      mkDurationSelect([4, 8, 12]),
-    ],
-  },
-
-  runway: {
-    id: "runway",
-    name: "🛫 Runway Gen-4.5",
-    description:
-      "Полный контроль над видео: указывайте, что и как должно двигаться, управляйте камерой. Выбор профессионалов.",
-    section: "video",
-    provider: "runway",
-    // $0.12/s (Gen-4.5); 5s=$0.60, 8s=$0.96, 10s=$1.20
-    costUsdPerRequest: 0,
-    costUsdPerSecond: 0.12,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    mediaInputs: [{ ...MI_FIRST_FRAME, required: true }],
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["1280:720", "720:1280", "1104:832", "832:1104", "960:960", "1584:672"],
-    supportedDurations: [5, 8, 10],
-    settings: [
-      mkAspectRatio(["1280:720", "720:1280", "1104:832", "832:1104", "960:960", "1584:672"], {
-        "1280:720": "Горизонталь 16:9",
-        "720:1280": "Вертикаль 9:16",
-        "1104:832": "Горизонталь 4:3",
-        "832:1104": "Вертикаль 3:4",
-        "960:960": "Квадрат 1:1",
-        "1584:672": "Широкий 21:9",
-      }),
-      mkDurationSelect([5, 8, 10]),
-      {
-        key: "seed",
-        label: "Seed",
-        description:
-          "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
-        type: "number",
-        min: 0,
-        max: 4294967295,
-        default: null,
-        advanced: true,
-      },
-      {
-        key: "camera_horizontal",
-        label: "Движение камеры: лево/право",
-        description:
-          "Панорамирование камеры по горизонтали: отрицательные значения — влево, положительные — вправо.",
-        type: "slider",
-        min: -10,
-        max: 10,
-        step: 0.5,
-        default: 0,
-        advanced: true,
-      },
-      {
-        key: "camera_vertical",
-        label: "Движение камеры: вверх/вниз",
-        description:
-          "Панорамирование камеры по вертикали: отрицательные значения — вниз, положительные — вверх.",
-        type: "slider",
-        min: -10,
-        max: 10,
-        step: 0.5,
-        default: 0,
-        advanced: true,
-      },
-      {
-        key: "camera_zoom",
-        label: "Зум камеры",
-        description:
-          "Приближение или удаление камеры: положительные значения — наезд, отрицательные — отъезд.",
-        type: "slider",
-        min: -10,
-        max: 10,
-        step: 0.5,
-        default: 0,
-        advanced: true,
-      },
-    ],
-  },
-
   heygen: {
     id: "heygen",
     name: "👤 HeyGen",
@@ -1238,7 +857,449 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
+  "grok-imagine": {
+    id: "grok-imagine",
+    name: "🔮 Grok Imagine",
+    description:
+      "Видеомодель от xAI (Grok). Text-to-video и image-to-video с длительностью 6–30 секунд. Поддержка до 7 входных изображений — ссылайтесь на них в промпте через @Image1, @Image2 и т.д.",
+    section: "video",
+    provider: "kie",
+    // Resolution-based: 480p $0.008/s, 720p $0.015/s
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.008,
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "480p": { costUsdPerSecond: 0.008 },
+        "720p": { costUsdPerSecond: 0.015 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_GROK_IMAGINE_REFS],
+    promptRefs: { images: { max: 7 } },
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["2:3", "3:2", "1:1", "16:9", "9:16"],
+    durationRange: { min: 6, max: 30 },
+    settings: [
+      mkAspectRatio(["16:9", "9:16", "1:1", "2:3", "3:2"]),
+      mkDurationSlider(6, 30),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description: "480p — быстрее и дешевле, 720p — более чёткое видео. Влияет на цену.",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        default: "480p",
+      },
+      {
+        key: "mode",
+        label: "Режим генерации",
+        description:
+          "Fun — более креативная и игривая интерпретация, Normal — сбалансированный подход.",
+        type: "select",
+        options: [
+          { value: "fun", label: "Fun" },
+          { value: "normal", label: "Normal" },
+        ],
+        default: "normal",
+      },
+      // {
+      //   key: "nsfw_checker",
+      //   label: "Фильтр контента",
+      //   description:
+      //     "Включить фильтрацию контента провайдером. При отключении результаты возвращаются напрямую от модели без дополнительной проверки.",
+      //   type: "toggle",
+      //   default: false,
+      // },
+    ],
+  },
+  veo: {
+    id: "veo",
+    name: "📽️ Veo 3.1",
+    description:
+      "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Standard — максимальное качество, выше детализация чем Fast. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
+    section: "video",
+    provider: "google",
+    familyId: "veo",
+    variantLabel: "Standard",
+    // $0.40/s (Veo 3.1 Standard, Gemini API)
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.4,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
+    modes: VEO_MODES,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16"],
+    supportedDurations: [4, 6, 8],
+    settings: [
+      mkAspectRatio(["16:9", "9:16"]),
+      {
+        key: "duration",
+        label: "Длительность",
+        description:
+          "Продолжительность видеоклипа в секундах. При использовании референсных изображений или разрешений 1080p/4K доступен только вариант 8 с.",
+        type: "select",
+        options: [
+          { value: 4, label: "4 с", unavailableIf: { key: "resolution", neq: "720p" } },
+          { value: 6, label: "6 с", unavailableIf: { key: "resolution", neq: "720p" } },
+          { value: 8, label: "8 с" },
+        ],
+        default: 4,
+      },
+      {
+        key: "resolution",
+        label: "Разрешение",
+        description: "Качество видео: 720p — любая длительность, 1080p — только 8 секунд.",
+        type: "select",
+        options: [
+          { value: "720p", label: "720p" },
+          {
+            value: "1080p",
+            label: "1080p",
+            unavailableIf: { key: "duration", neq: 8 },
+          },
+          {
+            value: "4k",
+            label: "4k",
+            unavailableIf: { key: "duration", neq: 8 },
+          },
+        ],
+        default: "720p",
+      },
+      {
+        key: "person_generation",
+        label: "Генерация людей",
+        description: "Разрешить ли появление людей в видео.",
+        type: "select",
+        options: [
+          { value: "dont_allow", label: "Запрещено" },
+          { value: "allow_adult", label: "Разрешены взрослые" },
+        ],
+        default: "allow_adult",
+      },
+      // {
+      //   key: "negative_prompt",
+      //   label: "Негативный промпт",
+      //   description:
+      //     "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
+      //   type: "text",
+      //   default: "",
+      //   advanced: true,
+      // },
+    ],
+  },
+  "veo-fast": {
+    id: "veo-fast",
+    name: "📽️ Veo 3.1 Fast",
+    description:
+      "Быстрая и более доступная версия Veo 3.1 от Google. Со звуком и голосами, но чуть ниже детализация чем Standard. Поддерживает 4K. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
+    section: "video",
+    provider: "google",
+    familyId: "veo",
+    variantLabel: "Fast",
+    // Resolution-based: 720p $0.10/s, 1080p $0.12/s, 4k $0.30/s
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.1,
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "720p": { costUsdPerSecond: 0.1 },
+        "1080p": { costUsdPerSecond: 0.12 },
+        "4k": { costUsdPerSecond: 0.3 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
+    modes: VEO_MODES,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16"],
+    supportedDurations: [4, 6, 8],
+    settings: [
+      mkAspectRatio(["16:9", "9:16"]),
+      {
+        key: "duration",
+        label: "Длительность",
+        description:
+          "Продолжительность видеоклипа в секундах. При использовании референсных изображений или разрешений 1080p/4K доступен только вариант 8 с.",
+        type: "select",
+        options: [
+          { value: 4, label: "4 с", unavailableIf: { key: "resolution", neq: "720p" } },
+          { value: 6, label: "6 с", unavailableIf: { key: "resolution", neq: "720p" } },
+          { value: 8, label: "8 с" },
+        ],
+        default: 4,
+      },
+      {
+        key: "resolution",
+        label: "Разрешение",
+        description: "Качество видео: 720p — любая длительность, 1080p — только 8 секунд.",
+        type: "select",
+        options: [
+          { value: "720p", label: "720p" },
+          {
+            value: "1080p",
+            label: "1080p",
+            unavailableIf: { key: "duration", neq: 8 },
+          },
+          {
+            value: "4k",
+            label: "4k",
+            unavailableIf: { key: "duration", neq: 8 },
+          },
+        ],
+        default: "720p",
+      },
+      // {
+      //   key: "negative_prompt",
+      //   label: "Негативный промпт",
+      //   description:
+      //     "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
+      //   type: "text",
+      //   default: "",
+      //   advanced: true,
+      // },
+    ],
+  },
+  "hailuo-fast": {
+    id: "hailuo-fast",
+    name: "🎞️ Hailuo 2.3 Fast",
+    description:
+      "Быстрая версия Hailuo 2.3 от MiniMax — ~40% дешевле стандартной при схожем качестве. Чуть ниже детализация. Требует фото как первый кадр.",
+    section: "video",
+    provider: "minimax",
+    familyId: "minimax",
+    variantLabel: "Fast",
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
+    // Default: 768P × 6s = $0.19. Exact price depends on resolution × duration — see costMatrix.
+    costUsdPerRequest: 0.19,
+    costMatrix: {
+      dims: ["resolution", "duration"],
+      table: {
+        "768P__6": 0.19,
+        "768P__10": 0.32,
+        "1080P__6": 0.33,
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9"],
+    supportedDurations: [6, 10],
+    settings: [
+      mkDurationSelect([6, 10]),
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description:
+          "768p — для любой длины включая 10с, 1080p — Full HD только для 6-секундных клипов.",
+        type: "select",
+        options: [
+          { value: "768P", label: "768p" },
+          { value: "1080P", label: "1080p" },
+        ],
+        default: "768P",
+      },
+    ],
+  },
+  hailuo: {
+    id: "hailuo",
+    name: "🎞️ Hailuo 2.3",
+    description:
+      "Стандартная версия Hailuo 2.3 от MiniMax — максимальное качество, поддержка 1080p и 10-секундных клипов. Принимает фото как первый кадр.",
+    section: "video",
+    provider: "minimax",
+    familyId: "minimax",
+    variantLabel: "Standard",
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
+    // Default: 768P × 6s = $0.28. Exact price depends on resolution × duration — see costMatrix.
+    costUsdPerRequest: 0.28,
+    costMatrix: {
+      dims: ["resolution", "duration"],
+      table: {
+        "768P__6": 0.28,
+        "768P__10": 0.56,
+        "1080P__6": 0.49,
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9"],
+    supportedDurations: [6, 10],
+    settings: [
+      {
+        key: "duration",
+        label: "Длительность",
+        description: "Продолжительность видеоклипа в секундах.",
+        type: "select",
+        options: [
+          { value: 6, label: "6 с" },
+          { value: 10, label: "10 с", unavailableIf: { key: "resolution", eq: "1080P" } },
+        ],
+        default: 6,
+      },
+      {
+        key: "resolution",
+        label: "Разрешение видео",
+        description:
+          "768p — для любой длины включая 10с, 1080p — Full HD только для 6-секундных клипов.",
+        type: "select",
+        options: [
+          { value: "768P", label: "768p" },
+          { value: "1080P", label: "1080p", unavailableIf: { key: "duration", eq: 10 } },
+        ],
+        default: "768P",
+      },
+    ],
+  },
+  sora: {
+    id: "sora",
+    name: "🌌 Sora 2",
+    description:
+      "Устаревшая модель генерации видео от OpenAI. Объекты двигаются как в реальности, со звуком и правильной физикой. Отправьте фото вместе с текстом — оно станет первым кадром видео.",
+    section: "video",
+    provider: "openai",
+    // $0.10/s (via Replicate openai/sora)
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.1,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_REFERENCE],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    // Native Replicate values: "portrait" (720×1280) and "landscape" (1280×720)
+    supportedAspectRatios: ["portrait", "landscape"],
+    supportedDurations: [4, 8, 12],
+    settings: [
+      {
+        key: "aspect_ratio",
+        label: "Соотношение сторон",
+        description: "Portrait — вертикальное видео 720×1280, Landscape — горизонтальное 1280×720.",
+        type: "select",
+        options: [
+          { value: "portrait", label: "Portrait (9:16)" },
+          { value: "landscape", label: "Landscape (16:9)" },
+        ],
+        default: "portrait",
+      },
+      mkDurationSelect([4, 8, 12]),
+    ],
+  },
+  runway: {
+    id: "runway",
+    name: "🛫 Runway Gen-4.5",
+    description:
+      "Полный контроль над видео: указывайте, что и как должно двигаться, управляйте камерой. Выбор профессионалов.",
+    section: "video",
+    provider: "runway",
+    // $0.12/s (Gen-4.5); 5s=$0.60, 8s=$0.96, 10s=$1.20
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.12,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [{ ...MI_FIRST_FRAME, required: true }],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["1280:720", "720:1280", "1104:832", "832:1104", "960:960", "1584:672"],
+    supportedDurations: [5, 8, 10],
+    settings: [
+      mkAspectRatio(["1280:720", "720:1280", "1104:832", "832:1104", "960:960", "1584:672"], {
+        "1280:720": "Горизонталь 16:9",
+        "720:1280": "Вертикаль 9:16",
+        "1104:832": "Горизонталь 4:3",
+        "832:1104": "Вертикаль 3:4",
+        "960:960": "Квадрат 1:1",
+        "1584:672": "Широкий 21:9",
+      }),
+      mkDurationSelect([5, 8, 10]),
+      {
+        key: "seed",
+        label: "Seed",
+        description:
+          "Число для воспроизведения результата. Пусто — случайный результат каждый раз.",
+        type: "number",
+        min: 0,
+        max: 4294967295,
+        default: null,
+        advanced: true,
+      },
+      {
+        key: "camera_horizontal",
+        label: "Движение камеры: лево/право",
+        description:
+          "Панорамирование камеры по горизонтали: отрицательные значения — влево, положительные — вправо.",
+        type: "slider",
+        min: -10,
+        max: 10,
+        step: 0.5,
+        default: 0,
+        advanced: true,
+      },
+      {
+        key: "camera_vertical",
+        label: "Движение камеры: вверх/вниз",
+        description:
+          "Панорамирование камеры по вертикали: отрицательные значения — вниз, положительные — вверх.",
+        type: "slider",
+        min: -10,
+        max: 10,
+        step: 0.5,
+        default: 0,
+        advanced: true,
+      },
+      {
+        key: "camera_zoom",
+        label: "Зум камеры",
+        description:
+          "Приближение или удаление камеры: положительные значения — наезд, отрицательные — отъезд.",
+        type: "slider",
+        min: -10,
+        max: 10,
+        step: 0.5,
+        default: 0,
+        advanced: true,
+      },
+    ],
+  },
   "luma-ray2": {
     id: "luma-ray2",
     name: "☀️ Luma: Ray 2",
@@ -1293,7 +1354,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
   minimax: {
     id: "minimax",
     name: "🎦 MiniMax Video-01",
@@ -1323,7 +1383,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
   pika: {
     id: "pika",
     name: "📸 Pika 2.2",
@@ -1385,111 +1444,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
-  "hailuo-fast": {
-    id: "hailuo-fast",
-    name: "🎞️ Hailuo 2.3 Fast",
-    description:
-      "Быстрая версия Hailuo 2.3 от MiniMax — ~40% дешевле стандартной при схожем качестве. Чуть ниже детализация. Требует фото как первый кадр.",
-    section: "video",
-    provider: "minimax",
-    familyId: "minimax",
-    variantLabel: "Fast",
-    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
-    // Default: 768P × 6s = $0.19. Exact price depends on resolution × duration — see costMatrix.
-    costUsdPerRequest: 0.19,
-    costMatrix: {
-      dims: ["resolution", "duration"],
-      table: {
-        "768P__6": 0.19,
-        "768P__10": 0.32,
-        "1080P__6": 0.33,
-      },
-    },
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9"],
-    supportedDurations: [6, 10],
-    settings: [
-      mkDurationSelect([6, 10]),
-      {
-        key: "resolution",
-        label: "Разрешение видео",
-        description:
-          "768p — для любой длины включая 10с, 1080p — Full HD только для 6-секундных клипов.",
-        type: "select",
-        options: [
-          { value: "768P", label: "768p" },
-          { value: "1080P", label: "1080p" },
-        ],
-        default: "768P",
-      },
-    ],
-  },
-
-  hailuo: {
-    id: "hailuo",
-    name: "🎞️ Hailuo 2.3",
-    description:
-      "Стандартная версия Hailuo 2.3 от MiniMax — максимальное качество, поддержка 1080p и 10-секундных клипов. Принимает фото как первый кадр.",
-    section: "video",
-    provider: "minimax",
-    familyId: "minimax",
-    variantLabel: "Standard",
-    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
-    // Default: 768P × 6s = $0.28. Exact price depends on resolution × duration — see costMatrix.
-    costUsdPerRequest: 0.28,
-    costMatrix: {
-      dims: ["resolution", "duration"],
-      table: {
-        "768P__6": 0.28,
-        "768P__10": 0.56,
-        "1080P__6": 0.49,
-      },
-    },
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9"],
-    supportedDurations: [6, 10],
-    settings: [
-      {
-        key: "duration",
-        label: "Длительность",
-        description: "Продолжительность видеоклипа в секундах.",
-        type: "select",
-        options: [
-          { value: 6, label: "6 с" },
-          { value: 10, label: "10 с", unavailableIf: { key: "resolution", eq: "1080P" } },
-        ],
-        default: 6,
-      },
-      {
-        key: "resolution",
-        label: "Разрешение видео",
-        description:
-          "768p — для любой длины включая 10с, 1080p — Full HD только для 6-секундных клипов.",
-        type: "select",
-        options: [
-          { value: "768P", label: "768p" },
-          { value: "1080P", label: "1080p", unavailableIf: { key: "duration", eq: 10 } },
-        ],
-        default: "768P",
-      },
-    ],
-  },
-
   wan: {
     id: "wan",
     name: "🏯 Wan 2.7 (Alibaba)",
@@ -1563,64 +1517,6 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
-  // "d-id": {
-  //   id: "d-id",
-  //   name: "🤳 D-ID",
-  //   description:
-  //     "Оживляет фотографии и аватары. Синхронизирует речь с движением губ для создания реалистичных говорящих персонажей.",
-  //   section: "video",
-  //   provider: "d-id",
-  //   // $0.018/s (Pro plan, 1 credit = 15s ≈ $0.27/credit) ≈ $1.07/min
-  //   // API streaming users get 50% discount → ~$0.009/s ≈ $0.54/min
-  //   costUsdPerRequest: 0,
-  //   costUsdPerSecond: 0.018,
-  //   inputCostUsdPerMToken: 0,
-  //   outputCostUsdPerMToken: 0,
-  //   supportsImages: true,
-  //   supportsVoice: true,
-  //   supportsWeb: false,
-  //   isAsync: true,
-  //   contextStrategy: "db_history",
-  //   contextMaxMessages: 0,
-  //   supportedAspectRatios: ["16:9", "9:16", "1:1"],
-  //   supportedDurations: null, // script-driven
-  //   settings: [
-  //     mkAspectRatio(["16:9", "9:16", "1:1"]),
-  //     {
-  //       key: "sentiment",
-  //       label: "Настроение аватара",
-  //       description: "Эмоциональный тон выступления аватара (выражение лица).",
-  //       type: "select",
-  //       options: [
-  //         { value: "neutral", label: "Нейтральное" },
-  //         { value: "happy", label: "Радостное" },
-  //         { value: "surprise", label: "Удивлённое" },
-  //         { value: "serious", label: "Серьёзное" },
-  //       ],
-  //       default: "neutral",
-  //     },
-  //     {
-  //       key: "emotion_intensity",
-  //       label: "Интенсивность эмоции",
-  //       description:
-  //         "Насколько ярко выражена эмоция на лице аватара. Применяется только при настроении, отличном от нейтрального.",
-  //       type: "slider",
-  //       min: 0,
-  //       max: 1,
-  //       step: 0.1,
-  //       default: 0.7,
-  //       unavailableIf: { key: "sentiment", eq: "neutral" },
-  //     },
-  //     {
-  //       key: "voice_id",
-  //       label: "Голос",
-  //       description: "Выберите официальный голос или клонированный голос ElevenLabs.",
-  //       type: "did-voice-picker",
-  //       default: "",
-  //     },
-  //   ],
-  // },
 };
 
 /**

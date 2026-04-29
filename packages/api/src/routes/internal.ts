@@ -303,16 +303,26 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
    * a granted bonus subscription. Decrements subscriptionTokenBalance by
    * `tokens`, FLOORED at 0.
    *
-   * НЕ удаляет LocalSubscription — у юзера могут быть другие активные
-   * подписки. Для полного экспайра подписки используется /revoke-tokens.
+   * Если передан `metaboxSubscriptionId` — также УДАЛЯЕТ LocalSubscription,
+   * у которой metaboxSubscriptionId совпадает. Это нужно при откате
+   * бандла — бонус-подписка пропадает целиком, а не висит «пустым»
+   * рекордом без токенов. Если у юзера в LocalSubscription другой
+   * metaboxSubscriptionId [реальная подписка после бонуса] — она НЕ
+   * трогается.
    *
-   * Body: { telegramId: string, tokens: number, description?: string }
+   * Body: {
+   *   telegramId: string,
+   *   tokens: number,
+   *   description?: string,
+   *   metaboxSubscriptionId?: string,
+   * }
    */
   fastify.post("/decrement-subscription-tokens", async (request, reply) => {
-    const { telegramId, tokens, description } = request.body as {
+    const { telegramId, tokens, description, metaboxSubscriptionId } = request.body as {
       telegramId: string;
       tokens: number;
       description?: string;
+      metaboxSubscriptionId?: string;
     };
 
     if (!telegramId || typeof tokens !== "number" || tokens <= 0) {
@@ -322,14 +332,30 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
     const userId = BigInt(telegramId);
     const user = await db.user.findUnique({ where: { id: userId } });
     if (!user) {
-      return { ok: true, deducted: 0, newBalance: 0 };
+      return { ok: true, deducted: 0, newBalance: 0, localSubscriptionDeleted: false };
     }
 
     const currentBalance = Number(user.subscriptionTokenBalance);
     const actualDeduct = Math.min(currentBalance, tokens);
 
+    let localSubscriptionDeleted = false;
+    if (metaboxSubscriptionId) {
+      // Удаляем LocalSubscription только если её metaboxSubscriptionId
+      // совпадает с откатываемой. Иначе [например юзер успел купить
+      // другую подписку поверх бонуса] — не трогаем.
+      const deleteResult = await db.localSubscription.deleteMany({
+        where: { userId, metaboxSubscriptionId },
+      });
+      localSubscriptionDeleted = deleteResult.count > 0;
+    }
+
     if (actualDeduct === 0) {
-      return { ok: true, deducted: 0, newBalance: currentBalance };
+      return {
+        ok: true,
+        deducted: 0,
+        newBalance: currentBalance,
+        localSubscriptionDeleted,
+      };
     }
 
     await db.$transaction([
@@ -352,6 +378,7 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
       ok: true,
       deducted: actualDeduct,
       newBalance: currentBalance - actualDeduct,
+      localSubscriptionDeleted,
     };
   });
 

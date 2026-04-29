@@ -13,7 +13,7 @@ import {
   MODELS_BY_SECTION,
   AI_MODELS,
   MODEL_TO_FAMILY,
-  FAMILIES_BY_SECTION,
+  MODEL_FAMILIES,
   config,
   generateWebToken,
   UserFacingError,
@@ -73,29 +73,25 @@ function pickDesignPending(ctx: BotContext): string {
  */
 export function buildDesignModelKeyboard(savedModelId?: string | null): InlineKeyboard {
   const allModels = MODELS_BY_SECTION["design"] ?? [];
-  const families = FAMILIES_BY_SECTION["design"] ?? [];
   const kb = new InlineKeyboard();
-
-  // Collect all model IDs that belong to a family (skip individual buttons for them)
-  const familyModelIds = new Set(families.flatMap((f) => f.members.map((m) => m.modelId)));
-
-  // One button per family, using saved model if it's in that family, else defaultModelId
   const rows: Array<[string, string]> = [];
-  for (const family of families) {
-    const memberIds = new Set(family.members.map((m) => m.modelId));
-    const modelId =
-      savedModelId && memberIds.has(savedModelId) ? savedModelId : family.defaultModelId;
-    rows.push([family.name, `design_family_${family.id}__${modelId}`]);
-  }
+  const addedFamilies = new Set<string>();
 
-  // Standalone models
   for (const m of allModels) {
-    if (!familyModelIds.has(m.id)) {
+    const familyId = MODEL_TO_FAMILY[m.id];
+    if (familyId) {
+      if (addedFamilies.has(familyId)) continue;
+      addedFamilies.add(familyId);
+      const family = MODEL_FAMILIES[familyId]!;
+      const memberIds = new Set(family.members.map((fm) => fm.modelId));
+      const modelId =
+        savedModelId && memberIds.has(savedModelId) ? savedModelId : family.defaultModelId;
+      rows.push([family.name, `design_family_${family.id}__${modelId}`]);
+    } else {
       rows.push([m.name, `design_model_${m.id}`]);
     }
   }
 
-  // Layout: 2 per row
   for (let i = 0; i < rows.length; i += 2) {
     kb.text(rows[i][0], rows[i][1]);
     if (rows[i + 1]) kb.text(rows[i + 1][0], rows[i + 1][1]);

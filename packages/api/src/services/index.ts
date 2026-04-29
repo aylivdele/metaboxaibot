@@ -54,6 +54,9 @@ export {
   markTokensGrantedOnMetabox,
   getPendingTokenGrants,
   markOrderGrantedOnMetabox,
+  getMetaboxUserStatus,
+  resendMetaboxVerification,
+  changeMetaboxEmailPending,
 } from "./metabox-bridge.service.js";
 export type {
   AiBotProduct,

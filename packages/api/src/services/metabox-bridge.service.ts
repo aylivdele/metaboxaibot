@@ -110,9 +110,15 @@ export interface MergedAccountInfo {
 
 export interface RegisterFromBotResult {
   metaboxUserId: string;
-  ssoToken: string;
+  /** Только если аккаунт уже верифицирован [STAGE_MODE]. В обычном
+   * режиме email требует подтверждения, токена не будет. */
+  ssoToken?: string;
   referralCode: string;
   mergedFrom?: MergedAccountInfo;
+  /** Если true — пользователю отправлено письмо с подтверждением,
+   * SSO-логин не выдан. Юзер должен подтвердить email и войти вручную. */
+  requiresVerification?: boolean;
+  email?: string;
 }
 
 /** Register a new Metabox user from the bot (email + password). */
@@ -130,6 +136,35 @@ export async function registerFromBot(params: {
     telegramId: params.telegramId.toString(),
     referrerTelegramId: params.referrerTelegramId?.toString(),
   });
+}
+
+/** Получить статус metabox-юзера: email + emailVerified.
+ *  Используется ботом чтобы решить — звать SSO или показать
+ *  «Подтвердите почту» pending-экран.
+ *
+ *  ВАЖНО: helper get() добавляет префикс /api, а нам нужен /api/internal —
+ *  поэтому путь начинаем с /internal. */
+export async function getMetaboxUserStatus(
+  metaboxUserId: string,
+): Promise<{ email: string; emailVerified: boolean; name: string }> {
+  return get(`/internal/user-status?metaboxUserId=${encodeURIComponent(metaboxUserId)}`);
+}
+
+/** Перевыпустить verification email — старый не дошёл, юзер потерял или
+ *  токен истёк. */
+export async function resendMetaboxVerification(
+  metaboxUserId: string,
+): Promise<{ ok: boolean; email: string; alreadyVerified?: boolean }> {
+  return post("/resend-verification", { metaboxUserId });
+}
+
+/** Сменить email на pending-аккаунте [юзер с ошибкой ввёл изначально]
+ *  и заново отправить письмо. Доступно только пока emailVerified=false. */
+export async function changeMetaboxEmailPending(
+  metaboxUserId: string,
+  newEmail: string,
+): Promise<{ ok: boolean; email: string; warning?: string }> {
+  return post("/change-email-pending", { metaboxUserId, newEmail });
 }
 
 /** Login existing Metabox user and link their Telegram account. */

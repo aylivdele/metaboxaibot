@@ -329,9 +329,6 @@ const SEEDREAM_SETTINGS: ModelSettingDef[] = [
 /** Kling / Kling Pro video settings. */
 
 export const DESIGN_MODELS: Record<string, AIModel> = {
-  // ── Дизайн ────────────────────────────────────────────────────────────────
-  // Media models have no per-token pricing; cost is driven by costUsdPerRequest.
-  // Values are mid-range provider prices used as break-even basis.
   "nano-banana-pro": {
     id: "nano-banana-pro",
     name: "🍌 Nano Banana PRO",
@@ -409,7 +406,6 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
   "nano-banana-2": {
     id: "nano-banana-2",
     name: "🍌 Nano Banana 2",
@@ -505,7 +501,6 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-
   "nano-banana-1": {
     id: "nano-banana-1",
     name: "🍌 Nano Banana",
@@ -572,6 +567,385 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
           { value: "jpeg", label: "JPEG" },
         ],
         default: "png",
+        advanced: true,
+      },
+    ],
+  },
+  "higgsfield-soul": {
+    id: "higgsfield-soul",
+    name: "🧬 Higgsfield Soul 2.0",
+    description:
+      "Генерация изображений с вашим персонажем (Soul ID). Создайте персонажа из 20+ фотографий — и генерируйте любые сцены с его внешностью. Поддерживает стили, референсные изображения и режим batch.",
+    section: "design",
+    provider: "higgsfield",
+    promptOptional: true,
+    promptOptionalRequiresMedia: true,
+    costUsdPerRequest: 0.09,
+    costMatrix: {
+      dims: ["resolution", "batch_size"],
+      table: {
+        "720p__1": 0.09,
+        "720p__4": 0.13,
+        "1080p__1": 0.19,
+        "1080p__4": 0.31,
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [{ slotKey: "edit", mode: "edit", labelKey: "reference" }],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["4:3", "9:16", "16:9", "3:4", "1:1", "2:3", "3:2"],
+    settings: [
+      {
+        key: "custom_reference_id",
+        label: "Персонаж (Soul ID)",
+        description: "Выберите созданного персонажа. Обязательно для генерации.",
+        type: "soul-picker",
+        default: null,
+      },
+      {
+        key: "custom_reference_strength",
+        label: "Сила персонажа",
+        description:
+          "Насколько сильно внешность персонажа влияет на результат (0 — слабо, 1 — максимально).",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 1,
+      },
+      mkAspectRatio(["4:3", "9:16", "16:9", "3:4", "1:1", "2:3", "3:2"]),
+      {
+        key: "resolution",
+        label: "Разрешение",
+        description: "Качество выходного изображения. 1080p дороже, но детальнее.",
+        type: "select",
+        options: [
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        default: "720p",
+      },
+      {
+        key: "batch_size",
+        label: "Кол-во изображений",
+        description: "Сколько вариантов сгенерировать за один запрос (1 или 4).",
+        type: "select",
+        options: [
+          { value: 1, label: "1" },
+          { value: 4, label: "4" },
+        ],
+        default: 1,
+      },
+      {
+        key: "enhance_prompt",
+        label: "Улучшение промпта",
+        description: "Автоматически улучшает ваш промпт для более детального результата.",
+        type: "toggle",
+        default: true,
+      },
+      {
+        key: "style_id",
+        label: "Стиль (Soul Style)",
+        description: "Выберите стиль для генерации — определяет настроение, цвета и эстетику.",
+        type: "soul-style-picker",
+        default: null,
+      },
+      {
+        key: "style_strength",
+        label: "Сила стиля",
+        description: "Насколько сильно стиль влияет на результат (0 — слабо, 1 — максимально).",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 1,
+        advanced: true,
+      },
+      {
+        key: "seed",
+        label: "Seed",
+        description:
+          "Фиксирует случайность генерации для воспроизводимых результатов (1–1 000 000). Оставьте пустым для случайного.",
+        type: "number",
+        min: 1,
+        max: 1000000,
+        default: null,
+        advanced: true,
+      },
+    ],
+  },
+  "grok-imagine-image": {
+    id: "grok-imagine-image",
+    name: "🔮 Grok Imagine",
+    description:
+      "Генерация изображений от xAI (Grok). Text-to-image и image-to-image. Режим Quality — повышенная точность и детализация, Speed — быстрая генерация с большим количеством вариантов.",
+    section: "design",
+    provider: "kie",
+    // Speed: $0.02 per 6 images, Quality: $0.025 per 4 images
+    costUsdPerRequest: 0.02,
+    costVariants: {
+      settingKey: "enable_pro",
+      map: { false: 0.02, true: 0.025 },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_EDIT],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["1:1", "2:3", "3:2", "16:9", "9:16"],
+    settings: [
+      mkAspectRatio(["1:1", "2:3", "3:2", "16:9", "9:16"]),
+      {
+        key: "enable_pro",
+        label: "Режим",
+        description:
+          "Speed — быстрая генерация (6 вариантов), Quality — повышенное качество и точность (4 варианта). Влияет на цену.",
+        type: "select",
+        options: [
+          { value: false, label: "Speed" },
+          { value: true, label: "Quality" },
+        ],
+        default: false,
+      },
+      // {
+      //   key: "nsfw_checker",
+      //   label: "Фильтр контента",
+      //   description:
+      //     "Включить фильтрацию контента провайдером. При отключении результаты возвращаются напрямую от модели без дополнительной проверки.",
+      //   type: "toggle",
+      //   default: false,
+      // },
+    ],
+  },
+  "gpt-image-2": {
+    id: "gpt-image-2",
+    name: "🖼️ GPT Image 2",
+    description:
+      "Новейшая версия GPT Image. Лучше предыдущей в рендеринге текста и точности следования промпту.",
+    section: "design",
+    familyId: "gpt-image",
+    versionLabel: "2",
+    variantLabel: "Standard",
+    // Временно проксируем через KIE. Прямая интеграция с OpenAI Images API
+    // сохранена в виде закомментированного блока ниже: для отката снять
+    // комменты, вернуть provider:"openai" и расширить условие в factory.ts.
+    provider: "kie",
+    // Базовая цена = 1K. Точная стоимость определяется variant-ом resolution.
+    costUsdPerRequest: 0.03,
+    costVariants: {
+      settingKey: "resolution",
+      map: { "1K": 0.03, "2K": 0.05, "4K": 0.08 },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_EDIT_4],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: null,
+    settings: [
+      {
+        key: "aspect_ratio",
+        label: "Соотношение сторон",
+        description:
+          "Auto — модель сама подберёт исходя из промпта. Для 4K-разрешения нужно выбрать конкретное соотношение (не Auto и не 1:1).",
+        type: "select",
+        options: [
+          // Auto допускает только 1K. При 2K/4K в picker'е разрешения этот
+          // вариант становится недоступным — юзер должен явно выбрать AR.
+          {
+            value: "auto",
+            label: "Auto",
+            unavailableIf: {
+              or: [
+                { key: "resolution", eq: "2K" },
+                { key: "resolution", eq: "4K" },
+              ],
+            },
+          },
+          // 1:1 несовместим с 4K (KIE-схема). При 4K — disabled.
+          {
+            value: "1:1",
+            label: "1:1",
+            unavailableIf: { key: "resolution", eq: "4K" },
+          },
+          { value: "16:9", label: "16:9" },
+          { value: "9:16", label: "9:16" },
+          { value: "4:3", label: "4:3" },
+          { value: "3:4", label: "3:4" },
+        ],
+        default: "auto",
+      },
+      {
+        key: "resolution",
+        label: "Разрешение",
+        description:
+          "1K — стандарт, 4K — максимальные детали. Влияет на цену. 4K требует aspect_ratio ≠ auto/1:1.",
+        type: "select",
+        options: [
+          { value: "1K", label: "1K" },
+          // 2K несовместим с aspect_ratio = "auto" (KIE-схема: auto → только 1K).
+          {
+            value: "2K",
+            label: "2K",
+            unavailableIf: { key: "aspect_ratio", eq: "auto" },
+          },
+          // 4K несовместим с auto и 1:1.
+          {
+            value: "4K",
+            label: "4K",
+            unavailableIf: {
+              or: [
+                { key: "aspect_ratio", eq: "auto" },
+                { key: "aspect_ratio", eq: "1:1" },
+              ],
+            },
+          },
+        ],
+        default: "1K",
+      },
+      {
+        key: "nsfw_checker",
+        label: "NSFW-фильтр",
+        description: "Если выключен — отключается фильтрация контента провайдером.",
+        type: "select",
+        options: [
+          { value: "false", label: "Off" },
+          { value: "true", label: "On" },
+        ],
+        default: "false",
+        advanced: true,
+      },
+    ],
+  },
+  "gpt-image-1.5": {
+    id: "gpt-image-1.5",
+    name: "🖼️ GPT Image 1.5",
+    description:
+      "Лучше всех понимает сложные текстовые запросы. Точно рисует то, что вы описали, включая текст на картинках.",
+    section: "design",
+    familyId: "gpt-image",
+    versionLabel: "1.5",
+    variantLabel: "Standard",
+    provider: "openai",
+    // Точная цена определяется адаптером на основе quality × size. Базовое значение: medium 1024×1024.
+    costUsdPerRequest: 0.034,
+    costMatrix: {
+      dims: ["quality", "size"],
+      table: {
+        low__1024x1024: 0.009,
+        low__1536x1024: 0.013,
+        low__1024x1536: 0.013,
+        medium__1024x1024: 0.034,
+        medium__1536x1024: 0.05,
+        medium__1024x1536: 0.05,
+        high__1024x1024: 0.133,
+        high__1536x1024: 0.2,
+        high__1024x1536: 0.2,
+        auto__1024x1024: 0.034,
+        auto__1536x1024: 0.05,
+        auto__1024x1536: 0.05,
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_EDIT_4],
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    maxVirtualBatch: 4,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: null,
+    settings: [
+      NUM_IMAGES_SETTING,
+      {
+        key: "size",
+        label: "Размер",
+        description:
+          "1024×1024 — квадрат, 1536×1024 — горизонталь, 1024×1536 — вертикаль. Влияет на цену.",
+        type: "select",
+        options: [
+          { value: "1024x1024", label: "1024 × 1024" },
+          { value: "1536x1024", label: "1536 × 1024 (16:9)" },
+          { value: "1024x1536", label: "1024 × 1536 (9:16)" },
+        ],
+        default: "1024x1024",
+      },
+      {
+        key: "quality",
+        label: "Качество",
+        description: "Low — быстро, Medium — баланс, High — максимум. Влияет на цену",
+        type: "select",
+        options: [
+          { value: "low", label: "Low" },
+          { value: "medium", label: "Medium" },
+          { value: "high", label: "High" },
+          { value: "auto", label: "Auto" },
+        ],
+        default: "medium",
+      },
+      {
+        key: "output_format",
+        label: "Формат",
+        description: "Формат сохраняемого изображения. PNG поддерживает прозрачность.",
+        type: "select",
+        options: [
+          { value: "png", label: "PNG" },
+          { value: "jpeg", label: "JPEG" },
+          { value: "webp", label: "WebP" },
+        ],
+        default: "png",
+        advanced: true,
+      },
+      {
+        key: "output_compression",
+        label: "Сжатие",
+        description:
+          "Степень сжатия для JPEG и WebP (0 — без потерь, 100 — максимальное сжатие). Не влияет на PNG.",
+        type: "slider",
+        min: 0,
+        max: 100,
+        step: 1,
+        default: 100,
+        advanced: true,
+      },
+      {
+        key: "background",
+        label: "Фон",
+        description: "transparent — прозрачный фон (только PNG/WebP), opaque — непрозрачный.",
+        type: "select",
+        options: [
+          { value: "auto", label: "Auto" },
+          { value: "opaque", label: "Opaque" },
+          { value: "transparent", label: "Transparent" },
+        ],
+        default: "auto",
+      },
+      {
+        key: "moderation",
+        label: "Модерация",
+        description: "low — ослабленная фильтрация контента, auto — стандартная.",
+        type: "select",
+        options: [
+          { value: "auto", label: "Auto" },
+          { value: "low", label: "Low" },
+        ],
+        default: "auto",
         advanced: true,
       },
     ],
@@ -752,375 +1126,66 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-  "gpt-image-2": {
-    id: "gpt-image-2",
-    name: "🖼️ GPT Image 2",
+  "seedream-5": {
+    id: "seedream-5",
+    name: "🛍️ Seedream 5.0 (ByteDance)",
     description:
-      "Новейшая версия GPT Image. Лучше предыдущей в рендеринге текста и точности следования промпту.",
+      "Идеально для товарных фото, одежды и каталогов. Версия 5.0 — улучшенное качество и реалистичность по сравнению с 4.5.",
     section: "design",
-    familyId: "gpt-image",
-    versionLabel: "2",
+    provider: "fal",
+    familyId: "seedream",
+    versionLabel: "5.0",
     variantLabel: "Standard",
-    // Временно проксируем через KIE. Прямая интеграция с OpenAI Images API
-    // сохранена в виде закомментированного блока ниже: для отката снять
-    // комменты, вернуть provider:"openai" и расширить условие в factory.ts.
-    provider: "kie",
-    // Базовая цена = 1K. Точная стоимость определяется variant-ом resolution.
-    costUsdPerRequest: 0.03,
-    costVariants: {
-      settingKey: "resolution",
-      map: { "1K": 0.03, "2K": 0.05, "4K": 0.08 },
-    },
+    costUsdPerRequest: 0.035,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_EDIT_4],
+    mediaInputs: [MI_EDIT_10],
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
+    // Native batch: FAL seedream принимает num_images (1-6) за один call.
+    // Биллинг per-image — chargePerOutput на модели включён, finalize × K.
+    nativeBatchMax: 6,
+    chargePerOutput: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    supportedAspectRatios: null,
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
-      {
-        key: "aspect_ratio",
-        label: "Соотношение сторон",
-        description:
-          "Auto — модель сама подберёт исходя из промпта. Для 4K-разрешения нужно выбрать конкретное соотношение (не Auto и не 1:1).",
-        type: "select",
-        options: [
-          // Auto допускает только 1K. При 2K/4K в picker'е разрешения этот
-          // вариант становится недоступным — юзер должен явно выбрать AR.
-          {
-            value: "auto",
-            label: "Auto",
-            unavailableIf: {
-              or: [
-                { key: "resolution", eq: "2K" },
-                { key: "resolution", eq: "4K" },
-              ],
-            },
-          },
-          // 1:1 несовместим с 4K (KIE-схема). При 4K — disabled.
-          {
-            value: "1:1",
-            label: "1:1",
-            unavailableIf: { key: "resolution", eq: "4K" },
-          },
-          { value: "16:9", label: "16:9" },
-          { value: "9:16", label: "9:16" },
-          { value: "4:3", label: "4:3" },
-          { value: "3:4", label: "3:4" },
-        ],
-        default: "auto",
-      },
-      {
-        key: "resolution",
-        label: "Разрешение",
-        description:
-          "1K — стандарт, 4K — максимальные детали. Влияет на цену. 4K требует aspect_ratio ≠ auto/1:1.",
-        type: "select",
-        options: [
-          { value: "1K", label: "1K" },
-          // 2K несовместим с aspect_ratio = "auto" (KIE-схема: auto → только 1K).
-          {
-            value: "2K",
-            label: "2K",
-            unavailableIf: { key: "aspect_ratio", eq: "auto" },
-          },
-          // 4K несовместим с auto и 1:1.
-          {
-            value: "4K",
-            label: "4K",
-            unavailableIf: {
-              or: [
-                { key: "aspect_ratio", eq: "auto" },
-                { key: "aspect_ratio", eq: "1:1" },
-              ],
-            },
-          },
-        ],
-        default: "1K",
-      },
-      {
-        key: "nsfw_checker",
-        label: "NSFW-фильтр",
-        description: "Если выключен — отключается фильтрация контента провайдером.",
-        type: "select",
-        options: [
-          { value: "false", label: "Off" },
-          { value: "true", label: "On" },
-        ],
-        default: "false",
-        advanced: true,
-      },
+      mkNumImagesSetting(6),
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      ...SEEDREAM_SETTINGS,
     ],
   },
-  // OpenAI gpt-image-2 версия перенесена в FALLBACK_DESIGN_MODELS как последний
-  // fallback (после evolink). Срабатывает когда KIE primary и evolink fallback
-  // оба недоступны.
-  "gpt-image-1.5": {
-    id: "gpt-image-1.5",
-    name: "🖼️ GPT Image 1.5",
+  "seedream-4.5": {
+    id: "seedream-4.5",
+    name: "🛍️ Seedream 4.5",
     description:
-      "Лучше всех понимает сложные текстовые запросы. Точно рисует то, что вы описали, включая текст на картинках.",
+      "Предыдущая версия Seedream — чуть проще, чем 5.0, но проверенная стабильность. Подойдёт для массовой генерации товарных фото.",
     section: "design",
-    familyId: "gpt-image",
-    versionLabel: "1.5",
+    provider: "fal",
+    familyId: "seedream",
+    versionLabel: "4.5",
     variantLabel: "Standard",
-    provider: "openai",
-    // Точная цена определяется адаптером на основе quality × size. Базовое значение: medium 1024×1024.
-    costUsdPerRequest: 0.034,
-    costMatrix: {
-      dims: ["quality", "size"],
-      table: {
-        low__1024x1024: 0.009,
-        low__1536x1024: 0.013,
-        low__1024x1536: 0.013,
-        medium__1024x1024: 0.034,
-        medium__1536x1024: 0.05,
-        medium__1024x1536: 0.05,
-        high__1024x1024: 0.133,
-        high__1536x1024: 0.2,
-        high__1024x1536: 0.2,
-        auto__1024x1024: 0.034,
-        auto__1536x1024: 0.05,
-        auto__1024x1536: 0.05,
-      },
-    },
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    mediaInputs: [MI_EDIT_4],
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    maxVirtualBatch: 4,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: null,
-    settings: [
-      NUM_IMAGES_SETTING,
-      {
-        key: "size",
-        label: "Размер",
-        description:
-          "1024×1024 — квадрат, 1536×1024 — горизонталь, 1024×1536 — вертикаль. Влияет на цену.",
-        type: "select",
-        options: [
-          { value: "1024x1024", label: "1024 × 1024" },
-          { value: "1536x1024", label: "1536 × 1024 (16:9)" },
-          { value: "1024x1536", label: "1024 × 1536 (9:16)" },
-        ],
-        default: "1024x1024",
-      },
-      {
-        key: "quality",
-        label: "Качество",
-        description: "Low — быстро, Medium — баланс, High — максимум. Влияет на цену",
-        type: "select",
-        options: [
-          { value: "low", label: "Low" },
-          { value: "medium", label: "Medium" },
-          { value: "high", label: "High" },
-          { value: "auto", label: "Auto" },
-        ],
-        default: "medium",
-      },
-      {
-        key: "output_format",
-        label: "Формат",
-        description: "Формат сохраняемого изображения. PNG поддерживает прозрачность.",
-        type: "select",
-        options: [
-          { value: "png", label: "PNG" },
-          { value: "jpeg", label: "JPEG" },
-          { value: "webp", label: "WebP" },
-        ],
-        default: "png",
-        advanced: true,
-      },
-      {
-        key: "output_compression",
-        label: "Сжатие",
-        description:
-          "Степень сжатия для JPEG и WebP (0 — без потерь, 100 — максимальное сжатие). Не влияет на PNG.",
-        type: "slider",
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 100,
-        advanced: true,
-      },
-      {
-        key: "background",
-        label: "Фон",
-        description: "transparent — прозрачный фон (только PNG/WebP), opaque — непрозрачный.",
-        type: "select",
-        options: [
-          { value: "auto", label: "Auto" },
-          { value: "opaque", label: "Opaque" },
-          { value: "transparent", label: "Transparent" },
-        ],
-        default: "auto",
-      },
-      {
-        key: "moderation",
-        label: "Модерация",
-        description: "low — ослабленная фильтрация контента, auto — стандартная.",
-        type: "select",
-        options: [
-          { value: "auto", label: "Auto" },
-          { value: "low", label: "Low" },
-        ],
-        default: "auto",
-        advanced: true,
-      },
-    ],
-  },
-  "stable-diffusion": {
-    id: "stable-diffusion",
-    name: "🌊 Stable Diffusion 3.5 Medium",
-    description:
-      "Генерирует детальные изображения в любом стиле: от фотореализма до аниме и фэнтези. Отличается гибкостью. Работает только с промптами на анлгийском языке!",
-    section: "design",
-    provider: "replicate",
-    costUsdPerRequest: 0.065,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    mediaInputs: [MI_EDIT],
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    // Replicate/SDXL accepts arbitrary dimensions — offer extended set
-    supportedAspectRatios: ["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"],
-    settings: [
-      {
-        key: "auto_translate_prompt",
-        label: "Автоперевод промпта",
-        description:
-          "Эта модель работает только (либо значительно лучше) с промптами на английском языке, мы можем перевести его для вас за отдельную плату.",
-        type: "toggle",
-        default: false,
-      },
-      mkAspectRatio(["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"]),
-      {
-        key: "negative_prompt",
-        label: "Негативный промпт",
-        description:
-          "Что НЕ должно быть на картинке: перечислите нежелательные объекты, стили или черты.",
-        type: "text",
-        default: "",
-        advanced: true,
-      },
-      {
-        key: "cfg",
-        label: "Следование промпту (CFG)",
-        description:
-          "Насколько строго ИИ следует тексту. Высокие значения — буквально, низкие — с творческой интерпретацией.",
-        type: "slider",
-        min: 1,
-        max: 10,
-        step: 0.5,
-        default: 5,
-        advanced: true,
-      },
-      {
-        key: "prompt_strength",
-        label: "Сила промпта (img2img)",
-        description:
-          "Степень изменения при img2img. 1.0 = полное изменение оригинала, 0 = без изменений.",
-        type: "slider",
-        min: 0,
-        max: 1,
-        step: 0.05,
-        default: 0.85,
-        advanced: true,
-      },
-      {
-        key: "output_format",
-        label: "Формат",
-        description: "Формат результирующего изображения.",
-        type: "select",
-        options: [
-          { value: "png", label: "PNG" },
-          { value: "webp", label: "WebP" },
-          { value: "jpeg", label: "JPEG" },
-        ],
-        default: "png",
-        advanced: true,
-      },
-      {
-        key: "seed",
-        label: "Seed",
-        description: "Фиксированный seed для воспроизводимости результата.",
-        type: "number",
-        min: 0,
-        default: null,
-        advanced: true,
-      },
-    ],
-  },
-  "dall-e-3": {
-    id: "dall-e-3",
-    name: "🎯 DALL-E 3 Turbo",
-    description:
-      "Простой и понятный генератор от OpenAI. Хорошо понимает запросы на любом языке, отлично для быстрых идей.",
-    section: "design",
-    provider: "openai",
-    // Base: standard 1024×1024. Exact cost = quality × size (see costMatrix).
     costUsdPerRequest: 0.04,
-    costMatrix: {
-      dims: ["quality", "aspect_ratio"],
-      table: {
-        "standard__1:1": 0.04,
-        "standard__16:9": 0.08,
-        "standard__9:16": 0.08,
-        "hd__1:1": 0.08,
-        "hd__16:9": 0.12,
-        "hd__9:16": 0.12,
-      },
-    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
-    supportsImages: false,
+    supportsImages: true,
+    mediaInputs: [MI_EDIT_10],
     supportsVoice: false,
     supportsWeb: false,
-    isAsync: false,
-    maxVirtualBatch: 4,
+    isAsync: true,
+    // Native batch: FAL seedream принимает num_images (1-6) за один call.
+    // Биллинг per-image — chargePerOutput на модели включён, finalize × K.
+    nativeBatchMax: 6,
+    chargePerOutput: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    // DALL-E 3 only supports exactly 3 sizes
-    supportedAspectRatios: ["1:1", "16:9", "9:16"],
+    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
     settings: [
-      NUM_IMAGES_SETTING,
-      mkAspectRatio(["1:1", "16:9", "9:16"]),
-      {
-        key: "quality",
-        label: "Качество",
-        description: "Standard — быстрее и дешевле, HD — более детальная и сложная картинка.",
-        type: "select",
-        options: [
-          { value: "standard", label: "Standard" },
-          { value: "hd", label: "HD" },
-        ],
-        default: "standard",
-      },
-      {
-        key: "style",
-        label: "Стиль",
-        description:
-          "Vivid — насыщенные цвета, яркий и выразительный результат. Natural — более спокойный и реалистичный.",
-        type: "select",
-        options: [
-          { value: "vivid", label: "Vivid" },
-          { value: "natural", label: "Natural" },
-        ],
-        default: "vivid",
-      },
+      mkNumImagesSetting(6),
+      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
+      ...SEEDREAM_SETTINGS,
     ],
   },
   "ideogram-quality": {
@@ -1845,160 +1910,14 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
       },
     ],
   },
-  "seedream-5": {
-    id: "seedream-5",
-    name: "🛍️ Seedream 5.0 (ByteDance)",
+  "stable-diffusion": {
+    id: "stable-diffusion",
+    name: "🌊 Stable Diffusion 3.5 Medium",
     description:
-      "Идеально для товарных фото, одежды и каталогов. Версия 5.0 — улучшенное качество и реалистичность по сравнению с 4.5.",
+      "Генерирует детальные изображения в любом стиле: от фотореализма до аниме и фэнтези. Отличается гибкостью. Работает только с промптами на анлгийском языке!",
     section: "design",
-    provider: "fal",
-    familyId: "seedream",
-    versionLabel: "5.0",
-    variantLabel: "Standard",
-    costUsdPerRequest: 0.035,
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    mediaInputs: [MI_EDIT_10],
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    // Native batch: FAL seedream принимает num_images (1-6) за один call.
-    // Биллинг per-image — chargePerOutput на модели включён, finalize × K.
-    nativeBatchMax: 6,
-    chargePerOutput: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
-    settings: [
-      mkNumImagesSetting(6),
-      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
-      ...SEEDREAM_SETTINGS,
-    ],
-  },
-  "higgsfield-soul": {
-    id: "higgsfield-soul",
-    name: "🧬 Higgsfield Soul 2.0",
-    description:
-      "Генерация изображений с вашим персонажем (Soul ID). Создайте персонажа из 20+ фотографий — и генерируйте любые сцены с его внешностью. Поддерживает стили, референсные изображения и режим batch.",
-    section: "design",
-    provider: "higgsfield",
-    promptOptional: true,
-    promptOptionalRequiresMedia: true,
-    costUsdPerRequest: 0.09,
-    costMatrix: {
-      dims: ["resolution", "batch_size"],
-      table: {
-        "720p__1": 0.09,
-        "720p__4": 0.13,
-        "1080p__1": 0.19,
-        "1080p__4": 0.31,
-      },
-    },
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    mediaInputs: [{ slotKey: "edit", mode: "edit", labelKey: "reference" }],
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["4:3", "9:16", "16:9", "3:4", "1:1", "2:3", "3:2"],
-    settings: [
-      {
-        key: "custom_reference_id",
-        label: "Персонаж (Soul ID)",
-        description: "Выберите созданного персонажа. Обязательно для генерации.",
-        type: "soul-picker",
-        default: null,
-      },
-      {
-        key: "custom_reference_strength",
-        label: "Сила персонажа",
-        description:
-          "Насколько сильно внешность персонажа влияет на результат (0 — слабо, 1 — максимально).",
-        type: "slider",
-        min: 0,
-        max: 1,
-        step: 0.05,
-        default: 1,
-      },
-      mkAspectRatio(["4:3", "9:16", "16:9", "3:4", "1:1", "2:3", "3:2"]),
-      {
-        key: "resolution",
-        label: "Разрешение",
-        description: "Качество выходного изображения. 1080p дороже, но детальнее.",
-        type: "select",
-        options: [
-          { value: "720p", label: "720p" },
-          { value: "1080p", label: "1080p" },
-        ],
-        default: "720p",
-      },
-      {
-        key: "batch_size",
-        label: "Кол-во изображений",
-        description: "Сколько вариантов сгенерировать за один запрос (1 или 4).",
-        type: "select",
-        options: [
-          { value: 1, label: "1" },
-          { value: 4, label: "4" },
-        ],
-        default: 1,
-      },
-      {
-        key: "enhance_prompt",
-        label: "Улучшение промпта",
-        description: "Автоматически улучшает ваш промпт для более детального результата.",
-        type: "toggle",
-        default: true,
-      },
-      {
-        key: "style_id",
-        label: "Стиль (Soul Style)",
-        description: "Выберите стиль для генерации — определяет настроение, цвета и эстетику.",
-        type: "soul-style-picker",
-        default: null,
-      },
-      {
-        key: "style_strength",
-        label: "Сила стиля",
-        description: "Насколько сильно стиль влияет на результат (0 — слабо, 1 — максимально).",
-        type: "slider",
-        min: 0,
-        max: 1,
-        step: 0.05,
-        default: 1,
-        advanced: true,
-      },
-      {
-        key: "seed",
-        label: "Seed",
-        description:
-          "Фиксирует случайность генерации для воспроизводимых результатов (1–1 000 000). Оставьте пустым для случайного.",
-        type: "number",
-        min: 1,
-        max: 1000000,
-        default: null,
-        advanced: true,
-      },
-    ],
-  },
-
-  "grok-imagine-image": {
-    id: "grok-imagine-image",
-    name: "🔮 Grok Imagine",
-    description:
-      "Генерация изображений от xAI (Grok). Text-to-image и image-to-image. Режим Quality — повышенная точность и детализация, Speed — быстрая генерация с большим количеством вариантов.",
-    section: "design",
-    provider: "kie",
-    // Speed: $0.02 per 6 images, Quality: $0.025 per 4 images
-    costUsdPerRequest: 0.02,
-    costVariants: {
-      settingKey: "enable_pro",
-      map: { false: 0.02, true: 0.025 },
-    },
+    provider: "replicate",
+    costUsdPerRequest: 0.065,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -2008,61 +1927,132 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    supportedAspectRatios: ["1:1", "2:3", "3:2", "16:9", "9:16"],
+    // Replicate/SDXL accepts arbitrary dimensions — offer extended set
+    supportedAspectRatios: ["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"],
     settings: [
-      mkAspectRatio(["1:1", "2:3", "3:2", "16:9", "9:16"]),
       {
-        key: "enable_pro",
-        label: "Режим",
+        key: "auto_translate_prompt",
+        label: "Автоперевод промпта",
         description:
-          "Speed — быстрая генерация (6 вариантов), Quality — повышенное качество и точность (4 варианта). Влияет на цену.",
-        type: "select",
-        options: [
-          { value: false, label: "Speed" },
-          { value: true, label: "Quality" },
-        ],
+          "Эта модель работает только (либо значительно лучше) с промптами на английском языке, мы можем перевести его для вас за отдельную плату.",
+        type: "toggle",
         default: false,
       },
-      // {
-      //   key: "nsfw_checker",
-      //   label: "Фильтр контента",
-      //   description:
-      //     "Включить фильтрацию контента провайдером. При отключении результаты возвращаются напрямую от модели без дополнительной проверки.",
-      //   type: "toggle",
-      //   default: false,
-      // },
+      mkAspectRatio(["1:1", "16:9", "21:9", "2:3", "3:2", "4:5", "5:4", "9:16", "9:21"]),
+      {
+        key: "negative_prompt",
+        label: "Негативный промпт",
+        description:
+          "Что НЕ должно быть на картинке: перечислите нежелательные объекты, стили или черты.",
+        type: "text",
+        default: "",
+        advanced: true,
+      },
+      {
+        key: "cfg",
+        label: "Следование промпту (CFG)",
+        description:
+          "Насколько строго ИИ следует тексту. Высокие значения — буквально, низкие — с творческой интерпретацией.",
+        type: "slider",
+        min: 1,
+        max: 10,
+        step: 0.5,
+        default: 5,
+        advanced: true,
+      },
+      {
+        key: "prompt_strength",
+        label: "Сила промпта (img2img)",
+        description:
+          "Степень изменения при img2img. 1.0 = полное изменение оригинала, 0 = без изменений.",
+        type: "slider",
+        min: 0,
+        max: 1,
+        step: 0.05,
+        default: 0.85,
+        advanced: true,
+      },
+      {
+        key: "output_format",
+        label: "Формат",
+        description: "Формат результирующего изображения.",
+        type: "select",
+        options: [
+          { value: "png", label: "PNG" },
+          { value: "webp", label: "WebP" },
+          { value: "jpeg", label: "JPEG" },
+        ],
+        default: "png",
+        advanced: true,
+      },
+      {
+        key: "seed",
+        label: "Seed",
+        description: "Фиксированный seed для воспроизводимости результата.",
+        type: "number",
+        min: 0,
+        default: null,
+        advanced: true,
+      },
     ],
   },
-
-  "seedream-4.5": {
-    id: "seedream-4.5",
-    name: "🛍️ Seedream 4.5",
+  "dall-e-3": {
+    id: "dall-e-3",
+    name: "🎯 DALL-E 3 Turbo",
     description:
-      "Предыдущая версия Seedream — чуть проще, чем 5.0, но проверенная стабильность. Подойдёт для массовой генерации товарных фото.",
+      "Простой и понятный генератор от OpenAI. Хорошо понимает запросы на любом языке, отлично для быстрых идей.",
     section: "design",
-    provider: "fal",
-    familyId: "seedream",
-    versionLabel: "4.5",
-    variantLabel: "Standard",
+    provider: "openai",
+    // Base: standard 1024×1024. Exact cost = quality × size (see costMatrix).
     costUsdPerRequest: 0.04,
+    costMatrix: {
+      dims: ["quality", "aspect_ratio"],
+      table: {
+        "standard__1:1": 0.04,
+        "standard__16:9": 0.08,
+        "standard__9:16": 0.08,
+        "hd__1:1": 0.08,
+        "hd__16:9": 0.12,
+        "hd__9:16": 0.12,
+      },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    mediaInputs: [MI_EDIT_10],
+    supportsImages: false,
     supportsVoice: false,
     supportsWeb: false,
-    isAsync: true,
-    // Native batch: FAL seedream принимает num_images (1-6) за один call.
-    // Биллинг per-image — chargePerOutput на модели включён, finalize × K.
-    nativeBatchMax: 6,
-    chargePerOutput: true,
+    isAsync: false,
+    maxVirtualBatch: 4,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    supportedAspectRatios: ["1:1", "4:3", "3:4", "16:9", "9:16"],
+    // DALL-E 3 only supports exactly 3 sizes
+    supportedAspectRatios: ["1:1", "16:9", "9:16"],
     settings: [
-      mkNumImagesSetting(6),
-      mkAspectRatio(["1:1", "4:3", "3:4", "16:9", "9:16"]),
-      ...SEEDREAM_SETTINGS,
+      NUM_IMAGES_SETTING,
+      mkAspectRatio(["1:1", "16:9", "9:16"]),
+      {
+        key: "quality",
+        label: "Качество",
+        description: "Standard — быстрее и дешевле, HD — более детальная и сложная картинка.",
+        type: "select",
+        options: [
+          { value: "standard", label: "Standard" },
+          { value: "hd", label: "HD" },
+        ],
+        default: "standard",
+      },
+      {
+        key: "style",
+        label: "Стиль",
+        description:
+          "Vivid — насыщенные цвета, яркий и выразительный результат. Natural — более спокойный и реалистичный.",
+        type: "select",
+        options: [
+          { value: "vivid", label: "Vivid" },
+          { value: "natural", label: "Natural" },
+        ],
+        default: "vivid",
+      },
     ],
   },
 };
