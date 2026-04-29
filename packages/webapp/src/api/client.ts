@@ -130,7 +130,25 @@ export const api = {
         userStatus: string;
         referralCode: string | null;
       }>("/profile/partner-balance"),
-    metaboxSso: () => request<{ ssoUrl: string }>("/profile/metabox-sso"),
+    metaboxSso: () =>
+      request<
+        | { ssoUrl: string; requiresVerification?: undefined }
+        | { ssoUrl?: undefined; requiresVerification: true; email: string }
+      >("/profile/metabox-sso"),
+    metaboxStatus: () =>
+      request<{ linked: false } | { linked: true; emailVerified: boolean; email: string }>(
+        "/profile/metabox-status",
+      ),
+    metaboxResendVerification: () =>
+      request<{ ok: boolean; email: string; alreadyVerified?: boolean }>(
+        "/profile/metabox-resend-verification",
+        { method: "POST" },
+      ),
+    metaboxChangeEmail: (newEmail: string) =>
+      request<{ ok: boolean; email: string; warning?: string }>("/profile/metabox-change-email", {
+        method: "POST",
+        body: JSON.stringify({ newEmail }),
+      }),
     metaboxRegister: (
       email: string,
       password: string,

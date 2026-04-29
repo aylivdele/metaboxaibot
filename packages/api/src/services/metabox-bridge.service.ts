@@ -138,6 +138,32 @@ export async function registerFromBot(params: {
   });
 }
 
+/** Получить статус metabox-юзера: email + emailVerified.
+ *  Используется ботом чтобы решить — звать SSO или показать
+ *  «Подтвердите почту» pending-экран. */
+export async function getMetaboxUserStatus(
+  metaboxUserId: string,
+): Promise<{ email: string; emailVerified: boolean; name: string }> {
+  return get(`/user-status?metaboxUserId=${encodeURIComponent(metaboxUserId)}`);
+}
+
+/** Перевыпустить verification email — старый не дошёл, юзер потерял или
+ *  токен истёк. */
+export async function resendMetaboxVerification(
+  metaboxUserId: string,
+): Promise<{ ok: boolean; email: string; alreadyVerified?: boolean }> {
+  return post("/resend-verification", { metaboxUserId });
+}
+
+/** Сменить email на pending-аккаунте [юзер с ошибкой ввёл изначально]
+ *  и заново отправить письмо. Доступно только пока emailVerified=false. */
+export async function changeMetaboxEmailPending(
+  metaboxUserId: string,
+  newEmail: string,
+): Promise<{ ok: boolean; email: string; warning?: string }> {
+  return post("/change-email-pending", { metaboxUserId, newEmail });
+}
+
 /** Login existing Metabox user and link their Telegram account. */
 export async function loginAndLink(params: {
   email: string;

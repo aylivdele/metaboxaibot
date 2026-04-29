@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { TranslationKey } from "../i18n.js";
@@ -11,6 +11,13 @@ interface Props {
 }
 
 type Mode = "choose" | "register" | "login";
+
+interface PendingState {
+  email: string;
+  // "view" — показываем «проверьте почту» с кнопками,
+  // "change" — форма ввода нового email.
+  view: "view" | "change";
+}
 
 type TgWebApp = {
   openLink?: (url: string) => void;
@@ -52,9 +59,35 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
     siteMentor: { name: string; contact: string };
     botMentor: { name: string; contact: string };
   } | null>(null);
-  // После успешной регистрации [когда email требует подтверждения]
-  // показываем экран «Проверьте почту» и НЕ открываем SSO авто-логин.
-  const [verificationSent, setVerificationSent] = useState<{ email: string } | null>(null);
+  // pending = аккаунт уже привязан, но email НЕ подтверждён. Показываем
+  // экран «Проверьте почту» с кнопками «Отправить повторно» / «Изменить».
+  const [pending, setPending] = useState<PendingState | null>(null);
+  const [pendingNewEmail, setPendingNewEmail] = useState("");
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+
+  // На монтировании проверяем — может юзер уже зарегистрировался ранее
+  // и должен видеть pending-экран сразу [не choose].
+  useEffect(() => {
+    let cancelled = false;
+    api.profile
+      .metaboxStatus()
+      .then((status) => {
+        if (cancelled) return;
+        if (status.linked && !status.emailVerified) {
+          setPending({ email: status.email, view: "view" });
+        }
+      })
+      .catch(() => {
+        // Если статус не получили — продолжаем с choose как обычно.
+      })
+      .finally(() => {
+        if (!cancelled) setStatusLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const submit = async () => {
     if (!email.trim() || !password) return;
@@ -80,9 +113,10 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
 
       // При регистрации backend может вернуть requiresVerification — это
       // значит письмо с подтверждением отправлено, SSO-логин НЕ выдан.
-      // Показываем экран «Проверьте почту», не пытаемся открывать SSO.
+      // Показываем pending-экран «Проверьте почту», не открываем SSO.
       if ("requiresVerification" in result && result.requiresVerification) {
-        setVerificationSent({ email: result.email });
+        setPending({ email: result.email, view: "view" });
+        setPendingMessage("Письмо с подтверждением отправлено.");
         onSuccess?.();
         return;
       }
@@ -140,6 +174,59 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
     }
   };
 
+  const handleResend = async () => {
+    if (!pending) return;
+    setLoading(true);
+    setPendingMessage(null);
+    try {
+      const result = await api.profile.metaboxResendVerification();
+      if (result.alreadyVerified) {
+        setPendingMessage("Email уже подтверждён.");
+        // Перезагрузить — после verification попадём в основной flow.
+        const status = await api.profile.metaboxStatus();
+        if (status.linked && status.emailVerified) {
+          setPending(null);
+        }
+      } else {
+        setPendingMessage(`Письмо отправлено повторно на ${result.email}.`);
+      }
+    } catch (err: any) {
+      setPendingMessage(err?.error || "Не удалось отправить письмо. Попробуйте позже.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangeEmailSubmit = async () => {
+    if (!pending) return;
+    const newEmail = pendingNewEmail.trim();
+    if (!newEmail) return;
+    setLoading(true);
+    setPendingMessage(null);
+    setError(null);
+    try {
+      const result = await api.profile.metaboxChangeEmail(newEmail);
+      setPending({ email: result.email, view: "view" });
+      setPendingNewEmail("");
+      setPendingMessage(result.warning ?? `Письмо с подтверждением отправлено на ${result.email}.`);
+    } catch (err: any) {
+      const code = err?.code;
+      if (code === "EMAIL_EXISTS") {
+        setError("Этот email уже занят другим аккаунтом");
+      } else if (code === "SAME_EMAIL") {
+        setError("Это тот же email что был указан");
+      } else if (code === "INVALID_EMAIL") {
+        setError("Некорректный формат email");
+      } else if (code === "ALREADY_VERIFIED") {
+        setError("Email уже подтверждён, изменение через этот flow недоступно");
+      } else {
+        setError(err?.error || "Не удалось сменить email");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="page">
       <div className="page-header">
@@ -149,19 +236,79 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
         <h2>{t("linkMetabox.title")}</h2>
       </div>
 
-      {verificationSent && (
+      {pending && pending.view === "view" && (
         <div className="link-metabox-verification">
           <p className="page-subtitle">
-            Аккаунт создан. На <b>{verificationSent.email}</b> отправлено письмо с подтверждением.
-            Перейдите по ссылке из письма, затем войдите на сайте по своим email и паролю.
+            Email <b>{pending.email}</b> ещё не подтверждён. Мы отправили вам письмо со ссылкой
+            подтверждения. Откройте письмо и перейдите по ссылке, затем войдите на сайте по email и
+            паролю.
           </p>
-          <button className="primary-btn" onClick={onBack}>
+          {pendingMessage && (
+            <p className="page-subtitle" style={{ color: "var(--color-success)" }}>
+              {pendingMessage}
+            </p>
+          )}
+          {error && <div className="form-error">{error}</div>}
+          <button className="primary-btn" onClick={() => void handleResend()} disabled={loading}>
+            {loading ? t("common.loading") : "Отправить повторно"}
+          </button>
+          <button
+            className="secondary-btn"
+            onClick={() => {
+              setPending({ ...pending, view: "change" });
+              setPendingNewEmail("");
+              setPendingMessage(null);
+              setError(null);
+            }}
+            disabled={loading}
+          >
+            Изменить почту
+          </button>
+        </div>
+      )}
+
+      {pending && pending.view === "change" && (
+        <div className="link-metabox-form">
+          <p className="page-subtitle">
+            Введите новый email — мы перезапишем его в системе и отправим новое письмо с
+            подтверждением.
+          </p>
+
+          <div className="form-field">
+            <label className="form-label">Новый email</label>
+            <input
+              className="form-input"
+              type="email"
+              value={pendingNewEmail}
+              onChange={(e) => setPendingNewEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+          </div>
+
+          {error && <div className="form-error">{error}</div>}
+
+          <button
+            className="primary-btn"
+            onClick={() => void handleChangeEmailSubmit()}
+            disabled={loading || !pendingNewEmail.trim()}
+          >
+            {loading ? t("common.loading") : "Сохранить и отправить письмо"}
+          </button>
+          <button
+            className="secondary-btn"
+            onClick={() => {
+              setPending({ ...pending, view: "view" });
+              setError(null);
+            }}
+            disabled={loading}
+          >
             {t("common.back")}
           </button>
         </div>
       )}
 
-      {!verificationSent && mode === "choose" && (
+      {!pending && !statusLoading && mode === "choose" && (
         <div className="link-metabox-choose">
           <p className="page-subtitle">{t("linkMetabox.subtitle")}</p>
           <button className="primary-btn" onClick={() => setMode("register")}>
@@ -173,7 +320,7 @@ export function LinkMetaboxPage({ firstName, username, onBack, onSuccess }: Prop
         </div>
       )}
 
-      {!verificationSent && (mode === "register" || mode === "login") && (
+      {!pending && !statusLoading && (mode === "register" || mode === "login") && (
         <div className="link-metabox-form">
           <p className="page-subtitle">
             {mode === "register" ? t("linkMetabox.registerHint") : t("linkMetabox.loginHint")}

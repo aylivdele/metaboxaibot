@@ -144,7 +144,12 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
 
   /**
    * GET /profile/metabox-sso — get SSO redirect URL for linked Metabox account.
-   * Returns { ssoUrl } for already-linked users, 409 if not linked.
+   *
+   * Если аккаунт привязан, но email НЕ подтверждён — возвращаем
+   * { requiresVerification: true, email } вместо ssoUrl. UI покажет
+   * pending-экран с кнопками «Отправить повторно» / «Изменить почту»
+   * вместо попытки авто-логина [который всё равно отвалится из-за
+   * проверки emailVerified в SSO-провайдере metabox].
    */
   fastify.get("/profile/metabox-sso", async (request, reply) => {
     const { userId } = request as AuthRequest;
@@ -155,6 +160,22 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     if (!user?.metaboxUserId) {
       return reply.code(409).send({ error: "Metabox account not linked" });
     }
+
+    const { getMetaboxUserStatus } = await import("../services/metabox-bridge.service.js");
+    try {
+      const status = await getMetaboxUserStatus(user.metaboxUserId);
+      if (!status.emailVerified) {
+        return {
+          requiresVerification: true,
+          email: status.email,
+        };
+      }
+    } catch (err) {
+      // Если статус вытащить не удалось — продолжим как раньше [SSO
+      // провайдер metabox сам отрежет невалидированных].
+      console.error("[metabox-sso] failed to check user status:", err);
+    }
+
     const metaboxUrl = config.metabox.apiUrl ?? "https://app.meta-box.ru";
     let ssoToken: string;
     if (config.metabox.ssoSecret) {
@@ -164,6 +185,89 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       ssoToken = result.ssoToken;
     }
     return { ssoUrl: `${metaboxUrl}/auth/sso?token=${ssoToken}` };
+  });
+
+  /**
+   * GET /profile/metabox-status — статус metabox-аккаунта юзера.
+   * Используется UI чтобы понять — показывать pending-экран или открывать
+   * полный профиль.
+   */
+  fastify.get("/profile/metabox-status", async (request, reply) => {
+    const { userId } = request as AuthRequest;
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { metaboxUserId: true },
+    });
+    if (!user?.metaboxUserId) {
+      return { linked: false };
+    }
+    const { getMetaboxUserStatus } = await import("../services/metabox-bridge.service.js");
+    try {
+      const status = await getMetaboxUserStatus(user.metaboxUserId);
+      return {
+        linked: true,
+        emailVerified: status.emailVerified,
+        email: status.email,
+      };
+    } catch (err) {
+      console.error("[metabox-status] failed:", err);
+      return reply.code(502).send({ error: "Failed to fetch status" });
+    }
+  });
+
+  /**
+   * POST /profile/metabox-resend-verification — заново отправить
+   * verification-email на текущий адрес.
+   */
+  fastify.post("/profile/metabox-resend-verification", async (request, reply) => {
+    const { userId } = request as AuthRequest;
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { metaboxUserId: true },
+    });
+    if (!user?.metaboxUserId) {
+      return reply.code(409).send({ error: "Metabox account not linked" });
+    }
+    const { resendMetaboxVerification } = await import("../services/metabox-bridge.service.js");
+    try {
+      const result = await resendMetaboxVerification(user.metaboxUserId);
+      return result;
+    } catch (err) {
+      if (err instanceof MetaboxApiError) {
+        return reply.code(err.status).send({ error: err.body, code: err.code });
+      }
+      throw err;
+    }
+  });
+
+  /**
+   * POST /profile/metabox-change-email — поменять email на pending-аккаунте
+   * [когда юзер ошибся при регистрации] и переотправить верификацию.
+   * Body: { newEmail: string }
+   */
+  fastify.post("/profile/metabox-change-email", async (request, reply) => {
+    const { userId } = request as AuthRequest;
+    const { newEmail } = request.body as { newEmail?: string };
+    if (!newEmail) {
+      return reply.code(400).send({ error: "newEmail is required" });
+    }
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { metaboxUserId: true },
+    });
+    if (!user?.metaboxUserId) {
+      return reply.code(409).send({ error: "Metabox account not linked" });
+    }
+    const { changeMetaboxEmailPending } = await import("../services/metabox-bridge.service.js");
+    try {
+      const result = await changeMetaboxEmailPending(user.metaboxUserId, newEmail);
+      return result;
+    } catch (err) {
+      if (err instanceof MetaboxApiError) {
+        return reply.code(err.status).send({ error: err.body, code: err.code });
+      }
+      throw err;
+    }
   });
 
   /**
