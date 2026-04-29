@@ -291,8 +291,21 @@ export async function submitWithFallback<T, D extends object>(
         const isLong = cls.isLongWindow || cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS;
 
         if (isLong) {
-          // Provider-wide маркер: на TTL=cooldownMs провайдер заблокирован для всех job'ов.
-          void markProviderLongCooldown(keyProvider, cls.cooldownMs, cls.reason);
+          // Provider-wide marker блокирует ВСЕ ключи провайдера на cooldownMs.
+          // Ставим его ТОЛЬКО когда cooldownMs действительно длинный (>1ч) —
+          // это надёжный signal что провайдер реально лежит (например, вернул
+          // Retry-After: 3600+).
+          //
+          // Pattern-matched isLongWindow ("insufficient credits", "trial limit",
+          // "out of credits", "account suspended" и т.п.) с коротким cooldown
+          // (60с дефолт) — это per-account ошибка одного ключа, НЕ отказ всего
+          // провайдера. У соседних ключей того же провайдера деньги/доступ
+          // могут быть в порядке. Не блокируем их ради per-key проблемы —
+          // markRateLimited на конкретный keyId уже изолирует "плохой" ключ,
+          // следующий submit acquireKey'ем подберёт здоровый.
+          if (cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS) {
+            void markProviderLongCooldown(keyProvider, cls.cooldownMs, cls.reason);
+          }
           if (shouldNotify) {
             void notifyRateLimit({
               section: opts.section,
