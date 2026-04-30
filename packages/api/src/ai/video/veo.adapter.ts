@@ -5,7 +5,7 @@ import type {
   VideoResult,
   VideoValidationError,
 } from "./base.adapter.js";
-import { config } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog, logCall } from "../../utils/fetch.js";
 import { resolveImageMimeType } from "../../utils/mime-detect.js";
 import { logger } from "../../logger.js";
@@ -142,8 +142,8 @@ export class VeoAdapter implements VideoAdapter {
 
     const uri = operation.response?.generatedVideos?.[0]?.video?.uri;
     if (!uri) {
-      logger.error({ operation }, "Empty operation response");
-      throw new Error("Veo: no video URI in completed operation");
+      logger.warn({ operation }, "Veo: empty generatedVideos — content filtered");
+      throw new UserFacingError("Veo: content filtered", { key: "contentPolicyViolation" });
     }
     return { url: uri, filename: "veo.mp4" };
   }
