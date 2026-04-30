@@ -45,6 +45,11 @@ export { BOT_STATES, SECTION_BY_STATE, WELCOME_BONUS_TOKENS } from "./constants/
 export { PLANS } from "./constants/plans.js";
 export type { Plan } from "./constants/plans.js";
 export { ONE_SHOT_SETTING_KEYS } from "./constants/model-settings-keys.js";
+export {
+  VOICE_CLONE_RETURN_TTL_SECONDS,
+  voiceCloneReturnRedisKey,
+} from "./constants/voice-clone-return.js";
+export type { VoiceCloneReturnTarget } from "./constants/voice-clone-return.js";
 
 // Errors
 export {

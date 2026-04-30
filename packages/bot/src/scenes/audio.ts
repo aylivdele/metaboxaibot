@@ -4,6 +4,7 @@ import { audioGenerationService, userStateService } from "@metabox/api/services"
 import { acquireKey, recordSuccess, recordError } from "@metabox/api/services/key-pool";
 import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
 import { db } from "@metabox/api/db";
+import { getRedis } from "@metabox/api/redis";
 import { evictOneElevenLabsVoice } from "@metabox/api/services/user-voice";
 import {
   AI_MODELS,
@@ -12,6 +13,7 @@ import {
   resolveModelDisplay,
   UserFacingError,
   resolveUserFacingError,
+  voiceCloneReturnRedisKey,
 } from "@metabox/shared";
 import { logger } from "../logger.js";
 import { buildCostLine } from "../utils/cost-line.js";
@@ -19,6 +21,7 @@ import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-err
 import { transcribeAndReply } from "../utils/voice-transcribe.js";
 import { uploadBuffer, buildS3Key } from "@metabox/api/services/s3";
 import { acquireLock, releaseLock } from "../utils/dedup.js";
+import { activateVideoModel } from "./video.js";
 
 // ── Sub-section entry points ──────────────────────────────────────────────────
 
@@ -31,6 +34,15 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
 
   await userStateService.setState(ctx.user.id, "AUDIO_ACTIVE", "audio");
   await userStateService.setModelForSection(ctx.user.id, "audio", modelId);
+
+  // Voice-clone activated outside the dedicated webapp button → drop any
+  // pending HeyGen-return marker, otherwise the user's next clone here would
+  // unexpectedly bounce them back to HeyGen.
+  if (modelId === "voice-clone") {
+    await getRedis()
+      .del(voiceCloneReturnRedisKey(ctx.user.id))
+      .catch(() => void 0);
+  }
 
   const instructions: Record<string, string> = {
     "tts-openai": ctx.t.audio.ttsActivated,
@@ -183,11 +195,31 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     await ctx.reply(ctx.t.audio.voiceCloneSuccess.replace("{name}", name));
+
+    // If the clone was launched from the HeyGen voice picker (webapp button),
+    // bring the user back to HeyGen as the active video model so they can
+    // immediately use the voice they just cloned.
+    const redis = getRedis();
+    const returnKey = voiceCloneReturnRedisKey(ctx.user.id);
+    const returnTarget = await redis.get(returnKey).catch(() => null);
+    if (returnTarget) {
+      await redis.del(returnKey).catch(() => void 0);
+      if (returnTarget === "heygen") {
+        await activateVideoModel(ctx, "heygen").catch((reactivateErr) =>
+          logger.warn(reactivateErr, "Voice clone return: failed to re-activate HeyGen"),
+        );
+      }
+    }
   } catch (err) {
     await releaseLock(lockKey);
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     logger.error(err, "Voice clone error");
     await ctx.reply(ctx.t.audio.voiceCloneFailed);
+    // Drop any pending return marker — we don't want to silently re-activate
+    // HeyGen on the next unrelated voice the user sends.
+    await getRedis()
+      .del(voiceCloneReturnRedisKey(ctx.user.id))
+      .catch(() => void 0);
   }
 }
 

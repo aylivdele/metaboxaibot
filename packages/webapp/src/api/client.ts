@@ -374,6 +374,11 @@ export const api = {
   userVoices: {
     list: (provider?: string) =>
       request<UserVoice[]>(provider ? `/user-voices?provider=${provider}` : "/user-voices"),
+    startCreation: (returnTo?: "heygen") =>
+      request<{ ok: boolean }>("/user-voices/start-creation", {
+        method: "POST",
+        body: JSON.stringify(returnTo ? { returnTo } : {}),
+      }),
     rename: (id: string, name: string) =>
       request<UserVoice>(`/user-voices/${id}`, {
         method: "PATCH",
