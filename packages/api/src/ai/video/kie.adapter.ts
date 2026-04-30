@@ -309,6 +309,13 @@ export class KieVideoAdapter implements VideoAdapter {
           params: { min: durationMatch[1], max: durationMatch[2] },
         });
       }
+      const dimMatch = /image dimensions must be at least (\d+) pixels/i.exec(msg);
+      if (dimMatch) {
+        throw new UserFacingError(`KIE: ${msg}`, {
+          key: "kieImageTooSmall",
+          params: { min: dimMatch[1] },
+        });
+      }
       throw new Error(`KIE submit failed: ${data.code} — ${data.msg}`);
     }
     return data.data.taskId;

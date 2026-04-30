@@ -20,7 +20,7 @@ const SYSTEM_PROMPT =
  * (digits, punctuation, whitespace, emoji) are ignored — they are
  * language-neutral and shouldn't force a translation call.
  */
-function looksEnglish(text: string): boolean {
+export function looksEnglish(text: string): boolean {
   for (const ch of text) {
     const cp = ch.codePointAt(0)!;
     // Skip ASCII non-letters, whitespace, and characters outside BMP letter

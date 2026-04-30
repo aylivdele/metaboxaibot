@@ -6,6 +6,7 @@ import {
   userAvatarService,
   describeImageForPrompt,
   probeImageMetadata,
+  looksEnglish,
 } from "@metabox/api/services";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
@@ -484,6 +485,16 @@ export async function executeDesignPrompt(
     }
   }
 
+  // English-only models: validate prompt language before enqueuing
+  const model = AI_MODELS[modelId];
+  if (prompt && model?.settings?.some((s) => s.key === "auto_translate_prompt")) {
+    const allSettings = await userStateService.getModelSettings(ctx.user.id);
+    if (allSettings[modelId]?.auto_translate_prompt !== true && !looksEnglish(prompt)) {
+      await ctx.reply(ctx.t.errors.promptNotEnglish);
+      return;
+    }
+  }
+
   // Higgsfield Soul pre-flight: must have a created+selected character avatar.
   if (modelId === "higgsfield-soul") {
     const allSettings = await userStateService.getModelSettings(ctx.user.id);
@@ -829,6 +840,15 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
   if (caption) {
     const chatId = ctx.chat?.id;
     if (!chatId) return;
+
+    // English-only models: validate prompt language before enqueuing
+    if (model?.settings?.some((s) => s.key === "auto_translate_prompt")) {
+      const allSettings = await userStateService.getModelSettings(ctx.user.id);
+      if (allSettings[modelId]?.auto_translate_prompt !== true && !looksEnglish(caption)) {
+        await ctx.reply(ctx.t.errors.promptNotEnglish);
+        return;
+      }
+    }
 
     // If model has media input slots, save the photo to the first slot
     let mediaInputs: Record<string, string[]> | undefined;

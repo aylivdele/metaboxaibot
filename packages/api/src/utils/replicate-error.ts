@@ -7,7 +7,7 @@
  */
 
 /** Codes that indicate a user-correctable problem. */
-const USER_FACING_CODES = new Set(["E1001", "E9243", "E9825"]);
+const USER_FACING_CODES = new Set(["E006", "E1001", "E9243", "E9825"]);
 
 export class ReplicatePredictionError extends Error {
   constructor(
@@ -44,6 +44,8 @@ export function getReplicateUserMessage(
 ): string {
   const e = t.errors;
   switch (err.code) {
+    case "E006":
+      return e.replicateContentPolicy;
     case "E1001":
       return e.replicateOom;
     case "E9243":
