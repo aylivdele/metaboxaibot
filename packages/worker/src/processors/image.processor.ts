@@ -45,6 +45,7 @@ import type { AIModel } from "@metabox/shared";
 import type { DeductResult } from "@metabox/api/services";
 import { notifyTechError, notifyRateLimit, notifyFallback } from "../utils/notify-error.js";
 import { isKieFiveXxError } from "@metabox/api/utils/kie-error";
+import { isProviderTemporaryUnavailable } from "@metabox/api/utils/provider-unavailable-error";
 import { isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import { submitWithFallback } from "../utils/submit-with-fallback.js";
 import { deriveLockedProvider, detectUsedFallback } from "../utils/fallback-state.js";
@@ -686,6 +687,8 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
                     cooldownMs: cls.cooldownMs,
                     reason: cls.reason,
                     isLongWindow: true,
+                    err,
+                    jobId: dbJobId,
                   });
                   lastSubError = `long-window: ${message.slice(0, 200)}`;
                   continue; // → следующий кандидат (long-window триггерит fallback)
@@ -697,6 +700,8 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
                   cooldownMs: cls.cooldownMs,
                   reason: cls.reason,
                   isLongWindow: false,
+                  err,
+                  jobId: dbJobId,
                 });
                 lastSubError = `rate-limit: ${message.slice(0, 200)}`;
                 break;
@@ -1351,6 +1356,121 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
     const dbJobForRl = await db.generationJob
       .findUnique({ where: { id: dbJobId }, select: { providerKeyId: true } })
       .catch(() => null);
+
+    // ── Poll-stage re-submit на per-account long-window 429 ─────────────
+    // Провайдеры (KIE/evolink, Google и т.п.) иногда сообщают billing-quota
+    // только в poll-ответе. Сама генерация ещё не выполнялась — кредиты
+    // юзера не списаны (deductTokens вызывается на финализации после успеха).
+    // Маркаем sticky-ключ как throttled и re-enqueue'им job на submit-стадию:
+    // acquireKey priority-логикой возьмёт другой ключ из пула.
+    if (stage === "poll" && dbJobForRl?.providerKeyId) {
+      const cls = classifyRateLimit(err, modelMeta?.provider);
+      if (cls.isRateLimit && cls.isLongWindow && cls.cooldownMs <= LONG_WINDOW_THRESHOLD_MS) {
+        await markRateLimited(dbJobForRl.providerKeyId, cls.cooldownMs, cls.reason);
+        logger.warn(
+          {
+            dbJobId,
+            modelId,
+            keyId: dbJobForRl.providerKeyId,
+            cooldownMs: cls.cooldownMs,
+            reason: cls.reason,
+          },
+          "Image poll: per-account long-window quota — re-enqueuing on submit stage with fresh key",
+        );
+        await db.generationJob.update({
+          where: { id: dbJobId },
+          data: { providerJobId: null, providerKeyId: null },
+        });
+        await delayJob(
+          job,
+          {
+            ...job.data,
+            stage: undefined,
+            pollStartedAt: undefined,
+            lastIntervalMs: undefined,
+          },
+          1000,
+          token,
+        );
+      }
+    }
+
+    // ── Poll-stage re-submit на provider temporary unavailable ──────────
+    // KIE 422 "high demand" / "service is currently unavailable" и т.п. —
+    // узел провайдера перегружен; defer + retry на том же провайдере не помогает.
+    // Если есть неиспользованный fallback-кандидат (другая модель/провайдер) —
+    // переключаемся на него: чистим providerJobId/Key + добавляем текущий
+    // effective в attemptedProviders + re-enqueue на submit-стадию. Submit
+    // через skipProviders пропустит примари и возьмёт следующего кандидата.
+    // Без fallback fall-through на rate-limit defer-цикл (legacy behavior).
+    if (stage === "poll" && isProviderTemporaryUnavailable(err) && modelMeta) {
+      const requestedN = job.data.numImages ?? 1;
+      const isVirtualBatchNow = requestedN > 1 && (modelMeta?.nativeBatchMax ?? 1) === 1;
+      if (!isVirtualBatchNow) {
+        const dbJob = await db.generationJob.findUnique({
+          where: { id: dbJobId },
+          select: { inputData: true },
+        });
+        const inputData = (dbJob?.inputData as Record<string, unknown> | null | undefined) ?? {};
+        const fbStateNow =
+          (inputData.fallback as
+            | { effectiveProvider?: string; attemptedProviders?: string[] }
+            | undefined) ?? {};
+        const currentEff = fbStateNow.effectiveProvider ?? modelMeta.provider;
+        const alreadyAttempted = new Set(fbStateNow.attemptedProviders ?? []);
+        alreadyAttempted.add(currentEff);
+
+        const fallbackCandidatesNow = getFallbackCandidates(modelId, "design").filter((m) =>
+          isFallbackCompatible(m, job.data.mediaInputs),
+        );
+        const nextCandidate = fallbackCandidatesNow.find((m) => !alreadyAttempted.has(m.provider));
+
+        if (nextCandidate) {
+          logger.warn(
+            { dbJobId, modelId, currentEff, next: nextCandidate.provider },
+            "Image poll: provider temporary unavailable — re-enqueuing on fallback",
+          );
+          await notifyFallback({
+            section: "image",
+            modelId,
+            primaryProvider: modelMeta.provider,
+            fallbackProvider: nextCandidate.provider,
+            reason: "persistent_5xx",
+            jobId: dbJobId,
+            userId: userIdStr,
+          });
+
+          const merged = {
+            ...inputData,
+            fallback: {
+              primaryProvider: modelMeta.provider,
+              attemptedProviders: Array.from(alreadyAttempted),
+            },
+          };
+          await db.generationJob.update({
+            where: { id: dbJobId },
+            data: {
+              providerJobId: null,
+              providerKeyId: null,
+              inputData: merged as unknown as Prisma.InputJsonValue,
+            },
+          });
+
+          await delayJob(
+            job,
+            {
+              ...job.data,
+              stage: undefined,
+              pollStartedAt: undefined,
+              lastIntervalMs: undefined,
+            },
+            1000,
+            token,
+          );
+        }
+      }
+    }
+
     await deferIfRateLimitOverload({
       err,
       job,

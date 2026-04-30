@@ -86,6 +86,7 @@ export function StandaloneCard({
             settings={model.settings}
             values={allModelSettings[model.id] ?? {}}
             onChange={onSettingChange}
+            modeId={selectedModeId ?? model.modes?.find((m) => m.default)?.id}
           />
         </div>
       )}

@@ -49,7 +49,25 @@ const LONG_WINDOW_PATTERNS: RegExp[] = [
   /credit exhausted/i,
   /account.*suspended/i,
   /tier limit/i,
+  // Google AI Studio / Gemini / Veo: при превышении billing-quota шлют 429
+  // с message "You exceeded your current quota, please check your plan and
+  // billing details." Это per-account/project лимит — другие наши ключи
+  // могут быть ещё в порядке, поэтому per-key throttle (а не provider-wide).
+  /exceeded your (current )?quota/i,
 ];
+
+/**
+ * Default cooldown (per-key) for pattern-matched long-window quotas without
+ * explicit Retry-After header. Bumped from 60s default к 1h: дневные/месячные
+ * квоты обычно живут долго, 60-секундный throttle почти бесполезен — после
+ * него мы тут же снова хватаем тот же 429.
+ *
+ * Намеренно равен LONG_WINDOW_THRESHOLD_MS (НЕ строго больше) — submit-fallback
+ * gate `cooldownMs > LONG_WINDOW_THRESHOLD_MS` НЕ срабатывает, provider-wide
+ * marker не ставим. Per-account quota блокирует только конкретный ключ;
+ * соседние ключи провайдера остаются в пуле.
+ */
+const LONG_WINDOW_PATTERN_COOLDOWN_MS = 60 * 60 * 1000;
 
 /** Patterns that mark an error as rate-limit / concurrency related.
  *
@@ -162,12 +180,23 @@ export function classifyRateLimit(err: unknown, provider?: string): RateLimitCla
 
   const baseCooldown =
     (provider ? COOLDOWN_MS[provider.toLowerCase()] : undefined) ?? DEFAULT_COOLDOWN_MS;
-  const cooldownMs = retryAfterMs && retryAfterMs > 0 ? retryAfterMs : baseCooldown;
 
-  const isLongWindow =
-    LONG_WINDOW_PATTERNS.some((p) => p.test(message)) || cooldownMs > LONG_WINDOW_THRESHOLD_MS;
+  const matchedLongWindow = LONG_WINDOW_PATTERNS.some((p) => p.test(message));
 
-  const reason = `${status ?? code ?? "rate_limit"}: ${message.slice(0, 160)}`;
+  // Cooldown precedence: explicit Retry-After > pattern-matched long-window
+  // (1h) > provider default (60s). Без bump'а до 1h pattern-matched квоты
+  // не давали меняться ключам — markRateLimited на 60с и тот же ключ снова
+  // хватал тот же 429.
+  const cooldownMs =
+    retryAfterMs && retryAfterMs > 0
+      ? retryAfterMs
+      : matchedLongWindow
+        ? LONG_WINDOW_PATTERN_COOLDOWN_MS
+        : baseCooldown;
+
+  const isLongWindow = matchedLongWindow || cooldownMs > LONG_WINDOW_THRESHOLD_MS;
+
+  const reason = `${status ?? code ?? "rate_limit"}: ${message}`;
 
   return { isRateLimit: true, cooldownMs, isLongWindow, reason };
 }

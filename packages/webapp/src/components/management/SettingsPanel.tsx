@@ -69,9 +69,16 @@ interface SettingsPanelProps {
   settings: ModelSettingDef[];
   values: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
+  /**
+   * Активный режим (id из ModelMode, например "t2v"/"i2v"/"r2v"). Если задан,
+   * прокидывается в effectiveValues под synthetic-ключом `_mode` — это позволяет
+   * `unavailableIf` правилам ссылаться на режим (например, скрыть/задизейблить
+   * опции длительности в r2v режиме где провайдер фиксирует duration).
+   */
+  modeId?: string;
 }
 
-export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps) {
+export function SettingsPanel({ settings, values, onChange, modeId }: SettingsPanelProps) {
   const { locale, t } = useI18n();
   const settingLocale = SETTING_TRANSLATIONS[locale] ?? SETTING_TRANSLATIONS["en"] ?? {};
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -83,6 +90,10 @@ export function SettingsPanel({ settings, values, onChange }: SettingsPanelProps
   const effectiveValues: Record<string, unknown> = {};
   for (const def of settings) {
     effectiveValues[def.key] = values[def.key] !== undefined ? values[def.key] : def.default;
+  }
+  // Synthetic key `_mode` для unavailableIf-правил, зависящих от текущего режима.
+  if (modeId !== undefined) {
+    effectiveValues._mode = modeId;
   }
 
   const basicSettings = settings.filter((s) => !s.advanced);

@@ -12,6 +12,7 @@ import { HiggsFieldAdapter } from "./higgsfield.adapter.js";
 import { AlibabaVideoAdapter } from "./alibaba.adapter.js";
 import { MinimaxVideoAdapter } from "./minimax.adapter.js";
 import { KieVideoAdapter } from "./kie.adapter.js";
+import { KieVeoAdapter } from "./kie-veo.adapter.js";
 import { EvolinkVideoAdapter } from "./evolink.adapter.js";
 import { buildProxyFetch } from "../transport/proxy-fetch.js";
 import type { AdapterContext } from "../with-pool.js";
@@ -69,6 +70,12 @@ export function createVideoAdapter(
     case "higgsfield":
       return new HiggsFieldAdapter(modelId, apiKey, undefined, fetchFn);
     case "kie":
+      // Veo 3.1 имеет собственные эндпоинты (/api/v1/veo/generate +
+      // /api/v1/veo/record-info) и shape ответа, отличный от unified Market
+      // jobs API — отдельный adapter.
+      if (modelId === "veo" || modelId === "veo-fast") {
+        return new KieVeoAdapter(modelId, apiKey, fetchFn);
+      }
       return new KieVideoAdapter(modelId, apiKey, fetchFn);
     case "evolink":
       return new EvolinkVideoAdapter(modelId, apiKey, fetchFn);

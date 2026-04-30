@@ -103,6 +103,10 @@
       "types": "./src/utils/kie-error.ts",
       "default": "./dist/utils/kie-error.js"
     },
+    "./utils/provider-unavailable-error": {
+      "types": "./src/utils/provider-unavailable-error.ts",
+      "default": "./dist/utils/provider-unavailable-error.js"
+    },
     "./utils/fetch": {
       "types": "./src/utils/fetch.ts",
       "default": "./dist/utils/fetch.js"

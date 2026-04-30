@@ -255,6 +255,8 @@ export default {
       "❌ The image is too large ({actualW}×{actualH} px). Maximum size is {maxW}×{maxH} px.",
     mediaSlotReadMetadataFailed: "❌ Failed to read file metadata. Check the format and try again.",
     kieVideoDurationOutOfRange: "❌ Video duration must be between {min} and {max} seconds.",
+    kieImageTooSmall:
+      "❌ The image is too small — both sides must be at least {min} px. Please send a larger photo.",
     mediaSlotImagesOnly:
       "❌ This slot only accepts photos. Videos are not supported — please send a photo.",
     contentPolicyViolation:
@@ -377,6 +379,10 @@ export default {
       "❌ Generation failed to start due to invalid parameters. Please check your settings and try again.",
     replicateFileTooLarge:
       "❌ Failed to upload the file for generation. Please check the size (usually up to 50 MB) and file format.",
+    replicateContentPolicy:
+      "❌ Request rejected by the model. Possible reasons: content policy violation or unsupported file format. Try modifying your prompt or use a different image.",
+    promptNotEnglish:
+      '❌ This model only accepts prompts in English. To automatically translate your prompt, enable "Auto-translate prompt" in ⚙ Management.',
     // Fal
     falContentPolicy:
       "❌ Your request was rejected due to a content policy violation. Please modify your prompt and try again.",

@@ -45,6 +45,7 @@ import {
 import type { AIModel } from "@metabox/shared";
 import { notifyTechError, notifyFallback } from "../utils/notify-error.js";
 import { isKieFiveXxError } from "@metabox/api/utils/kie-error";
+import { isProviderTemporaryUnavailable } from "@metabox/api/utils/provider-unavailable-error";
 import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import { submitWithFallback } from "../utils/submit-with-fallback.js";
 import { computeSeedance2BillableUsd } from "../utils/seedance2-billing.js";
@@ -54,7 +55,8 @@ import {
   acquireForSubmitSticky,
 } from "../utils/acquire-for-processor.js";
 import { resolveKeyProvider, resolveKeyProviderForModel } from "@metabox/api/ai/key-provider";
-import { acquireById } from "@metabox/api/services/key-pool";
+import { acquireById, markRateLimited } from "@metabox/api/services/key-pool";
+import { classifyRateLimit, LONG_WINDOW_THRESHOLD_MS } from "@metabox/api/utils/rate-limit-error";
 import type { AcquiredKey } from "@metabox/api/services/key-pool";
 import type { Prisma } from "@prisma/client";
 import { userAvatarService } from "@metabox/api/services/user-avatar";
@@ -715,6 +717,119 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
     const dbJobForRl = await db.generationJob
       .findUnique({ where: { id: dbJobId }, select: { providerKeyId: true } })
       .catch(() => null);
+
+    // ── Poll-stage re-submit на per-account long-window 429 ─────────────
+    // Провайдеры (Google Veo и т.п.) иногда сообщают billing-quota только в
+    // poll-ответе, а не на submit'е. Сама генерация ещё не выполнялась —
+    // кредиты юзера не списаны (deductTokens вызывается после успеха в
+    // Stage 3). Маркаем sticky-ключ как throttled и re-enqueue'им job на
+    // submit-стадию: acquireKey priority-логикой возьмёт другой ключ из пула.
+    //
+    // Ограничения:
+    //  - Только когда cooldownMs ≤ LONG_WINDOW_THRESHOLD_MS (per-account).
+    //    cooldownMs > 1ч это provider-wide outage — попадёт в обычный
+    //    deferIfRateLimitOverload + RateLimitLongWindowError flow.
+    //  - Только если есть hint что другой ключ может помочь (есть keyId).
+    //    Без keyId (env-fallback режим) re-submit ничего не поменяет.
+    if (stage === "poll" && dbJobForRl?.providerKeyId) {
+      const cls = classifyRateLimit(err, modelMeta?.provider);
+      if (cls.isRateLimit && cls.isLongWindow && cls.cooldownMs <= LONG_WINDOW_THRESHOLD_MS) {
+        await markRateLimited(dbJobForRl.providerKeyId, cls.cooldownMs, cls.reason);
+        logger.warn(
+          {
+            dbJobId,
+            modelId,
+            keyId: dbJobForRl.providerKeyId,
+            cooldownMs: cls.cooldownMs,
+            reason: cls.reason,
+          },
+          "Video poll: per-account long-window quota — re-enqueuing on submit stage with fresh key",
+        );
+        await db.generationJob.update({
+          where: { id: dbJobId },
+          data: { providerJobId: null, providerKeyId: null },
+        });
+        await delayJob(
+          job,
+          {
+            ...job.data,
+            stage: undefined,
+            pollStartedAt: undefined,
+            lastIntervalMs: undefined,
+          },
+          1000,
+          token,
+        );
+      }
+    }
+
+    // ── Poll-stage re-submit на provider temporary unavailable ──────────
+    // KIE 422 "high demand" / "service is currently unavailable" и т.п. —
+    // узел провайдера перегружен; defer + retry на том же провайдере не помогает.
+    // Если есть неиспользованный fallback-кандидат (другая модель/провайдер) —
+    // переключаемся: чистим providerJobId/Key + добавляем текущий effective
+    // в attemptedProviders + re-enqueue на submit-стадию.
+    if (stage === "poll" && isProviderTemporaryUnavailable(err) && modelMeta) {
+      const dbJob = await db.generationJob.findUnique({
+        where: { id: dbJobId },
+        select: { inputData: true },
+      });
+      const inputData = (dbJob?.inputData as Record<string, unknown> | null | undefined) ?? {};
+      const fbStateNow =
+        (inputData.fallback as
+          | { effectiveProvider?: string; attemptedProviders?: string[] }
+          | undefined) ?? {};
+      const currentEff = fbStateNow.effectiveProvider ?? modelMeta.provider;
+      const alreadyAttempted = new Set(fbStateNow.attemptedProviders ?? []);
+      alreadyAttempted.add(currentEff);
+
+      const nextCandidate = fallbackCandidates.find((m) => !alreadyAttempted.has(m.provider));
+
+      if (nextCandidate) {
+        logger.warn(
+          { dbJobId, modelId, currentEff, next: nextCandidate.provider },
+          "Video poll: provider temporary unavailable — re-enqueuing on fallback",
+        );
+        await notifyFallback({
+          section: "video",
+          modelId,
+          primaryProvider: modelMeta.provider,
+          fallbackProvider: nextCandidate.provider,
+          reason: "persistent_5xx",
+          jobId: dbJobId,
+          userId: userIdStr,
+        });
+
+        const merged = {
+          ...inputData,
+          fallback: {
+            primaryProvider: modelMeta.provider,
+            attemptedProviders: Array.from(alreadyAttempted),
+          },
+        };
+        await db.generationJob.update({
+          where: { id: dbJobId },
+          data: {
+            providerJobId: null,
+            providerKeyId: null,
+            inputData: merged as unknown as Prisma.InputJsonValue,
+          },
+        });
+
+        await delayJob(
+          job,
+          {
+            ...job.data,
+            stage: undefined,
+            pollStartedAt: undefined,
+            lastIntervalMs: undefined,
+          },
+          1000,
+          token,
+        );
+      }
+    }
+
     await deferIfRateLimitOverload({
       err,
       job,
