@@ -132,16 +132,52 @@ export interface RateLimitNotificationContext {
   cooldownMs: number;
   reason: string;
   isLongWindow: boolean;
+  /**
+   * Оригинальная ошибка для serializeError — полное тело ответа провайдера,
+   * cause-chain, code/syscall. Без этого alert обрезает body на ~160 символах
+   * (cls.reason идёт усечённый из classifyRateLimit).
+   */
+  err?: unknown;
+  /**
+   * BullMQ/DB jobId для dedup'а через Redis. Без него один и тот же job на
+   * каждом retry'е (раз в cooldownMs ≈ минуту) спамил тех-канал. Если не
+   * указан — dedup по `modelId:reason-hash` (более грубо, но всё равно гасит).
+   */
+  jobId?: string;
+}
+
+/** Минимум на сколько душим повторы алертов за один rate-limit эпизод. */
+const RATE_LIMIT_ALERT_MIN_TTL_MS = 10 * 60 * 1000;
+
+function shortHash(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h).toString(36);
 }
 
 /**
  * Sends a rate-limit / throttle notification to ALERT_CHAT_ID. Distinct from
  * `notifyTechError` so the on-call thread can be filtered visually.
  * Does not throw — always resolves.
+ *
+ * Dedup: одна и та же rate-limit ошибка одного job'а (или одной модели если
+ * jobId не пришёл) шлёт alert один раз за TTL = max(cooldownMs * 6,
+ * RATE_LIMIT_ALERT_MIN_TTL_MS). До этого фикса каждый retry job'а (раз в
+ * cooldownMs) генерировал отдельный alert.
  */
 export async function notifyRateLimit(ctx: RateLimitNotificationContext): Promise<void> {
   const chatId = config.alerts.chatId;
   if (!chatId) return;
+
+  // Dedup. Ключ включает jobId если есть — иначе по modelId+reason-hash чтобы
+  // одинаковые rate-limit'ы разных задач на одной модели всё-таки гасились.
+  const dedupSuffix = ctx.jobId ?? shortHash(ctx.reason);
+  const dedupKey = `alert:ratelimit:${ctx.modelId}:${dedupSuffix}`;
+  const ttl = Math.max(ctx.cooldownMs * 6, RATE_LIMIT_ALERT_MIN_TTL_MS);
+  const setResult = await getRedis()
+    .set(dedupKey, ctx.reason.slice(0, 80), "PX", ttl, "NX")
+    .catch(() => null);
+  if (setResult !== "OK") return;
 
   const threadId = config.alerts.threadId;
 
@@ -155,11 +191,18 @@ export async function notifyRateLimit(ctx: RateLimitNotificationContext): Promis
       ? `${Math.round(ctx.cooldownMs / 60_000)}m`
       : `${Math.round(ctx.cooldownMs / 1000)}s`;
 
-  const text = [
-    header,
-    `cooldown: <code>${cooldownLabel}</code>`,
-    `<pre>${escapeHtml(ctx.reason.slice(0, 1500))}</pre>`,
-  ].join("\n");
+  // Если есть оригинальный err — сериализуем полностью (тело провайдера,
+  // cause-chain, code/syscall). Иначе fallback на (усечённый) cls.reason.
+  const body = ctx.err !== undefined ? serializeError(ctx.err) : ctx.reason;
+
+  const meta: string[] = [`cooldown: <code>${cooldownLabel}</code>`];
+  if (ctx.jobId) meta.push(`job: <code>${ctx.jobId}</code>`);
+
+  // Telegram cap 4096; оставляем запас на header/meta/HTML escaping.
+  const maxBodyLen = 3500 - header.length - meta.join(" | ").length;
+  const truncated = body.length > maxBodyLen ? body.slice(0, maxBodyLen) + "\n…[truncated]" : body;
+
+  const text = [header, meta.join(" | "), `<pre>${escapeHtml(truncated)}</pre>`].join("\n");
 
   await telegram
     .sendMessage(chatId, text, {

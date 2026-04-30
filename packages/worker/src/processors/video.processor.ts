@@ -54,7 +54,8 @@ import {
   acquireForSubmitSticky,
 } from "../utils/acquire-for-processor.js";
 import { resolveKeyProvider, resolveKeyProviderForModel } from "@metabox/api/ai/key-provider";
-import { acquireById } from "@metabox/api/services/key-pool";
+import { acquireById, markRateLimited } from "@metabox/api/services/key-pool";
+import { classifyRateLimit, LONG_WINDOW_THRESHOLD_MS } from "@metabox/api/utils/rate-limit-error";
 import type { AcquiredKey } from "@metabox/api/services/key-pool";
 import type { Prisma } from "@prisma/client";
 import { userAvatarService } from "@metabox/api/services/user-avatar";
@@ -715,6 +716,52 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
     const dbJobForRl = await db.generationJob
       .findUnique({ where: { id: dbJobId }, select: { providerKeyId: true } })
       .catch(() => null);
+
+    // ── Poll-stage re-submit на per-account long-window 429 ─────────────
+    // Провайдеры (Google Veo и т.п.) иногда сообщают billing-quota только в
+    // poll-ответе, а не на submit'е. Сама генерация ещё не выполнялась —
+    // кредиты юзера не списаны (deductTokens вызывается после успеха в
+    // Stage 3). Маркаем sticky-ключ как throttled и re-enqueue'им job на
+    // submit-стадию: acquireKey priority-логикой возьмёт другой ключ из пула.
+    //
+    // Ограничения:
+    //  - Только когда cooldownMs ≤ LONG_WINDOW_THRESHOLD_MS (per-account).
+    //    cooldownMs > 1ч это provider-wide outage — попадёт в обычный
+    //    deferIfRateLimitOverload + RateLimitLongWindowError flow.
+    //  - Только если есть hint что другой ключ может помочь (есть keyId).
+    //    Без keyId (env-fallback режим) re-submit ничего не поменяет.
+    if (stage === "poll" && dbJobForRl?.providerKeyId) {
+      const cls = classifyRateLimit(err, modelMeta?.provider);
+      if (cls.isRateLimit && cls.isLongWindow && cls.cooldownMs <= LONG_WINDOW_THRESHOLD_MS) {
+        await markRateLimited(dbJobForRl.providerKeyId, cls.cooldownMs, cls.reason);
+        logger.warn(
+          {
+            dbJobId,
+            modelId,
+            keyId: dbJobForRl.providerKeyId,
+            cooldownMs: cls.cooldownMs,
+            reason: cls.reason,
+          },
+          "Video poll: per-account long-window quota — re-enqueuing on submit stage with fresh key",
+        );
+        await db.generationJob.update({
+          where: { id: dbJobId },
+          data: { providerJobId: null, providerKeyId: null },
+        });
+        await delayJob(
+          job,
+          {
+            ...job.data,
+            stage: undefined,
+            pollStartedAt: undefined,
+            lastIntervalMs: undefined,
+          },
+          1000,
+          token,
+        );
+      }
+    }
+
     await deferIfRateLimitOverload({
       err,
       job,

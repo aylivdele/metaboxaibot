@@ -75,6 +75,8 @@ export async function deferIfRateLimitOverload<
     cooldownMs: cls.cooldownMs,
     reason: cls.reason,
     isLongWindow: cls.isLongWindow,
+    err,
+    jobId: job.id,
   });
 
   const delay = cls.cooldownMs + Math.floor(Math.random() * JITTER_MS);

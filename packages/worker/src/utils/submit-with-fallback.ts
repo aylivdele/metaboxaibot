@@ -313,6 +313,8 @@ export async function submitWithFallback<T, D extends object>(
               cooldownMs: cls.cooldownMs,
               reason: cls.reason,
               isLongWindow: true,
+              err,
+              jobId: opts.jobId,
             });
           }
           attempts.push({
@@ -334,6 +336,8 @@ export async function submitWithFallback<T, D extends object>(
             cooldownMs: cls.cooldownMs,
             reason: cls.reason,
             isLongWindow: false,
+            err,
+            jobId: opts.jobId,
           });
         }
         const delay = withJitter(cls.cooldownMs);

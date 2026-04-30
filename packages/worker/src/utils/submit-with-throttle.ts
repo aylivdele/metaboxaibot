@@ -138,27 +138,46 @@ export async function submitWithThrottle<T, D extends object>(
         cooldownMs: cls.cooldownMs,
         reason: cls.reason,
         isLongWindow: cls.isLongWindow,
+        err,
       });
     }
 
-    if (cls.isLongWindow || cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS) {
-      // Provider-wide маркер: на TTL=cooldownMs провайдер считается "лежачим",
-      // submit-fallback цикл будет пропускать его без вызова acquireKey.
-      // Per-key throttle уже выставлен выше через markRateLimited/tripThrottle.
+    // Provider-wide outage: cooldownMs реально длинный (> 1ч из Retry-After
+    // или подобного explicit-сигнала). Ставим provider-wide маркер и фейлим
+    // job — fallback-логика покажет user-facing "временно недоступна".
+    if (cls.cooldownMs > LONG_WINDOW_THRESHOLD_MS) {
       if (provider) {
         void markProviderLongCooldown(provider, cls.cooldownMs, cls.reason);
       }
       logger.warn(
         { modelId, keyId, cooldownMs: cls.cooldownMs, reason: cls.reason },
-        "submitWithThrottle: long-window quota — failing job",
+        "submitWithThrottle: provider-wide long-window quota — failing job",
       );
       throw new RateLimitLongWindowError(modelId, cls.cooldownMs);
     }
 
-    const delay = withJitter(cls.cooldownMs);
+    // Pattern-matched long-window per-account quota (Google billing, "out of
+    // credits", "trial limit" и т.п.) ИЛИ short-window 429 — defer'им SHORT,
+    // чтобы BullMQ retry попал в acquireKey'ем; priority-логика skip'нет
+    // throttled key#1 и возьмёт другой ключ из пула. Если все ключи throttled —
+    // acquireForSubmit поймает PoolExhaustedError и defer'нет на actual cooldown.
+    //
+    // До фикса: defer был на cooldownMs (для long-window — 1ч), что заставляло
+    // юзера ждать час даже когда соседний ключ свободен.
+    const isPatternLongWindow = cls.isLongWindow;
+    const delay = isPatternLongWindow ? withJitter(MIN_DEFER_MS) : withJitter(cls.cooldownMs);
     logger.info(
-      { modelId, keyId, delay, reason: cls.reason },
-      "submitWithThrottle: rate-limited, deferring job",
+      {
+        modelId,
+        keyId,
+        delay,
+        cooldownMs: cls.cooldownMs,
+        isLongWindow: cls.isLongWindow,
+        reason: cls.reason,
+      },
+      isPatternLongWindow
+        ? "submitWithThrottle: per-key long-window quota — deferring short to retry with fresh key"
+        : "submitWithThrottle: rate-limited, deferring job",
     );
     await delayJob(job, job.data as Record<string, unknown>, delay, token);
     throw new Error("unreachable: delayJob did not throw");
