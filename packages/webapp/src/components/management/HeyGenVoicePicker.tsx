@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../api/client.js";
 import { useI18n } from "../../i18n.js";
 import type { HeyGenVoice, UserVoice } from "../../types.js";
+import { closeMiniApp } from "../../utils/telegram.js";
 import { VoiceList, type VoiceListItem } from "./VoiceList.js";
 
 interface HeyGenVoicePickerProps {
@@ -16,8 +17,22 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
   const [voicesLoading, setVoicesLoading] = useState(false);
   const [myVoices, setMyVoices] = useState<UserVoice[]>([]);
   const [myVoicesLoading, setMyVoicesLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createHint, setCreateHint] = useState(false);
   const [langFilter, setLangFilter] = useState("all");
   const [genderFilter, setGenderFilter] = useState("all");
+
+  const handleCreateVoice = async () => {
+    setCreating(true);
+    try {
+      await api.userVoices.startCreation("heygen");
+      setCreateHint(true);
+      setTimeout(() => setCreateHint(false), 5000);
+      closeMiniApp();
+    } finally {
+      setCreating(false);
+    }
+  };
 
   useEffect(() => {
     if (tab === "official" && voices.length === 0) {
@@ -107,6 +122,7 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
 
   return (
     <div className="voice-picker">
+      {createHint && <div className="activated-popup">{t("uploads.createVoiceHint")}</div>}
       <div className="voice-picker__tabs">
         <button
           className={`voice-picker__tab${tab === "official" ? " voice-picker__tab--active" : ""}`}
@@ -164,17 +180,27 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
           </>
         ))}
 
-      {tab === "mine" &&
-        (myVoicesLoading ? (
-          <div className="voice-picker__loading">{t("picker.loading")}</div>
-        ) : (
-          <VoiceList
-            items={mineItems}
-            selectedId={mineSelectedId}
-            onSelect={selectCloned}
-            emptyText={t("uploads.emptyVoices")}
-          />
-        ))}
+      {tab === "mine" && (
+        <>
+          <button
+            className="voice-picker__create-btn"
+            onClick={handleCreateVoice}
+            disabled={creating}
+          >
+            {creating ? "…" : t("uploads.createVoice")}
+          </button>
+          {myVoicesLoading ? (
+            <div className="voice-picker__loading">{t("picker.loading")}</div>
+          ) : (
+            <VoiceList
+              items={mineItems}
+              selectedId={mineSelectedId}
+              onSelect={selectCloned}
+              emptyText={t("uploads.emptyVoices")}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }

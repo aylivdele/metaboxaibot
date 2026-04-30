@@ -4,6 +4,15 @@ import { db } from "../db.js";
 import { getFileUrl } from "../services/s3.service.js";
 import { acquireById } from "../services/key-pool.service.js";
 import { ElevenLabsAdapter } from "../ai/audio/elevenlabs.adapter.js";
+import { userStateService } from "../services/user-state.service.js";
+import { getRedis } from "../redis.js";
+import {
+  config,
+  getT,
+  voiceCloneReturnRedisKey,
+  VOICE_CLONE_RETURN_TTL_SECONDS,
+} from "@metabox/shared";
+import type { Language } from "@metabox/shared";
 import { logger } from "../logger.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
@@ -30,6 +39,64 @@ export const userVoicesRoutes: FastifyPluginAsync = async (fastify) => {
       createdAt: v.createdAt.toISOString(),
     }));
   });
+
+  /**
+   * POST /user-voices/start-creation
+   * Activates the `voice-clone` audio model (so the next voice/audio
+   * upload is routed into `handleVoiceCloneUpload`) and sends the
+   * cloning prompt to Telegram.
+   *
+   * Optional `returnTo` flag stores a Redis marker so the bot can
+   * re-activate that video model right after the clone succeeds —
+   * e.g. user came from the HeyGen voice picker and expects to land
+   * back on HeyGen once the clone is done.
+   */
+  fastify.post<{ Body?: { returnTo?: string } }>(
+    "/user-voices/start-creation",
+    async (request, reply) => {
+      const { userId } = request as AuthRequest;
+      const returnTo = request.body?.returnTo;
+
+      if (returnTo !== undefined && returnTo !== "heygen") {
+        return reply.status(400).send({ error: `Unsupported returnTo: ${returnTo}` });
+      }
+
+      await userStateService.setModelForSection(userId, "audio", "voice-clone");
+      await userStateService.setState(userId, "AUDIO_ACTIVE", "audio");
+
+      if (returnTo === "heygen") {
+        await getRedis().set(
+          voiceCloneReturnRedisKey(userId),
+          returnTo,
+          "EX",
+          VOICE_CLONE_RETURN_TTL_SECONDS,
+        );
+      } else {
+        // Stale marker from a previous flow would silently re-activate HeyGen
+        // after an unrelated clone — drop it on every plain start.
+        await getRedis().del(voiceCloneReturnRedisKey(userId));
+      }
+
+      const user = await db.user.findUnique({
+        where: { id: userId },
+        select: { language: true },
+      });
+      const t = getT((user?.language ?? "en") as Language);
+
+      if (config.bot.token) {
+        await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: String(userId),
+            text: `${t.audio.voiceClone}\n\n${t.audio.voiceCloneActivated}`,
+          }),
+        }).catch((err) => logger.warn(err, "voice clone start: failed to send prompt"));
+      }
+
+      return { ok: true };
+    },
+  );
 
   /**
    * GET /user-voices/:id/preview-url — resolve a playable URL on demand.

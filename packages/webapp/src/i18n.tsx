@@ -454,6 +454,9 @@ const translations = {
     "uploads.createAvatar": "➕ Create avatar",
     "uploads.createAvatarHint":
       "Return to the chat and send a photo with your face — the bot will create a personal avatar based on it.",
+    "uploads.createVoice": "➕ Create voice",
+    "uploads.createVoiceHint":
+      "Return to the chat and send a voice message or audio file — the bot will clone your voice and switch HeyGen back on.",
     "uploads.avatarCreating": "Creating...",
     "uploads.avatarOrphaned": "Unavailable",
     "uploads.avatarOrphanedHint": "This avatar is no longer available. Create a new one.",
@@ -960,6 +963,9 @@ const translations = {
     "uploads.createAvatar": "➕ Создать аватар",
     "uploads.createAvatarHint":
       "Вернитесь в чат и отправьте фото с лицом — бот создаст персональный аватар на его основе.",
+    "uploads.createVoice": "➕ Создать голос",
+    "uploads.createVoiceHint":
+      "Вернитесь в чат и отправьте голосовое или аудиофайл — бот клонирует ваш голос и снова включит HeyGen.",
     "uploads.avatarCreating": "Создаётся...",
     "uploads.avatarOrphaned": "Недоступен",
     "uploads.avatarOrphanedHint": "Этот аватар больше недоступен. Создайте новый.",
