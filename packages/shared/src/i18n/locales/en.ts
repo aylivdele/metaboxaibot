@@ -255,6 +255,8 @@ export default {
       "❌ The image is too large ({actualW}×{actualH} px). Maximum size is {maxW}×{maxH} px.",
     mediaSlotReadMetadataFailed: "❌ Failed to read file metadata. Check the format and try again.",
     kieVideoDurationOutOfRange: "❌ Video duration must be between {min} and {max} seconds.",
+    kieImageTooSmall:
+      "❌ The image is too small — both sides must be at least {min} px. Please send a larger photo.",
     mediaSlotImagesOnly:
       "❌ This slot only accepts photos. Videos are not supported — please send a photo.",
     contentPolicyViolation:
