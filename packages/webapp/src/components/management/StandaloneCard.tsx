@@ -112,6 +112,15 @@ export function StandaloneCard({
           </button>
         )}
       </div>
+      {isActive && (
+        <button
+          className="family-card__start-btn"
+          onClick={() => void handleActivate()}
+          disabled={activating}
+        >
+          {activating ? t("imageSettings.activating") : t("imageSettings.startWork")}
+        </button>
+      )}
       {cost && <div className="family-card__cost">{cost}</div>}
       {cost && model.id.startsWith("gpt-image") && (
         <div className="family-card__cost-note">{t("manage.price.gptImageNote")}</div>
