@@ -71,7 +71,7 @@ export { userUploadsService } from "./user-uploads.service.js";
 export { userAvatarService } from "./user-avatar.service.js";
 export { resolveVoiceForTTS } from "./user-voice.service.js";
 export type { ResolvedVoice } from "./user-voice.service.js";
-export { translatePromptIfNeeded } from "./prompt-translate.service.js";
+export { translatePromptIfNeeded, looksEnglish } from "./prompt-translate.service.js";
 export { describeImageForPrompt } from "./image-describe.service.js";
 
 // ── Web (ai.metabox.global) ─────────────────────────────────────────────

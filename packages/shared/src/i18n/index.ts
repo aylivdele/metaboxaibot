@@ -261,6 +261,8 @@ export interface Translations {
     replicateOom: string;
     replicateInvalidParams: string;
     replicateFileTooLarge: string;
+    replicateContentPolicy: string;
+    promptNotEnglish: string;
     // Fal
     falContentPolicy: string;
     falNoMediaGenerated: string;
