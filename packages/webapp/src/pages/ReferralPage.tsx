@@ -65,8 +65,7 @@ export function ReferralPage({ onLinkMetabox }: { onLinkMetabox: () => void }) {
   const isLinked = !!profile?.metaboxUserId;
   const hasPlaceholderEmail = profile?.metaboxUserId && !profile.metaboxReferralCode;
 
-  // Min reward: 1 PV × 2.4 × 135 = 324₽
-  const minReward = 324;
+  const minReward = 290;
 
   const handleWithdraw = async () => {
     if (!isLinked || hasPlaceholderEmail) {
