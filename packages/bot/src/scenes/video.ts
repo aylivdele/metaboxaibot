@@ -722,7 +722,7 @@ export async function executeVideoPrompt(
       prompt,
       imageUrl: state?.videoRefImageUrl ?? undefined,
       aspectRatio: modelSettings?.aspectRatio,
-      duration: modelSettings?.duration,
+      duration: (fullModelSettings.duration as number | undefined) ?? modelSettings?.duration,
       modelSettings: fullModelSettings,
       mediaInputs,
       userId: ctx.user.id,
