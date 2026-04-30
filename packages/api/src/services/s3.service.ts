@@ -58,6 +58,10 @@ function makeClient(): S3Client | null {
     credentials: { accessKeyId, secretAccessKey },
     // Required for path-style S3 endpoints (MinIO, R2)
     forcePathStyle: !!endpoint,
+    // Wasabi rejects presigned URLs that carry the unsigned x-amz-checksum-mode
+    // query param SDK v3.729+ adds by default. Opt out of automatic checksums.
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
   });
 }
 
@@ -170,12 +174,11 @@ export async function getFileUrl(key: string, downloadFilename?: string): Promis
       new GetObjectCommand({
         Bucket: bucket,
         Key: key,
-        ChecksumMode: undefined,
         ...(downloadFilename
           ? { ResponseContentDisposition: `attachment; filename="${downloadFilename}"` }
           : {}),
       }),
-      { expiresIn: PRESIGN_TTL, unsignableHeaders: new Set(["x-amz-checksum-mode"]) },
+      { expiresIn: PRESIGN_TTL },
     );
   } catch (err) {
     logger.error({ err, key }, "getFileUrl: failed to sign URL");
