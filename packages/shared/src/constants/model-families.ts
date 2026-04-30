@@ -154,7 +154,7 @@ export const MODEL_FAMILIES: Record<string, ModelFamily> = {
     defaultModelId: "veo-fast",
     members: [
       { modelId: "veo-fast", variantLabel: "Fast" },
-      { modelId: "veo", variantLabel: "Standard" },
+      { modelId: "veo", variantLabel: "Pro" },
     ],
   },
 

@@ -206,6 +206,56 @@ const VEO_MODES_KIE_QUALITY: ModelMode[] = [
     requiredSlotKeys: ["first_frame"],
   },
 ];
+/**
+ * Settings для GOOGLE Veo (Quality + Fast).
+ */
+const VEO_GOOGLE_SETTINGS: ModelSettingDef[] = [
+  mkAspectRatio(["16:9", "9:16"]),
+  {
+    key: "duration",
+    label: "Длительность",
+    description:
+      "Продолжительность видеоклипа в секундах. При использовании референсных изображений или разрешений 1080p/4K доступен только вариант 8 с.",
+    type: "select",
+    options: [
+      { value: 4, label: "4 с", unavailableIf: { key: "resolution", neq: "720p" } },
+      { value: 6, label: "6 с", unavailableIf: { key: "resolution", neq: "720p" } },
+      { value: 8, label: "8 с" },
+    ],
+    default: 4,
+  },
+  {
+    key: "resolution",
+    label: "Разрешение",
+    description: "Качество видео: 720p — любая длительность, 1080p — только 8 секунд.",
+    type: "select",
+    options: [
+      { value: "720p", label: "720p" },
+      {
+        value: "1080p",
+        label: "1080p",
+        unavailableIf: { key: "duration", neq: 8 },
+      },
+      {
+        value: "4k",
+        label: "4k",
+        unavailableIf: { key: "duration", neq: 8 },
+      },
+    ],
+    default: "720p",
+  },
+  {
+    key: "person_generation",
+    label: "Генерация людей",
+    description: "Разрешить ли появление людей в видео.",
+    type: "select",
+    options: [
+      { value: "dont_allow", label: "Запрещено" },
+      { value: "allow_adult", label: "Разрешены взрослые" },
+    ],
+    default: "allow_adult",
+  },
+];
 
 /**
  * Settings для KIE Veo (Quality + Fast). KIE Veo всегда 8s output, длительность
@@ -225,6 +275,118 @@ const VEO_KIE_SETTINGS: ModelSettingDef[] = [
       { value: "4k", label: "4k" },
     ],
     default: "720p",
+  },
+];
+
+/**
+ * Settings для Veo 3.1 через evolink. evolink поддерживает все продвинутые
+ * параметры: длительность, разрешение, звук, генерация людей, resize_mode,
+ * negative prompt. В REFERENCE mode evolink сам игнорирует duration/aspect/
+ * advanced params (по докам), наш UI это не запрещает явно — юзер увидит
+ * настройки, но они не будут применены если он загрузил reference image.
+ */
+const VEO_EVOLINK_SETTINGS: ModelSettingDef[] = [
+  // aspect_ratio в r2v evolink форсит 16:9 — скрываем настройку в этом режиме
+  // чтобы юзер не думал что его выбор применится.
+  {
+    ...mkAspectRatio(["16:9", "9:16", "auto"]),
+    unavailableIf: { key: "_mode", eq: "r2v" },
+  },
+  {
+    key: "duration",
+    label: "Длительность",
+    description: "Продолжительность видеоклипа в секундах. В режиме REFERENCE — фиксировано 8 с.",
+    type: "select",
+    options: [
+      // r2v: evolink фиксирует 8s — дизейблим 4 и 6 (комбинируем с existing
+      // resolution-constraint через `or`).
+      {
+        value: 4,
+        label: "4 с",
+        unavailableIf: {
+          or: [
+            { key: "resolution", neq: "720p" },
+            { key: "_mode", eq: "r2v" },
+          ],
+        },
+      },
+      {
+        value: 6,
+        label: "6 с",
+        unavailableIf: {
+          or: [
+            { key: "resolution", neq: "720p" },
+            { key: "_mode", eq: "r2v" },
+          ],
+        },
+      },
+      { value: 8, label: "8 с" },
+    ],
+    default: 4,
+  },
+  {
+    key: "resolution",
+    label: "Разрешение",
+    description: "Качество видео. 4K увеличивает стоимость.",
+    type: "select",
+    options: [
+      { value: "720p", label: "720p" },
+      { value: "1080p", label: "1080p", unavailableIf: { key: "duration", neq: 8 } },
+      { value: "4k", label: "4k", unavailableIf: { key: "duration", neq: 8 } },
+    ],
+    default: "720p",
+    // r2v: evolink игнорирует resolution (фактически 720p) — скрываем.
+    unavailableIf: { key: "_mode", eq: "r2v" },
+  },
+  {
+    key: "generate_audio",
+    label: "Звук",
+    description: "Генерировать звук в видео. Влияет на стоимость.",
+    type: "toggle",
+    default: true,
+  },
+  {
+    key: "person_generation",
+    label: "Генерация людей",
+    description: "Разрешить ли появление людей в видео.",
+    type: "select",
+    options: [
+      { value: "allow_adult", label: "Разрешены взрослые" },
+      { value: "dont_allow", label: "Запрещено" },
+    ],
+    default: "allow_adult",
+    // r2v evolink не поддерживает person_generation (по докам "other advanced
+    // params not supported"). Скрываем чтобы юзер не запутался.
+    unavailableIf: { key: "_mode", eq: "r2v" },
+  },
+  {
+    key: "resize_mode",
+    label: "Режим resize",
+    description: "Только для image-to-video. pad — добавить поля; crop — обрезать.",
+    type: "select",
+    options: [
+      { value: "pad", label: "pad" },
+      { value: "crop", label: "crop" },
+    ],
+    default: "pad",
+    advanced: true,
+    // resize_mode применим только в I2V (FIRST&LAST). В t2v и r2v скрываем.
+    unavailableIf: {
+      or: [
+        { key: "_mode", eq: "t2v" },
+        { key: "_mode", eq: "r2v" },
+      ],
+    },
+  },
+  {
+    key: "negative_prompt",
+    label: "Негативный промпт",
+    description: "Что НЕ должно появляться в видео.",
+    type: "text",
+    default: "",
+    advanced: true,
+    // r2v не поддерживает negative_prompt.
+    unavailableIf: { key: "_mode", eq: "r2v" },
   },
 ];
 
@@ -967,70 +1129,32 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     id: "veo",
     name: "📽️ Veo 3.1",
     description:
-      "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Standard — максимальное качество, выше детализация чем Fast. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
+      "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Standard — максимальное качество, выше детализации чем Fast. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
     section: "video",
-    provider: "kie",
+    provider: "evolink",
     familyId: "veo",
-    variantLabel: "Standard",
-    // KIE Veo 3.1 Quality: per-video price by resolution.
-    //   720p:  $1.25
-    //   1080p: $1.275
-    //   4k:    $1.85
-    costUsdPerRequest: 1.25,
-    costUsdPerSecond: 0,
-    costVariants: {
-      settingKey: "resolution",
-      map: {
-        "720p": { costUsdPerRequest: 1.25 },
-        "1080p": { costUsdPerRequest: 1.275 },
-        "4k": { costUsdPerRequest: 1.85 },
+    variantLabel: "Pro",
+    // Evolink Veo 3.1 Pro: per-second × resolution × generate_audio (см. costMatrix).
+    //   720p/1080p, no audio:  $0.186/s
+    //   720p/1080p, with audio: $0.373/s
+    //   4K, no audio:           $0.373/s
+    //   4K, with audio:         $0.559/s
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.186,
+    costMatrix: {
+      dims: ["resolution", "generate_audio"],
+      table: {
+        "720p__false": 0.186,
+        "720p__true": 0.373,
+        "1080p__false": 0.186,
+        "1080p__true": 0.373,
+        "4k__false": 0.373,
+        "4k__true": 0.559,
       },
     },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    // KIE REFERENCE_2_VIDEO mode — Fast-only по докам, поэтому MI_REFERENCE_VEO
-    // на Quality убран. Юзер не сможет выбрать r2v на Quality.
-    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
-    modes: VEO_MODES_KIE_QUALITY,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: true,
-    contextStrategy: "db_history",
-    contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9", "9:16"],
-    // KIE Veo всегда 8s output — duration-слайдер не показываем.
-    supportedDurations: [8],
-    settings: VEO_KIE_SETTINGS,
-  },
-  "veo-fast": {
-    id: "veo-fast",
-    name: "📽️ Veo 3.1 Fast",
-    description:
-      "Быстрая и более доступная версия Veo 3.1 от Google. Со звуком и голосами, но чуть ниже детализация чем Standard. Поддерживает 4K. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
-    section: "video",
-    provider: "kie",
-    familyId: "veo",
-    variantLabel: "Fast",
-    // KIE Veo 3.1 Fast: per-video price by resolution.
-    //   720p:  $0.30  (≈ reference-to-video $0.30 baseline)
-    //   1080p: $0.325
-    //   4k:    $0.90
-    costUsdPerRequest: 0.3,
-    costUsdPerSecond: 0,
-    costVariants: {
-      settingKey: "resolution",
-      map: {
-        "720p": { costUsdPerRequest: 0.3 },
-        "1080p": { costUsdPerRequest: 0.325 },
-        "4k": { costUsdPerRequest: 0.9 },
-      },
-    },
-    inputCostUsdPerMToken: 0,
-    outputCostUsdPerMToken: 0,
-    supportsImages: true,
-    // Fast — единственная Veo модель которая поддерживает REFERENCE_2_VIDEO,
-    // поэтому MI_REFERENCE_VEO остаётся.
     mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
     modes: VEO_MODES,
     supportsVoice: false,
@@ -1038,10 +1162,50 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    supportedAspectRatios: ["16:9", "9:16"],
-    // KIE Veo всегда 8s output.
-    supportedDurations: [8],
-    settings: VEO_KIE_SETTINGS,
+    supportedAspectRatios: ["16:9", "9:16", "auto"],
+    supportedDurations: [4, 6, 8],
+    settings: VEO_EVOLINK_SETTINGS,
+  },
+  "veo-fast": {
+    id: "veo-fast",
+    name: "📽️ Veo 3.1 Fast",
+    description:
+      "Быстрая и более доступная версия Veo 3.1 от Google. Со звуком и голосами, но чуть ниже детализация чем Standard. Поддерживает 4K. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
+    section: "video",
+    provider: "evolink",
+    familyId: "veo",
+    variantLabel: "Fast",
+    // Evolink Veo 3.1 Fast: per-second × resolution × generate_audio.
+    //   720p/1080p, no audio:  $0.093/s
+    //   720p/1080p, with audio: $0.140/s
+    //   4K, no audio:           $0.280/s
+    //   4K, with audio:         $0.327/s
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.093,
+    costMatrix: {
+      dims: ["resolution", "generate_audio"],
+      table: {
+        "720p__false": 0.093,
+        "720p__true": 0.14,
+        "1080p__false": 0.093,
+        "1080p__true": 0.14,
+        "4k__false": 0.28,
+        "4k__true": 0.327,
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
+    modes: VEO_MODES,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16", "auto"],
+    supportedDurations: [4, 6, 8],
+    settings: VEO_EVOLINK_SETTINGS,
   },
   "hailuo-fast": {
     id: "hailuo-fast",
@@ -2030,13 +2194,13 @@ export const FALLBACK_VIDEO_MODELS: AIModel[] = [
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
     supportedDurations: [4, 6, 8],
-    settings: [],
+    settings: VEO_GOOGLE_SETTINGS,
   },
-  // ── Veo 3.1 Fast via Google Gemini API — fallback при недоступности KIE.
+  // ── Veo 3.1 Fast via Google Gemini API — fallback при недоступности evolink.
   {
     id: "veo-fast",
     name: "Veo 3.1 Fast (google fallback)",
-    description: "Fallback на прямую Google Gemini API при недоступности KIE.",
+    description: "Fallback на прямую Google Gemini API при недоступности evolink.",
     section: "video",
     provider: "google",
     familyId: "veo",
@@ -2063,6 +2227,76 @@ export const FALLBACK_VIDEO_MODELS: AIModel[] = [
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
     supportedDurations: [4, 6, 8],
-    settings: [],
+    settings: VEO_GOOGLE_SETTINGS,
+  },
+  // ── Veo 3.1 Quality via KIE — последний fallback (после Google).
+  // Биллинг при fallback'е по primary (evolink) цене, KIE свой costMatrix не
+  // применяется. KIE Quality не поддерживает REFERENCE_2_VIDEO режим, поэтому
+  // mediaInputs/modes урезаны (без MI_REFERENCE_VEO, без r2v mode). При
+  // приходе sub-job'а с references фолбек скипнется через isFallbackCompatible.
+  {
+    id: "veo",
+    name: "Veo 3.1 (kie fallback)",
+    description: "Fallback на KIE при недоступности evolink и Google.",
+    section: "video",
+    provider: "kie",
+    familyId: "veo",
+    variantLabel: "Standard",
+    costUsdPerRequest: 1.25,
+    costUsdPerSecond: 0,
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "720p": { costUsdPerRequest: 1.25 },
+        "1080p": { costUsdPerRequest: 1.275 },
+        "4k": { costUsdPerRequest: 1.85 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
+    modes: VEO_MODES_KIE_QUALITY,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16"],
+    supportedDurations: [8],
+    settings: VEO_KIE_SETTINGS,
+  },
+  // ── Veo 3.1 Fast via KIE — последний fallback (после Google).
+  {
+    id: "veo-fast",
+    name: "Veo 3.1 Fast (kie fallback)",
+    description: "Fallback на KIE при недоступности evolink и Google.",
+    section: "video",
+    provider: "kie",
+    familyId: "veo",
+    variantLabel: "Fast",
+    costUsdPerRequest: 0.3,
+    costUsdPerSecond: 0,
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "720p": { costUsdPerRequest: 0.3 },
+        "1080p": { costUsdPerRequest: 0.325 },
+        "4k": { costUsdPerRequest: 0.9 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
+    modes: VEO_MODES,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16"],
+    supportedDurations: [8],
+    settings: VEO_KIE_SETTINGS,
   },
 ];

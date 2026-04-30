@@ -169,6 +169,7 @@ export function FamilyCard({
             settings={selected.settings}
             values={allModelSettings[selected.id] ?? {}}
             onChange={(key, val) => onSettingChange(selected.id, key, val)}
+            modeId={selectedModes?.[selected.id] ?? selected.modes?.find((m) => m.default)?.id}
           />
         </div>
       )}

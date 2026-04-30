@@ -31,7 +31,8 @@ type EvolinkVideoMapping =
   | { family: "kling-v3-motion-control"; quality: "720p" | "1080p" }
   | { family: "kling-o3"; quality: "720p" | "1080p" }
   | { family: "seedance-2.0"; speed: "standard" | "fast" }
-  | { family: "seedance-1.5-pro" };
+  | { family: "seedance-1.5-pro" }
+  | { family: "veo-3.1"; tier: "pro" | "fast" };
 
 const EVOLINK_VIDEO_MAP: Record<string, EvolinkVideoMapping> = {
   "kling-motion": { family: "kling-v3-motion-control", quality: "720p" },
@@ -41,6 +42,8 @@ const EVOLINK_VIDEO_MAP: Record<string, EvolinkVideoMapping> = {
   "seedance-2": { family: "seedance-2.0", speed: "standard" },
   "seedance-2-fast": { family: "seedance-2.0", speed: "fast" },
   seedance: { family: "seedance-1.5-pro" },
+  veo: { family: "veo-3.1", tier: "pro" },
+  "veo-fast": { family: "veo-3.1", tier: "fast" },
 };
 
 /** True если у задачи есть хоть один media input (image-source). */
@@ -155,6 +158,10 @@ export class EvolinkVideoAdapter implements VideoAdapter {
         // Один endpoint `seedance-1.5-pro`. Mode auto-detected на стороне
         // evolink по image_urls.length: 0=t2v, 1=i2v, 2=first-last-frame.
         body = this.buildSeedance15ProBody(input);
+        break;
+      }
+      case "veo-3.1": {
+        body = this.buildVeoBody(input, mapping);
         break;
       }
       default:
@@ -484,6 +491,111 @@ export class EvolinkVideoAdapter implements VideoAdapter {
     if (firstFrame) imageUrls.push(firstFrame);
     if (lastFrame) imageUrls.push(lastFrame);
     if (imageUrls.length > 0) body.image_urls = imageUrls;
+
+    return body;
+  }
+
+  /**
+   * Veo 3.1 Pro / Fast — endpoint `/v1/videos/generations` с разными значениями
+   * `model`. Все продвинутые параметры поддерживаются (генерация людей, audio,
+   * negative prompt, resize_mode, seed, callback_url).
+   *
+   * Generation modes (auto-detect по media-inputs):
+   *   - REFERENCE: есть `mediaInputs.reference` — fixed 8s, fixed 16:9, advanced
+   *     params kроме `generate_audio` игнорируются (по докам evolink).
+   *   - FIRST&LAST: есть `first_frame` или `last_frame` — 1-2 кадра.
+   *   - TEXT: ничего не загружено.
+   *
+   * Settings mapping:
+   *   modelSettings.aspect_ratio   → aspect_ratio (auto / 16:9 / 9:16)
+   *   modelSettings.duration       → duration (4 / 6 / 8). REFERENCE → 8.
+   *   modelSettings.resolution     → quality (720p / 1080p / 4k)
+   *   modelSettings.generate_audio → generate_audio (boolean, default true)
+   *   modelSettings.person_generation → person_generation (allow_adult / dont_allow)
+   *   modelSettings.resize_mode    → resize_mode (pad / crop) — только для I2V (FIRST&LAST)
+   *   modelSettings.negative_prompt → negative_prompt
+   *   modelSettings.seed            → seed
+   */
+  private buildVeoBody(
+    input: VideoInput,
+    mapping: Extract<EvolinkVideoMapping, { family: "veo-3.1" }>,
+  ): Record<string, unknown> {
+    const ms = input.modelSettings ?? {};
+    const mi = input.mediaInputs ?? {};
+
+    const firstFrame = mi.first_frame?.[0] ?? input.imageUrl;
+    const lastFrame = mi.last_frame?.[0];
+    const refs = (mi.reference ?? []).slice(0, 3);
+
+    let generationType: "TEXT" | "FIRST&LAST" | "REFERENCE";
+    let imageUrls: string[] = [];
+    if (refs.length > 0) {
+      generationType = "REFERENCE";
+      imageUrls = refs;
+    } else if (firstFrame || lastFrame) {
+      generationType = "FIRST&LAST";
+      const frames: string[] = [];
+      if (firstFrame) frames.push(firstFrame);
+      if (lastFrame) frames.push(lastFrame);
+      imageUrls = frames;
+    } else {
+      generationType = "TEXT";
+    }
+
+    const evolinkModel =
+      mapping.tier === "pro" ? "veo-3.1-generate-preview" : "veo-3.1-fast-generate-preview";
+
+    const body: Record<string, unknown> = {
+      model: evolinkModel,
+      prompt: input.prompt?.slice(0, 2000),
+      generation_type: generationType,
+    };
+    if (imageUrls.length > 0) body.image_urls = imageUrls;
+
+    // generate_audio — единственный advanced param который остаётся в REFERENCE
+    // mode (по докам evolink). default true — KIE/evolink дефолт совпадают.
+    const generateAudio = ms.generate_audio !== undefined ? !!ms.generate_audio : true;
+    body.generate_audio = generateAudio;
+
+    if (generationType === "REFERENCE") {
+      // REFERENCE: duration fixed 8s, aspect_ratio fixed 16:9; остальные
+      // advanced params игнорируются evolink'ом — НЕ шлём чтобы не спровоцировать
+      // 400 invalid_request.
+      body.duration = 8;
+      body.aspect_ratio = "16:9";
+      return body;
+    }
+
+    // TEXT и FIRST&LAST — все advanced params поддерживаются.
+    const aspectRatio = (ms.aspect_ratio as string | undefined) ?? input.aspectRatio ?? "16:9";
+    body.aspect_ratio = aspectRatio;
+
+    const rawDuration = (ms.duration as number | undefined) ?? input.duration ?? 4;
+    const duration = [4, 6, 8].includes(Number(rawDuration)) ? Number(rawDuration) : 4;
+    body.duration = duration;
+
+    const quality = (ms.resolution as string | undefined) ?? "720p";
+    body.quality = quality;
+
+    if (ms.person_generation === "allow_adult" || ms.person_generation === "dont_allow") {
+      body.person_generation = ms.person_generation;
+    }
+
+    if (ms.negative_prompt && typeof ms.negative_prompt === "string" && ms.negative_prompt.trim()) {
+      body.negative_prompt = ms.negative_prompt.slice(0, 2000);
+    }
+
+    if (typeof ms.seed === "number" && ms.seed > 0 && ms.seed <= 4_294_967_295) {
+      body.seed = Math.floor(ms.seed);
+    }
+
+    // resize_mode — только в I2V (FIRST&LAST) по докам.
+    if (
+      generationType === "FIRST&LAST" &&
+      (ms.resize_mode === "pad" || ms.resize_mode === "crop")
+    ) {
+      body.resize_mode = ms.resize_mode;
+    }
 
     return body;
   }
