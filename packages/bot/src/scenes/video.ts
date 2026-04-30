@@ -116,8 +116,9 @@ function pickVideoPending(ctx: BotContext): string {
 const AVATAR_MODELS = new Set(["heygen", "d-id"]);
 
 /**
- * If the video model uses an ElevenLabs voice (voice_provider === "elevenlabs")
- * and no raw audio override is present, synthesises the prompt via ElevenLabs TTS,
+ * If the video model uses an ElevenLabs voice (voice_provider === "elevenlabs",
+ * or legacy settings where voice_id maps to a UserVoice/EL externalId) and no
+ * raw audio override is present, synthesises the prompt via ElevenLabs TTS,
  * uploads to S3, deducts TTS tokens, and returns the S3 key.
  * Returns null when TTS pre-generation is not needed.
  */
@@ -134,17 +135,14 @@ async function preGenerateELTts(
 
   const requestedVoice = videoModelSettings.voice_id as string | undefined;
   const voiceProvider = videoModelSettings.voice_provider as string | undefined;
-  if (!requestedVoice || voiceProvider !== "elevenlabs") return null;
-
-  const ttsModel = AI_MODELS["tts-el"];
-  if (!ttsModel) return null;
+  if (!requestedVoice) return null;
+  // Явно non-EL provider (например "heygen" — native HeyGen voice) → не TTS'им,
+  // адаптер передаст voice_id напрямую в HeyGen.
+  if (voiceProvider && voiceProvider !== "elevenlabs") return null;
 
   // Resolve UserVoice cuid → ElevenLabs externalId + sticky API key.
   // Pickers send `UserVoice.id` (local cuid). Legacy paths may send raw EL
-  // externalId — try both. Если ничего не нашли — это официальный EL-голос,
-  // используем env-fallback ключ.
-  let resolvedVoiceId = requestedVoice;
-  let stickyApiKey: string | undefined;
+  // externalId — try both.
   const userVoice =
     (await db.userVoice.findFirst({
       where: { id: requestedVoice, provider: "elevenlabs" },
@@ -154,6 +152,18 @@ async function preGenerateELTts(
       where: { provider: "elevenlabs", externalId: requestedVoice },
       select: { id: true },
     }));
+
+  // Если voice_provider не задан (legacy data) и UserVoice не нашли — мы не
+  // можем подтвердить что это EL-голос. Лучше скипнуть pre-TTS чем угадывать —
+  // адаптер сам отдаст voice_id в HeyGen, и если это native HeyGen voice
+  // (попавший без provider-marker'а) всё сработает.
+  if (!userVoice && voiceProvider !== "elevenlabs") return null;
+
+  const ttsModel = AI_MODELS["tts-el"];
+  if (!ttsModel) return null;
+
+  let resolvedVoiceId = requestedVoice;
+  let stickyApiKey: string | undefined;
   if (userVoice) {
     const resolved = await resolveVoiceForTTS(userVoice.id);
     resolvedVoiceId = resolved.voiceId;
@@ -754,11 +764,13 @@ export async function executeVideoPrompt(
   const pendingMsg = await ctx.reply(pickVideoPending(ctx));
 
   try {
-    // If avatar model + EL cloned voice selected + no raw audio override → pre-generate TTS
+    // If avatar model + EL voice (explicit или legacy без provider-marker'а) +
+    // no raw audio override → pre-generate TTS. Skip только если provider
+    // явно non-EL (например "heygen" — native HeyGen voice catalog).
     let elTtsS3Key: string | null = null;
     if (AVATAR_MODELS.has(modelId) && !rawVoiceS3Key) {
       const voiceProvider = fullModelSettings.voice_provider as string | undefined;
-      if (voiceProvider === "elevenlabs") {
+      if (!voiceProvider || voiceProvider === "elevenlabs") {
         await ctx.api
           .editMessageText(chatId, pendingMsg.message_id, ctx.t.video.elVoiceGenerating)
           .catch(() => void 0);
@@ -1198,6 +1210,31 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     const pendingMsg = await ctx.reply(pickVideoPending(ctx));
 
     try {
+      // For HeyGen/D-ID with EL voice: pre-generate TTS via ElevenLabs and pass
+      // S3 key as voice_s3key (HeyGen uses lip-sync via audio_asset_id, не TTS
+      // через voice_id — последний у HeyGen свой каталог и не примет EL id'ы).
+      // Аналогично main executeVideoPrompt path: skip только при явно non-EL
+      // provider'е.
+      let elTtsS3Key: string | null = null;
+      if (AVATAR_MODELS.has(modelId)) {
+        const voiceProvider = fullModelSettings.voice_provider as string | undefined;
+        if (!voiceProvider || voiceProvider === "elevenlabs") {
+          await ctx.api
+            .editMessageText(chatId, pendingMsg.message_id, ctx.t.video.elVoiceGenerating)
+            .catch(() => void 0);
+          elTtsS3Key = await preGenerateELTts(
+            ctx.user.id,
+            modelId,
+            caption,
+            fullModelSettings,
+            undefined,
+          );
+          await ctx.api
+            .editMessageText(chatId, pendingMsg.message_id, pickVideoPending(ctx))
+            .catch(() => void 0);
+        }
+      }
+
       await videoGenerationService.submitVideo({
         userId: ctx.user.id,
         modelId,
@@ -1208,6 +1245,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
         sendOriginalLabel: ctx.t.common.sendOriginal,
         aspectRatio: modelSettings?.aspectRatio,
         duration: modelSettings?.duration,
+        extraModelSettings: elTtsS3Key ? { voice_s3key: elTtsS3Key, voice_url: "" } : undefined,
       });
 
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
