@@ -122,19 +122,21 @@ export class KieVeoAdapter implements VideoAdapter {
     const lastFrame = mi.last_frame?.[0];
     const refs = (mi.reference ?? []).slice(0, 3);
 
-    // Mode selection. REFERENCE_2_VIDEO — fast-only по докам KIE; для Quality
-    // с references трактуем первый ref как first_frame (graceful degradation).
+    // Mode selection. REFERENCE_2_VIDEO — Fast-only по докам KIE: на Quality
+    // (`veo3`) этот режим в принципе недоступен в UI (mediaInputs Quality
+    // модели не включает MI_REFERENCE_VEO), так что refs тут оказаться не
+    // должны. Если всё же пришли (legacy data / mismatched fallback) — игнор,
+    // используем first_frame/last_frame как обычный i2v.
     let generationType: "TEXT_2_VIDEO" | "FIRST_AND_LAST_FRAMES_2_VIDEO" | "REFERENCE_2_VIDEO";
     let imageUrls: string[] = [];
 
     if (refs.length > 0 && this.apiModel === "veo3_fast") {
       generationType = "REFERENCE_2_VIDEO";
       imageUrls = refs;
-    } else if (firstFrame || lastFrame || refs.length > 0) {
+    } else if (firstFrame || lastFrame) {
       generationType = "FIRST_AND_LAST_FRAMES_2_VIDEO";
       const frames: string[] = [];
       if (firstFrame) frames.push(firstFrame);
-      else if (refs.length > 0) frames.push(refs[0]!);
       if (lastFrame) frames.push(lastFrame);
       imageUrls = frames;
     } else {

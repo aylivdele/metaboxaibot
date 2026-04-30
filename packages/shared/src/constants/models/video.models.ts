@@ -193,6 +193,42 @@ const VEO_MODES: ModelMode[] = [
 ];
 
 /**
+ * Modes для KIE Veo Quality (`veo3`). По докам KIE REFERENCE_2_VIDEO работает
+ * ТОЛЬКО на Fast (`veo3_fast`), поэтому r2v убран — иначе юзер бы выбирал
+ * режим, который KIE отвергает.
+ */
+const VEO_MODES_KIE_QUALITY: ModelMode[] = [
+  { id: "t2v", labelKey: "t2v", slotKeys: [], textOnly: true, default: true },
+  {
+    id: "i2v",
+    labelKey: "i2v",
+    slotKeys: ["first_frame", "last_frame"],
+    requiredSlotKeys: ["first_frame"],
+  },
+];
+
+/**
+ * Settings для KIE Veo (Quality + Fast). KIE Veo всегда 8s output, длительность
+ * нельзя настроить через payload, поэтому duration-слайдер убран. Также нет
+ * person_generation (Google-only). Остаётся: aspect ratio + resolution.
+ */
+const VEO_KIE_SETTINGS: ModelSettingDef[] = [
+  mkAspectRatio(["16:9", "9:16"]),
+  {
+    key: "resolution",
+    label: "Разрешение",
+    description: "Качество видео. 4K требует больше кредитов.",
+    type: "select",
+    options: [
+      { value: "720p", label: "720p" },
+      { value: "1080p", label: "1080p" },
+      { value: "4k", label: "4k" },
+    ],
+    default: "720p",
+  },
+];
+
+/**
  * Wan 2.7 supports two distinct image-driven modes per provider docs:
  *  - i2v: starts from a still frame, optional last_frame and driving_audio.
  *  - clipExtend: continues from an existing short video, optional last_frame.
@@ -953,71 +989,19 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
-    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
-    modes: VEO_MODES,
+    // KIE REFERENCE_2_VIDEO mode — Fast-only по докам, поэтому MI_REFERENCE_VEO
+    // на Quality убран. Юзер не сможет выбрать r2v на Quality.
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME],
+    modes: VEO_MODES_KIE_QUALITY,
     supportsVoice: false,
     supportsWeb: false,
     isAsync: true,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
-    supportedDurations: [4, 6, 8],
-    settings: [
-      mkAspectRatio(["16:9", "9:16"]),
-      {
-        key: "duration",
-        label: "Длительность",
-        description:
-          "Продолжительность видеоклипа в секундах. При использовании референсных изображений или разрешений 1080p/4K доступен только вариант 8 с.",
-        type: "select",
-        options: [
-          { value: 4, label: "4 с", unavailableIf: { key: "resolution", neq: "720p" } },
-          { value: 6, label: "6 с", unavailableIf: { key: "resolution", neq: "720p" } },
-          { value: 8, label: "8 с" },
-        ],
-        default: 4,
-      },
-      {
-        key: "resolution",
-        label: "Разрешение",
-        description: "Качество видео: 720p — любая длительность, 1080p — только 8 секунд.",
-        type: "select",
-        options: [
-          { value: "720p", label: "720p" },
-          {
-            value: "1080p",
-            label: "1080p",
-            unavailableIf: { key: "duration", neq: 8 },
-          },
-          {
-            value: "4k",
-            label: "4k",
-            unavailableIf: { key: "duration", neq: 8 },
-          },
-        ],
-        default: "720p",
-      },
-      {
-        key: "person_generation",
-        label: "Генерация людей",
-        description: "Разрешить ли появление людей в видео.",
-        type: "select",
-        options: [
-          { value: "dont_allow", label: "Запрещено" },
-          { value: "allow_adult", label: "Разрешены взрослые" },
-        ],
-        default: "allow_adult",
-      },
-      // {
-      //   key: "negative_prompt",
-      //   label: "Негативный промпт",
-      //   description:
-      //     "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
-      //   type: "text",
-      //   default: "",
-      //   advanced: true,
-      // },
-    ],
+    // KIE Veo всегда 8s output — duration-слайдер не показываем.
+    supportedDurations: [8],
+    settings: VEO_KIE_SETTINGS,
   },
   "veo-fast": {
     id: "veo-fast",
@@ -1045,6 +1029,8 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
+    // Fast — единственная Veo модель которая поддерживает REFERENCE_2_VIDEO,
+    // поэтому MI_REFERENCE_VEO остаётся.
     mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
     modes: VEO_MODES,
     supportsVoice: false,
@@ -1053,52 +1039,9 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
-    supportedDurations: [4, 6, 8],
-    settings: [
-      mkAspectRatio(["16:9", "9:16"]),
-      {
-        key: "duration",
-        label: "Длительность",
-        description:
-          "Продолжительность видеоклипа в секундах. При использовании референсных изображений или разрешений 1080p/4K доступен только вариант 8 с.",
-        type: "select",
-        options: [
-          { value: 4, label: "4 с", unavailableIf: { key: "resolution", neq: "720p" } },
-          { value: 6, label: "6 с", unavailableIf: { key: "resolution", neq: "720p" } },
-          { value: 8, label: "8 с" },
-        ],
-        default: 4,
-      },
-      {
-        key: "resolution",
-        label: "Разрешение",
-        description: "Качество видео: 720p — любая длительность, 1080p — только 8 секунд.",
-        type: "select",
-        options: [
-          { value: "720p", label: "720p" },
-          {
-            value: "1080p",
-            label: "1080p",
-            unavailableIf: { key: "duration", neq: 8 },
-          },
-          {
-            value: "4k",
-            label: "4k",
-            unavailableIf: { key: "duration", neq: 8 },
-          },
-        ],
-        default: "720p",
-      },
-      // {
-      //   key: "negative_prompt",
-      //   label: "Негативный промпт",
-      //   description:
-      //     "Что НЕ должно появляться в видео. Перечислите нежелательные объекты или стили.",
-      //   type: "text",
-      //   default: "",
-      //   advanced: true,
-      // },
-    ],
+    // KIE Veo всегда 8s output.
+    supportedDurations: [8],
+    settings: VEO_KIE_SETTINGS,
   },
   "hailuo-fast": {
     id: "hailuo-fast",

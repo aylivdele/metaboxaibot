@@ -50,6 +50,7 @@ import {
   LONG_WINDOW_THRESHOLD_MS,
 } from "@metabox/api/utils/rate-limit-error";
 import { resolveKeyProviderForModel } from "@metabox/api/ai/key-provider";
+import { isProviderTemporaryUnavailable } from "@metabox/api/utils/provider-unavailable-error";
 import { logger } from "../logger.js";
 import { delayJob } from "./delay-job.js";
 import { notifyRateLimit, notifyFallback } from "./notify-error.js";
@@ -100,6 +101,7 @@ export interface FallbackCandidateAttempt {
     | "pool_exhausted"
     | "long_window"
     | "persistent_5xx"
+    | "provider_unavailable"
     | "incompatible_input";
   error?: string;
 }
@@ -273,6 +275,31 @@ export async function submitWithFallback<T, D extends object>(
       lastError = err;
       const message = err instanceof Error ? err.message : String(err);
       const cls = classifyRateLimit(err, keyProvider);
+
+      // Provider temporarily unavailable (e.g. KIE 422 "high demand") — узел
+      // провайдера перегружен, retry на том же или соседнем ключе того же
+      // провайдера не помогает. Пробуем следующего кандидата (другую модель/
+      // провайдера). Эти же паттерны матчатся и в RATE_LIMIT_PATTERNS — если
+      // следующего кандидата нет (зацикливаемся на том же primary), управление
+      // упадёт ниже в rate-limit defer-цикл и сохранится legacy behavior.
+      if (isProviderTemporaryUnavailable(err)) {
+        if (acquired.keyId) void recordError(acquired.keyId, message.slice(0, 500));
+        attempts.push({
+          provider: candidateProvider,
+          outcome: "provider_unavailable",
+          error: message.slice(0, 200),
+        });
+        logger.warn(
+          {
+            jobId: opts.jobId,
+            provider: candidateProvider,
+            err: message.slice(0, 200),
+          },
+          "submitWithFallback: provider temporarily unavailable — trying next candidate",
+        );
+        // Не выставляем lastDeferDelay — если все unavailable, бросим ошибку наверх.
+        continue;
+      }
 
       if (cls.isRateLimit) {
         // Per-key throttle: bad key карантинится, остальные ключи провайдера

@@ -45,6 +45,7 @@ import type { AIModel } from "@metabox/shared";
 import type { DeductResult } from "@metabox/api/services";
 import { notifyTechError, notifyRateLimit, notifyFallback } from "../utils/notify-error.js";
 import { isKieFiveXxError } from "@metabox/api/utils/kie-error";
+import { isProviderTemporaryUnavailable } from "@metabox/api/utils/provider-unavailable-error";
 import { isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import { submitWithFallback } from "../utils/submit-with-fallback.js";
 import { deriveLockedProvider, detectUsedFallback } from "../utils/fallback-state.js";
@@ -1391,6 +1392,82 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
           1000,
           token,
         );
+      }
+    }
+
+    // ── Poll-stage re-submit на provider temporary unavailable ──────────
+    // KIE 422 "high demand" / "service is currently unavailable" и т.п. —
+    // узел провайдера перегружен; defer + retry на том же провайдере не помогает.
+    // Если есть неиспользованный fallback-кандидат (другая модель/провайдер) —
+    // переключаемся на него: чистим providerJobId/Key + добавляем текущий
+    // effective в attemptedProviders + re-enqueue на submit-стадию. Submit
+    // через skipProviders пропустит примари и возьмёт следующего кандидата.
+    // Без fallback fall-through на rate-limit defer-цикл (legacy behavior).
+    if (stage === "poll" && isProviderTemporaryUnavailable(err) && modelMeta) {
+      const requestedN = job.data.numImages ?? 1;
+      const isVirtualBatchNow = requestedN > 1 && (modelMeta?.nativeBatchMax ?? 1) === 1;
+      if (!isVirtualBatchNow) {
+        const dbJob = await db.generationJob.findUnique({
+          where: { id: dbJobId },
+          select: { inputData: true },
+        });
+        const inputData = (dbJob?.inputData as Record<string, unknown> | null | undefined) ?? {};
+        const fbStateNow =
+          (inputData.fallback as
+            | { effectiveProvider?: string; attemptedProviders?: string[] }
+            | undefined) ?? {};
+        const currentEff = fbStateNow.effectiveProvider ?? modelMeta.provider;
+        const alreadyAttempted = new Set(fbStateNow.attemptedProviders ?? []);
+        alreadyAttempted.add(currentEff);
+
+        const fallbackCandidatesNow = getFallbackCandidates(modelId, "design").filter((m) =>
+          isFallbackCompatible(m, job.data.mediaInputs),
+        );
+        const nextCandidate = fallbackCandidatesNow.find((m) => !alreadyAttempted.has(m.provider));
+
+        if (nextCandidate) {
+          logger.warn(
+            { dbJobId, modelId, currentEff, next: nextCandidate.provider },
+            "Image poll: provider temporary unavailable — re-enqueuing on fallback",
+          );
+          await notifyFallback({
+            section: "image",
+            modelId,
+            primaryProvider: modelMeta.provider,
+            fallbackProvider: nextCandidate.provider,
+            reason: "persistent_5xx",
+            jobId: dbJobId,
+            userId: userIdStr,
+          });
+
+          const merged = {
+            ...inputData,
+            fallback: {
+              primaryProvider: modelMeta.provider,
+              attemptedProviders: Array.from(alreadyAttempted),
+            },
+          };
+          await db.generationJob.update({
+            where: { id: dbJobId },
+            data: {
+              providerJobId: null,
+              providerKeyId: null,
+              inputData: merged as unknown as Prisma.InputJsonValue,
+            },
+          });
+
+          await delayJob(
+            job,
+            {
+              ...job.data,
+              stage: undefined,
+              pollStartedAt: undefined,
+              lastIntervalMs: undefined,
+            },
+            1000,
+            token,
+          );
+        }
       }
     }
 
