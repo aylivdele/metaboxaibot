@@ -933,12 +933,23 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     description:
       "Видео от Google со звуком и голосами. Поддерживает вертикальный формат для Reels и Shorts. Standard — максимальное качество, выше детализация чем Fast. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
     section: "video",
-    provider: "google",
+    provider: "kie",
     familyId: "veo",
     variantLabel: "Standard",
-    // $0.40/s (Veo 3.1 Standard, Gemini API)
-    costUsdPerRequest: 0,
-    costUsdPerSecond: 0.4,
+    // KIE Veo 3.1 Quality: per-video price by resolution.
+    //   720p:  $1.25
+    //   1080p: $1.275
+    //   4k:    $1.85
+    costUsdPerRequest: 1.25,
+    costUsdPerSecond: 0,
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "720p": { costUsdPerRequest: 1.25 },
+        "1080p": { costUsdPerRequest: 1.275 },
+        "4k": { costUsdPerRequest: 1.85 },
+      },
+    },
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
     supportsImages: true,
@@ -1014,18 +1025,21 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     description:
       "Быстрая и более доступная версия Veo 3.1 от Google. Со звуком и голосами, но чуть ниже детализация чем Standard. Поддерживает 4K. Можно задать первый и последний кадр — Veo сгенерирует плавный переход между ними.",
     section: "video",
-    provider: "google",
+    provider: "kie",
     familyId: "veo",
     variantLabel: "Fast",
-    // Resolution-based: 720p $0.10/s, 1080p $0.12/s, 4k $0.30/s
-    costUsdPerRequest: 0,
-    costUsdPerSecond: 0.1,
+    // KIE Veo 3.1 Fast: per-video price by resolution.
+    //   720p:  $0.30  (≈ reference-to-video $0.30 baseline)
+    //   1080p: $0.325
+    //   4k:    $0.90
+    costUsdPerRequest: 0.3,
+    costUsdPerSecond: 0,
     costVariants: {
       settingKey: "resolution",
       map: {
-        "720p": { costUsdPerSecond: 0.1 },
-        "1080p": { costUsdPerSecond: 0.12 },
-        "4k": { costUsdPerSecond: 0.3 },
+        "720p": { costUsdPerRequest: 0.3 },
+        "1080p": { costUsdPerRequest: 0.325 },
+        "4k": { costUsdPerRequest: 0.9 },
       },
     },
     inputCostUsdPerMToken: 0,
@@ -2046,5 +2060,66 @@ export const FALLBACK_VIDEO_MODELS: AIModel[] = [
         default: "480p",
       },
     ],
+  },
+  // ── Veo 3.1 (Quality) via Google Gemini API — fallback при недоступности KIE.
+  // Те же media-input slot keys (first_frame/last_frame/reference) что у primary,
+  // чтобы isFallbackCompatible не отсекал. Биллинг при fallback'е по primary
+  // (KIE) цене — providerUsdCost из adapter'а игнорируется в effective !== primary.
+  {
+    id: "veo",
+    name: "Veo 3.1 (google fallback)",
+    description: "Fallback на прямую Google Gemini API при недоступности KIE.",
+    section: "video",
+    provider: "google",
+    familyId: "veo",
+    variantLabel: "Standard",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.4,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
+    modes: VEO_MODES,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16"],
+    supportedDurations: [4, 6, 8],
+    settings: [],
+  },
+  // ── Veo 3.1 Fast via Google Gemini API — fallback при недоступности KIE.
+  {
+    id: "veo-fast",
+    name: "Veo 3.1 Fast (google fallback)",
+    description: "Fallback на прямую Google Gemini API при недоступности KIE.",
+    section: "video",
+    provider: "google",
+    familyId: "veo",
+    variantLabel: "Fast",
+    costUsdPerRequest: 0,
+    costUsdPerSecond: 0.1,
+    costVariants: {
+      settingKey: "resolution",
+      map: {
+        "720p": { costUsdPerSecond: 0.1 },
+        "1080p": { costUsdPerSecond: 0.12 },
+        "4k": { costUsdPerSecond: 0.3 },
+      },
+    },
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: true,
+    mediaInputs: [MI_FIRST_FRAME, MI_LAST_FRAME, MI_REFERENCE_VEO],
+    modes: VEO_MODES,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: true,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    supportedAspectRatios: ["16:9", "9:16"],
+    supportedDurations: [4, 6, 8],
+    settings: [],
   },
 ];

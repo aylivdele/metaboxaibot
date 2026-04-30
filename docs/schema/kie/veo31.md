@@ -5,8 +5,8 @@
 ```yaml
 openapi: 3.0.1
 info:
-  title: ''
-  description: ''
+  title: ""
+  description: ""
   version: 1.0.0
 paths:
   /api/v1/veo/generate:
@@ -139,14 +139,14 @@ paths:
                     - veo3_fast
                   x-apidog-enum:
                     - value: veo3
-                      name: ''
-                      description: ''
+                      name: ""
+                      description: ""
                     - value: veo3_fast
-                      name: ''
-                      description: ''
+                      name: ""
+                      description: ""
                     - value: veo3_lite
-                      name: ''
-                      description: ''
+                      name: ""
+                      description: ""
                 generationType:
                   type: string
                   description: >-
@@ -198,12 +198,12 @@ paths:
 
                     Default value is 16:9.
                   enum:
-                    - '16:9'
-                    - '9:16'
+                    - "16:9"
+                    - "9:16"
                     - Auto
-                  default: '16:9'
+                  default: "16:9"
                   examples:
-                    - '16:9'
+                    - "16:9"
                 callBackUrl:
                   type: string
                   description: >-
@@ -306,14 +306,14 @@ paths:
                     - 4k
                   x-apidog-enum:
                     - value: 720p
-                      name: ''
-                      description: ''
+                      name: ""
+                      description: ""
                     - value: 1080p
-                      name: ''
-                      description: ''
+                      name: ""
+                      description: ""
                     - value: 4k
-                      name: ''
-                      description: ''
+                      name: ""
+                      description: ""
                   default: 720p
                   description: >-
                     Controls the pixel dimensions of the generated image. Higher
@@ -340,7 +340,7 @@ paths:
                   model: veo3_fast
                   watermark: MyBrand
                   callBackUrl: http://your-callback-url.com/complete
-                  aspect_ratio: '16:9'
+                  aspect_ratio: "16:9"
                   seeds: 12345
                   enableFallback: false
                   enableTranslation: true
@@ -354,12 +354,12 @@ paths:
               model: veo3_fast
               watermark: MyBrand
               callBackUrl: http://your-callback-url.com/complete
-              aspect_ratio: '16:9'
+              aspect_ratio: "16:9"
               enableFallback: false
               enableTranslation: true
               generationType: REFERENCE_2_VIDEO
       responses:
-        '200':
+        "200":
           description: Request successful
           content:
             application/json:
@@ -450,7 +450,7 @@ paths:
                   taskId: veo_task_abcdef123456
           headers: {}
           x-apidog-name: success
-        '500':
+        "500":
           description: request failed
           content:
             application/json:
@@ -519,7 +519,7 @@ paths:
                   the request
                 data: null
           headers: {}
-          x-apidog-name: 'Error '
+          x-apidog-name: "Error "
       security:
         - BearerAuth: []
           x-apidog:
@@ -535,7 +535,7 @@ paths:
                 BearerAuth: []
       callbacks:
         onVideoGenerated:
-          '{$request.body#/callBackUrl}':
+          "{$request.body#/callBackUrl}":
             post:
               summary: Video Generation Callback
               description: >-
@@ -602,13 +602,13 @@ paths:
                                 resultUrls:
                                   type: string
                                   description: Generated video URLs
-                                  example: '[http://example.com/video1.mp4]'
+                                  example: "[http://example.com/video1.mp4]"
                                 originUrls:
                                   type: string
                                   description: >-
                                     Original video URLs. Only has value when
                                     aspect_ratio is not 16:9
-                                  example: '[http://example.com/original_video1.mp4]'
+                                  example: "[http://example.com/original_video1.mp4]"
                                 resolution:
                                   type: string
                                   description: Video resolution information
@@ -622,7 +622,7 @@ paths:
                               example: false
                               deprecated: true
               responses:
-                '200':
+                "200":
                   description: Callback received successfully
       x-apidog-folder: docs/en/Market/Veo3.1 API
       x-apidog-status: released
@@ -663,5 +663,4 @@ security:
       scopes:
         kn8M4YUlc5i0A0179ezwx:
           BearerAuth: []
-
 ```
