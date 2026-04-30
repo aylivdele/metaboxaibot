@@ -196,7 +196,7 @@ const ENABLE_THINKING: ModelSettingDef = {
   default: true,
 };
 
-/** Thinking budget slider for Gemini models. */
+/** Thinking budget slider for Gemini 2.x (thinking optional, can be disabled). */
 const THINKING_BUDGET: ModelSettingDef = {
   key: "thinking_budget",
   label: "Бюджет рассуждений",
@@ -206,6 +206,22 @@ const THINKING_BUDGET: ModelSettingDef = {
   max: 24576,
   step: 256,
   default: 0,
+};
+
+/**
+ * Thinking budget slider for Gemini 3.x — thinking is REQUIRED, нельзя 0.
+ * Google API на budget=0 вернёт 400 "This model only works in thinking mode".
+ * Min/default подняты до 128 чтобы UI не позволял задать невалидное значение.
+ */
+const THINKING_BUDGET_REQUIRED: ModelSettingDef = {
+  key: "thinking_budget",
+  label: "Бюджет рассуждений",
+  description: "Сколько токенов модель может потратить на внутренние рассуждения.",
+  type: "slider",
+  min: 128,
+  max: 24576,
+  step: 256,
+  default: 1024,
 };
 
 /**
@@ -964,7 +980,8 @@ for (const [id, model] of Object.entries(GPT_MODELS)) {
     extras.push(ENABLE_THINKING);
   }
   if (GEMINI_THINKING_IDS.has(id)) {
-    extras.push(THINKING_BUDGET);
+    // Gemini 3.x требует thinking mode > 0; 2.x допускает 0 (выкл.).
+    extras.push(id.startsWith("gemini-3") ? THINKING_BUDGET_REQUIRED : THINKING_BUDGET);
   }
   const temp =
     ANTHROPIC_THINKING_IDS.has(id) || id === "claude-haiku"
