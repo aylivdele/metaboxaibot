@@ -52,6 +52,14 @@ export class GeminiAdapter extends BaseLLMAdapter {
       parts: [{ text: m.content }],
     }));
 
+    // Gemini 3 Pro семейство требует thinking mode (budget > 0). Если юзер
+    // сохранил `thinking_budget: 0` (legacy default из старого слайдера) или
+    // явно поставил 0 — Google API вернёт 400 "This model only works in thinking
+    // mode". Coerce'им 0 в -1 (dynamic — модель сама выбирает бюджет).
+    const requiresThinking = this.apiModel.startsWith("gemini-3");
+    const effectiveThinkingBudget =
+      requiresThinking && input.thinkingBudget === 0 ? -1 : input.thinkingBudget;
+
     const chat = this.ai.chats.create({
       model: this.apiModel,
       history,
@@ -59,8 +67,8 @@ export class GeminiAdapter extends BaseLLMAdapter {
         ...(input.systemPrompt ? { systemInstruction: input.systemPrompt } : {}),
         ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
         ...(input.maxTokens !== undefined ? { maxOutputTokens: input.maxTokens } : {}),
-        ...(input.thinkingBudget !== undefined
-          ? { thinkingConfig: { thinkingBudget: input.thinkingBudget } }
+        ...(effectiveThinkingBudget !== undefined
+          ? { thinkingConfig: { thinkingBudget: effectiveThinkingBudget } }
           : {}),
       },
     });

@@ -1394,7 +1394,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     description:
       "Быстрые видео с крутыми спецэффектами: взрывы, плавление, сжатие. Идеально для TikTok и Reels. Поддерживает фото как первый кадр.",
     section: "video",
-    provider: "pika",
+    provider: "fal",
     // Per-generation flat fee: 720p/5s=$0.20, 1080p/5s=$0.45 (10s assumed ×2)
     costUsdPerRequest: 0.2,
     costMatrix: {
