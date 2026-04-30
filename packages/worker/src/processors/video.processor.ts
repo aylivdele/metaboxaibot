@@ -9,7 +9,6 @@ import type { VideoJobData } from "@metabox/api/queues";
 import { getVideoQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createVideoAdapter } from "@metabox/api/ai/video";
-import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
 import {
   deductTokens,
   calculateCost,
@@ -255,14 +254,6 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
         // adapter (HeyGen / D-ID) receives a voice_id it can actually use.
         // Records saved before this migration store the externalId directly
         // — both shapes are accepted via the two-pass findFirst below.
-        //
-        // Special case for HeyGen: HeyGen has its own voice catalog and не
-        // принимает ElevenLabs voice_id'ы (вернёт 400 "Invalid voice_id: ...
-        // Voice not found"). Поэтому если модель — HeyGen и юзер выбрал
-        // клонированный ElevenLabs голос, мы заранее генерируем TTS через
-        // ElevenLabs, аплоадим в S3 и передаём адаптеру `voice_url`/`voice_s3key`
-        // — HeyGen.submit увидит их вместо voice_id и пойдёт через
-        // audio_asset_id flow (lip-sync), а не TTS.
         let effectiveModelSettings = modelSettings;
         const requestedVoice = (modelSettings?.voice_id as string | undefined)?.trim();
         if (requestedVoice) {
@@ -278,71 +269,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
           if (userVoice) {
             try {
               const resolved = await resolveVoiceForTTS(userVoice.id);
-              if (modelMeta?.provider === "heygen") {
-                // Reuse pre-generated audio if a previous attempt succeeded.
-                // На retry submit TTS не генерим повторно — берём S3-ключ из inputData.
-                const existingInputData =
-                  (existingJob?.inputData as Record<string, unknown> | null | undefined) ?? {};
-                const cachedAudio = existingInputData.preTtsAudio as
-                  | { s3Key?: string; userVoiceId?: string }
-                  | undefined;
-
-                let voiceS3Key: string | null = null;
-                if (cachedAudio?.s3Key && cachedAudio.userVoiceId === userVoice.id) {
-                  voiceS3Key = cachedAudio.s3Key;
-                } else {
-                  const tts = new ElevenLabsAdapter("tts-el", resolved.acquired.apiKey);
-                  const audioResult = await tts.generate({
-                    prompt: effectivePrompt,
-                    modelSettings: {
-                      voice_id: resolved.voiceId,
-                      ...((modelSettings?.voice_settings as Record<string, unknown>) ?? {}),
-                    },
-                  });
-                  if (!audioResult.buffer) {
-                    throw new Error("ElevenLabs TTS returned no audio buffer");
-                  }
-                  const audioKey = buildS3Key(
-                    "audio",
-                    userIdStr,
-                    dbJobId,
-                    audioResult.ext ?? "mp3",
-                  );
-                  voiceS3Key = await uploadBuffer(
-                    audioKey,
-                    audioResult.buffer,
-                    audioResult.contentType ?? `audio/${audioResult.ext ?? "mpeg"}`,
-                  );
-                  if (!voiceS3Key) throw new Error("Failed to upload pre-TTS audio to S3");
-                  // Persist для recovery — следующий retry submit'а не будет re-TTS'ить.
-                  await db.generationJob
-                    .update({
-                      where: { id: dbJobId },
-                      data: {
-                        inputData: {
-                          ...existingInputData,
-                          preTtsAudio: { s3Key: voiceS3Key, userVoiceId: userVoice.id },
-                        } as unknown as Prisma.InputJsonValue,
-                      },
-                    })
-                    .catch((err) =>
-                      logger.warn(
-                        { dbJobId, err },
-                        "Video submit: failed to persist preTtsAudio to inputData",
-                      ),
-                    );
-                }
-
-                const voiceUrl = await getFileUrl(voiceS3Key).catch(() => null);
-                effectiveModelSettings = {
-                  ...modelSettings,
-                  voice_id: undefined,
-                  voice_s3key: voiceS3Key,
-                  ...(voiceUrl ? { voice_url: voiceUrl } : {}),
-                };
-              } else {
-                effectiveModelSettings = { ...modelSettings, voice_id: resolved.voiceId };
-              }
+              effectiveModelSettings = { ...modelSettings, voice_id: resolved.voiceId };
             } catch (err) {
               logger.warn(
                 { userVoiceId: userVoice.id, err },
