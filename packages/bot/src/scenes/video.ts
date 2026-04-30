@@ -1141,6 +1141,24 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     const photoCaptionSlots = await getActiveModelSlots(ctx.user.id, modelId);
     if (supportsImages && photoCaptionSlots.length) {
       const firstSlot = photoCaptionSlots[0];
+      if (firstSlot.constraints) {
+        let widthPx = photoSize?.width;
+        let heightPx = photoSize?.height;
+        if (isImageDoc) {
+          try {
+            const meta = await probeImageMetadata(tgUrl);
+            widthPx = meta.width;
+            heightPx = meta.height;
+          } catch (err) {
+            logger.warn({ err }, "probeImageMetadata failed in caption+photo path");
+          }
+        }
+        const violation = validateMediaAgainstSlot(firstSlot, { widthPx, heightPx }, ctx.t);
+        if (violation) {
+          await ctx.reply(violation);
+          return;
+        }
+      }
       mediaInputs = { [firstSlot.slotKey]: [tgUrl] };
     }
 

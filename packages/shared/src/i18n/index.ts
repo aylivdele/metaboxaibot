@@ -181,6 +181,7 @@ export interface Translations {
     mediaSlotImageTooLarge: string;
     mediaSlotReadMetadataFailed: string;
     kieVideoDurationOutOfRange: string;
+    kieImageTooSmall: string;
     mediaSlotImagesOnly: string;
     contentPolicyViolation: string;
     copyrightViolation: string;
@@ -260,6 +261,8 @@ export interface Translations {
     replicateOom: string;
     replicateInvalidParams: string;
     replicateFileTooLarge: string;
+    replicateContentPolicy: string;
+    promptNotEnglish: string;
     // Fal
     falContentPolicy: string;
     falNoMediaGenerated: string;
