@@ -356,6 +356,8 @@ export default {
       "❌ The loop option is not compatible with the selected settings. Please disable it and try again.",
     lumaNoKeyframes: "❌ No keyframes provided. Please check your settings and try again.",
     lumaUnknownRequestType: "❌ Invalid request type. Please check your model settings.",
+    lumaIntellectualProperty:
+      "❌ Request rejected: prompt references protected intellectual property (brands, celebrities, movie/game characters). Please rephrase without such references.",
     lumaRejected: "❌ Luma rejected your request. Please check your settings and try again.",
     // MiniMax
     minimaxSensitiveContent:
