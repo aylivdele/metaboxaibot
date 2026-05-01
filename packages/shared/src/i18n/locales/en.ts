@@ -260,6 +260,10 @@ export default {
       "❌ The image is too small — both sides must be at least {min} px. Please send a larger photo.",
     mediaSlotImagesOnly:
       "❌ This slot only accepts photos. Videos are not supported — please send a photo.",
+    mediaSlotVideosOnly:
+      "❌ This slot only accepts videos. Photos are not supported — please send a video file.",
+    mediaSlotAudiosOnly:
+      "❌ This slot only accepts audio. Please send an audio file or voice message.",
     contentPolicyViolation:
       "❌ Your request was rejected due to a content policy violation. Please modify your prompt and try again.",
     copyrightViolation:
@@ -267,7 +271,7 @@ export default {
     publicFigureViolation:
       "❌ Request blocked: the model detected a prominent public figure in your description or image. Provider policy disallows generating with celebrities — modify your description or use a different photo.",
     klingMotionImageRecognitionFailed:
-      "❌ Could not recognize the image. Upload a photo where the entire upper body is clearly visible (head, shoulders, torso). Close-up face shots, back views, or cropped figures will not work.",
+      "❌ Could not recognize the character in the reference image. Upload a different photo — ideally one where the full body or upper body (head, shoulders, torso) is clearly visible. Close-up face shots, back views, or cropped figures will not work.",
     generationNoResult:
       "❌ The model could not generate a result for this request. Try rephrasing the prompt or adjusting the settings.",
     modelDoesNotSupportImg2img:

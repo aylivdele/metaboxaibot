@@ -352,13 +352,16 @@ export class KieVideoAdapter implements VideoAdapter {
         /sensitive|restrict|policy|prohibited|nsfw|violat|inappropriate|safety|content moderation|blocked/i.test(
           failMsg,
         );
-      // Kling Motion: "Image recognition failed. ... No complete upper body
-      // detected in the image; ensure the upper body is clearly visible."
+      // Kling Motion: ошибки про невалидное reference-фото. Включают:
+      //  - "Image recognition failed. ... No complete upper body detected ..."
+      //  - "The input was rejected, The character in the reference image or
+      //     the first frame of the motion video is invalid."
+      //  - "whole body" / "upper body is clearly visible" advisories
       // Юзер должен загрузить другое фото — детерминированный hardcoded message
       // лучше чем gpt-5-nano AI-classifier (который варьирует от запуска к запуску
       // и тригерит лишний ops alert через notifyOps:true).
       const isKlingImageRecognitionFailed =
-        /image recognition failed|upper body (detected|is clearly visible)|whole body/i.test(
+        /image recognition failed|upper body (detected|is clearly visible)|whole body|character in the (reference image|first frame|motion video).*invalid|the input was rejected/i.test(
           failMsg,
         );
       if (isKlingImageRecognitionFailed) {
