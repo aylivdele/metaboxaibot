@@ -4,7 +4,7 @@ import type {
   VideoValidationError,
   VideoResult,
 } from "./base.adapter.js";
-import { config, UserFacingError, ProviderInputIncompatibleError } from "@metabox/shared";
+import { config, UserFacingError } from "@metabox/shared";
 import { fetchWithLog } from "../../utils/fetch.js";
 import { uploadFileUrl } from "../../utils/kie-upload.js";
 import { classifyAIError } from "../../services/ai-error-classifier.service.js";
@@ -153,16 +153,14 @@ export class KieVideoAdapter implements VideoAdapter {
       const firstFrame = mi.first_frame?.[0] ?? input.imageUrl;
       const lastFrame = mi.last_frame?.[0];
 
-      // KIE cannot process image_urls (i2v) and kling_elements simultaneously.
-      // Check before any uploads so we don't waste KIE file-upload API calls.
-      // submitWithFallback catches this and routes to evolink, which separates
-      // them into image_start and image_urls and handles both correctly.
-      const hasFrame = !!(firstFrame || lastFrame);
-      const hasElements = [1, 2, 3].some((i) => mi[`ref_element_${i}`]?.length);
-      if (hasFrame && hasElements) {
-        throw new ProviderInputIncompatibleError(
-          "KIE kling: image_urls + kling_elements combination is not supported — routing to fallback",
-        );
+      // KIE Kling 3.0 принимает image_urls=[first] (length 1) ИЛИ
+      // image_urls=[first, last] (length 2). Передать только last_frame
+      // нельзя — KIE проинтерпретирует одиночный URL как first_frame, и
+      // юзер получит видео с обратным направлением. Отказываем сразу.
+      if (lastFrame && !firstFrame) {
+        throw new UserFacingError("KIE kling: last_frame without first_frame is not supported", {
+          key: "klingLastFrameNeedsFirst",
+        });
       }
 
       const imageUrls: string[] = [];
@@ -184,6 +182,13 @@ export class KieVideoAdapter implements VideoAdapter {
       // Element references: up to 3 elements, each 2–4 images.
       // User-uploaded images in ref_element_{1..3} slots become
       // @element1 / @element2 / @element3 referenceable in the prompt.
+      //
+      // KIE требует non-empty `image_urls` когда в промпте есть @elementN role
+      // references. Если у юзера нет first/last_frame, мы подставляем первую
+      // картинку первого элемента как заглушку (issue #31). Если frame уже
+      // есть — image_urls уже не пустой, заглушка не нужна и переполнит
+      // лимит spec'а (max 2 = first+last).
+      const hasFrameInImageUrls = imageUrls.length > 0;
       const klingElements: Array<{
         name: string;
         description: string;
@@ -202,9 +207,15 @@ export class KieVideoAdapter implements VideoAdapter {
           description: `reference element ${i}`,
           element_input_urls: elementUrls,
         });
-        // KIE requires image_urls to have an entry for each element when
-        // role references (@element1, @element2) appear in the prompt.
-        imageUrls.push(elementUrls[0]!);
+      }
+      // Заглушка для KIE: если frame нет, но есть elements — кладём по
+      // первой картинке от каждого element'а в image_urls (поведение из
+      // issue #31, "an entry for each element"). Если frame уже есть, не
+      // трогаем — иначе превышаем spec-лимит 2 (first+last).
+      if (!hasFrameInImageUrls) {
+        for (const el of klingElements) {
+          imageUrls.push(el.element_input_urls[0]!);
+        }
       }
       if (klingElements.length) inputPayload.kling_elements = klingElements;
       if (imageUrls.length) inputPayload.image_urls = imageUrls;
