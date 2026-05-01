@@ -40,7 +40,7 @@ export function createLLMAdapter(modelId: string, ctx?: AdapterContext): LLMAdap
       return new GeminiAdapter(modelId, model.contextMaxMessages, apiKey);
     case "alibaba":
       return new QwenAdapter(modelId, model.contextMaxMessages, apiKey, fetchFn);
-    case "xai":
+    case "grok":
       return new GrokAdapter(modelId, model.contextMaxMessages, apiKey, fetchFn);
     case "deepseek":
       return new DeepSeekAdapter(modelId, model.contextMaxMessages, apiKey, fetchFn);

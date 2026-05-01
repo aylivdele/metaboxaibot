@@ -956,7 +956,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     description:
       "Создаёт самые красивые и стильные изображения. Лучший выбор для арта, иллюстраций и эффектных визуалов.",
     section: "design",
-    provider: "midjourney",
+    provider: "replicate",
     costUsdPerRequest: 0.0085,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -1194,7 +1194,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     description:
       "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров и рекламы. Quality — максимальная детализация и точность, самый медленный и дорогой вариант.",
     section: "design",
-    provider: "ideogram",
+    provider: "replicate",
     familyId: "ideogram",
     variantLabel: "Quality",
     costUsdPerRequest: 0.09,
@@ -1311,7 +1311,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     description:
       "Imagen 4 от Google — высокая фотореалистичность. Fast — самый быстрый и дешёвый вариант, без поддержки 2K разрешения. Подходит для быстрых итераций.",
     section: "design",
-    provider: "google",
+    provider: "replicate",
     familyId: "imagen",
     versionLabel: "4",
     variantLabel: "Fast",
@@ -1361,7 +1361,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     description:
       "Imagen 4 от Google — высокая фотореалистичность. Standard — баланс качества и цены, поддержка 2K разрешения. Оптимальный выбор для большинства задач.",
     section: "design",
-    provider: "google",
+    provider: "replicate",
     familyId: "imagen",
     versionLabel: "4",
     variantLabel: "Standard",
@@ -1422,7 +1422,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     description:
       "Imagen 4 от Google — высокая фотореалистичность. Ultra — максимальная детализация и качество рендеринга для профессиональных задач, поддержка 2K.",
     section: "design",
-    provider: "google",
+    provider: "replicate",
     familyId: "imagen",
     versionLabel: "4",
     variantLabel: "Ultra",

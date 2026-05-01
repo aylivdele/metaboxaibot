@@ -631,7 +631,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     description:
       "Флагман xAI — максимальное качество рассуждений, контекст 256K. Дороже Grok 4 Fast, но точнее для сложных задач.",
     section: "gpt",
-    provider: "xai",
+    provider: "grok",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 2.0, // x2 if context > 200k
     outputCostUsdPerMToken: 6.0, // x2 if context > 200k
@@ -649,7 +649,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     description:
       "Ускоренная версия Grok 4 от xAI. Контекст до 2M токенов, в ~10 раз дешевле стандартного Grok 4. Быстрые ответы с рассуждением.",
     section: "gpt",
-    provider: "xai",
+    provider: "grok",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0.2, // x2 if context > 128k
     outputCostUsdPerMToken: 0.5, // x2 if context > 128k

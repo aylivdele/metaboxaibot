@@ -23,15 +23,8 @@ export function resolveKeyProvider(modelId: string): string {
  * resolution это критично.
  */
 export function resolveKeyProviderForModel(model: AIModel): string {
-  const { section, provider } = model;
+  const { provider } = model;
 
-  if (section === "design") {
-    if (provider === "ideogram" || provider === "midjourney") return "replicate";
-    if (provider === "google") return "replicate"; // Imagen → Replicate mirror
-  }
-  if (section === "video" && model.id === "sora" && provider === "openai") return "replicate";
-  if (provider === "suno") return "apipass";
-  if (provider === "xai") return "grok"; // env-переменная — GROK_API_KEY
   if (provider === "kie-claude") return "kie"; // Claude через kie использует общий kie-ключ
 
   return provider;

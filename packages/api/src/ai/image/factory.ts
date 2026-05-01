@@ -46,8 +46,6 @@ export function createImageAdapter(
     case "recraft":
       return new RecraftAdapter(modelId, apiKey, fetchFn);
     case "replicate":
-    case "ideogram":
-    case "midjourney":
       return new ReplicateAdapter(modelId, apiKey, fetchFn);
     case "google":
       // Imagen 4 — use Replicate mirror until direct API is available
