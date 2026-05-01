@@ -20,6 +20,12 @@ export interface ErrorContext {
   userId?: string;
   /** Number of attempts made so far */
   attempt?: number;
+  /**
+   * True если часть sub-jobs всё-таки завершилась успешно — юзер получил
+   * частичный результат, джоб БД помечен `completed`, не `failed`. Меняет
+   * заголовок алерта на ⚠️, чтобы ops видели разницу со «всё упало».
+   */
+  partialSuccess?: boolean;
 }
 
 /**
@@ -137,7 +143,9 @@ export async function notifyTechError(err: unknown, ctx: ErrorContext): Promise<
   const threadId = config.alerts.threadId;
 
   const label = [ctx.section, ctx.modelId].filter(Boolean).join("/") || "unknown";
-  const header = `🔴 <b>Job error</b> [${label}]`;
+  const header = ctx.partialSuccess
+    ? `⚠️ <b>Sub-job failure (partial success)</b> [${label}]`
+    : `🔴 <b>Job error</b> [${label}]`;
 
   const meta: string[] = [];
   if (ctx.jobId) meta.push(`job: <code>${ctx.jobId}</code>`);
