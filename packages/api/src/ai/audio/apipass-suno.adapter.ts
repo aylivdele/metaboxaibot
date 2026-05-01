@@ -128,6 +128,28 @@ export class ApipassSunoAdapter implements AudioAdapter {
           params: { max, current: input.prompt.length },
         });
       }
+      // Provider account out of credits — affects every user job until an
+      // operator tops up. Show a generic "temporarily unavailable" to the
+      // user (it's not their fault and there's nothing for them to fix),
+      // skip retries (BullMQ → UnrecoverableError downstream), and let
+      // ops get a burst of alerts (5 per 30min window) — enough to grab
+      // attention even when AFK without flooding the tech channel for
+      // hours after the first ping.
+      // Tightened to credits/balance co-occurrence so we don't false-match
+      // unrelated "insufficient X" errors (e.g. prompt-quality complaints)
+      // and route the user into a misleading "model unavailable" message.
+      if (
+        /credits?\s+(?:are|is)?\s*insufficient|insufficient\s+(?:credits?|balance)|top[\s-]?up|out\s+of\s+credits/i.test(
+          msg,
+        )
+      ) {
+        throw new UserFacingError(`Suno API: ${msg}`, {
+          key: "modelTemporarilyUnavailable",
+          params: { modelName: "Suno" },
+          notifyOps: true,
+          opsAlertDedupKey: "suno-credits-exhausted",
+        });
+      }
       throw new Error(`Suno API: ${msg}`);
     }
     return data.data.taskId;

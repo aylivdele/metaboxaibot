@@ -82,6 +82,50 @@ function serializeError(err: unknown): string {
   return parts.join("\n");
 }
 
+const PROVIDER_OUT_ALERT_TTL_MS = 30 * 60 * 1000;
+const DEFAULT_MAX_ALERTS_PER_WINDOW = 5;
+
+/**
+ * Burst-throttled variant of `notifyTechError` — sends up to `maxAlerts`
+ * alerts per `dedupKey` within `ttlMs`, then stays silent until the TTL
+ * expires. Use for provider-wide conditions that affect every user job
+ * (e.g. credits exhausted, key revoked).
+ *
+ * The burst is intentional: a single muted alert is easy to miss when
+ * we're AFK, so we let the tech channel ping a few times to make sure
+ * someone notices. After the burst we go quiet to avoid a flood when
+ * the issue persists for hours.
+ *
+ * Falls back to an unthrottled send if Redis is unavailable.
+ */
+export async function notifyTechErrorThrottled(
+  err: unknown,
+  ctx: ErrorContext,
+  dedupKey: string,
+  opts: { maxAlerts?: number; ttlMs?: number } = {},
+): Promise<void> {
+  const maxAlerts = opts.maxAlerts ?? DEFAULT_MAX_ALERTS_PER_WINDOW;
+  const ttlMs = opts.ttlMs ?? PROVIDER_OUT_ALERT_TTL_MS;
+  const redis = getRedis();
+  const counterKey = `alert:tech:${dedupKey}:count`;
+
+  let count: number;
+  try {
+    count = await redis.incr(counterKey);
+    if (count === 1) {
+      // First alert in the window → set TTL so the counter resets later.
+      await redis.pexpire(counterKey, ttlMs);
+    }
+  } catch {
+    // Redis down → don't swallow, send through.
+    await notifyTechError(err, ctx);
+    return;
+  }
+
+  if (count > maxAlerts) return;
+  await notifyTechError(err, ctx);
+}
+
 /**
  * Sends a tech error alert to ALERT_CHAT_ID.
  * Does not throw — always resolves.
