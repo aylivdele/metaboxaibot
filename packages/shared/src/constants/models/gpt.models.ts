@@ -423,28 +423,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     settings: [REASONING_EFFORT, ...REASONING_MODEL_SETTINGS],
   },
-  // ── Claude (через kie.ai) ─────────────────────────────────────────────────
-  // Цены заданы в формате "за 1M API-токенов в USD" — перевод credits→USD
-  // выполняет calculateCost. У kie 1 credit ≈ $0.005, цены ниже взяты с их
-  // прайсинг-страницы. PDF kie не поддерживает напрямую → автоматически
-  // активируется documentTextExtractFallback (см. ниже).
-  "claude-opus": {
-    id: "claude-opus",
-    name: "🎭 Claude 4.6 Opus",
-    description:
-      "Новейшая и самая умная модель Anthropic (версия 4.6). Лучшая для сложных аналитических и творческих задач. Понимает изображения.",
-    section: "gpt",
-    provider: "kie-claude",
-    costUsdPerRequest: 0,
-    inputCostUsdPerMToken: 1.425,
-    outputCostUsdPerMToken: 7.15,
-    supportsImages: true,
-    supportsVoice: false,
-    supportsWeb: false,
-    isAsync: false,
-    contextStrategy: "db_history",
-    contextMaxMessages: 50,
-  },
+
   // "claude-opus-4-5": закомментировано — экономически нецелесообразно держать
   //   предыдущее поколение Opus параллельно с 4.6. Чтобы вернуть — раскомментируйте
   //   и убедитесь, что claude-opus-4-5 поддерживается у kie на /claude/v1/messages.
@@ -757,6 +736,36 @@ export const GPT_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "db_history",
     contextMaxMessages: 40,
+  },
+    // ── Claude (через kie.ai) ─────────────────────────────────────────────────
+  // Цены — USD за 1M ТЕКСТОВЫХ токенов модели (input / output Anthropic-native,
+  // не KIE credits). KIE проксирует /claude/v1/messages 1:1 c Anthropic SSE,
+  // и adapter парсит usage.input_tokens / usage.output_tokens напрямую — это
+  // те же токены, на которые модель токенизирует промпт.
+  //
+  // Откуда числа: KIE публикует прайсинг в credits/1M (1 credit ≈ $0.005),
+  // эти credits-цены вручную умножены на $/credit и зашиты как USD-константы
+  // ниже. calculateCost никаких credits→USD преобразований НЕ делает —
+  // просто tokens × inputCostUsdPerMToken / 1M.
+  //
+  // PDF kie не поддерживает напрямую → автоматически активируется
+  // documentTextExtractFallback (см. ниже).
+  "claude-opus": {
+    id: "claude-opus",
+    name: "🎭 Claude 4.6 Opus",
+    description:
+      "Новейшая и самая умная модель Anthropic (версия 4.6). Лучшая для сложных аналитических и творческих задач. Понимает изображения.",
+    section: "gpt",
+    provider: "kie-claude",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 1.425,
+    outputCostUsdPerMToken: 7.15,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 50,
   },
   // "qwen-3": {
   //   id: "qwen-3",
