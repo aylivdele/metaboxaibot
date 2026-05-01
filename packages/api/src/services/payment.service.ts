@@ -152,12 +152,18 @@ export const paymentService = {
         : `Пакет токенов ${productName || productId}`;
 
     if (productType === "subscription") {
-      // Extend from current endDate (from LocalSubscription) if still active, otherwise from now
+      // Extend from current endDate (from LocalSubscription) if still active, otherwise from now.
+      // EXCEPTION: триал не extend'ит платную подписку — иначе юзер получает
+      // оставшиеся дни триала бесплатно поверх оплаченного периода (например,
+      // купив M1 на 2-й день триала, получал бы ~58 дней вместо 30).
+      // Триал заменяется купленной подпиской, baseDate = "сейчас".
       const currentSub = await db.localSubscription.findUnique({ where: { userId } });
-      const baseDate =
-        currentSub && currentSub.isActive && currentSub.endDate > startDate
-          ? currentSub.endDate
-          : startDate;
+      const isExtendable =
+        currentSub &&
+        currentSub.isActive &&
+        currentSub.endDate > startDate &&
+        currentSub.planName !== "Trial";
+      const baseDate = isExtendable ? currentSub.endDate : startDate;
       // End of day MSK (23:59:59.999 Moscow time)
       const rawEnd = endDateOverride ?? add(baseDate, { months });
       const mskDateStr = rawEnd.toLocaleDateString("sv-SE", { timeZone: "Europe/Moscow" });
