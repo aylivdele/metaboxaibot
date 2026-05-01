@@ -166,6 +166,8 @@ export default {
       "❌ Prompt is too long — this model supports up to {limit} characters. Please shorten your text and try again.",
     klingElementsRequired:
       "❌ Your prompt contains element references (like @element_dog) but no element images were uploaded. Use the element slots below to attach reference images, or remove the @element references from your prompt.",
+    klingLastFrameNeedsFirst:
+      "❌ Last frame only works together with a first frame. Please upload a first frame as well, or remove the last frame.",
     promptRefElementWordName:
       "❌ Named element references (@{raw}) are not supported. Use numeric references instead: @Element1..@Element{max}.",
     promptRefElementMissing:
