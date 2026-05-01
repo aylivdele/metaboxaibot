@@ -160,9 +160,20 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
       await db.user.update({ where: { id: userId }, data: userData });
     }
 
-    // Upsert LocalSubscription (single source of truth for subscription state)
+    // Upsert LocalSubscription (single source of truth for subscription state).
+    //
+    // Edge case: если у юзера активный триал с endDate ПОЗЖЕ чем metabox-sub
+    // endDate (например metabox прислал короткую/почти истёкшую подписку, а
+    // триал ещё на 3 недели), переписывая endDate с триала на metabox мы бы
+    // юзера лишили оставшегося триала. Берём max(triale, metaboxe) когда
+    // current = Trial — триал сохраняется как минимум до своего конца.
     if (endDate) {
       const resolvedEndDate = new Date(endDate);
+      const existing = await db.localSubscription.findUnique({ where: { userId } });
+      const finalEndDate =
+        existing?.planName === "Trial" && existing.endDate > resolvedEndDate
+          ? existing.endDate
+          : resolvedEndDate;
       await db.localSubscription.upsert({
         where: { userId },
         create: {
@@ -171,8 +182,8 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
           period: period ?? "M1",
           tokensGranted: tokensGranted ?? 0,
           startDate: startDate ? new Date(startDate) : new Date(),
-          endDate: resolvedEndDate,
-          isActive: resolvedEndDate > new Date(),
+          endDate: finalEndDate,
+          isActive: finalEndDate > new Date(),
           metaboxSubscriptionId: metaboxSubscriptionId ?? null,
         },
         update: {
@@ -180,8 +191,8 @@ export const internalRoutes: FastifyPluginAsync = async (fastify) => {
           ...(period ? { period } : {}),
           ...(tokensGranted !== undefined ? { tokensGranted } : {}),
           ...(startDate ? { startDate: new Date(startDate) } : {}),
-          endDate: resolvedEndDate,
-          isActive: resolvedEndDate > new Date(),
+          endDate: finalEndDate,
+          isActive: finalEndDate > new Date(),
           ...(metaboxSubscriptionId !== undefined ? { metaboxSubscriptionId } : {}),
         },
       });
