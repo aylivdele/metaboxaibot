@@ -227,3 +227,24 @@ export function isActiveSection(section: string, state?: string) {
   }
   return false;
 }
+
+/**
+ * True когда юзер находится в секции, но конкретная модель в чате ещё НЕ
+ * запущена (бот сидит на состоянии типа "выберите раздел"). В этом состоянии
+ * имеет смысл показывать кнопку "Начать работу" — она отправит запрос
+ * активации в чат. После реальной активации (state → `*_ACTIVE`) кнопка не
+ * нужна: повторный клик дублирует приветственное сообщение модели.
+ */
+export function isInSectionPicker(section: string, state?: string) {
+  switch (section) {
+    case "gpt":
+      return state === "GPT_SECTION";
+    case "design":
+      return state === "DESIGN_SECTION";
+    case "video":
+      return state === "VIDEO_SECTION";
+    case "audio":
+      return state === "AUDIO_SECTION";
+  }
+  return false;
+}

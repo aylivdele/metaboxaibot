@@ -230,6 +230,7 @@ export function MediaSettingsView({
             activeModelId === standaloneModel.id &&
             isActiveSection(standaloneModel.section, stateStr)
           }
+          activeState={stateStr}
           savedId={savedId}
           allModelSettings={allModelSettings}
           selectedModeId={selectedModes[standaloneModel.id]}
