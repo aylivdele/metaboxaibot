@@ -208,14 +208,15 @@ export class KieVideoAdapter implements VideoAdapter {
           element_input_urls: elementUrls,
         });
       }
-      // Заглушка для KIE: если frame нет, но есть elements — кладём по
-      // первой картинке от каждого element'а в image_urls (поведение из
-      // issue #31, "an entry for each element"). Если frame уже есть, не
-      // трогаем — иначе превышаем spec-лимит 2 (first+last).
-      if (!hasFrameInImageUrls) {
-        for (const el of klingElements) {
-          imageUrls.push(el.element_input_urls[0]!);
-        }
+      // Заглушка для KIE: если frame нет, но есть elements — кладём ОДНУ
+      // картинку (первого элемента) в image_urls. KIE требует non-empty
+      // image_urls когда в промпте есть @elementN (issue #31), но дока KIE
+      // явно ограничивает массив до 2 entries (first+last frame). При 2-3
+      // элементах прежний код пушил N entries и KIE возвращал 422
+      // "image_urls supports at most 2 images". Одной заглушки достаточно:
+      // KIE интерпретирует image_urls.length === 1 как first frame.
+      if (!hasFrameInImageUrls && klingElements.length > 0) {
+        imageUrls.push(klingElements[0]!.element_input_urls[0]!);
       }
       if (klingElements.length) inputPayload.kling_elements = klingElements;
       if (imageUrls.length) inputPayload.image_urls = imageUrls;
