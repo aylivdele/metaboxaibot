@@ -4,12 +4,13 @@ import { MODEL_TRANSLATIONS } from "@metabox/shared-browser";
 import { useState } from "react";
 import { useI18n } from "../../i18n";
 import type { Model } from "../../types";
-import { modelCostLabel } from "../../utils/mediaSettingsViewHelpers";
+import { isInSectionPicker, modelCostLabel } from "../../utils/mediaSettingsViewHelpers";
 import { SettingsPanel } from "./SettingsPanel";
 
 interface StandaloneCardProps {
   model: Model;
   isActive: boolean;
+  activeState?: string;
   savedId: string | null;
   allModelSettings: Record<string, Record<string, unknown>>;
   selectedModeId?: string;
@@ -22,6 +23,7 @@ interface StandaloneCardProps {
 export function StandaloneCard({
   model,
   isActive,
+  activeState,
   savedId,
   allModelSettings,
   selectedModeId,
@@ -112,7 +114,7 @@ export function StandaloneCard({
           </button>
         )}
       </div>
-      {isActive && (
+      {isActive && isInSectionPicker(model.section, activeState) && (
         <button
           className="family-card__start-btn"
           onClick={() => void handleActivate()}

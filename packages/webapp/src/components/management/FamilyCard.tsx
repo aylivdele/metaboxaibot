@@ -5,7 +5,11 @@ import { useState, useEffect } from "react";
 import { useI18n } from "../../i18n";
 import type { Model } from "../../types";
 import { SettingsPanel } from "./SettingsPanel";
-import { isActiveSection, modelCostLabel } from "../../utils/mediaSettingsViewHelpers";
+import {
+  isActiveSection,
+  isInSectionPicker,
+  modelCostLabel,
+} from "../../utils/mediaSettingsViewHelpers";
 
 interface FamilyCardProps {
   members: Model[];
@@ -197,7 +201,7 @@ export function FamilyCard({
         )}
       </div>
 
-      {isGloballyActive && (
+      {isGloballyActive && isInSectionPicker(selected.section, activeState) && (
         <button
           className="family-card__start-btn"
           onClick={() => void handleActivate()}
