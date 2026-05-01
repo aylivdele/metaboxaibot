@@ -91,7 +91,8 @@ export default {
       "You can refine an image, get the original uncompressed file sent back into the chat, or download it via link (we recommend opening the link in a browser if you're using the mobile version of Telegram).\n\n🔄 - Refine\n📎 - Send as file\n⬇️ - Download",
     batchActionsNoDownload:
       "You can refine an image or get the original uncompressed file sent back into the chat.\n\n🔄 - Refine\n📎 - Send as file",
-    batchPartialFooter: "✅ Generated {success} of {total}. Failed:\n{errors}",
+    batchPartialFooter:
+      "✅ Generated {success} of {total}. You were only charged for the successful ones. Failed:\n{errors}",
     batchAllFailed: "❌ Failed to generate any of {total}. Errors:\n{errors}",
     chooseModel: "🎨 Choose model",
   },
@@ -288,7 +289,7 @@ export default {
       "❌ The provider failed to generate audio. Please try modifying your request.",
     audioCreateTaskFailed: "❌ Failed to create a generation task. Please try again later.",
     generationTimeout: "❌ Generation took too long. Please try again.",
-    generationFailed: "❌ {modelName}: AI model error.",
+    generationFailed: "❌ {modelName}: temporary provider issue. Please try again.",
     generationStillRunning: "{modelName}\nStill generating, please wait...",
     generationTimedOut24h:
       "❌ {modelName}: generation did not finish within 24 hours and was cancelled. Please try again.",
@@ -356,6 +357,8 @@ export default {
       "❌ The loop option is not compatible with the selected settings. Please disable it and try again.",
     lumaNoKeyframes: "❌ No keyframes provided. Please check your settings and try again.",
     lumaUnknownRequestType: "❌ Invalid request type. Please check your model settings.",
+    lumaIntellectualProperty:
+      "❌ Request rejected: prompt references protected intellectual property (brands, celebrities, movie/game characters). Please rephrase without such references.",
     lumaRejected: "❌ Luma rejected your request. Please check your settings and try again.",
     // MiniMax
     minimaxSensitiveContent:

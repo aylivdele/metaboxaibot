@@ -246,6 +246,7 @@ export interface Translations {
     lumaLoopUnsupported: string;
     lumaNoKeyframes: string;
     lumaUnknownRequestType: string;
+    lumaIntellectualProperty: string;
     lumaRejected: string;
     // MiniMax
     minimaxSensitiveContent: string;
