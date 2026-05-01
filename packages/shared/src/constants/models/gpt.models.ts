@@ -737,7 +737,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 40,
   },
-    // ── Claude (через kie.ai) ─────────────────────────────────────────────────
+  // ── Claude (через kie.ai) ─────────────────────────────────────────────────
   // Цены — USD за 1M ТЕКСТОВЫХ токенов модели (input / output Anthropic-native,
   // не KIE credits). KIE проксирует /claude/v1/messages 1:1 c Anthropic SSE,
   // и adapter парсит usage.input_tokens / usage.output_tokens напрямую — это
