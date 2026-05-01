@@ -91,7 +91,8 @@ export default {
       "You can refine an image, get the original uncompressed file sent back into the chat, or download it via link (we recommend opening the link in a browser if you're using the mobile version of Telegram).\n\n🔄 - Refine\n📎 - Send as file\n⬇️ - Download",
     batchActionsNoDownload:
       "You can refine an image or get the original uncompressed file sent back into the chat.\n\n🔄 - Refine\n📎 - Send as file",
-    batchPartialFooter: "✅ Generated {success} of {total}. Failed:\n{errors}",
+    batchPartialFooter:
+      "✅ Generated {success} of {total}. You were only charged for the successful ones. Failed:\n{errors}",
     batchAllFailed: "❌ Failed to generate any of {total}. Errors:\n{errors}",
     chooseModel: "🎨 Choose model",
   },
@@ -165,6 +166,8 @@ export default {
       "❌ Prompt is too long — this model supports up to {limit} characters. Please shorten your text and try again.",
     klingElementsRequired:
       "❌ Your prompt contains element references (like @element_dog) but no element images were uploaded. Use the element slots below to attach reference images, or remove the @element references from your prompt.",
+    klingLastFrameNeedsFirst:
+      "❌ Last frame only works together with a first frame. Please upload a first frame as well, or remove the last frame.",
     promptRefElementWordName:
       "❌ Named element references (@{raw}) are not supported. Use numeric references instead: @Element1..@Element{max}.",
     promptRefElementMissing:
@@ -259,6 +262,10 @@ export default {
       "❌ The image is too small — both sides must be at least {min} px. Please send a larger photo.",
     mediaSlotImagesOnly:
       "❌ This slot only accepts photos. Videos are not supported — please send a photo.",
+    mediaSlotVideosOnly:
+      "❌ This slot only accepts videos. Photos are not supported — please send a video file.",
+    mediaSlotAudiosOnly:
+      "❌ This slot only accepts audio. Please send an audio file or voice message.",
     contentPolicyViolation:
       "❌ Your request was rejected due to a content policy violation. Please modify your prompt and try again.",
     copyrightViolation:
@@ -266,7 +273,7 @@ export default {
     publicFigureViolation:
       "❌ Request blocked: the model detected a prominent public figure in your description or image. Provider policy disallows generating with celebrities — modify your description or use a different photo.",
     klingMotionImageRecognitionFailed:
-      "❌ Could not recognize the image. Upload a photo where the entire upper body is clearly visible (head, shoulders, torso). Close-up face shots, back views, or cropped figures will not work.",
+      "❌ Could not recognize the character in the reference image. Upload a different photo — ideally one where the full body or upper body (head, shoulders, torso) is clearly visible. Close-up face shots, back views, or cropped figures will not work.",
     generationNoResult:
       "❌ The model could not generate a result for this request. Try rephrasing the prompt or adjusting the settings.",
     modelDoesNotSupportImg2img:
@@ -288,7 +295,7 @@ export default {
       "❌ The provider failed to generate audio. Please try modifying your request.",
     audioCreateTaskFailed: "❌ Failed to create a generation task. Please try again later.",
     generationTimeout: "❌ Generation took too long. Please try again.",
-    generationFailed: "❌ {modelName}: AI model error.",
+    generationFailed: "❌ {modelName}: temporary provider issue. Please try again.",
     generationStillRunning: "{modelName}\nStill generating, please wait...",
     generationTimedOut24h:
       "❌ {modelName}: generation did not finish within 24 hours and was cancelled. Please try again.",
@@ -356,6 +363,8 @@ export default {
       "❌ The loop option is not compatible with the selected settings. Please disable it and try again.",
     lumaNoKeyframes: "❌ No keyframes provided. Please check your settings and try again.",
     lumaUnknownRequestType: "❌ Invalid request type. Please check your model settings.",
+    lumaIntellectualProperty:
+      "❌ Request rejected: prompt references protected intellectual property (brands, celebrities, movie/game characters). Please rephrase without such references.",
     lumaRejected: "❌ Luma rejected your request. Please check your settings and try again.",
     // MiniMax
     minimaxSensitiveContent:

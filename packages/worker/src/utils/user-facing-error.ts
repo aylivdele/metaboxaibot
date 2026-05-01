@@ -36,6 +36,18 @@ export function shouldNotifyOps(err: unknown): boolean {
 }
 
 /**
+ * Returns the dedup key for ops alerts when the underlying error wants
+ * the tech channel throttled (provider-wide conditions like credits
+ * exhausted). `null` → caller should send a regular non-throttled alert.
+ */
+export function getOpsAlertDedupKey(err: unknown): string | null {
+  if (err instanceof UserFacingError && err.opsAlertDedupKey) {
+    return err.opsAlertDedupKey;
+  }
+  return null;
+}
+
+/**
  * Resolve a sub-job error в form для virtual batch'а.
  *
  *   - userText: что показываем пользователю в footer'е batchPartialFooter /

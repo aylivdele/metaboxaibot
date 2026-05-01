@@ -205,7 +205,7 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     description:
       "Генерирует полноценные музыкальные треки с вокалом и аранжировкой. Можно задать стиль, настроение и текст песни. До 4 минут. Дольше ElevenLabs, но с полноценным вокалом.",
     section: "audio",
-    provider: "suno",
+    provider: "apipass",
     costUsdPerRequest: 0.06, // ~$0.030–$0.040/track (apipass.net proxy)
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,

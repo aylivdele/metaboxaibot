@@ -4,12 +4,13 @@ import { MODEL_TRANSLATIONS } from "@metabox/shared-browser";
 import { useState } from "react";
 import { useI18n } from "../../i18n";
 import type { Model } from "../../types";
-import { modelCostLabel } from "../../utils/mediaSettingsViewHelpers";
+import { isInSectionPicker, modelCostLabel } from "../../utils/mediaSettingsViewHelpers";
 import { SettingsPanel } from "./SettingsPanel";
 
 interface StandaloneCardProps {
   model: Model;
   isActive: boolean;
+  activeState?: string;
   savedId: string | null;
   allModelSettings: Record<string, Record<string, unknown>>;
   selectedModeId?: string;
@@ -22,6 +23,7 @@ interface StandaloneCardProps {
 export function StandaloneCard({
   model,
   isActive,
+  activeState,
   savedId,
   allModelSettings,
   selectedModeId,
@@ -112,6 +114,15 @@ export function StandaloneCard({
           </button>
         )}
       </div>
+      {isActive && isInSectionPicker(model.section, activeState) && (
+        <button
+          className="family-card__start-btn"
+          onClick={() => void handleActivate()}
+          disabled={activating}
+        >
+          {activating ? t("imageSettings.activating") : t("imageSettings.startWork")}
+        </button>
+      )}
       {cost && <div className="family-card__cost">{cost}</div>}
       {cost && model.id.startsWith("gpt-image") && (
         <div className="family-card__cost-note">{t("manage.price.gptImageNote")}</div>

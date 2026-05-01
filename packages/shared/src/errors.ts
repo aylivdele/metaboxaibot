@@ -14,6 +14,15 @@ export class UserFacingError extends Error {
    * tracking (e.g. AI-classified provider errors that aren't yet hardcoded).
    */
   public readonly notifyOps?: boolean;
+  /**
+   * When set together with `notifyOps: true`, the worker burst-throttles
+   * ops alerts by this key (default: 5 alerts per 30min window, then
+   * silent). Use for provider-wide conditions that affect every user
+   * job until an operator intervenes (credits exhausted, key revoked,
+   * etc.) — without throttling the alert channel gets one message per
+   * failed job, with a single muted alert it's easy to miss.
+   */
+  public readonly opsAlertDedupKey?: string;
 
   constructor(
     message: string,
@@ -21,6 +30,7 @@ export class UserFacingError extends Error {
       key?: string;
       params?: Record<string, string | number>;
       notifyOps?: boolean;
+      opsAlertDedupKey?: string;
       /**
        * Оригинальная ошибка, которую этот UserFacingError оборачивает.
        * Используется в notifyTechError — серилайзер развернёт цепочку
@@ -35,6 +45,7 @@ export class UserFacingError extends Error {
     this.key = options?.key;
     this.params = options?.params;
     this.notifyOps = options?.notifyOps;
+    this.opsAlertDedupKey = options?.opsAlertDedupKey;
   }
 }
 

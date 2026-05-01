@@ -10,8 +10,12 @@ import type { DeductResult } from "@metabox/api/services";
 import { buildS3Key, uploadBuffer, uploadFromUrl, getFileUrl } from "@metabox/api/services/s3";
 import { logger } from "../logger.js";
 import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
-import { notifyTechError } from "../utils/notify-error.js";
-import { resolveUserFacingMessage, shouldNotifyOps } from "../utils/user-facing-error.js";
+import { notifyTechError, notifyTechErrorThrottled } from "../utils/notify-error.js";
+import {
+  resolveUserFacingMessage,
+  shouldNotifyOps,
+  getOpsAlertDedupKey,
+} from "../utils/user-facing-error.js";
 import { getIntervalForElapsed } from "../utils/poll-schedule.js";
 import { submitWithThrottle, isRateLimitLongWindowError } from "../utils/submit-with-throttle.js";
 import {
@@ -388,13 +392,19 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
         data: { status: "failed", error: providerMsg },
       });
       if (shouldNotifyOps(err)) {
-        await notifyTechError(err, {
+        const ctx = {
           jobId: dbJobId,
           modelId,
           section: "audio",
           userId: userIdStr,
           attempt: job.attemptsMade,
-        });
+        };
+        const dedupKey = getOpsAlertDedupKey(err);
+        if (dedupKey) {
+          await notifyTechErrorThrottled(err, ctx, dedupKey);
+        } else {
+          await notifyTechError(err, ctx);
+        }
       }
       await telegram.sendMessage(telegramChatId, providerMsg).catch(() => void 0);
       throw new UnrecoverableError(providerMsg);

@@ -13,7 +13,7 @@ const PROVIDER_ORDER = [
   "anthropic",
   "google",
   "deepseek",
-  "xai",
+  "grok",
   "perplexity",
   "alibaba",
 ] as const;

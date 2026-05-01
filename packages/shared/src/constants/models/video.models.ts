@@ -1315,7 +1315,7 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     description:
       "Устаревшая модель генерации видео от OpenAI. Объекты двигаются как в реальности, со звуком и правильной физикой. Отправьте фото вместе с текстом — оно станет первым кадром видео.",
     section: "video",
-    provider: "openai",
+    provider: "replicate",
     // $0.10/s (via Replicate openai/sora)
     costUsdPerRequest: 0,
     costUsdPerSecond: 0.1,

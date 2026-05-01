@@ -183,6 +183,8 @@ export interface Translations {
     kieVideoDurationOutOfRange: string;
     kieImageTooSmall: string;
     mediaSlotImagesOnly: string;
+    mediaSlotVideosOnly: string;
+    mediaSlotAudiosOnly: string;
     contentPolicyViolation: string;
     copyrightViolation: string;
     publicFigureViolation: string;
@@ -246,6 +248,7 @@ export interface Translations {
     lumaLoopUnsupported: string;
     lumaNoKeyframes: string;
     lumaUnknownRequestType: string;
+    lumaIntellectualProperty: string;
     lumaRejected: string;
     // MiniMax
     minimaxSensitiveContent: string;

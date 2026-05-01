@@ -20,6 +20,12 @@ export interface ErrorContext {
   userId?: string;
   /** Number of attempts made so far */
   attempt?: number;
+  /**
+   * True если часть sub-jobs всё-таки завершилась успешно — юзер получил
+   * частичный результат, джоб БД помечен `completed`, не `failed`. Меняет
+   * заголовок алерта на ⚠️, чтобы ops видели разницу со «всё упало».
+   */
+  partialSuccess?: boolean;
 }
 
 /**
@@ -82,6 +88,50 @@ function serializeError(err: unknown): string {
   return parts.join("\n");
 }
 
+const PROVIDER_OUT_ALERT_TTL_MS = 30 * 60 * 1000;
+const DEFAULT_MAX_ALERTS_PER_WINDOW = 5;
+
+/**
+ * Burst-throttled variant of `notifyTechError` — sends up to `maxAlerts`
+ * alerts per `dedupKey` within `ttlMs`, then stays silent until the TTL
+ * expires. Use for provider-wide conditions that affect every user job
+ * (e.g. credits exhausted, key revoked).
+ *
+ * The burst is intentional: a single muted alert is easy to miss when
+ * we're AFK, so we let the tech channel ping a few times to make sure
+ * someone notices. After the burst we go quiet to avoid a flood when
+ * the issue persists for hours.
+ *
+ * Falls back to an unthrottled send if Redis is unavailable.
+ */
+export async function notifyTechErrorThrottled(
+  err: unknown,
+  ctx: ErrorContext,
+  dedupKey: string,
+  opts: { maxAlerts?: number; ttlMs?: number } = {},
+): Promise<void> {
+  const maxAlerts = opts.maxAlerts ?? DEFAULT_MAX_ALERTS_PER_WINDOW;
+  const ttlMs = opts.ttlMs ?? PROVIDER_OUT_ALERT_TTL_MS;
+  const redis = getRedis();
+  const counterKey = `alert:tech:${dedupKey}:count`;
+
+  let count: number;
+  try {
+    count = await redis.incr(counterKey);
+    if (count === 1) {
+      // First alert in the window → set TTL so the counter resets later.
+      await redis.pexpire(counterKey, ttlMs);
+    }
+  } catch {
+    // Redis down → don't swallow, send through.
+    await notifyTechError(err, ctx);
+    return;
+  }
+
+  if (count > maxAlerts) return;
+  await notifyTechError(err, ctx);
+}
+
 /**
  * Sends a tech error alert to ALERT_CHAT_ID.
  * Does not throw — always resolves.
@@ -93,7 +143,9 @@ export async function notifyTechError(err: unknown, ctx: ErrorContext): Promise<
   const threadId = config.alerts.threadId;
 
   const label = [ctx.section, ctx.modelId].filter(Boolean).join("/") || "unknown";
-  const header = `🔴 <b>Job error</b> [${label}]`;
+  const header = ctx.partialSuccess
+    ? `⚠️ <b>Sub-job failure (partial success)</b> [${label}]`
+    : `🔴 <b>Job error</b> [${label}]`;
 
   const meta: string[] = [];
   if (ctx.jobId) meta.push(`job: <code>${ctx.jobId}</code>`);

@@ -29,6 +29,8 @@ const USER_FACING_PATTERNS: string[] = [
   "frame moderation failed",
   "advanced prompt moderation failed",
   "failed to read user input frames",
+  // Prompt rejection (covers "contains IP", celebrity refs, etc.)
+  "prompt not allowed",
   // Prompt validation (submit)
   "prompt is required",
   "prompt is too short",
@@ -56,6 +58,8 @@ export function getLumaUserMessage(
   if (lower.includes("frame moderation failed")) return e.lumaImageModeration;
   if (lower.includes("advanced prompt moderation failed")) return e.lumaPromptModeration;
   if (lower.includes("failed to read user input frames")) return e.lumaImageLoadError;
+  if (lower.includes("contains ip")) return e.lumaIntellectualProperty;
+  if (lower.includes("prompt not allowed")) return e.lumaPromptModeration;
   if (lower.includes("prompt is required")) return e.lumaPromptRequired;
   if (lower.includes("prompt is too short")) return e.lumaPromptTooShort;
   if (lower.includes("prompt is too long")) return e.lumaPromptTooLong;

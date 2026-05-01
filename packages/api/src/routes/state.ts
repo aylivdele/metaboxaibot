@@ -13,11 +13,13 @@ import {
   getResolvedModes,
   resolveActiveMode,
   getActiveSlots,
+  voiceCloneReturnRedisKey,
   type AIModel,
   type Section,
   type Translations,
 } from "@metabox/shared";
 import type { Language } from "@metabox/shared";
+import { getRedis } from "../redis.js";
 import { logger } from "../logger.js";
 
 type AuthRequest = FastifyRequest & { userId: bigint };
@@ -585,6 +587,15 @@ export const stateRoutes: FastifyPluginAsync = async (fastify) => {
       section as "design" | "audio" | "video",
       modelId,
     );
+
+    // Voice-clone activated through the management UI → drop any pending
+    // HeyGen-return marker, otherwise a clone started here would silently
+    // throw the user back into HeyGen instead of staying in audio.
+    if (modelId === "voice-clone") {
+      await getRedis()
+        .del(voiceCloneReturnRedisKey(userId))
+        .catch(() => void 0);
+    }
 
     // Synchronously switch the bot state + section so the very next user message
     // is routed to the newly-activated section (avoids a race with the async

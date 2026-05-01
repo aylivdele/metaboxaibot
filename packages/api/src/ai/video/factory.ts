@@ -36,18 +36,6 @@ export function createVideoAdapter(
   if (!model) throw new Error(`Unknown video model: ${String(modelOrId)}`);
   const modelId = model.id;
 
-  // Legacy quirks: certain primary modelIds route to a different adapter than
-  // their `provider` field would suggest. Only matched when the model is the
-  // canonical primary definition (matching provider). Fallback registrations
-  // for the same id with a different provider fall through to the provider
-  // switch below.
-  if (modelId === "pika" && model.provider === "pika") {
-    return new FalVideoAdapter(modelId, apiKey, fetchFn);
-  }
-  if (modelId === "sora" && model.provider === "openai") {
-    return new ReplicateVideoAdapter(modelId, apiKey, fetchFn);
-  }
-
   switch (model.provider) {
     case "fal":
       return new FalVideoAdapter(modelId, apiKey, fetchFn);

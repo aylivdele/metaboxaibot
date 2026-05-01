@@ -46,6 +46,7 @@ import {
   TG_DOWNLOAD_LIMIT_BYTES,
   sendSlotPreview,
   validateMediaAgainstSlot,
+  getSlotMediaTypes,
   pickAutoSlot,
   trackDistribution,
   consumeDistribution,
@@ -993,6 +994,18 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
         : await getActiveModelSlots(ctx.user.id, slotModelId);
     const slot = slotsForModel.find((s) => s.slotKey === activeSlot.slotKey);
 
+    // Slot media-type gate: если активный слот принимает только видео/аудио
+    // (например `ref_videos`), фото туда класть нельзя — иначе провайдер потом
+    // упадёт мид-генерации (Evolink "Failed to detect video duration..." на
+    // .jpg URL'е). Раньше этот гейт работал только в auto-slot ветке через
+    // pickAutoSlot, а активный слот валидил только размеры.
+    if (slot && !getSlotMediaTypes(slot).includes("image")) {
+      const types = getSlotMediaTypes(slot);
+      const errKey = types.includes("video") ? "mediaSlotVideosOnly" : "mediaSlotAudiosOnly";
+      await ctx.reply(ctx.t.errors[errKey]);
+      return;
+    }
+
     if (slot?.constraints) {
       let widthPx = photoSize?.width;
       let heightPx = photoSize?.height;
@@ -1300,6 +1313,16 @@ export async function handleVideoVideo(ctx: BotContext): Promise<void> {
         ? activeModeSlots
         : await getActiveModelSlots(ctx.user.id, slotModelId);
     const slot = slotsForModel.find((s) => s.slotKey === activeSlot.slotKey);
+
+    // Slot media-type gate: видео-файл нельзя класть в image-only слот
+    // (например `ref_images`) или audio-only слот.
+    if (slot && !getSlotMediaTypes(slot).includes("video")) {
+      const types = getSlotMediaTypes(slot);
+      const errKey = types.includes("image") ? "mediaSlotImagesOnly" : "mediaSlotAudiosOnly";
+      await ctx.reply(ctx.t.errors[errKey]);
+      return;
+    }
+
     if (slot?.constraints) {
       let durationSec: number | undefined = videoMsg?.duration;
       let widthPx: number | undefined = videoMsg?.width;

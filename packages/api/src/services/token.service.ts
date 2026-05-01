@@ -35,7 +35,7 @@ export async function deductTokens(
 
   // Subscription tokens are spent first, then regular (purchased) tokens.
   const fromSub = Math.min(Number(user.subscriptionTokenBalance), amount);
-  const fromRegular = amount - fromSub;
+  const fromRegular = Math.min(Number(user.tokenBalance), amount - fromSub);
 
   // Onboarding: count generations and flip the flag after 10
   const newCount = user.generationCount + 1;

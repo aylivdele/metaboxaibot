@@ -762,6 +762,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
               section: "image",
               userId: userIdStr,
               attempt: job.attemptsMade,
+              partialSuccess: successResults.length > 0,
             });
           }
           if (successResults.length === 0) {
@@ -1054,6 +1055,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
             section: "image",
             userId: userIdStr,
             attempt: job.attemptsMade,
+            partialSuccess: successResults.length > 0,
           });
         }
         if (successResults.length === 0) {
