@@ -4589,7 +4589,7 @@ textarea::placeholder {
 
 .avatars-page__create-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 4px;
 }
