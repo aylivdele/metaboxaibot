@@ -1,6 +1,7 @@
 import { createLLMAdapter } from "../ai/llm/factory.js";
 import { dialogService, type StoredAttachment } from "./dialog.service.js";
 import { calculateCost, checkBalance, deductTokens } from "./token.service.js";
+import { estimateTokens as estimateStringTokens } from "./token-estimator.js";
 import type { LLMInput, MessageAttachment } from "../ai/llm/base.adapter.js";
 import { AI_MODELS, UserFacingError } from "@metabox/shared";
 import { userStateService } from "./user-state.service.js";
@@ -418,6 +419,37 @@ export const chatService = {
     if (acquiredKeyId) void recordSuccess(acquiredKeyId);
 
     const responseText = stripThinkingBlocks(chunks.join(""));
+
+    // ── Token usage logging ─────────────────────────────────────────────
+    // Provider возвращает usage не всегда (некоторые SSE-стримы или non-stream
+    // ответы у проксей вроде KIE). Когда нет — выводим нашу оценку через
+    // tiktoken cl100k_base (token-estimator.ts) с пометкой `estimated`,
+    // чтобы при анализе логов было видно что число — наша аппроксимация,
+    // а не provider-truth.
+    const inputTokensFromProvider = inputTokensUsed !== undefined;
+    const outputTokensFromProvider = outputTokensUsed !== undefined;
+    const inputTokensCount = inputTokensFromProvider
+      ? (inputTokensUsed as number)
+      : estimateStringTokens(content);
+    const outputTokensCount = outputTokensFromProvider
+      ? (outputTokensUsed as number)
+      : estimateStringTokens(responseText);
+
+    logger.info(
+      {
+        dialogId,
+        modelId: dialog.modelId,
+        inputTokens: inputTokensCount,
+        inputTokensSource: inputTokensFromProvider ? "provider" : "estimated",
+        outputTokens: outputTokensCount,
+        outputTokensSource: outputTokensFromProvider ? "provider" : "estimated",
+        ...(cachedInputTokensUsed !== undefined && cachedInputTokensUsed > 0
+          ? { cachedInputTokens: cachedInputTokensUsed }
+          : {}),
+      },
+      `chat: token usage [input=${inputTokensCount}${inputTokensFromProvider ? "" : " est."}, output=${outputTokensCount}${outputTokensFromProvider ? "" : " est."}]`,
+    );
+
     const tokensUsed =
       providerUsdCost !== undefined
         ? providerUsdCost
