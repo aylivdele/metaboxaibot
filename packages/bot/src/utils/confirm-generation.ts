@@ -21,6 +21,7 @@ import {
 import { InlineKeyboard } from "grammy";
 import { replyNoSubscription, replyInsufficientTokens } from "./reply-error.js";
 import { ensureELTtsForVideo } from "./el-tts.js";
+import { pickVideoPending, pickDesignPending } from "./pending-messages.js";
 import { logger } from "../logger.js";
 
 export type ConfirmKind = "image" | "video" | "audio";
@@ -137,8 +138,8 @@ async function runReplaySubmit(
     kind === "audio"
       ? ctx.t.audio.processing
       : kind === "video"
-        ? ctx.t.video.asyncPending
-        : ctx.t.design.generating;
+        ? pickVideoPending(ctx)
+        : pickDesignPending(ctx);
   const pendingMsg = await ctx.reply(pendingText);
 
   try {
@@ -152,7 +153,9 @@ async function runReplaySubmit(
     } else {
       await audioGenerationService.submitAudio(params as SubmitAudioParams);
     }
-    await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
+    // pendingMsg намеренно НЕ удаляется на успехе — остаётся как «в процессе»-
+    // индикатор, пока воркер не пришлёт финальный результат. Mirrors confirm-off
+    // scene behavior (audio/design просто оставляют pendingMsg).
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     if (err instanceof Error && err.message === "NO_SUBSCRIPTION") {

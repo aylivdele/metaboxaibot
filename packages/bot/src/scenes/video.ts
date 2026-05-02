@@ -15,6 +15,7 @@ import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { gateLowIqMode } from "../utils/confirm-generation.js";
 import { AVATAR_MODELS, preGenerateELTts } from "../utils/el-tts.js";
+import { pickVideoPending } from "../utils/pending-messages.js";
 import { getAvatarQueue } from "@metabox/api/queues";
 import {
   MODELS_BY_SECTION,
@@ -89,24 +90,6 @@ function getAvatarVoice(userId: bigint, id: string): AvatarVoiceEntry | null {
     return null;
   }
   return entry;
-}
-
-// ── Random video pending messages (Russian) ──────────────────────────────────
-
-const VIDEO_PENDING_RU = [
-  "⏳ Монтаж в процессе. Нейросеть режет, клеит и добавляет магии. Пару минут — и скинем результат.",
-  "🎥 Ваше видео в производстве. Бюджет — ноль, ожидание — пара минут, результат — бесценен. Пришлём, как будет готово.",
-  "🪄 Нейросеть взяла камеру и ушла на съёмочную площадку. Обычно укладывается в несколько минут. Ждём вместе.",
-  "🧠 Миллиарды нейронов сейчас рендерят ваше видео. Это займёт пару минут — но оно того стоит. Сразу скинем.",
-  "🚀 Запрос принят, рендер запущен. Пока ждёте — можно успеть налить чай. Видео прилетит, как только будет готово.",
-  "🎬 Тссс, идёт съёмка! Нейросеть работает над вашим видео. Несколько минут — и отправим вам готовый ролик. Без рекламы, обещаем.",
-];
-
-function pickVideoPending(ctx: BotContext): string {
-  if (ctx.user?.language === "ru") {
-    return VIDEO_PENDING_RU[Math.floor(Math.random() * VIDEO_PENDING_RU.length)];
-  }
-  return ctx.t.video.asyncPending;
 }
 
 // ── Model selection keyboard ──────────────────────────────────────────────────
