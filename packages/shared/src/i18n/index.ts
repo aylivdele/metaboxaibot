@@ -418,6 +418,12 @@ export interface Translations {
     cancelled: string;
     expired: string;
     replaced: string;
+    mediaPreviewPhotoSingle: string;
+    mediaPreviewPhotoMulti: string;
+    mediaPreviewVideoSingle: string;
+    mediaPreviewVideoMulti: string;
+    mediaPreviewAudioSingle: string;
+    mediaPreviewAudioMulti: string;
   };
   modelModes: {
     pickerTitle: string;

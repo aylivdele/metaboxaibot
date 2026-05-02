@@ -11,6 +11,7 @@ import {
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { gateLowIqMode } from "../utils/confirm-generation.js";
+import { pickDesignPending } from "../utils/pending-messages.js";
 import {
   MODELS_BY_SECTION,
   AI_MODELS,
@@ -47,24 +48,6 @@ import {
   getActiveModelSlots,
   findMissingRequiredSlot,
 } from "../utils/media-input-state.js";
-
-// ── Random design pending messages (Russian) ────────────────────────────────
-
-const DESIGN_PENDING_RU = [
-  "⏳ Нейросеть взяла кисточку и начала рисовать. Скинем результат, как только шедевр будет готов.",
-  "🎨 Картинка в работе! Нейросеть старается. Иногда даже высовывает язык от усердия. Пришлём, как будет готово.",
-  // "🖼 Генерируем картинку. Да, мы тоже хотим посмотреть, что получится. Ждём вместе с вами.",
-  "⏳ Нейросеть приняла заказ и ушла творить. Не переживайте — она не прокрастинирует. Обычно.",
-  "🚀 Запрос улетел, картинка на подходе. Пока ждёте — можете моргнуть. Но не слишком долго, а то пропустите.",
-  "🎬 Тишина на площадке! Нейросеть генерирует ваш кадр. Как только скажет «снято» — сразу пришлём.",
-];
-
-function pickDesignPending(ctx: BotContext): string {
-  if (ctx.user?.language === "ru") {
-    return DESIGN_PENDING_RU[Math.floor(Math.random() * DESIGN_PENDING_RU.length)];
-  }
-  return ctx.t.design.asyncPending;
-}
 
 // ── Model selection keyboard ──────────────────────────────────────────────────
 
@@ -507,6 +490,11 @@ export async function executeDesignPrompt(
     }
   }
 
+  // Snapshot raw state values for low-iq Cancel-restore (captured BEFORE the
+  // existing clear/getAndClear calls so the user gets exactly what they had).
+  const snapshotMediaInputs = hasMediaInputs ? { ...mediaInputs } : undefined;
+  const snapshotDesignRefMessageId = state?.designRefMessageId ?? undefined;
+
   // Clear media inputs for this model (consumed on generation start)
   if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id, modelId);
 
@@ -542,6 +530,10 @@ export async function executeDesignPrompt(
       modelId,
       prompt,
       submitParams,
+      restoreSnapshot: {
+        ...(snapshotMediaInputs ? { mediaInputs: snapshotMediaInputs } : {}),
+        ...(snapshotDesignRefMessageId ? { designRefMessageId: snapshotDesignRefMessageId } : {}),
+      },
     })
   ) {
     return;

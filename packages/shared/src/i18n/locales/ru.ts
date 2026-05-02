@@ -562,13 +562,20 @@ export default {
     refineSaved: "✅ Изображение загружено в «{slot}».",
   },
   confirmGeneration: {
-    message: "Модель: {model}\nПромпт: {prompt}\nНачать генерацию? Предварительная цена: {cost} ✦",
+    message:
+      "Модель: {model}\nПромпт:\n<blockquote expandable>{prompt}</blockquote>\n\nПредварительная цена: {cost} ✦\n\nНачать генерацию?",
     voicePrompt: "🎵 голосовое сообщение",
     start: "Начать",
     cancel: "Отмена",
-    cancelled: "Генерация отменена.",
+    cancelled: "Генерация отменена. Загруженные файлы остались сохранёнными.",
     expired: "Запрос устарел, отправьте промпт заново.",
     replaced: "Запрос заменён более новым.",
+    mediaPreviewPhotoSingle: "🖼 Это изображение будет использоваться как «{label}»",
+    mediaPreviewPhotoMulti: "🖼 Эти изображения будут использоваться как «{label}»",
+    mediaPreviewVideoSingle: "🎥 Это видео будет использоваться как «{label}»",
+    mediaPreviewVideoMulti: "🎥 Эти видео будут использоваться как «{label}»",
+    mediaPreviewAudioSingle: "🎵 Это аудио будет использоваться как «{label}»",
+    mediaPreviewAudioMulti: "🎵 Эти аудио будут использоваться как «{label}»",
   },
   modelModes: {
     pickerTitle: "Выберите режим работы:",
