@@ -221,6 +221,11 @@ export const chatService = {
       ...(ms.context_window != null ? { contextWindowOverride: ms.context_window as number } : {}),
     };
 
+    // Версия attachments которая попадёт в DB при saveMessage. Для provider_chain
+    // переписывается на uploaded-версию (с openaiFileIds) — иначе следующий turn
+    // re-uploadнет тот же файл (DB не помнит что мы загрузили).
+    let attachmentsToSave: StoredAttachment[] | undefined = documentAttachments;
+
     if (dialog.contextStrategy === "db_history") {
       const history = await dialogService.getHistory(dialogId, adapter.contextMaxMessages);
       // For every historical message: re-inline text-class attachments by reading
@@ -245,24 +250,30 @@ export const chatService = {
         proxy: acquired.proxy,
       });
       // Replace current-turn attachments — резолвим openaiFileId из
-      // openaiFileIds[currentKey] для адаптера.
-      if (filesResult.currentAttachments) {
+      // openaiFileIds[currentKey] для адаптера. ВАЖНО: сохраняем url для
+      // fallback'а (если upload в OpenAI не прошёл, адаптер всё равно
+      // отправит file_url — presigned URL валиден ~1ч, в рамках этого turn'а
+      // успеем).
+      if (filesResult.currentAttachments && currentDocAttachments) {
         const currentKeyKey = acquired.keyId ?? OPENAI_ENV_KEY;
-        input.documentAttachments = filesResult.currentAttachments.map((att) => {
+        input.documentAttachments = filesResult.currentAttachments.map((att, i) => {
           const fileMap = readOpenAIFileIds(att);
           const resolvedFileId = fileMap[currentKeyKey];
+          const original = currentDocAttachments![i];
           return {
             s3Key: att.s3Key,
             mimeType: att.mimeType,
             name: att.name,
             size: att.size,
-            // file_url для legacy fallback / non-OpenAI адаптеров
-            // (chat.service later не пере-presign'ит current). Адаптер берёт
-            // openaiFileId если есть.
+            url: original?.url, // presigned fallback
             openaiFileId: resolvedFileId,
             openaiKeyId: resolvedFileId ? acquired.keyId : undefined,
           };
         });
+        // Save в DB uploaded-версию (с openaiFileIds map). Без этого следующий
+        // turn'ов ensureOpenAIFiles увидит attachment без fileMap и сделает
+        // повторный upload → дубликаты в OpenAI storage.
+        attachmentsToSave = filesResult.currentAttachments;
       }
 
       // Привязка response_id к ключу: используем previousResponseId только
@@ -305,7 +316,7 @@ export const chatService = {
     const savedMediaUrl = firstS3Key ?? firstImageUrl;
     const userMessage = await dialogService.saveMessage(dialogId, "user", content, {
       ...(savedMediaUrl ? { mediaUrl: savedMediaUrl, mediaType: "image" } : {}),
-      ...(hasDocs ? { attachments: documentAttachments } : {}),
+      ...(hasDocs && attachmentsToSave ? { attachments: attachmentsToSave } : {}),
     });
     logger.debug(
       { dialogId, docs: documentAttachments?.length ?? 0, modelId: dialog.modelId },

@@ -132,7 +132,10 @@ export class OpenAIAdapter extends BaseLLMAdapter {
 
   private buildInput(input: LLMInput): string | OpenAI.Responses.ResponseInput {
     const urls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
-    const docs = (input.documentAttachments ?? []).filter((d) => !!d.url);
+    // Принимаем attachment'ы у которых есть либо openaiFileId (uploaded в Files API)
+    // либо url (presigned S3 fallback). Раньше фильтр требовал url → docs с file_id
+    // и без url'а молча выкидывались, OpenAI не получал документ → "не вижу файл".
+    const docs = (input.documentAttachments ?? []).filter((d) => !!d.openaiFileId || !!d.url);
     const hasHistory = !input.previousResponseId && (input.history?.length ?? 0) > 0;
 
     const buildUserContent = (): OpenAI.Responses.ResponseInputContent[] => [
