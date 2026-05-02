@@ -453,6 +453,8 @@ const translations = {
     "uploads.myPhotos": "My photos",
     "uploads.myAvatars": "My avatars",
     "uploads.createAvatar": "➕ Create avatar",
+    "uploads.createHeyGen": "➕ Create HeyGen",
+    "uploads.createSoulProvider": "➕ Create Soul",
     "uploads.createAvatarHint":
       "Return to the chat and send a photo with your face — the bot will create a personal avatar based on it.",
     "uploads.createVoice": "➕ Create voice",
@@ -963,6 +965,8 @@ const translations = {
     "uploads.myPhotos": "Мои фото",
     "uploads.myAvatars": "Мои аватары",
     "uploads.createAvatar": "➕ Создать аватар",
+    "uploads.createHeyGen": "➕ Создать HeyGen",
+    "uploads.createSoulProvider": "➕ Создать Soul",
     "uploads.createAvatarHint":
       "Вернитесь в чат и отправьте фото с лицом — бот создаст персональный аватар на его основе.",
     "uploads.createVoice": "➕ Создать голос",
