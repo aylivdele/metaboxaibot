@@ -37,6 +37,7 @@ import {
 } from "../services/web-session.service.js";
 import { extractWebUserFromRequest, webAuthPreHandler } from "../middlewares/web-auth.js";
 import { config } from "@metabox/shared";
+import { validateEmail } from "../utils/email-validation.js";
 
 const REFRESH_COOKIE_NAME = "aibw_refresh";
 
@@ -197,6 +198,18 @@ export const webAuthRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(400).send({ error: "Пароль должен быть не короче 8 символов" });
       if (firstNameNorm.length < 1 || firstNameNorm.length > 100)
         return reply.code(400).send({ error: "Укажите имя" });
+
+      // MX-проверка домена. Опечатки внутри валидных доменов
+      // (gmail.co и т.п.) ловит фронт через suggestEmailTypo.
+      const emailCheck = await validateEmail(emailNorm);
+      if (!emailCheck.ok) {
+        return reply.code(400).send({
+          error:
+            emailCheck.reason === "syntax"
+              ? "Некорректный email"
+              : "Указан несуществующий email-домен. Проверьте адрес и попробуйте снова.",
+        });
+      }
 
       let registered;
       try {

@@ -102,20 +102,32 @@ export function AvatarsPage() {
       </div>
 
       <div className="avatars-page__create-row">
-        <button
-          className="voice-picker__create-btn"
-          onClick={() => void handleCreate("heygen")}
-          disabled={creatingProvider === "heygen"}
-        >
-          {creatingProvider === "heygen" ? "…" : t("uploads.createAvatar")}
-        </button>
-        <button
-          className="voice-picker__create-btn"
-          onClick={() => void handleCreate("higgsfield_soul")}
-          disabled={creatingProvider === "higgsfield_soul"}
-        >
-          {creatingProvider === "higgsfield_soul" ? "…" : t("uploads.createSoul")}
-        </button>
+        {(filter === "all" || filter === "heygen") && (
+          <button
+            className="voice-picker__create-btn"
+            onClick={() => void handleCreate("heygen")}
+            disabled={creatingProvider === "heygen"}
+          >
+            {creatingProvider === "heygen"
+              ? "…"
+              : filter === "all"
+                ? t("uploads.createHeyGen")
+                : t("uploads.createAvatar")}
+          </button>
+        )}
+        {(filter === "all" || filter === "higgsfield_soul") && (
+          <button
+            className="voice-picker__create-btn"
+            onClick={() => void handleCreate("higgsfield_soul")}
+            disabled={creatingProvider === "higgsfield_soul"}
+          >
+            {creatingProvider === "higgsfield_soul"
+              ? "…"
+              : filter === "all"
+                ? t("uploads.createSoulProvider")
+                : t("uploads.createSoul")}
+          </button>
+        )}
       </div>
 
       {loading ? (

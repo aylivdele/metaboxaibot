@@ -4488,6 +4488,46 @@ textarea::placeholder {
 .account-section:last-child {
   border-bottom: none;
 }
+.account-label--with-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.account-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: var(--text-hint);
+  font-size: 10px;
+  font-weight: 700;
+  font-family: serif;
+  font-style: italic;
+  line-height: 1;
+  cursor: pointer;
+}
+.account-info-btn:hover {
+  color: var(--accent);
+}
+.account-toggle-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.account-toggle-state {
+  font-size: 13px;
+  color: var(--text-hint);
+}
+.account-info-text {
+  white-space: pre-line;
+  line-height: 1.5;
+}
 .account-label {
   font-size: 12px;
   color: var(--text-hint);
@@ -4549,7 +4589,7 @@ textarea::placeholder {
 
 .avatars-page__create-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 4px;
 }

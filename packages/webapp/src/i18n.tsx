@@ -47,6 +47,12 @@ const translations = {
     "profile.until": "until",
 
     // Account tab
+    "account.generationMode": "GENERATION MODE",
+    "account.generationModeOn": "With confirmation",
+    "account.generationModeOff": "No confirmation",
+    "account.generationModeInfoAria": "Generation mode info",
+    "account.generationModeInfo":
+      "Control how generation starts:\n\n🎯 With confirmation — see the final request and confirm the start manually. Protects from accidental runs and extra spend.\n\n⚡ No confirmation — generation starts automatically after you send a prompt. Handy when you're already an experienced user.",
     "account.notLinked": "Metabox account not linked",
     "account.status": "STATUS",
     "account.statusPartner": "Partner",
@@ -369,7 +375,7 @@ const translations = {
     "linkMetabox.verify.sent": "Confirmation email sent.",
     "linkMetabox.verify.alreadyVerified":
       "Email is already verified. You can sign in on the website.",
-    "linkMetabox.verify.sendError": "Couldn't send the email. Try again later.",
+    "linkMetabox.verify.sendError": "Couldn't send the email. Сheck the email you entered.",
     "linkMetabox.verify.limitExhausted":
       "You've hit the resend limit. Please wait a bit, or change the email address below.",
 
@@ -453,6 +459,8 @@ const translations = {
     "uploads.myPhotos": "My photos",
     "uploads.myAvatars": "My avatars",
     "uploads.createAvatar": "➕ Create avatar",
+    "uploads.createHeyGen": "➕ Create HeyGen",
+    "uploads.createSoulProvider": "➕ Create Soul",
     "uploads.createAvatarHint":
       "Return to the chat and send a photo with your face — the bot will create a personal avatar based on it.",
     "uploads.createVoice": "➕ Create voice",
@@ -563,6 +571,12 @@ const translations = {
     "profile.until": "до",
 
     // Account tab
+    "account.generationMode": "РЕЖИМ ГЕНЕРАЦИИ",
+    "account.generationModeOn": "С подтверждением",
+    "account.generationModeOff": "Без подтверждения",
+    "account.generationModeInfoAria": "Информация о режиме генерации",
+    "account.generationModeInfo":
+      "Управляйте тем, как запускается генерация:\n\n🎯 С подтверждением — увидите финальный запрос и подтвердите старт вручную. Защищает от случайных запусков и лишних трат.\n\n⚡ Без подтверждения — генерация начнётся автоматически после отправки промпта. Удобно, когда вы уже опытный пользователь.",
     "account.notLinked": "Аккаунт Metabox не привязан",
     "account.status": "СТАТУС",
     "account.statusPartner": "Партнёр",
@@ -879,7 +893,7 @@ const translations = {
       "Письмо отправлено. Проверьте почту и убедитесь, что email выше указан верно.",
     "linkMetabox.verify.sent": "Письмо с подтверждением отправлено.",
     "linkMetabox.verify.alreadyVerified": "Email уже подтверждён. Можно входить на сайте.",
-    "linkMetabox.verify.sendError": "Не удалось отправить письмо. Попробуйте позже.",
+    "linkMetabox.verify.sendError": "Не удалось отправить письмо. Проверьте введенную почту.",
     "linkMetabox.verify.limitExhausted":
       "Превышен лимит повторных отправок. Подождите немного или измените email ниже.",
 
@@ -963,6 +977,8 @@ const translations = {
     "uploads.myPhotos": "Мои фото",
     "uploads.myAvatars": "Мои аватары",
     "uploads.createAvatar": "➕ Создать аватар",
+    "uploads.createHeyGen": "➕ Создать HeyGen",
+    "uploads.createSoulProvider": "➕ Создать Soul",
     "uploads.createAvatarHint":
       "Вернитесь в чат и отправьте фото с лицом — бот создаст персональный аватар на его основе.",
     "uploads.createVoice": "➕ Создать голос",

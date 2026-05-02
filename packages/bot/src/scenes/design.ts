@@ -10,6 +10,8 @@ import {
 } from "@metabox/api/services";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
+import { gateLowIqMode } from "../utils/confirm-generation.js";
+import { pickDesignPending } from "../utils/pending-messages.js";
 import {
   MODELS_BY_SECTION,
   AI_MODELS,
@@ -46,24 +48,6 @@ import {
   getActiveModelSlots,
   findMissingRequiredSlot,
 } from "../utils/media-input-state.js";
-
-// ── Random design pending messages (Russian) ────────────────────────────────
-
-const DESIGN_PENDING_RU = [
-  "⏳ Нейросеть взяла кисточку и начала рисовать. Скинем результат, как только шедевр будет готов.",
-  "🎨 Картинка в работе! Нейросеть старается. Иногда даже высовывает язык от усердия. Пришлём, как будет готово.",
-  // "🖼 Генерируем картинку. Да, мы тоже хотим посмотреть, что получится. Ждём вместе с вами.",
-  "⏳ Нейросеть приняла заказ и ушла творить. Не переживайте — она не прокрастинирует. Обычно.",
-  "🚀 Запрос улетел, картинка на подходе. Пока ждёте — можете моргнуть. Но не слишком долго, а то пропустите.",
-  "🎬 Тишина на площадке! Нейросеть генерирует ваш кадр. Как только скажет «снято» — сразу пришлём.",
-];
-
-function pickDesignPending(ctx: BotContext): string {
-  if (ctx.user?.language === "ru") {
-    return DESIGN_PENDING_RU[Math.floor(Math.random() * DESIGN_PENDING_RU.length)];
-  }
-  return ctx.t.design.asyncPending;
-}
 
 // ── Model selection keyboard ──────────────────────────────────────────────────
 
@@ -506,6 +490,11 @@ export async function executeDesignPrompt(
     }
   }
 
+  // Snapshot raw state values for low-iq Cancel-restore (captured BEFORE the
+  // existing clear/getAndClear calls so the user gets exactly what they had).
+  const snapshotMediaInputs = hasMediaInputs ? { ...mediaInputs } : undefined;
+  const snapshotDesignRefMessageId = state?.designRefMessageId ?? undefined;
+
   // Clear media inputs for this model (consumed on generation start)
   if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id, modelId);
 
@@ -522,21 +511,38 @@ export async function executeDesignPrompt(
   const imageSettings = await userStateService.getImageSettings(ctx.user.id);
   const aspectRatio = imageSettings[modelId]?.aspectRatio;
 
+  const submitParams = {
+    userId: ctx.user.id,
+    modelId,
+    prompt,
+    sourceImageUrl,
+    mediaInputs: hasMediaInputs ? await resolveMediaInputUrls(mediaInputs) : undefined,
+    telegramChatId: chatId,
+    dialogId,
+    sendOriginalLabel: ctx.t.common.sendOriginal,
+    aspectRatio,
+    sourceMessageId,
+  };
+  if (
+    await gateLowIqMode({
+      ctx,
+      kind: "image",
+      modelId,
+      prompt,
+      submitParams,
+      restoreSnapshot: {
+        ...(snapshotMediaInputs ? { mediaInputs: snapshotMediaInputs } : {}),
+        ...(snapshotDesignRefMessageId ? { designRefMessageId: snapshotDesignRefMessageId } : {}),
+      },
+    })
+  ) {
+    return;
+  }
+
   const pendingMsg = await ctx.reply(pickDesignPending(ctx));
 
   try {
-    await generationService.submitImage({
-      userId: ctx.user.id,
-      modelId,
-      prompt,
-      sourceImageUrl,
-      mediaInputs: hasMediaInputs ? await resolveMediaInputUrls(mediaInputs) : undefined,
-      telegramChatId: chatId,
-      dialogId,
-      sendOriginalLabel: ctx.t.common.sendOriginal,
-      aspectRatio,
-      sourceMessageId,
-    });
+    await generationService.submitImage(submitParams);
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     if (err instanceof Error && err.message === "NO_SUBSCRIPTION") {
@@ -859,20 +865,34 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
 
     const imageSettings = await userStateService.getImageSettings(ctx.user.id);
     const aspectRatio = imageSettings[modelId]?.aspectRatio;
+
+    const submitParams = {
+      userId: ctx.user.id,
+      modelId,
+      prompt: caption,
+      sourceImageUrl: fileUrl,
+      mediaInputs,
+      telegramChatId: chatId,
+      dialogId,
+      sendOriginalLabel: ctx.t.common.sendOriginal,
+      aspectRatio,
+    };
+    if (
+      await gateLowIqMode({
+        ctx,
+        kind: "image",
+        modelId,
+        prompt: caption,
+        submitParams,
+      })
+    ) {
+      return;
+    }
+
     const pendingMsg = await ctx.reply(pickDesignPending(ctx));
 
     try {
-      await generationService.submitImage({
-        userId: ctx.user.id,
-        modelId,
-        prompt: caption,
-        sourceImageUrl: fileUrl,
-        mediaInputs,
-        telegramChatId: chatId,
-        dialogId,
-        sendOriginalLabel: ctx.t.common.sendOriginal,
-        aspectRatio,
-      });
+      await generationService.submitImage(submitParams);
     } catch (err: unknown) {
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
       if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {

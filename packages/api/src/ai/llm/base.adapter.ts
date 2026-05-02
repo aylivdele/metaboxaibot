@@ -9,6 +9,14 @@ export interface MessageAttachment {
   size?: number;
   /** Presigned GET URL — populated by the chat service just before the adapter call. */
   url?: string;
+  /**
+   * OpenAI Files API file_id (`purpose: "user_data"`). Если задан, OpenAI-
+   * адаптер передаёт `file_id` вместо `file_url` в input_file блоке —
+   * не зависит от TTL presigned URL'ов S3.
+   */
+  openaiFileId?: string;
+  /** OpenAI keyId которым выполнен upload — для sticky-binding (см. StoredAttachment). */
+  openaiKeyId?: string | null;
 }
 
 export interface MessageRecord {

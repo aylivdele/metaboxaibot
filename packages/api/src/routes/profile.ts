@@ -7,6 +7,7 @@ import {
   MetaboxApiError,
 } from "../services/metabox-bridge.service.js";
 import { config } from "@metabox/shared";
+import { validateEmail } from "../utils/email-validation.js";
 
 type AuthRequest = FastifyRequest & {
   userId: bigint;
@@ -173,6 +174,7 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       metaboxUserId: user.metaboxUserId ?? null,
       metaboxReferralCode: user.metaboxReferralCode ?? null,
       finishedOnboarding: user.finishedOnboarding,
+      confirmBeforeGenerate: user.confirmBeforeGenerate,
       tokenBalance: (Number(user.tokenBalance) + Number(user.subscriptionTokenBalance)).toString(),
       purchasedTokenBalance: Number(user.tokenBalance).toString(),
       subscriptionTokenBalance: Number(user.subscriptionTokenBalance).toString(),
@@ -190,6 +192,28 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       })),
     };
   });
+
+  /** PATCH /profile/preferences — update per-user UX flags (low-iq mode toggle, …) */
+  fastify.patch<{ Body: { confirmBeforeGenerate?: boolean } }>(
+    "/profile/preferences",
+    async (request, reply) => {
+      const { userId } = request as AuthRequest;
+      const body = request.body ?? {};
+      const data: { confirmBeforeGenerate?: boolean } = {};
+      if (typeof body.confirmBeforeGenerate === "boolean") {
+        data.confirmBeforeGenerate = body.confirmBeforeGenerate;
+      }
+      if (Object.keys(data).length === 0) {
+        return reply.code(400).send({ error: "No supported fields in body" });
+      }
+      const user = await db.user.update({
+        where: { id: userId },
+        data,
+        select: { confirmBeforeGenerate: true },
+      });
+      return { ok: true, confirmBeforeGenerate: user.confirmBeforeGenerate };
+    },
+  );
 
   /** GET /profile/partner-balance — Metabox partner balance for "Партнёрка" tab */
   fastify.get("/profile/partner-balance", async (request) => {
@@ -360,6 +384,16 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     if (!newEmail) {
       return reply.code(400).send({ error: "newEmail is required" });
     }
+    const emailCheck = await validateEmail(newEmail);
+    if (!emailCheck.ok) {
+      return reply.code(400).send({
+        code: emailCheck.reason === "syntax" ? "INVALID_EMAIL" : "EMAIL_DOMAIN_INVALID",
+        error:
+          emailCheck.reason === "syntax"
+            ? "Некорректный формат email"
+            : "Указан несуществующий email-домен",
+      });
+    }
     const user = await db.user.findUnique({
       where: { id: userId },
       select: { metaboxUserId: true },
@@ -397,6 +431,14 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     };
     if (!email || !password) {
       return reply.code(400).send({ error: "email and password are required" });
+    }
+    const emailCheck = await validateEmail(email);
+    if (!emailCheck.ok) {
+      return reply.code(400).send({
+        code: emailCheck.reason === "syntax" ? "INVALID_EMAIL" : "EMAIL_DOMAIN_INVALID",
+        error:
+          emailCheck.reason === "syntax" ? "Invalid email format" : "Email domain does not exist",
+      });
     }
     const user = await db.user.findUnique({
       where: { id: userId },

@@ -536,7 +536,18 @@ function GalleryTab({
           onClick={() => setCreateFolderOpen(true)}
           aria-label={t("gallery.folder.new")}
         >
-          +
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
         </button>
         {folders.some((f) => !f.isDefault) && (
           <button
@@ -1885,9 +1896,13 @@ interface AccountData {
   } | null;
 }
 
-function AccountTab(_props: { profile: UserProfile }) {
+function AccountTab(props: { profile: UserProfile }) {
   const { t } = useI18n();
   const [data, setData] = useState<AccountData | null>(null);
+  const [confirmBeforeGenerate, setConfirmBeforeGenerate] = useState<boolean>(
+    props.profile.confirmBeforeGenerate,
+  );
+  const [showGenerationModeInfo, setShowGenerationModeInfo] = useState(false);
 
   useEffect(() => {
     api.profile
@@ -1896,8 +1911,62 @@ function AccountTab(_props: { profile: UserProfile }) {
       .catch(() => {});
   }, []);
 
+  const handleConfirmBeforeGenerateChange = async (next: boolean) => {
+    setConfirmBeforeGenerate(next);
+    try {
+      await api.profile.updatePreferences({ confirmBeforeGenerate: next });
+    } catch {
+      setConfirmBeforeGenerate(!next);
+    }
+  };
+
   return (
     <div className="account-tab">
+      {/* Generation mode toggle */}
+      <div className="account-section">
+        <div className="account-label account-label--with-info">
+          <span>{t("account.generationMode")}</span>
+          <button
+            type="button"
+            className="account-info-btn"
+            onClick={() => setShowGenerationModeInfo(true)}
+            aria-label={t("account.generationModeInfoAria")}
+          >
+            i
+          </button>
+        </div>
+        <div className="account-value account-toggle-stack">
+          <label className="settings-panel__toggle-label">
+            <input
+              type="checkbox"
+              checked={confirmBeforeGenerate}
+              onChange={(e) => handleConfirmBeforeGenerateChange(e.target.checked)}
+            />
+            <span className="settings-panel__toggle-track" />
+          </label>
+          <span className="account-toggle-state">
+            {confirmBeforeGenerate ? t("account.generationModeOn") : t("account.generationModeOff")}
+          </span>
+        </div>
+      </div>
+
+      {showGenerationModeInfo && (
+        <div className="modal-overlay" onClick={() => setShowGenerationModeInfo(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setShowGenerationModeInfo(false)}
+              aria-label="close"
+            >
+              ×
+            </button>
+            <div className="modal-title">{t("account.generationMode")}</div>
+            <div className="modal-text account-info-text">{t("account.generationModeInfo")}</div>
+          </div>
+        </div>
+      )}
+
       {/* Email */}
       <div className="account-section">
         <div className="account-label">Email</div>
