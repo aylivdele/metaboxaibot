@@ -43,6 +43,10 @@ export class RunwayAdapter implements VideoAdapter {
   validateRequest(input: VideoInput): VideoValidationError | null {
     const imgUrl = input.mediaInputs?.first_frame?.[0] ?? input.imageUrl;
     if (!imgUrl) return { key: "runwayRequiresImage" };
+    const limit = 1000;
+    if (input.prompt && input.prompt.length > limit) {
+      return { key: "promptTooLong", params: { limit } };
+    }
     return null;
   }
 
