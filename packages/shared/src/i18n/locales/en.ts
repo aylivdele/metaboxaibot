@@ -295,7 +295,8 @@ export default {
       "❌ The provider failed to generate audio. Please try modifying your request.",
     audioCreateTaskFailed: "❌ Failed to create a generation task. Please try again later.",
     generationTimeout: "❌ Generation took too long. Please try again.",
-    generationFailed: "❌ {modelName}: temporary provider issue. Please try again.",
+    generationFailed:
+      "❌ {modelName} decided to take a break. We didn't approve, but it didn't ask. We're already on it. Meanwhile, plenty of other AI models in the bot are happy to see you.",
     generationStillRunning: "{modelName}\nStill generating, please wait...",
     generationTimedOut24h:
       "❌ {modelName}: generation did not finish within 24 hours and was cancelled. Please try again.",
