@@ -1,8 +1,8 @@
 import { db } from "../db.js";
 import { getAudioQueue } from "../queues/audio.queue.js";
 import { AI_MODELS, ONE_SHOT_SETTING_KEYS } from "@metabox/shared";
-import { checkBalance, calculateCost } from "./token.service.js";
-import { userStateService } from "./user-state.service.js";
+import { checkBalance } from "./token.service.js";
+import { costPreviewService } from "./cost-preview.service.js";
 
 /** Drop one-shot upload fields (avatar_photo_*, voice_*, …) from the history
  * snapshot so `inputData.modelSettings` stays clean of per-generation noise. */
@@ -35,19 +35,9 @@ export const audioGenerationService = {
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
 
-    const allModelSettings = await userStateService.getModelSettings(userId);
-    const modelSettings = allModelSettings[modelId] ?? {};
-    const estimatedCost = calculateCost(
-      model,
-      0,
-      0,
-      undefined,
-      undefined,
-      modelSettings,
-      undefined,
-      prompt.length,
-    );
-    await checkBalance(userId, estimatedCost);
+    const preview = await costPreviewService.previewAudio(params);
+    const modelSettings = preview.effectiveModelSettings;
+    await checkBalance(userId, preview.cost);
 
     const job = await db.generationJob.create({
       data: {

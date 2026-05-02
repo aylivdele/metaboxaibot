@@ -410,6 +410,15 @@ export interface Translations {
     refineVideo: string;
     refineSaved: string;
   };
+  confirmGeneration: {
+    message: string;
+    voicePrompt: string;
+    start: string;
+    cancel: string;
+    cancelled: string;
+    expired: string;
+    replaced: string;
+  };
   modelModes: {
     pickerTitle: string;
     activated: string;

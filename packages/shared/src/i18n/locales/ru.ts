@@ -561,6 +561,15 @@ export default {
     refineVideo: "🎥 Видео",
     refineSaved: "✅ Изображение загружено в «{slot}».",
   },
+  confirmGeneration: {
+    message: "Модель: {model}\nПромпт: {prompt}\nНачать генерацию? Предварительная цена: {cost} ✦",
+    voicePrompt: "🎵 голосовое сообщение",
+    start: "Начать",
+    cancel: "Отмена",
+    cancelled: "Генерация отменена.",
+    expired: "Запрос устарел, отправьте промпт заново.",
+    replaced: "Запрос заменён более новым.",
+  },
   modelModes: {
     pickerTitle: "Выберите режим работы:",
     activated:

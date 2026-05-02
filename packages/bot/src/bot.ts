@@ -74,6 +74,7 @@ import {
 import { handleSendOriginal } from "./handlers/send-original.handler.js";
 import { getActiveSlot } from "./utils/media-input-state.js";
 import { handleVoicePromptCallback } from "./handlers/voice-prompt.handler.js";
+import { handleLowIqStart, handleLowIqCancel } from "./utils/confirm-generation.js";
 import {
   handleMergeChoice,
   handleMergeCancel,
@@ -304,6 +305,10 @@ export function createBot(token: string): Bot<BotContext> {
   bot.callbackQuery(/^merge:(site|bot):/, handleMergeChoice);
   bot.callbackQuery("merge:cancel", handleMergeCancel);
   bot.callbackQuery(/^merge_confirm:(site|bot):/, handleMergeConfirm);
+
+  // ── Низкий IQ мод: подтверждение перед запуском генерации ─────────────────
+  bot.callbackQuery("lqg:start", handleLowIqStart);
+  bot.callbackQuery("lqg:cancel", handleLowIqCancel);
 
   // ── Section picker callback (from noTool fallback) ───────────────────────
   bot.callbackQuery(/^section:/, async (ctx) => {

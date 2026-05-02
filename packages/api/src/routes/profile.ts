@@ -173,6 +173,7 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       metaboxUserId: user.metaboxUserId ?? null,
       metaboxReferralCode: user.metaboxReferralCode ?? null,
       finishedOnboarding: user.finishedOnboarding,
+      confirmBeforeGenerate: user.confirmBeforeGenerate,
       tokenBalance: (Number(user.tokenBalance) + Number(user.subscriptionTokenBalance)).toString(),
       purchasedTokenBalance: Number(user.tokenBalance).toString(),
       subscriptionTokenBalance: Number(user.subscriptionTokenBalance).toString(),
@@ -190,6 +191,28 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
       })),
     };
   });
+
+  /** PATCH /profile/preferences — update per-user UX flags (low-iq mode toggle, …) */
+  fastify.patch<{ Body: { confirmBeforeGenerate?: boolean } }>(
+    "/profile/preferences",
+    async (request, reply) => {
+      const { userId } = request as AuthRequest;
+      const body = request.body ?? {};
+      const data: { confirmBeforeGenerate?: boolean } = {};
+      if (typeof body.confirmBeforeGenerate === "boolean") {
+        data.confirmBeforeGenerate = body.confirmBeforeGenerate;
+      }
+      if (Object.keys(data).length === 0) {
+        return reply.code(400).send({ error: "No supported fields in body" });
+      }
+      const user = await db.user.update({
+        where: { id: userId },
+        data,
+        select: { confirmBeforeGenerate: true },
+      });
+      return { ok: true, confirmBeforeGenerate: user.confirmBeforeGenerate };
+    },
+  );
 
   /** GET /profile/partner-balance — Metabox partner balance for "Партнёрка" tab */
   fastify.get("/profile/partner-balance", async (request) => {
