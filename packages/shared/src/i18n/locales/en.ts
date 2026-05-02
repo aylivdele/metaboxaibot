@@ -563,6 +563,15 @@ export default {
     refineVideo: "🎥 Video",
     refineSaved: "✅ Image loaded into «{slot}».",
   },
+  confirmGeneration: {
+    message: "Model: {model}\nPrompt: {prompt}\nStart generation? Estimated price: {cost} ✦",
+    voicePrompt: "🎵 voice message",
+    start: "Start",
+    cancel: "Cancel",
+    cancelled: "Generation cancelled.",
+    expired: "Request expired, please send the prompt again.",
+    replaced: "Request replaced by a newer one.",
+  },
   modelModes: {
     pickerTitle: "Choose mode:",
     activated:

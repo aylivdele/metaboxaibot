@@ -13,6 +13,7 @@ import { checkProviderBalances } from "./monitors/balance.monitor.js";
 import { sendUsageReport, msUntilNextMidnightMsk } from "./monitors/usage-report.monitor.js";
 import { runWatchdog } from "./monitors/watchdog.monitor.js";
 import { runCleanupOldJobs } from "./monitors/cleanup-old-jobs.monitor.js";
+import { runPendingGenerationCleanup } from "./monitors/pending-generation.monitor.js";
 import { reconcileOrphanedJobs } from "./reconcile.js";
 import { initPricingConfig } from "@metabox/api/services/pricing-config";
 import { logger } from "./logger.js";
@@ -109,6 +110,18 @@ const scheduleCleanup = (): void => {
 runCleanupOldJobs().catch((err) => logger.error({ err }, "Cleanup-old-jobs error"));
 scheduleCleanup();
 
+// ── Pending generation cleanup: drop expired confirm-rows every 10 min ──────
+const PENDING_GEN_INTERVAL_MS = 10 * 60 * 1000;
+let pendingGenTimer: ReturnType<typeof setTimeout>;
+const schedulePendingGenCleanup = (): void => {
+  pendingGenTimer = setTimeout(() => {
+    runPendingGenerationCleanup()
+      .catch((err) => logger.error({ err }, "Pending-generation cleanup error"))
+      .finally(() => schedulePendingGenCleanup());
+  }, PENDING_GEN_INTERVAL_MS);
+};
+schedulePendingGenCleanup();
+
 // ── Balance monitor ───────────────────────────────────────────────────────────
 // Шлёт алерты в alerts.chatId; не запускается, если этот канал не настроен.
 let balanceTimer: ReturnType<typeof setInterval> | undefined;
@@ -145,6 +158,7 @@ if (config.reports.chatId) {
 process.on("SIGTERM", async () => {
   clearTimeout(watchdogTimer);
   clearTimeout(cleanupTimer);
+  clearTimeout(pendingGenTimer);
   if (balanceTimer) clearInterval(balanceTimer);
   if (usageReportTimer) clearInterval(usageReportTimer);
   await Promise.all([

@@ -10,6 +10,7 @@ import {
 } from "@metabox/api/services";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
+import { gateLowIqMode } from "../utils/confirm-generation.js";
 import {
   MODELS_BY_SECTION,
   AI_MODELS,
@@ -522,21 +523,34 @@ export async function executeDesignPrompt(
   const imageSettings = await userStateService.getImageSettings(ctx.user.id);
   const aspectRatio = imageSettings[modelId]?.aspectRatio;
 
+  const submitParams = {
+    userId: ctx.user.id,
+    modelId,
+    prompt,
+    sourceImageUrl,
+    mediaInputs: hasMediaInputs ? await resolveMediaInputUrls(mediaInputs) : undefined,
+    telegramChatId: chatId,
+    dialogId,
+    sendOriginalLabel: ctx.t.common.sendOriginal,
+    aspectRatio,
+    sourceMessageId,
+  };
+  if (
+    await gateLowIqMode({
+      ctx,
+      kind: "image",
+      modelId,
+      prompt,
+      submitParams,
+    })
+  ) {
+    return;
+  }
+
   const pendingMsg = await ctx.reply(pickDesignPending(ctx));
 
   try {
-    await generationService.submitImage({
-      userId: ctx.user.id,
-      modelId,
-      prompt,
-      sourceImageUrl,
-      mediaInputs: hasMediaInputs ? await resolveMediaInputUrls(mediaInputs) : undefined,
-      telegramChatId: chatId,
-      dialogId,
-      sendOriginalLabel: ctx.t.common.sendOriginal,
-      aspectRatio,
-      sourceMessageId,
-    });
+    await generationService.submitImage(submitParams);
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     if (err instanceof Error && err.message === "NO_SUBSCRIPTION") {
@@ -859,20 +873,34 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
 
     const imageSettings = await userStateService.getImageSettings(ctx.user.id);
     const aspectRatio = imageSettings[modelId]?.aspectRatio;
+
+    const submitParams = {
+      userId: ctx.user.id,
+      modelId,
+      prompt: caption,
+      sourceImageUrl: fileUrl,
+      mediaInputs,
+      telegramChatId: chatId,
+      dialogId,
+      sendOriginalLabel: ctx.t.common.sendOriginal,
+      aspectRatio,
+    };
+    if (
+      await gateLowIqMode({
+        ctx,
+        kind: "image",
+        modelId,
+        prompt: caption,
+        submitParams,
+      })
+    ) {
+      return;
+    }
+
     const pendingMsg = await ctx.reply(pickDesignPending(ctx));
 
     try {
-      await generationService.submitImage({
-        userId: ctx.user.id,
-        modelId,
-        prompt: caption,
-        sourceImageUrl: fileUrl,
-        mediaInputs,
-        telegramChatId: chatId,
-        dialogId,
-        sendOriginalLabel: ctx.t.common.sendOriginal,
-        aspectRatio,
-      });
+      await generationService.submitImage(submitParams);
     } catch (err: unknown) {
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
       if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {

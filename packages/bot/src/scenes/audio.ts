@@ -16,6 +16,7 @@ import {
   voiceCloneReturnRedisKey,
 } from "@metabox/shared";
 import { logger } from "../logger.js";
+import { gateLowIqMode } from "../utils/confirm-generation.js";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { transcribeAndReply } from "../utils/voice-transcribe.js";
@@ -237,15 +238,28 @@ export async function executeAudioPrompt(ctx: BotContext, prompt: string): Promi
   const state = await userStateService.get(ctx.user.id);
   const modelId = state?.audioModelId ?? "tts-openai";
 
+  const submitParams = {
+    userId: ctx.user.id,
+    modelId,
+    prompt,
+    telegramChatId: chatId,
+  };
+  if (
+    await gateLowIqMode({
+      ctx,
+      kind: "audio",
+      modelId,
+      prompt,
+      submitParams,
+    })
+  ) {
+    return;
+  }
+
   const pendingMsg = await ctx.reply(ctx.t.audio.processing);
 
   try {
-    await audioGenerationService.submitAudio({
-      userId: ctx.user.id,
-      modelId,
-      prompt,
-      telegramChatId: chatId,
-    });
+    await audioGenerationService.submitAudio(submitParams);
   } catch (err: unknown) {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     if (err instanceof Error && err.message === "NO_SUBSCRIPTION") {

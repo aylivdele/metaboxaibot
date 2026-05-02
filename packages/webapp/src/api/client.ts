@@ -122,6 +122,11 @@ export const api = {
 
   profile: {
     get: () => request<UserProfile>("/profile"),
+    updatePreferences: (body: { confirmBeforeGenerate?: boolean }) =>
+      request<{ ok: boolean; confirmBeforeGenerate: boolean }>("/profile/preferences", {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
     partnerBalance: () =>
       request<{
         balance: number;

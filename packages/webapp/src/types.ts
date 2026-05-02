@@ -13,6 +13,7 @@ export interface UserProfile {
   metaboxUserId: string | null;
   metaboxReferralCode: string | null;
   finishedOnboarding: boolean;
+  confirmBeforeGenerate: boolean;
   subscription: {
     planName: string;
     period: string;
