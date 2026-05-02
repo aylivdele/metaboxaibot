@@ -341,6 +341,34 @@ export const userStateService = {
     return all[modelId] ?? {};
   },
 
+  /**
+   * Bulk-set raw slot values for a model (used by low-iq mode Cancel-restore).
+   * Empty/undefined slots clears the model entry. Pass raw `tg:fileId:...` /
+   * S3-key strings — same shape as what `getMediaInputs` returns.
+   */
+  async setMediaInputsForModel(
+    userId: bigint,
+    modelId: string,
+    slots: Record<string, string[]> | undefined,
+  ): Promise<void> {
+    const all = await this.getAllMediaInputs(userId);
+    if (!slots || Object.keys(slots).length === 0) {
+      delete all[modelId];
+    } else {
+      all[modelId] = slots;
+    }
+    const hasAny = Object.keys(all).length > 0;
+    await db.userState.upsert({
+      where: { userId },
+      create: {
+        userId,
+        state: "IDLE",
+        mediaInputs: hasAny ? all : Prisma.DbNull,
+      },
+      update: { mediaInputs: hasAny ? all : Prisma.DbNull },
+    });
+  },
+
   /** Clear all media input slots for a specific model (e.g. after generation start). */
   async clearMediaInputs(userId: bigint, modelId: string): Promise<void> {
     const all = await this.getAllMediaInputs(userId);

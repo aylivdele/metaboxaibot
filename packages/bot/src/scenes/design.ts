@@ -490,6 +490,11 @@ export async function executeDesignPrompt(
     }
   }
 
+  // Snapshot raw state values for low-iq Cancel-restore (captured BEFORE the
+  // existing clear/getAndClear calls so the user gets exactly what they had).
+  const snapshotMediaInputs = hasMediaInputs ? { ...mediaInputs } : undefined;
+  const snapshotDesignRefMessageId = state?.designRefMessageId ?? undefined;
+
   // Clear media inputs for this model (consumed on generation start)
   if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id, modelId);
 
@@ -525,6 +530,10 @@ export async function executeDesignPrompt(
       modelId,
       prompt,
       submitParams,
+      restoreSnapshot: {
+        ...(snapshotMediaInputs ? { mediaInputs: snapshotMediaInputs } : {}),
+        ...(snapshotDesignRefMessageId ? { designRefMessageId: snapshotDesignRefMessageId } : {}),
+      },
     })
   ) {
     return;

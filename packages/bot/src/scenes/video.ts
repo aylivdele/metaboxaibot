@@ -627,6 +627,10 @@ export async function executeVideoPrompt(
     return;
   }
 
+  // Snapshot raw state values for low-iq Cancel-restore (captured BEFORE the
+  // existing clear/getAndClear calls — values are exactly what was about to be wiped).
+  const snapshotMediaInputs = hasMediaInputs ? { ...mediaInputs } : undefined;
+
   // Clear media inputs for this model (consumed on generation start)
   if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id, modelId);
 
@@ -667,6 +671,12 @@ export async function executeVideoPrompt(
       modelId,
       prompt,
       submitParams: submitParamsBase,
+      restoreSnapshot: {
+        ...(snapshotMediaInputs ? { mediaInputs: snapshotMediaInputs } : {}),
+        ...(imageUrl ? { videoRefImageUrl: imageUrl } : {}),
+        ...(driverUrl ? { videoRefDriverUrl: driverUrl } : {}),
+        ...(rawVoiceS3Key ? { videoRefVoiceUrl: rawVoiceS3Key } : {}),
+      },
     })
   ) {
     return;
@@ -1701,6 +1711,9 @@ export async function handleVideoAvatarVoiceCallback(ctx: BotContext): Promise<v
       prompt: "",
       submitParams,
       promptDisplay: ctx.t.confirmGeneration.voicePrompt,
+      restoreSnapshot: {
+        ...(imageUrl ? { videoRefImageUrl: imageUrl } : {}),
+      },
     })
   ) {
     return;

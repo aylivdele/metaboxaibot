@@ -10,6 +10,7 @@ import {
   audioGenerationService,
   pendingGenerationService,
   costPreviewService,
+  userStateService,
 } from "@metabox/api/services";
 import { db } from "@metabox/api/db";
 import {
@@ -27,6 +28,20 @@ import { logger } from "../logger.js";
 export type ConfirmKind = "image" | "video" | "audio";
 export type ConfirmSubmitParams = SubmitImageParams | SubmitVideoParams | SubmitAudioParams;
 
+/**
+ * Snapshot of state values consumed at scene-time (before gate).
+ * On Cancel, these are restored to userState so the user doesn't have to re-upload.
+ * Captured by the caller right before the existing `clearMediaInputs` / `getAndClear*`
+ * calls — values are exactly what was about to be wiped.
+ */
+export interface RestoreSnapshot {
+  mediaInputs?: Record<string, string[]>;
+  videoRefImageUrl?: string;
+  videoRefDriverUrl?: string;
+  videoRefVoiceUrl?: string;
+  designRefMessageId?: string;
+}
+
 interface GateInput {
   ctx: BotContext;
   kind: ConfirmKind;
@@ -35,7 +50,11 @@ interface GateInput {
   submitParams: ConfirmSubmitParams;
   /** Override displayed prompt — e.g. placeholder for HeyGen voice-only path. */
   promptDisplay?: string;
+  /** Snapshot of cleared state (slots + one-shot refs) for Cancel-restore. */
+  restoreSnapshot?: RestoreSnapshot;
 }
+
+const SNAPSHOT_KEY = "__restoreSnapshot__";
 
 const PROMPT_DISPLAY_MAX = 300;
 const PROMPT_DISPLAY_HALF = 140;
@@ -49,14 +68,23 @@ function bigintToString(_k: string, v: unknown): unknown {
   return typeof v === "bigint" ? v.toString() : v;
 }
 
-function serializePayload(params: ConfirmSubmitParams): unknown {
-  return JSON.parse(JSON.stringify(params, bigintToString));
+function serializePayload(params: ConfirmSubmitParams): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(params, bigintToString)) as Record<string, unknown>;
 }
 
 function deserializePayload(json: unknown, _kind: ConfirmKind): ConfirmSubmitParams {
   const obj = JSON.parse(JSON.stringify(json)) as Record<string, unknown>;
+  delete obj[SNAPSHOT_KEY];
   if (typeof obj.userId === "string") obj.userId = BigInt(obj.userId);
   return obj as unknown as ConfirmSubmitParams;
+}
+
+function extractSnapshot(json: unknown): RestoreSnapshot | null {
+  if (!json || typeof json !== "object") return null;
+  const obj = json as Record<string, unknown>;
+  const raw = obj[SNAPSHOT_KEY];
+  if (!raw || typeof raw !== "object") return null;
+  return raw as RestoreSnapshot;
 }
 
 /**
@@ -66,7 +94,7 @@ function deserializePayload(json: unknown, _kind: ConfirmKind): ConfirmSubmitPar
  * to its existing submit logic.
  */
 export async function gateLowIqMode(input: GateInput): Promise<boolean> {
-  const { ctx, kind, modelId, prompt, submitParams, promptDisplay } = input;
+  const { ctx, kind, modelId, prompt, submitParams, promptDisplay, restoreSnapshot } = input;
   if (!ctx.user || !ctx.chat) return false;
 
   const user = await db.user.findUnique({
@@ -105,12 +133,17 @@ export async function gateLowIqMode(input: GateInput): Promise<boolean> {
     .text(ctx.t.confirmGeneration.cancel, "lqg:cancel");
   const sent = await ctx.reply(text, { reply_markup: kb });
 
+  const payloadObj = serializePayload(submitParams);
+  if (restoreSnapshot && Object.keys(restoreSnapshot).length > 0) {
+    payloadObj[SNAPSHOT_KEY] = restoreSnapshot;
+  }
+
   const { previous } = await pendingGenerationService.upsert({
     userId: ctx.user.id,
     section: kind,
     modelId,
     prompt,
-    payload: serializePayload(submitParams) as object,
+    payload: payloadObj as object,
     estimatedCost: cost,
     chatId: BigInt(ctx.chat.id),
     messageId: BigInt(sent.message_id),
@@ -207,8 +240,59 @@ export async function handleLowIqStart(ctx: BotContext): Promise<void> {
   await runReplaySubmit(ctx, kind, params);
 }
 
+async function restoreFromSnapshot(
+  userId: bigint,
+  modelId: string,
+  snapshot: RestoreSnapshot,
+): Promise<void> {
+  const tasks: Promise<unknown>[] = [];
+  if (snapshot.mediaInputs) {
+    tasks.push(
+      userStateService
+        .setMediaInputsForModel(userId, modelId, snapshot.mediaInputs)
+        .catch((err) => logger.warn({ err, userId, modelId }, "restoreFromSnapshot: mediaInputs")),
+    );
+  }
+  if (snapshot.videoRefImageUrl) {
+    tasks.push(
+      userStateService
+        .setVideoRefImageUrl(userId, snapshot.videoRefImageUrl)
+        .catch((err) => logger.warn({ err, userId }, "restoreFromSnapshot: videoRefImageUrl")),
+    );
+  }
+  if (snapshot.videoRefDriverUrl) {
+    tasks.push(
+      userStateService
+        .setVideoRefDriverUrl(userId, snapshot.videoRefDriverUrl)
+        .catch((err) => logger.warn({ err, userId }, "restoreFromSnapshot: videoRefDriverUrl")),
+    );
+  }
+  if (snapshot.videoRefVoiceUrl) {
+    tasks.push(
+      userStateService
+        .setVideoRefVoiceUrl(userId, snapshot.videoRefVoiceUrl)
+        .catch((err) => logger.warn({ err, userId }, "restoreFromSnapshot: videoRefVoiceUrl")),
+    );
+  }
+  if (snapshot.designRefMessageId) {
+    tasks.push(
+      userStateService
+        .setDesignRefMessage(userId, snapshot.designRefMessageId)
+        .catch((err) => logger.warn({ err, userId }, "restoreFromSnapshot: designRefMessageId")),
+    );
+  }
+  await Promise.all(tasks);
+}
+
 export async function handleLowIqCancel(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
+  const pending = await pendingGenerationService.getByUser(ctx.user.id);
+  if (pending) {
+    const snapshot = extractSnapshot(pending.payload);
+    if (snapshot) {
+      await restoreFromSnapshot(ctx.user.id, pending.modelId, snapshot);
+    }
+  }
   await pendingGenerationService.deleteByUser(ctx.user.id);
   await ctx.answerCallbackQuery();
   await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
