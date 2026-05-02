@@ -88,9 +88,9 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     id: "voice-clone",
     name: "🎤 Клонирование голоса",
     description:
-      "Создаёт ваш голосовой профиль в ElevenLabs по короткому аудиообразцу. Готовый голос доступен в TTS ElevenLabs и видео-аватарах.",
+      "Создаёт ваш голосовой профиль по короткому аудиообразцу (~5 сек). Готовый голос доступен в синтезе речи и видео-аватарах.",
     section: "audio",
-    provider: "elevenlabs",
+    provider: "cartesia",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0,
     outputCostUsdPerMToken: 0,
@@ -100,16 +100,27 @@ export const AUDIO_MODELS: Record<string, AIModel> = {
     isAsync: false,
     contextStrategy: "db_history",
     contextMaxMessages: 0,
-    settings: [
-      {
-        key: "remove_background_noise",
-        label: "Удалить фоновый шум",
-        description:
-          "Удаляет фоновый шум из аудиообразца перед клонированием. Не используйте, если запись чистая — может ухудшить качество.",
-        type: "toggle" as const,
-        default: false,
-      },
-    ],
+    settings: [],
+  },
+  "tts-cartesia": {
+    id: "tts-cartesia",
+    name: "🔊 Синтез речи (Cartesia)",
+    description:
+      "Cartesia Sonic — быстрый и дешёвый TTS с поддержкой ваших клонированных голосов и многих языков, включая русский.",
+    section: "audio",
+    provider: "cartesia",
+    costUsdPerRequest: 0,
+    // Cartesia sonic-3: $0.065/1K chars (примерно). Округлено для калькуляции.
+    costUsdPerKChar: 0.065,
+    inputCostUsdPerMToken: 0,
+    outputCostUsdPerMToken: 0,
+    supportsImages: false,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 0,
+    settings: [],
   },
   "tts-el": {
     id: "tts-el",

@@ -1546,7 +1546,9 @@ function GalleryDetailsModal({
       types.has("did-voice-picker") ||
       types.has("elevenlabs-voice-picker")
     ) {
-      add(api.userVoices.list("elevenlabs"), (data) => {
+      // Без provider-фильтра: showname-резолв нужен для всех клонированных
+      // голосов юзера (Cartesia + legacy ElevenLabs).
+      add(api.userVoices.list(), (data) => {
         next.userVoices = new Map(
           data.map((v) => [v.externalId ?? v.id, v.name] as [string, string]),
         );

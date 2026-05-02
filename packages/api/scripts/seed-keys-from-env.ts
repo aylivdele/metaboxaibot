@@ -32,6 +32,7 @@ const seeds: Seed[] = [
   { provider: "runway", apiKey: config.ai.runway },
   { provider: "luma", apiKey: config.ai.luma },
   { provider: "elevenlabs", apiKey: config.ai.elevenlabs },
+  { provider: "cartesia", apiKey: config.ai.cartesia },
   { provider: "heygen", apiKey: config.ai.heygen },
   { provider: "did", apiKey: config.ai.did },
   { provider: "higgsfield", apiKey: config.ai.higgsfieldApiKey },

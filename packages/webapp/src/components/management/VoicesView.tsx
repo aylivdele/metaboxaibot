@@ -14,8 +14,10 @@ export function VoicesView({ onGoToVoiceClone }: { onGoToVoiceClone?: () => void
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    // Без provider-фильтра: показываем все клонированные голоса юзера
+    // (Cartesia + legacy ElevenLabs).
     api.userVoices
-      .list("elevenlabs")
+      .list()
       .then((v) => {
         setClonedVoices(v);
       })
@@ -104,7 +106,7 @@ export function VoicesView({ onGoToVoiceClone }: { onGoToVoiceClone?: () => void
         <p className="uploads-empty">{t("uploads.empty")}</p>
       ) : (
         <>
-          {/* Cloned voices (ElevenLabs) */}
+          {/* Cloned voices (Cartesia + legacy ElevenLabs) */}
           {clonedVoices.length > 0 && (
             <section className="uploads-section">
               <h3 className="uploads-section__title">{t("uploads.clonedVoicesTitle")}</h3>
@@ -143,7 +145,12 @@ export function VoicesView({ onGoToVoiceClone }: { onGoToVoiceClone?: () => void
                       )}
                       <div className="uploads-item__bottom">
                         <span className="uploads-item__meta">
-                          ElevenLabs · {new Date(voice.createdAt).toLocaleDateString()}
+                          {voice.provider === "cartesia"
+                            ? "Cartesia"
+                            : voice.provider === "elevenlabs"
+                              ? "ElevenLabs"
+                              : voice.provider}{" "}
+                          · {new Date(voice.createdAt).toLocaleDateString()}
                         </span>
                         <div className="uploads-item__actions">
                           <button

@@ -27,6 +27,7 @@ const COOLDOWN_MS: Record<string, number> = {
   alibaba: 60_000,
   replicate: 60_000,
   elevenlabs: 60_000,
+  cartesia: 60_000,
   suno: 60_000,
   did: 60_000,
 };

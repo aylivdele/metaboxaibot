@@ -2,10 +2,10 @@ import { InlineKeyboard } from "grammy";
 import type { BotContext } from "../types/context.js";
 import { audioGenerationService, userStateService } from "@metabox/api/services";
 import { acquireKey, recordSuccess, recordError } from "@metabox/api/services/key-pool";
-import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
+import { CartesiaAdapter } from "@metabox/api/ai/audio";
 import { db } from "@metabox/api/db";
 import { getRedis } from "@metabox/api/redis";
-import { evictOneElevenLabsVoice } from "@metabox/api/services/user-voice";
+import { evictOneCartesiaVoice } from "@metabox/api/services/user-voice";
 import {
   AI_MODELS,
   config,
@@ -120,42 +120,39 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
     const audioBuffer = Buffer.from(await res.arrayBuffer());
     const filename = filePath.split("/").pop() ?? "voice.ogg";
 
-    // 2. Generate sequential name
-    const count = await db.userVoice.count({
-      where: { userId: ctx.user.id, provider: "elevenlabs" },
-    });
+    // 2. Generate sequential name. Считаем все голоса юзера (любой провайдер) —
+    // для последовательной нумерации в UI неважно где голос хранится.
+    const count = await db.userVoice.count({ where: { userId: ctx.user.id } });
     const name = `Голос ${ctx.user.id} #${count + 1}`;
 
-    // 3. Clone voice on ElevenLabs (with LRU eviction on limit error).
-    // Voice_id живёт на конкретном аккаунте → сохраняем providerKeyId,
-    // чтобы при TTS дёргать тот же ключ. Если ключ удалят — voice пересоздастся
-    // через resolveVoiceForTTS (см. user-voice.service.ts).
-    const allSettings = await userStateService.getModelSettings(ctx.user.id);
-    const cloneSettings = allSettings["voice-clone"] ?? {};
-    const removeBackgroundNoise = Boolean(cloneSettings.remove_background_noise ?? false);
-
-    const acquired = await acquireKey("elevenlabs");
+    // 3. Clone voice на Cartesia (заменили ElevenLabs из-за более жёстких
+    //    лимитов на slot'ы). Voice_id живёт в org конкретного API-ключа →
+    //    сохраняем providerKeyId, при TTS дёргаем тот же ключ. Если ключ
+    //    удалят — voice пересоздастся через resolveVoiceForTTS из audioS3Key.
+    //    Legacy EL-голоса юзеров продолжают работать через тот же resolveVoiceForTTS.
+    const acquired = await acquireKey("cartesia");
     let voiceId: string;
     try {
       try {
-        voiceId = await ElevenLabsAdapter.cloneVoice(
+        voiceId = await CartesiaAdapter.cloneVoice(
           audioBuffer,
           filename,
           name,
-          removeBackgroundNoise,
+          "ru",
           acquired.apiKey,
         );
       } catch (err) {
-        // ElevenLabs returns 400 with voice_limit_reached when the workspace slot limit is exceeded.
-        // Эвиктим на ТОМ ЖЕ ключе — слот-лимит per-account.
-        if (err instanceof Error && err.message.includes("voice_limit_reached")) {
-          const freed = await evictOneElevenLabsVoice(acquired.apiKey, acquired.keyId);
+        // Cartesia не документирует точный код slot-limit'а. По heuristic'у
+        // вылавливаем "limit"/"quota"/"exceeded" в message → eviction → retry.
+        const msg = err instanceof Error ? err.message.toLowerCase() : "";
+        if (/limit|quota|exceeded|maximum/i.test(msg)) {
+          const freed = await evictOneCartesiaVoice(acquired.apiKey, acquired.keyId);
           if (!freed) throw err;
-          voiceId = await ElevenLabsAdapter.cloneVoice(
+          voiceId = await CartesiaAdapter.cloneVoice(
             audioBuffer,
             filename,
             name,
-            removeBackgroundNoise,
+            "ru",
             acquired.apiKey,
           );
         } else {
@@ -175,19 +172,15 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
     const audioS3Key = buildS3Key("voices", ctx.user.id.toString(), voiceId, ext);
     await uploadBuffer(audioS3Key, audioBuffer, `audio/${ext}`).catch(() => null);
 
-    // 5. Fetch preview URL from ElevenLabs (используем тот же ключ, на котором голос создан)
-    const previewUrl = await ElevenLabsAdapter.getPreviewUrl(voiceId, acquired.apiKey).catch(
-      () => null,
-    );
-
-    // 6. Save to DB
+    // 5. Save to DB. previewUrl у Cartesia не сохраняем (preview генерируется
+    //    on-demand через expand[]=preview_file_url в getVoice; URL короткоживущий).
     await db.userVoice.create({
       data: {
         userId: ctx.user.id,
-        provider: "elevenlabs",
+        provider: "cartesia",
         name,
         externalId: voiceId,
-        previewUrl,
+        previewUrl: null,
         audioS3Key,
         status: "ready",
         providerKeyId: acquired.keyId,

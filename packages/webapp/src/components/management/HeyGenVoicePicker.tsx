@@ -45,8 +45,11 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
     }
     if (tab === "mine") {
       setMyVoicesLoading(true);
+      // Без фильтра по провайдеру: показываем все клонированные голоса юзера
+      // (новые — Cartesia, legacy — ElevenLabs). Бот резолвит провайдер из
+      // самой UserVoice-записи на стороне `preGenerateELTts`.
       api.userVoices
-        .list("elevenlabs")
+        .list()
         .then(setMyVoices)
         .catch(() => setMyVoices([]))
         .finally(() => setMyVoicesLoading(false));
@@ -63,12 +66,13 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
   const selectCloned = (item: VoiceListItem) => {
     const voice = myVoices.find((v) => v.id === item.id);
     if (!voice) return;
-    // For cloned voices we persist the stable local UserVoice.id — the worker
-    // resolves the current ElevenLabs externalId via `resolveVoiceForTTS`,
-    // which also handles eviction (re-clones from audioS3Key) and key-binding.
-    // Official EL voice_ids are passed through in `selectOfficial` instead.
+    // Persist стабильный local UserVoice.id — worker резолвит фактический
+    // external voice_id (Cartesia или ElevenLabs) через `resolveVoiceForTTS`,
+    // который также делает eviction + re-clone + key-binding.
+    // voice_provider берётся из самой UserVoice-записи: cartesia для новых,
+    // elevenlabs для legacy. Бот по этому полю выбирает TTS-адаптер.
     onChange("voice_id", voice.id);
-    onChange("voice_provider", "elevenlabs");
+    onChange("voice_provider", voice.provider);
     onChange("voice_url", "");
     onChange("voice_s3key", "");
   };
@@ -102,15 +106,24 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
     resolvePreviewUrl: v.preview_audio ? () => v.preview_audio! : undefined,
   }));
 
-  const mineItems: VoiceListItem[] = myVoices.map((v) => ({
-    id: v.id,
-    name: v.name,
-    meta: `ElevenLabs · ${new Date(v.createdAt).toLocaleDateString()}`,
-    hasPreview: v.hasAudio,
-    resolvePreviewUrl: v.hasAudio
-      ? async () => (await api.userVoices.previewUrl(v.id)).url
-      : undefined,
-  }));
+  const mineItems: VoiceListItem[] = myVoices.map((v) => {
+    // Display-friendly provider label: "Cartesia" / "ElevenLabs" / fallback to raw.
+    const providerLabel =
+      v.provider === "cartesia"
+        ? "Cartesia"
+        : v.provider === "elevenlabs"
+          ? "ElevenLabs"
+          : v.provider;
+    return {
+      id: v.id,
+      name: v.name,
+      meta: `${providerLabel} · ${new Date(v.createdAt).toLocaleDateString()}`,
+      hasPreview: v.hasAudio,
+      resolvePreviewUrl: v.hasAudio
+        ? async () => (await api.userVoices.previewUrl(v.id)).url
+        : undefined,
+    };
+  });
 
   // voice_id is the local UserVoice.id for cloned voices. Fall back to
   // externalId for records saved before this migration (backward compat).

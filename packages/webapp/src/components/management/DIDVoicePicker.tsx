@@ -33,8 +33,10 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
     }
     if (tab === "mine") {
       setMyVoicesLoading(true);
+      // Без provider-фильтра: показываем все клонированные голоса юзера
+      // (Cartesia + ElevenLabs legacy).
       api.userVoices
-        .list("elevenlabs")
+        .list()
         .then(setMyVoices)
         .catch(() => setMyVoices([]))
         .finally(() => setMyVoicesLoading(false));
@@ -51,11 +53,11 @@ export function DIDVoicePicker({ voiceId, onChange }: DIDVoicePickerProps) {
   const selectCloned = (item: VoiceListItem) => {
     const voice = myVoices.find((v) => v.id === item.id);
     if (!voice) return;
-    // For cloned voices we persist the stable local UserVoice.id — the worker
-    // resolves the current ElevenLabs externalId via `resolveVoiceForTTS`,
-    // which also handles eviction (re-clone) and key-binding.
+    // Persist стабильный UserVoice.id — worker резолвит фактический external
+    // voice_id через `resolveVoiceForTTS`. voice_provider берётся из самой
+    // UserVoice-записи (cartesia для новых, elevenlabs для legacy).
     onChange("voice_id", voice.id);
-    onChange("voice_provider", "elevenlabs");
+    onChange("voice_provider", voice.provider);
   };
 
   const languages = [

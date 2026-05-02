@@ -9,7 +9,7 @@ import type { VideoJobData } from "@metabox/api/queues";
 import { getVideoQueue } from "@metabox/api/queues";
 import { db } from "@metabox/api/db";
 import { createVideoAdapter } from "@metabox/api/ai/video";
-import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
+import { ElevenLabsAdapter, CartesiaAdapter } from "@metabox/api/ai/audio";
 import {
   deductTokens,
   calculateCost,
@@ -251,28 +251,28 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
         }
 
         // If voice_id is a local UserVoice.id (modern picker format) resolve
-        // it to the current ElevenLabs externalId here so the provider
-        // adapter (HeyGen / D-ID) receives a voice_id it can actually use.
-        // Records saved before this migration store the externalId directly
-        // — both shapes are accepted via the two-pass findFirst below.
+        // it to the current external voice_id here so the provider adapter
+        // (HeyGen / D-ID) receives a voice_id it can actually use.
+        // Records saved before this migration store the externalId directly —
+        // both shapes are accepted via the two-pass findFirst below (no
+        // provider filter, поскольку UserVoice может быть Cartesia или legacy EL).
         //
         // Special case for HeyGen: HeyGen has its own voice catalog and не
-        // принимает ElevenLabs voice_id'ы (вернёт 400 "Invalid voice_id: ...
-        // Voice not found"). Поэтому если модель — HeyGen и юзер выбрал
-        // клонированный ElevenLabs голос, мы заранее генерируем TTS через
-        // ElevenLabs, аплоадим в S3 и передаём адаптеру `voice_url`/`voice_s3key`
-        // — HeyGen.submit увидит их вместо voice_id и пойдёт через
-        // audio_asset_id flow (lip-sync), а не TTS.
+        // принимает Cartesia/EL voice_id'ы (вернёт 400 "Invalid voice_id"). Поэтому
+        // если модель — HeyGen и юзер выбрал клонированный голос, заранее
+        // генерируем TTS через провайдера голоса (Cartesia или legacy EL),
+        // аплоадим в S3 и передаём адаптеру `voice_url`/`voice_s3key` — HeyGen.submit
+        // увидит их вместо voice_id и пойдёт через audio_asset_id flow (lip-sync).
         let effectiveModelSettings = modelSettings;
         const requestedVoice = (modelSettings?.voice_id as string | undefined)?.trim();
         if (requestedVoice) {
           const userVoice =
             (await db.userVoice.findFirst({
-              where: { id: requestedVoice, provider: "elevenlabs" },
+              where: { id: requestedVoice },
               select: { id: true },
             })) ??
             (await db.userVoice.findFirst({
-              where: { provider: "elevenlabs", externalId: requestedVoice },
+              where: { externalId: requestedVoice },
               select: { id: true },
             }));
           if (userVoice) {
@@ -291,7 +291,12 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
                 if (cachedAudio?.s3Key && cachedAudio.userVoiceId === userVoice.id) {
                   voiceS3Key = cachedAudio.s3Key;
                 } else {
-                  const tts = new ElevenLabsAdapter("tts-el", resolved.acquired.apiKey);
+                  // Provider-aware TTS: после force-migration practically всегда
+                  // Cartesia, но legacy без audioS3Key могли остаться на EL.
+                  const tts =
+                    resolved.provider === "cartesia"
+                      ? new CartesiaAdapter("tts-cartesia", resolved.acquired.apiKey)
+                      : new ElevenLabsAdapter("tts-el", resolved.acquired.apiKey);
                   const audioResult = await tts.generate({
                     prompt: effectivePrompt,
                     modelSettings: {
@@ -300,7 +305,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
                     },
                   });
                   if (!audioResult.buffer) {
-                    throw new Error("ElevenLabs TTS returned no audio buffer");
+                    throw new Error(`${resolved.provider} TTS returned no audio buffer`);
                   }
                   const audioKey = buildS3Key(
                     "audio",

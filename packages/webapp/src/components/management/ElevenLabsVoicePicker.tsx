@@ -30,8 +30,11 @@ export function ElevenLabsVoicePicker({ voiceId, onChange }: ElevenLabsVoicePick
     }
     if (tab === "mine") {
       setMyVoicesLoading(true);
+      // Без provider-фильтра: показываем все клонированные голоса юзера
+      // (Cartesia + legacy ElevenLabs). Audio-processor под капотом подбирает
+      // правильный TTS-адаптер по фактическому provider'у через resolveVoiceForTTS.
       api.userVoices
-        .list("elevenlabs")
+        .list()
         .then(setMyVoices)
         .catch(() => setMyVoices([]))
         .finally(() => setMyVoicesLoading(false));
@@ -83,15 +86,23 @@ export function ElevenLabsVoicePicker({ voiceId, onChange }: ElevenLabsVoicePick
     resolvePreviewUrl: v.preview_url ? () => v.preview_url! : undefined,
   }));
 
-  const mineItems: VoiceListItem[] = myVoices.map((v) => ({
-    id: v.id,
-    name: v.name,
-    meta: `ElevenLabs · ${new Date(v.createdAt).toLocaleDateString()}`,
-    hasPreview: v.hasAudio,
-    resolvePreviewUrl: v.hasAudio
-      ? async () => (await api.userVoices.previewUrl(v.id)).url
-      : undefined,
-  }));
+  const mineItems: VoiceListItem[] = myVoices.map((v) => {
+    const providerLabel =
+      v.provider === "cartesia"
+        ? "Cartesia"
+        : v.provider === "elevenlabs"
+          ? "ElevenLabs"
+          : v.provider;
+    return {
+      id: v.id,
+      name: v.name,
+      meta: `${providerLabel} · ${new Date(v.createdAt).toLocaleDateString()}`,
+      hasPreview: v.hasAudio,
+      resolvePreviewUrl: v.hasAudio
+        ? async () => (await api.userVoices.previewUrl(v.id)).url
+        : undefined,
+    };
+  });
 
   // voice_id is the local UserVoice.id for cloned voices. Fall back to
   // externalId for records saved before this migration (backward compat).
