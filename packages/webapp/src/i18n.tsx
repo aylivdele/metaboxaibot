@@ -52,7 +52,7 @@ const translations = {
     "account.generationModeOff": "No confirmation",
     "account.generationModeInfoAria": "Generation mode info",
     "account.generationModeInfo":
-      "Control how generation starts.\n🎯 With confirmation — see the final request and confirm the start manually. Protects from accidental runs and extra spend.\n⚡ No confirmation — generation starts automatically after you send a prompt. Handy when you're already an experienced user.",
+      "Control how generation starts:\n\n🎯 With confirmation — see the final request and confirm the start manually. Protects from accidental runs and extra spend.\n\n⚡ No confirmation — generation starts automatically after you send a prompt. Handy when you're already an experienced user.",
     "account.notLinked": "Metabox account not linked",
     "account.status": "STATUS",
     "account.statusPartner": "Partner",
@@ -576,7 +576,7 @@ const translations = {
     "account.generationModeOff": "Без подтверждения",
     "account.generationModeInfoAria": "Информация о режиме генерации",
     "account.generationModeInfo":
-      "Управляйте тем, как запускается генерация.\n🎯 С подтверждением — увидите финальный запрос и подтвердите старт вручную. Защищает от случайных запусков и лишних трат.\n⚡ Без подтверждения — генерация начнётся автоматически после отправки промпта. Удобно, когда вы уже опытный пользователь.",
+      "Управляйте тем, как запускается генерация:\n\n🎯 С подтверждением — увидите финальный запрос и подтвердите старт вручную. Защищает от случайных запусков и лишних трат.\n\n⚡ Без подтверждения — генерация начнётся автоматически после отправки промпта. Удобно, когда вы уже опытный пользователь.",
     "account.notLinked": "Аккаунт Metabox не привязан",
     "account.status": "СТАТУС",
     "account.statusPartner": "Партнёр",
