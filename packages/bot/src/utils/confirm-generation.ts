@@ -15,6 +15,8 @@ import {
 import { db } from "@metabox/api/db";
 import {
   AI_MODELS,
+  config,
+  generateWebToken,
   resolveModelDisplay,
   UserFacingError,
   resolveUserFacingError,
@@ -23,6 +25,7 @@ import { InlineKeyboard } from "grammy";
 import { replyNoSubscription, replyInsufficientTokens } from "./reply-error.js";
 import { ensureELTtsForVideo } from "./el-tts.js";
 import { pickVideoPending, pickDesignPending } from "./pending-messages.js";
+import { buildMediaInputStatusMenu } from "./media-input-state.js";
 import { logger } from "../logger.js";
 
 export type ConfirmKind = "image" | "video" | "audio";
@@ -284,17 +287,65 @@ async function restoreFromSnapshot(
   await Promise.all(tasks);
 }
 
+/**
+ * Builds the post-cancel inline keyboard: media-input slots + management webapp button.
+ * Mirrors what the model activation message shows, so the user can immediately
+ * tweak slots or settings after cancelling.
+ */
+async function buildPostCancelKeyboard(
+  ctx: BotContext,
+  section: "image" | "video",
+  modelId: string,
+): Promise<InlineKeyboard | undefined> {
+  if (!ctx.user) return undefined;
+  const model = AI_MODELS[modelId];
+  if (!model) return undefined;
+
+  const kb = new InlineKeyboard();
+  if (model.mediaInputs?.length) {
+    const filledInputs = await userStateService.getMediaInputs(ctx.user.id, modelId);
+    const sceneSection = section === "image" ? "design" : "video";
+    const { kb: slotsKb } = buildMediaInputStatusMenu(
+      model.mediaInputs,
+      filledInputs,
+      sceneSection,
+      ctx.t,
+      {
+        promptOptional: model.promptOptional,
+        promptOptionalRequiresMedia: model.promptOptionalRequiresMedia,
+      },
+    );
+    for (const row of slotsKb.inline_keyboard) {
+      kb.row(...row);
+    }
+  }
+
+  const webappUrl = config.bot.webappUrl;
+  if (webappUrl) {
+    const wtoken = generateWebToken(ctx.user.id, config.bot.token);
+    const sectionParam = section === "image" ? "design" : "video";
+    const mgmtLabel = section === "image" ? ctx.t.design.management : ctx.t.video.management;
+    kb.webApp(mgmtLabel, `${webappUrl}?page=management&section=${sectionParam}&wtoken=${wtoken}`);
+  }
+
+  return kb.inline_keyboard.length ? kb : undefined;
+}
+
 export async function handleLowIqCancel(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   const pending = await pendingGenerationService.getByUser(ctx.user.id);
+  let menuKb: InlineKeyboard | undefined;
   if (pending) {
     const snapshot = extractSnapshot(pending.payload);
     if (snapshot) {
       await restoreFromSnapshot(ctx.user.id, pending.modelId, snapshot);
     }
+    if (pending.section === "image" || pending.section === "video") {
+      menuKb = await buildPostCancelKeyboard(ctx, pending.section, pending.modelId);
+    }
   }
   await pendingGenerationService.deleteByUser(ctx.user.id);
   await ctx.answerCallbackQuery();
   await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
-  await ctx.reply(ctx.t.confirmGeneration.cancelled);
+  await ctx.reply(ctx.t.confirmGeneration.cancelled, menuKb ? { reply_markup: menuKb } : undefined);
 }

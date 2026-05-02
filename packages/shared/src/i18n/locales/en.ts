@@ -568,7 +568,7 @@ export default {
     voicePrompt: "🎵 voice message",
     start: "Start",
     cancel: "Cancel",
-    cancelled: "Generation cancelled.",
+    cancelled: "Generation cancelled. Uploaded files have been preserved.",
     expired: "Request expired, please send the prompt again.",
     replaced: "Request replaced by a newer one.",
   },
