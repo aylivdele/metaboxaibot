@@ -197,7 +197,7 @@ export default {
     veoImageRequires8s:
       "❌ When using an input image, Veo only supports 8-second duration. Change the duration in ⚙ Management.",
     soulCreatePrompt:
-      "📸 Send 20+ photos to create a character.\n\n✅ Recommendations:\n• 20+ photos in one cohesive style, only your face on picture\n• High-quality, clear images\n• Different angles and poses\n\n❌ Avoid:\n• Faces, blurry or low-quality images\n• Mixed styles in one set\n\nSend photos one at a time or as a group.",
+      "📸 Send 20+ photos to create a character.\n\n✅ Recommendations:\n• 20+ photos in one cohesive style, only your face on picture\n• High-quality, clear images\n• Different angles and poses\n\n❌ Avoid:\n• Faces, blurry or low-quality images\n• Mixed styles in one set\n\nSend photos one at a time or as a group.\n\n💰 Creation cost: {cost} ✦.",
     soulPhotoCount: "📸 Uploaded {n} of {max} max.",
     soulCreateButton: "✅ Create character ({n} photos)",
     soulCreating:
@@ -295,7 +295,8 @@ export default {
       "❌ The provider failed to generate audio. Please try modifying your request.",
     audioCreateTaskFailed: "❌ Failed to create a generation task. Please try again later.",
     generationTimeout: "❌ Generation took too long. Please try again.",
-    generationFailed: "❌ {modelName}: temporary provider issue. Please try again.",
+    generationFailed:
+      "❌ {modelName} decided to take a break. We didn't approve, but it didn't ask. We're already on it. Meanwhile, plenty of other AI models in the bot are happy to see you.",
     generationStillRunning: "{modelName}\nStill generating, please wait...",
     generationTimedOut24h:
       "❌ {modelName}: generation did not finish within 24 hours and was cancelled. Please try again.",
@@ -561,6 +562,15 @@ export default {
     refineDesign: "🎨 Design",
     refineVideo: "🎥 Video",
     refineSaved: "✅ Image loaded into «{slot}».",
+  },
+  confirmGeneration: {
+    message: "Model: {model}\nPrompt: {prompt}\nStart generation? Estimated price: {cost} ✦",
+    voicePrompt: "🎵 voice message",
+    start: "Start",
+    cancel: "Cancel",
+    cancelled: "Generation cancelled.",
+    expired: "Request expired, please send the prompt again.",
+    replaced: "Request replaced by a newer one.",
   },
   modelModes: {
     pickerTitle: "Choose mode:",

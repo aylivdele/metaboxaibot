@@ -200,14 +200,32 @@ export async function processAvatarJob(job: Job<AvatarJobData>, token?: string):
         const result = await soulAdapter.poll(avatar.externalId);
 
         if (result.status === "ready") {
-          // Списываем токены ТОЛЬКО при успешном создании (зеркалит pattern
-          // обычной генерации: deductTokens на стадии finalize, не submit).
-          // checkBalance на сабмите в bot/scenes/video.ts уже отгейтил кейс
-          // "не хватает на момент клика"; здесь полагаемся на тот контракт.
-          // Если за 5-15 минут пока шла обработка юзер потратил баланс в другом
-          // месте — deductTokens декрементит до отрицательного значения, как и
-          // для обычной генерации (мы съедаем стоимость за HiggsField API,
-          // но даём готового персонажа).
+          // Idempotent finalize: atomic compare-and-swap on `status` ensures only
+          // one worker run flips "creating" → "ready" and runs the deduction.
+          // Если воркер крашнется между updateMany и deductTokens — сценарий
+          // "Soul бесплатно" (приемлемо vs двойного списания при ретрае).
+          const swap = await db.userAvatar.updateMany({
+            where: { id: userAvatarId, status: "creating" },
+            data: {
+              status: "ready",
+              ...(avatar.previewUrl || !result.previewUrl ? {} : { previewUrl: result.previewUrl }),
+            },
+          });
+
+          if (swap.count === 0) {
+            // Уже финализирован другим запуском — не списываем повторно.
+            logger.info(
+              { userAvatarId },
+              "Soul: avatar already finalized, skipping double deduction",
+            );
+            return;
+          }
+
+          // Списываем ПОСЛЕ успешного flip'а статуса. Если за 5-15 минут пока
+          // шла обработка юзер потратил баланс в другом месте — deductTokens
+          // декрементит до отрицательного значения (мы съедаем стоимость за
+          // HiggsField API, но даём готового персонажа). checkBalance на сабмите
+          // в bot/scenes/video.ts уже отгейтил кейс "не хватает на момент клика".
           await deductTokens(
             BigInt(userIdStr),
             usdToTokens(SOUL_COST_USD),
@@ -216,14 +234,6 @@ export async function processAvatarJob(job: Job<AvatarJobData>, token?: string):
             "soul_creation",
           );
 
-          // previewUrl от HiggsField'а игнорируем — наш own thumbnail из
-          // первого исходного фото уже выставлен на стадии create. Если
-          // create-thumbnail почему-то не сгенерировался, фолбэчимся на
-          // provider preview (если он его отдал).
-          await userAvatarService.updateStatus(userAvatarId, {
-            status: "ready",
-            ...(avatar.previewUrl ? {} : { previewUrl: result.previewUrl }),
-          });
           await telegram
             .sendMessage(
               telegramChatId,

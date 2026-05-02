@@ -6,6 +6,10 @@ import { getFileUrl } from "../services/s3.service.js";
 import { config, getT } from "@metabox/shared";
 import type { Language } from "@metabox/shared";
 import { db } from "../db.js";
+import { usdToTokens } from "../services/token.service.js";
+
+/** Должна совпадать со значениями в bot/scenes/video.ts и worker/processors/avatar.processor.ts. */
+const SOUL_COST_USD = 2.5;
 
 type AuthRequest = FastifyRequest & { userId: bigint };
 
@@ -64,12 +68,13 @@ export const userAvatarsRoutes: FastifyPluginAsync = async (fastify) => {
         });
         const t = getT((user?.language ?? "en") as Language);
 
+        const soulCost = usdToTokens(SOUL_COST_USD).toFixed(0);
         await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: telegramChatId,
-            text: t.video.soulCreatePrompt,
+            text: t.video.soulCreatePrompt.replace("{cost}", soulCost),
             reply_markup: {
               inline_keyboard: [
                 [{ text: t.video.soulCancelButton, callback_data: "soul_create_cancel" }],

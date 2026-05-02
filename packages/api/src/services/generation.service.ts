@@ -1,8 +1,8 @@
 import { db } from "../db.js";
 import { getImageQueue } from "../queues/image.queue.js";
 import { AI_MODELS, ONE_SHOT_SETTING_KEYS } from "@metabox/shared";
-import { checkBalance, calculateCost } from "./token.service.js";
-import { userStateService } from "./user-state.service.js";
+import { checkBalance } from "./token.service.js";
+import { costPreviewService } from "./cost-preview.service.js";
 
 /**
  * Strip one-shot (per-generation) fields from a `modelSettings` snapshot
@@ -90,33 +90,17 @@ export const generationService = {
       telegramChatId,
       dialogId,
       sendOriginalLabel,
-      aspectRatio,
     } = params;
 
     const model = AI_MODELS[modelId];
     if (!model) throw new Error(`Unknown model: ${modelId}`);
 
-    const allModelSettings = await userStateService.getModelSettings(userId);
-    const modelSettings = allModelSettings[modelId] ?? {};
-    // Prefer aspect_ratio from modelSettings (set via webapp) over legacy param
-    const effectiveAspectRatio = (modelSettings.aspect_ratio as string | undefined) ?? aspectRatio;
+    const preview = await costPreviewService.previewImage(params);
+    const modelSettings = preview.effectiveModelSettings;
+    const effectiveAspectRatio = preview.effectiveAspectRatio;
+    const numImages = preview.numImages;
 
-    // For per-megapixel models assume 1 MP (typical for most image resolutions)
-    const estimatedMegapixels = model.costUsdPerMPixel ? 1.0 : undefined;
-    const perImageCost = calculateCost(model, 0, 0, estimatedMegapixels, undefined, modelSettings);
-
-    // Virtual batch: для моделей с `maxVirtualBatch > 1` юзер может попросить N
-    // картинок (1..maxVirtualBatch). Воркер делает N submit'ов, скидывает в один
-    // mediaGroup. Списание идёт только за успешные (K × per-image), но для
-    // checkBalance берём worst-case (n × per-image).
-    const maxBatch = model.maxVirtualBatch ?? 1;
-    const isVirtualBatchEligible = maxBatch > 1 && (model.nativeBatchMax ?? 1) === 1;
-    const requestedN = Number(modelSettings.num_images ?? 1);
-    const numImages = isVirtualBatchEligible
-      ? Math.max(1, Math.min(maxBatch, Number.isFinite(requestedN) ? Math.floor(requestedN) : 1))
-      : 1;
-
-    await checkBalance(userId, perImageCost * numImages);
+    await checkBalance(userId, preview.cost);
 
     const job = await db.generationJob.create({
       data: {

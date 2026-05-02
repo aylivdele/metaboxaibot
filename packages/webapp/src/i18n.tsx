@@ -47,6 +47,12 @@ const translations = {
     "profile.until": "until",
 
     // Account tab
+    "account.generationMode": "GENERATION MODE",
+    "account.generationModeOn": "With confirmation",
+    "account.generationModeOff": "No confirmation",
+    "account.generationModeInfoAria": "Generation mode info",
+    "account.generationModeInfo":
+      "Control how generation starts.\n🎯 With confirmation — see the final request and confirm the start manually. Protects from accidental runs and extra spend.\n⚡ No confirmation — generation starts automatically after you send a prompt. Handy when you're already an experienced user.",
     "account.notLinked": "Metabox account not linked",
     "account.status": "STATUS",
     "account.statusPartner": "Partner",
@@ -453,6 +459,8 @@ const translations = {
     "uploads.myPhotos": "My photos",
     "uploads.myAvatars": "My avatars",
     "uploads.createAvatar": "➕ Create avatar",
+    "uploads.createHeyGen": "➕ Create HeyGen",
+    "uploads.createSoulProvider": "➕ Create Soul",
     "uploads.createAvatarHint":
       "Return to the chat and send a photo with your face — the bot will create a personal avatar based on it.",
     "uploads.createVoice": "➕ Create voice",
@@ -563,6 +571,12 @@ const translations = {
     "profile.until": "до",
 
     // Account tab
+    "account.generationMode": "РЕЖИМ ГЕНЕРАЦИИ",
+    "account.generationModeOn": "С подтверждением",
+    "account.generationModeOff": "Без подтверждения",
+    "account.generationModeInfoAria": "Информация о режиме генерации",
+    "account.generationModeInfo":
+      "Управляйте тем, как запускается генерация.\n🎯 С подтверждением — увидите финальный запрос и подтвердите старт вручную. Защищает от случайных запусков и лишних трат.\n⚡ Без подтверждения — генерация начнётся автоматически после отправки промпта. Удобно, когда вы уже опытный пользователь.",
     "account.notLinked": "Аккаунт Metabox не привязан",
     "account.status": "СТАТУС",
     "account.statusPartner": "Партнёр",
@@ -963,6 +977,8 @@ const translations = {
     "uploads.myPhotos": "Мои фото",
     "uploads.myAvatars": "Мои аватары",
     "uploads.createAvatar": "➕ Создать аватар",
+    "uploads.createHeyGen": "➕ Создать HeyGen",
+    "uploads.createSoulProvider": "➕ Создать Soul",
     "uploads.createAvatarHint":
       "Вернитесь в чат и отправьте фото с лицом — бот создаст персональный аватар на его основе.",
     "uploads.createVoice": "➕ Создать голос",

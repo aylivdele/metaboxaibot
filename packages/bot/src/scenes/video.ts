@@ -6,18 +6,15 @@ import {
   // userUploadsService,
   userAvatarService,
   s3Service,
-  calculateCost,
   checkBalance,
-  deductTokens,
   usdToTokens,
   probeImageMetadata,
 } from "@metabox/api/services";
 import { probeVideoMetadata } from "@metabox/api/utils/mp4-duration";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
-import { ElevenLabsAdapter } from "@metabox/api/ai/audio";
-import { resolveVoiceForTTS } from "@metabox/api/services/user-voice";
-import { db } from "@metabox/api/db";
+import { gateLowIqMode } from "../utils/confirm-generation.js";
+import { AVATAR_MODELS, preGenerateELTts } from "../utils/el-tts.js";
 import { getAvatarQueue } from "@metabox/api/queues";
 import {
   MODELS_BY_SECTION,
@@ -110,110 +107,6 @@ function pickVideoPending(ctx: BotContext): string {
     return VIDEO_PENDING_RU[Math.floor(Math.random() * VIDEO_PENDING_RU.length)];
   }
   return ctx.t.video.asyncPending;
-}
-
-// ── ElevenLabs TTS pre-generation for lip-sync ────────────────────────────────
-
-const AVATAR_MODELS = new Set(["heygen", "d-id"]);
-
-/**
- * If the video model uses an ElevenLabs voice (voice_provider === "elevenlabs",
- * or legacy settings where voice_id maps to a UserVoice/EL externalId) and no
- * raw audio override is present, synthesises the prompt via ElevenLabs TTS,
- * uploads to S3, deducts TTS tokens, and returns the S3 key.
- * Returns null when TTS pre-generation is not needed.
- */
-async function preGenerateELTts(
-  userId: bigint,
-  modelId: string,
-  prompt: string,
-  videoModelSettings: Record<string, unknown>,
-  rawVoiceOverride: string | undefined,
-): Promise<string | null> {
-  if (!AVATAR_MODELS.has(modelId)) return null;
-  if (rawVoiceOverride) return null; // raw audio takes priority
-  if (videoModelSettings.voice_s3key as string | undefined) return null;
-
-  const requestedVoice = videoModelSettings.voice_id as string | undefined;
-  const voiceProvider = videoModelSettings.voice_provider as string | undefined;
-  if (!requestedVoice) return null;
-  // Явно non-EL provider (например "heygen" — native HeyGen voice) → не TTS'им,
-  // адаптер передаст voice_id напрямую в HeyGen.
-  if (voiceProvider && voiceProvider !== "elevenlabs") return null;
-
-  // Resolve UserVoice cuid → ElevenLabs externalId + sticky API key.
-  // Pickers send `UserVoice.id` (local cuid). Legacy paths may send raw EL
-  // externalId — try both.
-  const userVoice =
-    (await db.userVoice.findFirst({
-      where: { id: requestedVoice, provider: "elevenlabs" },
-      select: { id: true },
-    })) ??
-    (await db.userVoice.findFirst({
-      where: { provider: "elevenlabs", externalId: requestedVoice },
-      select: { id: true },
-    }));
-
-  // Если voice_provider не задан (legacy data) и UserVoice не нашли — мы не
-  // можем подтвердить что это EL-голос. Лучше скипнуть pre-TTS чем угадывать —
-  // адаптер сам отдаст voice_id в HeyGen, и если это native HeyGen voice
-  // (попавший без provider-marker'а) всё сработает.
-  if (!userVoice && voiceProvider !== "elevenlabs") return null;
-
-  const ttsModel = AI_MODELS["tts-el"];
-  if (!ttsModel) return null;
-
-  let resolvedVoiceId = requestedVoice;
-  let stickyApiKey: string | undefined;
-  if (userVoice) {
-    const resolved = await resolveVoiceForTTS(userVoice.id);
-    resolvedVoiceId = resolved.voiceId;
-    stickyApiKey = resolved.acquired.apiKey;
-  }
-
-  // Get user's tts-el settings (model_id, stability, etc.) and override voice_id
-  const allSettings = await userStateService.getModelSettings(userId);
-  const ttsSettings: Record<string, unknown> = {
-    ...(allSettings["tts-el"] ?? {}),
-    voice_id: resolvedVoiceId,
-  };
-
-  // Check balance for TTS before generating
-  const ttsCost = calculateCost(
-    ttsModel,
-    0,
-    0,
-    undefined,
-    undefined,
-    ttsSettings,
-    undefined,
-    prompt.length,
-  );
-  await checkBalance(userId, ttsCost);
-
-  // Generate TTS using sticky key when voice is user-cloned (it lives only on
-  // that key's EL account); fallback to env key for official voices.
-  const adapter = new ElevenLabsAdapter("tts-el", stickyApiKey);
-  const result = await adapter.generate({ prompt, modelSettings: ttsSettings });
-  if (!result.buffer) return null;
-
-  // Upload to S3
-  const s3Key = `voice/el/${userId.toString()}/${Date.now()}.mp3`;
-  const uploadedKey = await s3Service
-    .uploadBuffer(s3Key, result.buffer, "audio/mpeg")
-    .catch(() => null);
-  if (!uploadedKey) {
-    logger.warn(
-      { userId, modelId },
-      "EL TTS generated but S3 upload failed — falling back to no TTS audio",
-    );
-    return null;
-  }
-
-  // Deduct TTS tokens
-  await deductTokens(userId, ttsCost, "tts-el");
-
-  return uploadedKey;
 }
 
 // ── Model selection keyboard ──────────────────────────────────────────────────
@@ -762,12 +655,44 @@ export async function executeVideoPrompt(
   const rawVoiceS3Key =
     (await userStateService.getAndClearVideoRefVoiceUrl(ctx.user.id)) ?? undefined;
 
+  // Build submitParams without EL TTS — preGen is deferred until after the gate
+  // so that cancelling the confirmation costs the user $0 in EL spend.
+  const submitParamsBase = {
+    userId: ctx.user.id,
+    modelId,
+    prompt,
+    imageUrl,
+    mediaInputs: hasMediaInputs ? await resolveMediaInputUrls(mediaInputs) : undefined,
+    telegramChatId: chatId,
+    sendOriginalLabel: ctx.t.common.sendOriginal,
+    aspectRatio: modelSettings?.aspectRatio,
+    duration: modelSettings?.duration,
+    extraModelSettings:
+      driverUrl || rawVoiceS3Key
+        ? {
+            ...(driverUrl ? { driver_url: driverUrl } : {}),
+            ...(rawVoiceS3Key ? { voice_s3key: rawVoiceS3Key, voice_url: "" } : {}),
+          }
+        : undefined,
+    sourceMessageId,
+  };
+
+  if (
+    await gateLowIqMode({
+      ctx,
+      kind: "video",
+      modelId,
+      prompt,
+      submitParams: submitParamsBase,
+    })
+  ) {
+    return;
+  }
+
+  // Confirm-off path: do EL TTS pre-gen now (if applicable), then submit.
   const pendingMsg = await ctx.reply(pickVideoPending(ctx));
 
   try {
-    // If avatar model + EL voice (explicit или legacy без provider-marker'а) +
-    // no raw audio override → pre-generate TTS. Skip только если provider
-    // явно non-EL (например "heygen" — native HeyGen voice catalog).
     let elTtsS3Key: string | null = null;
     if (AVATAR_MODELS.has(modelId) && !rawVoiceS3Key) {
       const voiceProvider = fullModelSettings.voice_provider as string | undefined;
@@ -782,35 +707,24 @@ export async function executeVideoPrompt(
           fullModelSettings,
           rawVoiceS3Key,
         );
+        await ctx.api
+          .editMessageText(chatId, pendingMsg.message_id, pickVideoPending(ctx))
+          .catch(() => void 0);
       }
     }
 
-    await ctx.api
-      .editMessageText(chatId, pendingMsg.message_id, pickVideoPending(ctx))
-      .catch(() => void 0);
+    const submitParams = elTtsS3Key
+      ? {
+          ...submitParamsBase,
+          extraModelSettings: {
+            ...submitParamsBase.extraModelSettings,
+            voice_s3key: elTtsS3Key,
+            voice_url: "",
+          },
+        }
+      : submitParamsBase;
 
-    // Build voice override: raw recording > EL TTS > nothing (adapter uses configured voice_id)
-    const effectiveVoiceS3Key = rawVoiceS3Key ?? elTtsS3Key ?? undefined;
-
-    await videoGenerationService.submitVideo({
-      userId: ctx.user.id,
-      modelId,
-      prompt,
-      imageUrl,
-      mediaInputs: hasMediaInputs ? await resolveMediaInputUrls(mediaInputs) : undefined,
-      telegramChatId: chatId,
-      sendOriginalLabel: ctx.t.common.sendOriginal,
-      aspectRatio: modelSettings?.aspectRatio,
-      duration: modelSettings?.duration,
-      extraModelSettings:
-        driverUrl || effectiveVoiceS3Key
-          ? {
-              ...(driverUrl ? { driver_url: driverUrl } : {}),
-              ...(effectiveVoiceS3Key ? { voice_s3key: effectiveVoiceS3Key, voice_url: "" } : {}),
-            }
-          : undefined,
-      sourceMessageId,
-    });
+    await videoGenerationService.submitVideo(submitParams);
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     await ctx.reply(pickVideoPending(ctx));
@@ -1220,14 +1134,34 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       await ctx.reply(ctx.t.video.imageIgnoredUnsupported).catch(() => void 0);
     }
 
+    // Build submitParams without EL TTS — preGen is deferred until after the gate.
+    const submitParamsBase = {
+      userId: ctx.user.id,
+      modelId,
+      prompt: caption,
+      imageUrl: supportsImages ? tgUrl : undefined,
+      mediaInputs,
+      telegramChatId: chatId,
+      sendOriginalLabel: ctx.t.common.sendOriginal,
+      aspectRatio: modelSettings?.aspectRatio,
+      duration: modelSettings?.duration,
+    };
+
+    if (
+      await gateLowIqMode({
+        ctx,
+        kind: "video",
+        modelId,
+        prompt: caption,
+        submitParams: submitParamsBase,
+      })
+    ) {
+      return;
+    }
+
     const pendingMsg = await ctx.reply(pickVideoPending(ctx));
 
     try {
-      // For HeyGen/D-ID with EL voice: pre-generate TTS via ElevenLabs and pass
-      // S3 key as voice_s3key (HeyGen uses lip-sync via audio_asset_id, не TTS
-      // через voice_id — последний у HeyGen свой каталог и не примет EL id'ы).
-      // Аналогично main executeVideoPrompt path: skip только при явно non-EL
-      // provider'е.
       let elTtsS3Key: string | null = null;
       if (AVATAR_MODELS.has(modelId)) {
         const voiceProvider = fullModelSettings.voice_provider as string | undefined;
@@ -1248,18 +1182,14 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
         }
       }
 
-      await videoGenerationService.submitVideo({
-        userId: ctx.user.id,
-        modelId,
-        prompt: caption,
-        imageUrl: supportsImages ? tgUrl : undefined,
-        mediaInputs,
-        telegramChatId: chatId,
-        sendOriginalLabel: ctx.t.common.sendOriginal,
-        aspectRatio: modelSettings?.aspectRatio,
-        duration: modelSettings?.duration,
-        extraModelSettings: elTtsS3Key ? { voice_s3key: elTtsS3Key, voice_url: "" } : undefined,
-      });
+      const submitParams = elTtsS3Key
+        ? {
+            ...submitParamsBase,
+            extraModelSettings: { voice_s3key: elTtsS3Key, voice_url: "" },
+          }
+        : submitParamsBase;
+
+      await videoGenerationService.submitVideo(submitParams);
 
       await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
       await ctx.reply(pickVideoPending(ctx));
@@ -1766,22 +1696,37 @@ export async function handleVideoAvatarVoiceCallback(ctx: BotContext): Promise<v
     return;
   }
 
+  const submitParams = {
+    userId,
+    modelId,
+    prompt: "",
+    imageUrl,
+    telegramChatId: chatId,
+    sendOriginalLabel: ctx.t.common.sendOriginal,
+    aspectRatio: modelSettings?.aspectRatio,
+    duration: modelSettings?.duration,
+    extraModelSettings: entry.uploadedKey
+      ? { voice_s3key: entry.uploadedKey, voice_url: "" }
+      : { voice_url: entry.tgUrl, voice_s3key: "" },
+  };
+
+  if (
+    await gateLowIqMode({
+      ctx,
+      kind: "video",
+      modelId,
+      prompt: "",
+      submitParams,
+      promptDisplay: ctx.t.confirmGeneration.voicePrompt,
+    })
+  ) {
+    return;
+  }
+
   const pendingMsg = await ctx.reply(ctx.t.video.videoVoiceQueuing);
 
   try {
-    await videoGenerationService.submitVideo({
-      userId,
-      modelId,
-      prompt: "",
-      imageUrl,
-      telegramChatId: chatId,
-      sendOriginalLabel: ctx.t.common.sendOriginal,
-      aspectRatio: modelSettings?.aspectRatio,
-      duration: modelSettings?.duration,
-      extraModelSettings: entry.uploadedKey
-        ? { voice_s3key: entry.uploadedKey, voice_url: "" }
-        : { voice_url: entry.tgUrl, voice_s3key: "" },
-    });
+    await videoGenerationService.submitVideo(submitParams);
 
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     await ctx.reply(pickVideoPending(ctx));

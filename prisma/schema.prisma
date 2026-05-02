@@ -31,6 +31,7 @@ model User {
   metaboxReferralCode String? // Реферальный код Metabox (кешируется при привязке)
   finishedOnboarding Boolean @default(false)
   generationCount    Int     @default(0)
+  confirmBeforeGenerate Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -45,8 +46,33 @@ model User {
   userVoices        UserVoice[]
   localSubscription LocalSubscription?
   galleryFolders    GalleryFolder[]
+  pendingGeneration PendingGeneration?
 
   @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// Подтверждение перед запуском генерации (Низкий IQ мод).
+// Один pending-запрос на пользователя — на новом промте upsert перезаписывает
+// предыдущий. Cleanup по expiresAt раз в N минут крон-монитором воркера.
+// ─────────────────────────────────────────────
+model PendingGeneration {
+  id            String   @id @default(cuid())
+  userId        BigInt   @unique
+  section       String   // image | video | audio
+  modelId       String
+  prompt        String
+  payload       Json     // SubmitImage/Video/AudioParams для replay
+  estimatedCost Decimal  @db.Decimal(12, 4)
+  chatId        BigInt
+  messageId     BigInt
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("pending_generations")
 }
 
 // Состояние FSM бота для пользователя
