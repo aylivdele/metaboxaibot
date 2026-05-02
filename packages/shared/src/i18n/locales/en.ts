@@ -197,7 +197,7 @@ export default {
     veoImageRequires8s:
       "❌ When using an input image, Veo only supports 8-second duration. Change the duration in ⚙ Management.",
     soulCreatePrompt:
-      "📸 Send 20+ photos to create a character.\n\n✅ Recommendations:\n• 20+ photos in one cohesive style, only your face on picture\n• High-quality, clear images\n• Different angles and poses\n\n❌ Avoid:\n• Faces, blurry or low-quality images\n• Mixed styles in one set\n\nSend photos one at a time or as a group.",
+      "📸 Send 20+ photos to create a character.\n\n✅ Recommendations:\n• 20+ photos in one cohesive style, only your face on picture\n• High-quality, clear images\n• Different angles and poses\n\n❌ Avoid:\n• Faces, blurry or low-quality images\n• Mixed styles in one set\n\nSend photos one at a time or as a group.\n\n💰 Creation cost: {cost} ✦.",
     soulPhotoCount: "📸 Uploaded {n} of {max} max.",
     soulCreateButton: "✅ Create character ({n} photos)",
     soulCreating:
