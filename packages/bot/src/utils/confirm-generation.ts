@@ -20,6 +20,8 @@ import {
   resolveModelDisplay,
   UserFacingError,
   resolveUserFacingError,
+  type AIModel,
+  type MediaInputSlot,
 } from "@metabox/shared";
 import { InlineKeyboard } from "grammy";
 import { replyNoSubscription, replyInsufficientTokens } from "./reply-error.js";
@@ -98,6 +100,92 @@ function extractSnapshot(json: unknown): RestoreSnapshot | null {
   return raw as RestoreSnapshot;
 }
 
+type MediaKind = "photo" | "video" | "audio";
+
+function inferKindFromSlot(slot: MediaInputSlot): MediaKind {
+  if (slot.mode === "reference_audio" || slot.mode === "driving_audio") return "audio";
+  if (
+    slot.mode === "reference_video" ||
+    slot.mode === "motion_video" ||
+    slot.mode === "first_clip"
+  ) {
+    return "video";
+  }
+  return "photo";
+}
+
+/** Extract sendable source from raw value: tg:kind:fileId → fileId, else passthrough URL. */
+function toSendable(v: string): string {
+  if (v.startsWith("tg:")) {
+    const idx = v.indexOf(":", 3);
+    return idx === -1 ? v.slice(3) : v.slice(idx + 1);
+  }
+  return v;
+}
+
+/**
+ * Sends one preview message per filled media slot, with a caption explaining
+ * which slot the media will be used as. Called BEFORE the confirm message so
+ * the user can visually verify their uploads before clicking Start.
+ *
+ * Prefer `rawInputs` (e.g. `tg:photo:fileId`) over resolved URLs to leverage
+ * Telegram file_id reuse and avoid re-downloading.
+ */
+async function sendMediaPreviews(
+  ctx: BotContext,
+  model: AIModel,
+  resolvedInputs: Record<string, string[]>,
+  rawInputs: Record<string, string[]> | undefined,
+): Promise<void> {
+  const slots = model.mediaInputs ?? [];
+  for (const slot of slots) {
+    const resolved = resolvedInputs[slot.slotKey];
+    if (!resolved?.length) continue;
+    const raws = rawInputs?.[slot.slotKey];
+    const sources = (raws && raws.length === resolved.length ? raws : resolved).map(toSendable);
+    const kind = inferKindFromSlot(slot);
+    const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
+    const captionKey: keyof typeof ctx.t.confirmGeneration =
+      sources.length === 1
+        ? kind === "photo"
+          ? "mediaPreviewPhotoSingle"
+          : kind === "video"
+            ? "mediaPreviewVideoSingle"
+            : "mediaPreviewAudioSingle"
+        : kind === "photo"
+          ? "mediaPreviewPhotoMulti"
+          : kind === "video"
+            ? "mediaPreviewVideoMulti"
+            : "mediaPreviewAudioMulti";
+    const caption = ctx.t.confirmGeneration[captionKey].replace("{label}", label);
+
+    try {
+      if (sources.length === 1) {
+        const src = sources[0];
+        if (kind === "photo") await ctx.replyWithPhoto(src, { caption });
+        else if (kind === "video") await ctx.replyWithVideo(src, { caption });
+        else await ctx.replyWithAudio(src, { caption });
+      } else {
+        const media = sources.map((src, i) => ({
+          type: kind,
+          media: src,
+          ...(i === 0 ? { caption } : {}),
+        }));
+        // grammY's replyWithMediaGroup type is restrictive on inputs; safe-cast
+        // since we've narrowed kind above and Telegram accepts mixed strings.
+        await ctx.replyWithMediaGroup(
+          media as unknown as Parameters<typeof ctx.replyWithMediaGroup>[0],
+        );
+      }
+    } catch (err) {
+      logger.warn(
+        { err, slotKey: slot.slotKey, kind, count: sources.length },
+        "sendMediaPreviews: failed to send slot preview, continuing",
+      );
+    }
+  }
+}
+
 /**
  * If the user has confirm-before-generate ON, sends a confirmation message,
  * persists the pending request, and returns true (caller must NOT proceed
@@ -138,6 +226,15 @@ export async function gateLowIqMode(input: GateInput): Promise<boolean> {
     .replace("{model}", escapeHtml(modelName))
     .replace("{prompt}", escapeHtml(displayedPrompt))
     .replace("{cost}", cost.toFixed(2));
+
+  // Send per-slot media previews BEFORE the confirm message so the user can
+  // visually verify uploads. Only for image/video kinds with mediaInputs.
+  if (model && (kind === "image" || kind === "video")) {
+    const submitMedia = (submitParams as SubmitImageParams | SubmitVideoParams).mediaInputs;
+    if (submitMedia && Object.keys(submitMedia).length > 0) {
+      await sendMediaPreviews(ctx, model, submitMedia, restoreSnapshot?.mediaInputs);
+    }
+  }
 
   const kb = new InlineKeyboard()
     .text(ctx.t.confirmGeneration.start, "lqg:start")

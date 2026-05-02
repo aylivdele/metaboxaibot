@@ -572,6 +572,12 @@ export default {
     cancelled: "Generation cancelled. Uploaded files have been preserved.",
     expired: "Request expired, please send the prompt again.",
     replaced: "Request replaced by a newer one.",
+    mediaPreviewPhotoSingle: "🖼 This image will be used as «{label}»",
+    mediaPreviewPhotoMulti: "🖼 These images will be used as «{label}»",
+    mediaPreviewVideoSingle: "🎥 This video will be used as «{label}»",
+    mediaPreviewVideoMulti: "🎥 These videos will be used as «{label}»",
+    mediaPreviewAudioSingle: "🎵 This audio will be used as «{label}»",
+    mediaPreviewAudioMulti: "🎵 These audios will be used as «{label}»",
   },
   modelModes: {
     pickerTitle: "Choose mode:",
