@@ -4,12 +4,57 @@ import type { Section } from "@metabox/shared";
 import type { Dialog, Message, Prisma } from "@prisma/client";
 import { userStateService } from "./user-state.service.js";
 
+/**
+ * Reserved map-key для env-fallback ключа (когда acquireKey не дал DB-tracked
+ * keyId, мы возвращаем acquired.keyId === null). Не пересекается с CUID'ами
+ * ProviderKey.id, потому что они никогда не начинаются с подчёркивания.
+ */
+export const OPENAI_ENV_KEY = "_env";
+
 /** Shape of one entry in Message.attachments JSON array. */
 export interface StoredAttachment {
   s3Key: string;
   mimeType: string;
   name: string;
   size?: number;
+  /**
+   * OpenAI Files API file_id'ы по uploading keyId.
+   *
+   * file_id привязан к organization своего ключа — если ключи pool'а в разных
+   * org'ах, на каждый key нужен отдельный upload. Map позволяет хранить
+   * результаты всех upload'ов и переиспользовать их при rotation: при
+   * повторном acquire'е старого ключа берём кэшированный file_id, не делаем
+   * лишний upload.
+   *
+   * Map-key:
+   *  - cuid из ProviderKey.id для DB-tracked keys
+   *  - `OPENAI_ENV_KEY` ("_env") для env-fallback (acquireKey вернул keyId=null)
+   *
+   * Map-value: file_id из `/v1/files` (`file-...`).
+   */
+  openaiFileIds?: Record<string, string>;
+  /**
+   * @deprecated Используй openaiFileIds. Поля сохранены для backward-compat
+   * чтения старых записей до миграции на map. На запись больше не выставляются.
+   */
+  openaiFileId?: string;
+  /** @deprecated См. openaiFileIds. */
+  openaiKeyId?: string | null;
+}
+
+/**
+ * Возвращает file_id'ы attachment'а по uploading keyId, normalising legacy
+ * формат (single openaiFileId + openaiKeyId) в map.
+ */
+export function readOpenAIFileIds(att: StoredAttachment): Record<string, string> {
+  if (att.openaiFileIds && Object.keys(att.openaiFileIds).length > 0) {
+    return att.openaiFileIds;
+  }
+  if (att.openaiFileId) {
+    const key = att.openaiKeyId ?? OPENAI_ENV_KEY;
+    return { [key]: att.openaiFileId };
+  }
+  return {};
 }
 
 export interface CreateDialogParams {
@@ -67,6 +112,19 @@ export const dialogService = {
   },
 
   async softDelete(dialogId: string, userId: bigint): Promise<void> {
+    // Best-effort cleanup OpenAI Files (uploaded для provider_chain attachments).
+    // Делается ДО update'а isDeleted, чтобы при ошибке БД мы не оставили
+    // orphan-файлы в OpenAI (повторный вызов softDelete пере-cleanup'нет их).
+    // Импорт через dynamic require чтобы избежать circular import (chat.service
+    // импортирует dialogService).
+    const { cleanupOpenAIFilesForDialog } = await import("./chat.service.js");
+    await cleanupOpenAIFilesForDialog(dialogId).catch(
+      (err) =>
+        // err уже залогирован внутри helper'а — здесь просто глотаем чтобы
+        // остальные cleanup-шаги выполнились.
+        void err,
+    );
+
     await db.dialog.update({ where: { id: dialogId }, data: { isDeleted: true } });
     await db.userState
       .update({

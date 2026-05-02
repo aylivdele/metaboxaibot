@@ -146,7 +146,11 @@ export class OpenAIAdapter extends BaseLLMAdapter {
         (d) =>
           ({
             type: "input_file" as const,
-            file_url: d.url!,
+            // OpenAI Files API file_id предпочтительнее file_url — file_id не
+            // имеет TTL, не зависит от presigned-URL'ов (которые истекают за 1ч).
+            // Если openaiFileId не выставлен (legacy/skipped upload) — fallback
+            // на presigned file_url (работает в рамках одного turn'а).
+            ...(d.openaiFileId ? { file_id: d.openaiFileId } : { file_url: d.url! }),
           }) as unknown as OpenAI.Responses.ResponseInputContent,
       ),
     ];
@@ -154,7 +158,7 @@ export class OpenAIAdapter extends BaseLLMAdapter {
     if (hasHistory) {
       const items: OpenAI.Responses.ResponseInput = [];
       for (const m of input.history!) {
-        const histDocs = (m.attachments ?? []).filter((a) => !!a.url);
+        const histDocs = (m.attachments ?? []).filter((a) => !!a.openaiFileId || !!a.url);
         if (m.role === "user") {
           const content: OpenAI.Responses.ResponseInputContent[] = [
             ...(m.content ? [{ type: "input_text" as const, text: m.content }] : []),
@@ -162,7 +166,7 @@ export class OpenAIAdapter extends BaseLLMAdapter {
               (d) =>
                 ({
                   type: "input_file" as const,
-                  file_url: d.url!,
+                  ...(d.openaiFileId ? { file_id: d.openaiFileId } : { file_url: d.url! }),
                 }) as unknown as OpenAI.Responses.ResponseInputContent,
             ),
           ];

@@ -1,7 +1,22 @@
 import { createLLMAdapter } from "../ai/llm/factory.js";
-import { dialogService, type StoredAttachment } from "./dialog.service.js";
+import {
+  dialogService,
+  readOpenAIFileIds,
+  OPENAI_ENV_KEY,
+  type StoredAttachment,
+} from "./dialog.service.js";
 import { calculateCost, checkBalance, deductTokens } from "./token.service.js";
 import { estimateTokens as estimateStringTokens } from "./token-estimator.js";
+import { downloadBuffer } from "./s3.service.js";
+import {
+  uploadFileToOpenAI,
+  deleteFileFromOpenAI,
+  isOpenAIFileSupportedMime,
+} from "../ai/llm/openai-files.js";
+import { buildProxyFetch } from "../ai/transport/proxy-fetch.js";
+import { acquireById } from "./key-pool.service.js";
+import type { Prisma } from "@prisma/client";
+import { db } from "../db.js";
 import type { LLMInput, MessageAttachment } from "../ai/llm/base.adapter.js";
 import { AI_MODELS, UserFacingError } from "@metabox/shared";
 import { userStateService } from "./user-state.service.js";
@@ -15,7 +30,13 @@ import {
 import type { MessageRecord } from "../ai/llm/base.adapter.js";
 import { ContextOverflowError, isContextOverflowError } from "../ai/llm/truncate.js";
 import { logger } from "../logger.js";
-import { acquireKey, markRateLimited, recordSuccess, recordError } from "./key-pool.service.js";
+import {
+  acquireKey,
+  markRateLimited,
+  recordSuccess,
+  recordError,
+  type AcquiredKey,
+} from "./key-pool.service.js";
 import { isPoolExhaustedError } from "../utils/pool-exhausted-error.js";
 import { resolveKeyProvider } from "../ai/key-provider.js";
 import { classifyRateLimit, isFiveXxError } from "../utils/rate-limit-error.js";
@@ -97,7 +118,7 @@ export const chatService = {
     // Acquire a key from the pool before any work — if the pool is exhausted
     // (all keys throttled), surface a user-facing "model temporarily unavailable"
     // error rather than enqueueing (chat is interactive, no re-enqueue path).
-    let acquired;
+    let acquired: AcquiredKey;
     try {
       acquired = await acquireKey(keyProvider);
     } catch (err) {
@@ -212,21 +233,63 @@ export const chatService = {
         ),
       );
     } else if (dialog.contextStrategy === "provider_chain") {
+      // Lazy-upload current + history attachments в OpenAI Files API чтобы
+      // в input'е использовать file_id вместо file_url. Без этого OpenAI
+      // кэшит file_url на стороне previous_response_id и через 1ч (TTL S3
+      // presigned URL) re-fetch ломается с 403.
+      const filesResult = await ensureOpenAIFiles({
+        dialogId,
+        currentAttachments: currentDocAttachments,
+        apiKey: acquired.apiKey,
+        keyId: acquired.keyId,
+        proxy: acquired.proxy,
+      });
+      // Replace current-turn attachments — резолвим openaiFileId из
+      // openaiFileIds[currentKey] для адаптера.
+      if (filesResult.currentAttachments) {
+        const currentKeyKey = acquired.keyId ?? OPENAI_ENV_KEY;
+        input.documentAttachments = filesResult.currentAttachments.map((att) => {
+          const fileMap = readOpenAIFileIds(att);
+          const resolvedFileId = fileMap[currentKeyKey];
+          return {
+            s3Key: att.s3Key,
+            mimeType: att.mimeType,
+            name: att.name,
+            size: att.size,
+            // file_url для legacy fallback / non-OpenAI адаптеров
+            // (chat.service later не пере-presign'ит current). Адаптер берёт
+            // openaiFileId если есть.
+            openaiFileId: resolvedFileId,
+            openaiKeyId: resolvedFileId ? acquired.keyId : undefined,
+          };
+        });
+      }
+
       // Привязка response_id к ключу: используем previousResponseId только
       // если он был создан тем же acquired.keyId. OpenAI response_id привязан
       // к организации/аккаунту — между разными ключами (разные org'и)
       // сервер вернёт 404, теряем continuity.
-      // Mismatch (разные keyId, либо legacy-data без сохранённого keyId на DB-key) →
-      // fallback на db_history-flow (history из БД).
+      //
+      // Mismatch (разные keyId, либо legacy-data без сохранённого keyId на DB-key,
+      // либо historyHadStaleUploads — в кэше OpenAI старый file_url, который
+      // только что заменён на file_id) → fallback на db_history-flow:
+      // отправляем full history с обновлёнными attachment'ами, OpenAI кэшит
+      // новый response_id с file_id'ами. Со следующего turn'а previous_response_id
+      // снова работает.
       const keyMatches =
         !!dialog.providerLastResponseId && dialog.providerLastResponseKeyId === acquired.keyId;
-      if (keyMatches) {
+      if (keyMatches && !filesResult.historyHadStaleUploads) {
         input.previousResponseId = dialog.providerLastResponseId ?? undefined;
-      } else if (dialog.providerLastResponseId) {
+      } else if (dialog.providerLastResponseId || filesResult.historyHadStaleUploads) {
         const history = await dialogService.getHistory(dialogId, adapter.contextMaxMessages);
         input.history = await Promise.all(
           history.map((m) =>
-            augmentHistoryMessage(m, model?.supportsDocuments === true, extractCache),
+            augmentHistoryMessage(
+              m,
+              model?.supportsDocuments === true,
+              extractCache,
+              acquired.keyId,
+            ),
           ),
         );
       }
@@ -498,6 +561,12 @@ async function augmentHistoryMessage(
   m: HistoryMessage,
   presignNativePdfs: boolean,
   extractCache: ExtractCache,
+  /**
+   * Текущий acquired keyId — нужен чтобы резолвить openaiFileIds[keyId] в
+   * MessageAttachment.openaiFileId для OpenAI-адаптера. null = env-fallback.
+   * undefined = не резолвить (для адаптеров где OpenAI files не применяется).
+   */
+  openaiKeyId?: string | null,
 ): Promise<MessageRecord> {
   const atts = m.attachments ?? [];
   if (atts.length === 0) return { id: m.id, role: m.role, content: m.content };
@@ -514,11 +583,20 @@ async function augmentHistoryMessage(
 
   let presignedNative: MessageAttachment[] | undefined;
   if (presignNativePdfs && nativeDocs.length > 0) {
+    const keyKey = openaiKeyId === undefined ? null : (openaiKeyId ?? OPENAI_ENV_KEY);
     presignedNative = await Promise.all(
-      nativeDocs.map(async (d) => ({
-        ...d,
-        url: (await getFileUrl(d.s3Key)) ?? undefined,
-      })),
+      nativeDocs.map(async (d) => {
+        const fileMap = readOpenAIFileIds(d);
+        const resolvedFileId = keyKey ? fileMap[keyKey] : undefined;
+        return {
+          ...d,
+          // file_url presigned per-turn для адаптеров без OpenAI Files (Anthropic,
+          // Gemini). OpenAIAdapter предпочтёт openaiFileId если он есть.
+          url: (await getFileUrl(d.s3Key)) ?? undefined,
+          openaiFileId: resolvedFileId,
+          openaiKeyId: resolvedFileId ? openaiKeyId : undefined,
+        };
+      }),
     );
   }
 
@@ -528,6 +606,173 @@ async function augmentHistoryMessage(
     content: augmentedContent,
     ...(presignedNative?.length ? { attachments: presignedNative } : {}),
   };
+}
+
+/**
+ * Lazy-upload attachments to OpenAI Files API for provider_chain dialogs.
+ *
+ * Зачем: OpenAI Responses API кэширует input по `previous_response_id`. Если
+ * у нас в кэше file_url (presigned S3), он протухает через 1ч — на следующем
+ * turn'е OpenAI re-fetch'ит → 403 → 400.
+ *
+ * Каждый attachment хранит МАП `openaiFileIds[keyId] → fileId`. На rotation
+ * между ключами один и тот же файл загружается на каждый ключ ОДИН раз и
+ * далее переиспользуется — никакого upload churn'а при чередовании ключей.
+ *
+ * Возвращаем `historyHadStaleUploads` — если хоть для одного history-attachment
+ * пришлось делать upload именно сейчас (т.е. для current keyId раньше fileId
+ * не было), это значит cached previous_response_id ссылается либо на старый
+ * file_url либо на file_id другого ключа. Chat.service дропает
+ * previousResponseId и собирает full history с обновлёнными file_id'ами;
+ * со следующего turn'а previous_response_id снова работает.
+ */
+async function ensureOpenAIFiles(opts: {
+  dialogId: string;
+  currentAttachments: StoredAttachment[] | undefined;
+  apiKey: string;
+  keyId: string | null;
+  /** Proxy config от acquired.proxy — используется для всех Files API вызовов
+   *  (upload), чтобы IP-bound ключи работали через тот же канал что chat completions. */
+  proxy: AcquiredKey["proxy"];
+}): Promise<{
+  currentAttachments: StoredAttachment[] | undefined;
+  historyHadStaleUploads: boolean;
+}> {
+  const keyKey = opts.keyId ?? OPENAI_ENV_KEY;
+  const fetchFn = buildProxyFetch(opts.proxy) ?? undefined;
+
+  const uploadOne = async (
+    att: StoredAttachment,
+  ): Promise<{ att: StoredAttachment; uploaded: boolean }> => {
+    if (!isOpenAIFileSupportedMime(att.mimeType)) return { att, uploaded: false };
+
+    const fileMap = readOpenAIFileIds(att);
+    if (fileMap[keyKey]) {
+      // Уже загружен на текущий ключ — переиспользуем. Возвращаем att с
+      // нормализованной map (мигрируем legacy single-fileId формат на map).
+      const normalised: StoredAttachment = { ...att, openaiFileIds: fileMap };
+      return { att: normalised, uploaded: false };
+    }
+
+    const bytes = await downloadBuffer(att.s3Key);
+    if (!bytes) {
+      logger.warn(
+        { s3Key: att.s3Key },
+        "ensureOpenAIFiles: S3 download failed, skipping OpenAI upload — adapter will fall back to file_url",
+      );
+      return { att, uploaded: false };
+    }
+
+    try {
+      const fileId = await uploadFileToOpenAI(opts.apiKey, bytes, att.name, fetchFn);
+      logger.info(
+        { s3Key: att.s3Key, fileId, keyId: opts.keyId },
+        "ensureOpenAIFiles: uploaded to OpenAI Files API",
+      );
+      const updatedMap = { ...fileMap, [keyKey]: fileId };
+      return {
+        att: { ...att, openaiFileIds: updatedMap },
+        uploaded: true,
+      };
+    } catch (err) {
+      logger.warn(
+        { err, s3Key: att.s3Key },
+        "ensureOpenAIFiles: OpenAI upload failed — adapter will fall back to file_url",
+      );
+      return { att, uploaded: false };
+    }
+  };
+
+  // Current turn attachments
+  const currentResults = opts.currentAttachments
+    ? await Promise.all(opts.currentAttachments.map(uploadOne))
+    : [];
+  const currentAttachments = opts.currentAttachments ? currentResults.map((r) => r.att) : undefined;
+
+  // History attachments — find Message rows in this dialog with attachments
+  const messages = await db.message.findMany({
+    where: { dialogId: opts.dialogId, failed: false },
+    select: { id: true, attachments: true },
+  });
+
+  let historyHadStaleUploads = false;
+  for (const msg of messages) {
+    const atts = msg.attachments as unknown as StoredAttachment[] | null;
+    if (!Array.isArray(atts) || atts.length === 0) continue;
+
+    const results = await Promise.all(atts.map(uploadOne));
+    const updated = results.map((r) => r.att);
+    const anyUploaded = results.some((r) => r.uploaded);
+    // Записываем обратно если был фактический upload ИЛИ legacy-формат
+    // мигрировался на map (openaiFileIds появился). Map-only check
+    // достаточен — uploadOne сохраняет старые поля как есть.
+    const anyMigrated = updated.some(
+      (u, i) => u.openaiFileIds !== atts[i].openaiFileIds && u.openaiFileIds,
+    );
+    if (anyUploaded || anyMigrated) {
+      if (anyUploaded) historyHadStaleUploads = true;
+      await db.message.update({
+        where: { id: msg.id },
+        data: { attachments: updated as unknown as Prisma.InputJsonValue },
+      });
+    }
+  }
+
+  return { currentAttachments, historyHadStaleUploads };
+}
+
+/**
+ * Cleanup всех OpenAI files этого диалога. Вызывается из dialogService.softDelete.
+ * Best-effort — ошибки логируются, не пробрасываются (delete-операция не должна
+ * падать если файл уже не существует на стороне OpenAI или ключ пропал).
+ *
+ * Группируем file_id'ы по ключу-аплоадеру: каждый удаляется ИМЕННО тем ключом
+ * (file_id виден только своей organization). Для legacy single-fileId формата
+ * читаем через `readOpenAIFileIds` (нормализует в map).
+ */
+export async function cleanupOpenAIFilesForDialog(dialogId: string): Promise<void> {
+  const messages = await db.message.findMany({
+    where: { dialogId },
+    select: { attachments: true },
+  });
+
+  // mapKey ("_env" для env-fallback или CUID ProviderKey.id) → fileIds[]
+  const filesByKeyKey = new Map<string, string[]>();
+  for (const msg of messages) {
+    const atts = msg.attachments as unknown as StoredAttachment[] | null;
+    if (!Array.isArray(atts)) continue;
+    for (const att of atts) {
+      const fileMap = readOpenAIFileIds(att);
+      for (const [keyKey, fileId] of Object.entries(fileMap)) {
+        if (!fileId) continue;
+        const list = filesByKeyKey.get(keyKey) ?? [];
+        list.push(fileId);
+        filesByKeyKey.set(keyKey, list);
+      }
+    }
+  }
+
+  for (const [keyKey, fileIds] of filesByKeyKey) {
+    const realKeyId = keyKey === OPENAI_ENV_KEY ? null : keyKey;
+    let acquired: AcquiredKey;
+    try {
+      acquired = await acquireById(realKeyId, "openai");
+    } catch (err) {
+      logger.warn(
+        { err, keyKey, fileCount: fileIds.length },
+        "cleanupOpenAIFilesForDialog: failed to acquire key, skipping",
+      );
+      continue;
+    }
+    const fetchFn = buildProxyFetch(acquired.proxy) ?? undefined;
+    for (const fileId of fileIds) {
+      await deleteFileFromOpenAI(acquired.apiKey, fileId, fetchFn);
+    }
+    logger.info(
+      { keyKey, deleted: fileIds.length, dialogId },
+      "cleanupOpenAIFilesForDialog: deleted OpenAI files",
+    );
+  }
 }
 
 /** Strip <think>...</think> reasoning blocks from model output before saving. */

@@ -107,6 +107,30 @@ export function sectionMeta(section: string): { ext: string; contentType: string
 }
 
 /**
+ * Download an object from S3 as a Buffer. Returns null if S3 is not configured
+ * or the object isn't accessible. Used when we need raw bytes server-side
+ * (e.g., to upload to OpenAI Files API).
+ */
+export async function downloadBuffer(key: string): Promise<Buffer | null> {
+  const client = makeClient();
+  if (!client) {
+    logger.warn({ key }, "downloadBuffer: S3 not configured");
+    return null;
+  }
+
+  try {
+    const res = await client.send(new GetObjectCommand({ Bucket: config.s3.bucket!, Key: key }));
+    if (!res.Body) return null;
+    const stream = res.Body as unknown as { transformToByteArray(): Promise<Uint8Array> };
+    const bytes = await stream.transformToByteArray();
+    return Buffer.from(bytes);
+  } catch (err) {
+    logger.error({ err, key }, "downloadBuffer: failed");
+    return null;
+  }
+}
+
+/**
  * Upload a Buffer to S3. Retries once on transient errors.
  * Returns the S3 key on success, null if S3 is not configured.
  * Throws after two failed attempts — callers decide how to recover.
