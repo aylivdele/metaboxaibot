@@ -436,13 +436,30 @@ async function buildPostCancelKeyboard(
   return kb.inline_keyboard.length ? kb : undefined;
 }
 
+/** True if snapshot has at least one non-empty slot/ref worth restoring. */
+function snapshotHasFiles(snapshot: RestoreSnapshot | null): boolean {
+  if (!snapshot) return false;
+  if (snapshot.mediaInputs) {
+    for (const arr of Object.values(snapshot.mediaInputs)) {
+      if (arr && arr.length > 0) return true;
+    }
+  }
+  if (snapshot.videoRefImageUrl) return true;
+  if (snapshot.videoRefDriverUrl) return true;
+  if (snapshot.videoRefVoiceUrl) return true;
+  if (snapshot.designRefMessageId) return true;
+  return false;
+}
+
 export async function handleLowIqCancel(ctx: BotContext): Promise<void> {
   if (!ctx.user) return;
   const pending = await pendingGenerationService.getByUser(ctx.user.id);
   let menuKb: InlineKeyboard | undefined;
+  let hadFiles = false;
   if (pending) {
     const snapshot = extractSnapshot(pending.payload);
     if (snapshot) {
+      hadFiles = snapshotHasFiles(snapshot);
       await restoreFromSnapshot(ctx.user.id, pending.modelId, snapshot);
     }
     if (pending.section === "image" || pending.section === "video") {
@@ -452,5 +469,8 @@ export async function handleLowIqCancel(ctx: BotContext): Promise<void> {
   await pendingGenerationService.deleteByUser(ctx.user.id);
   await ctx.answerCallbackQuery();
   await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => void 0);
-  await ctx.reply(ctx.t.confirmGeneration.cancelled, menuKb ? { reply_markup: menuKb } : undefined);
+  const text = hadFiles
+    ? ctx.t.confirmGeneration.cancelledWithFiles
+    : ctx.t.confirmGeneration.cancelled;
+  await ctx.reply(text, menuKb ? { reply_markup: menuKb } : undefined);
 }

@@ -416,6 +416,7 @@ export interface Translations {
     start: string;
     cancel: string;
     cancelled: string;
+    cancelledWithFiles: string;
     expired: string;
     replaced: string;
     mediaPreviewPhotoSingle: string;
