@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
 import { useI18n } from "../i18n.js";
 import type { TranslationKey } from "../i18n.js";
+import { suggestEmailTypo } from "@metabox/shared-browser";
 
 /**
  * Контекст откуда юзер пришёл на экран привязки. Определяет title/subtitle —
@@ -126,6 +127,8 @@ export function LinkMetaboxPage({
         : "linkMetabox.subtitle";
   const [mode, setMode] = useState<Mode>("choose");
   const [email, setEmail] = useState("");
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
+  const [pendingEmailSuggestion, setPendingEmailSuggestion] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -471,10 +474,38 @@ export function LinkMetaboxPage({
               className="form-input"
               type="email"
               value={pendingNewEmail}
-              onChange={(e) => setPendingNewEmail(e.target.value)}
+              onChange={(e) => {
+                setPendingNewEmail(e.target.value);
+                if (pendingEmailSuggestion) setPendingEmailSuggestion(null);
+              }}
+              onBlur={(e) => setPendingEmailSuggestion(suggestEmailTypo(e.target.value))}
               placeholder="you@example.com"
               autoComplete="email"
             />
+            {pendingEmailSuggestion && (
+              <div className="form-hint" style={{ marginTop: 6, fontSize: 13 }}>
+                Возможно, вы имели в виду{" "}
+                <button
+                  type="button"
+                  className="link-button"
+                  style={{
+                    background: "none",
+                    border: 0,
+                    padding: 0,
+                    color: "var(--accent)",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => {
+                    setPendingNewEmail(pendingEmailSuggestion);
+                    setPendingEmailSuggestion(null);
+                  }}
+                >
+                  {pendingEmailSuggestion}
+                </button>
+                ?
+              </div>
+            )}
           </div>
 
           {error && <div className="form-error">{resolveMsg(error, t)}</div>}
@@ -523,10 +554,38 @@ export function LinkMetaboxPage({
               className="form-input"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailSuggestion) setEmailSuggestion(null);
+              }}
+              onBlur={(e) => setEmailSuggestion(suggestEmailTypo(e.target.value))}
               placeholder="you@example.com"
               autoComplete="email"
             />
+            {emailSuggestion && (
+              <div className="form-hint" style={{ marginTop: 6, fontSize: 13 }}>
+                Возможно, вы имели в виду{" "}
+                <button
+                  type="button"
+                  className="link-button"
+                  style={{
+                    background: "none",
+                    border: 0,
+                    padding: 0,
+                    color: "var(--accent)",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => {
+                    setEmail(emailSuggestion);
+                    setEmailSuggestion(null);
+                  }}
+                >
+                  {emailSuggestion}
+                </button>
+                ?
+              </div>
+            )}
           </div>
 
           <div className="form-field">

@@ -375,7 +375,7 @@ const translations = {
     "linkMetabox.verify.sent": "Confirmation email sent.",
     "linkMetabox.verify.alreadyVerified":
       "Email is already verified. You can sign in on the website.",
-    "linkMetabox.verify.sendError": "Couldn't send the email. Try again later.",
+    "linkMetabox.verify.sendError": "Couldn't send the email. Сheck the email you entered.",
     "linkMetabox.verify.limitExhausted":
       "You've hit the resend limit. Please wait a bit, or change the email address below.",
 
@@ -893,7 +893,7 @@ const translations = {
       "Письмо отправлено. Проверьте почту и убедитесь, что email выше указан верно.",
     "linkMetabox.verify.sent": "Письмо с подтверждением отправлено.",
     "linkMetabox.verify.alreadyVerified": "Email уже подтверждён. Можно входить на сайте.",
-    "linkMetabox.verify.sendError": "Не удалось отправить письмо. Попробуйте позже.",
+    "linkMetabox.verify.sendError": "Не удалось отправить письмо. Проверьте введенную почту.",
     "linkMetabox.verify.limitExhausted":
       "Превышен лимит повторных отправок. Подождите немного или измените email ниже.",
 

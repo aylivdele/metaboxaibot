@@ -7,6 +7,7 @@ import {
   MetaboxApiError,
 } from "../services/metabox-bridge.service.js";
 import { config } from "@metabox/shared";
+import { validateEmail } from "../utils/email-validation.js";
 
 type AuthRequest = FastifyRequest & {
   userId: bigint;
@@ -383,6 +384,16 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     if (!newEmail) {
       return reply.code(400).send({ error: "newEmail is required" });
     }
+    const emailCheck = await validateEmail(newEmail);
+    if (!emailCheck.ok) {
+      return reply.code(400).send({
+        code: emailCheck.reason === "syntax" ? "INVALID_EMAIL" : "EMAIL_DOMAIN_INVALID",
+        error:
+          emailCheck.reason === "syntax"
+            ? "Некорректный формат email"
+            : "Указан несуществующий email-домен",
+      });
+    }
     const user = await db.user.findUnique({
       where: { id: userId },
       select: { metaboxUserId: true },
@@ -420,6 +431,14 @@ export const profileRoutes: FastifyPluginAsync = async (fastify) => {
     };
     if (!email || !password) {
       return reply.code(400).send({ error: "email and password are required" });
+    }
+    const emailCheck = await validateEmail(email);
+    if (!emailCheck.ok) {
+      return reply.code(400).send({
+        code: emailCheck.reason === "syntax" ? "INVALID_EMAIL" : "EMAIL_DOMAIN_INVALID",
+        error:
+          emailCheck.reason === "syntax" ? "Invalid email format" : "Email domain does not exist",
+      });
     }
     const user = await db.user.findUnique({
       where: { id: userId },

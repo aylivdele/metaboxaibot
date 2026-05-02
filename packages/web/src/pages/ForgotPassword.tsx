@@ -31,7 +31,7 @@ export default function ForgotPassword() {
       setSent(true);
     } catch (err) {
       if (err instanceof ApiError) setServerError(err.message);
-      else setServerError("Не удалось отправить письмо. Попробуйте позже.");
+      else setServerError("Не удалось отправить письмо. Проверьте введенную почту.");
     }
   };
 

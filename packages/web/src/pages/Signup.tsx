@@ -9,6 +9,7 @@ import { signup as signupApi } from "@/api/auth";
 import { ApiError } from "@/api/client";
 import { useAuthStore } from "@/stores/authStore";
 import { useUIStore } from "@/stores/uiStore";
+import { suggestEmailTypo } from "@metabox/shared-browser";
 
 const schema = z
   .object({
@@ -33,6 +34,7 @@ export default function Signup() {
   const setSession = useAuthStore((s) => s.setSession);
   const pushToast = useUIStore((s) => s.pushToast);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
 
   const {
     register,
@@ -43,6 +45,8 @@ export default function Signup() {
     resolver: zodResolver(schema),
     defaultValues: { referralCode: "" },
   });
+
+  const emailField = register("email");
 
   useEffect(() => {
     const ref = params.get("ref");
@@ -86,15 +90,41 @@ export default function Signup() {
             error={errors.firstName?.message}
             {...register("firstName")}
           />
-          <Input
-            id="email"
-            label="Email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@example.com"
-            error={errors.email?.message}
-            {...register("email")}
-          />
+          <div>
+            <Input
+              id="email"
+              label="Email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              error={errors.email?.message}
+              {...emailField}
+              onChange={(e) => {
+                void emailField.onChange(e);
+                if (emailSuggestion) setEmailSuggestion(null);
+              }}
+              onBlur={(e) => {
+                void emailField.onBlur(e);
+                setEmailSuggestion(suggestEmailTypo(e.target.value));
+              }}
+            />
+            {emailSuggestion && (
+              <p className="text-sm text-text-secondary mt-1.5">
+                Возможно, вы имели в виду{" "}
+                <button
+                  type="button"
+                  className="text-accent underline hover:no-underline"
+                  onClick={() => {
+                    setValue("email", emailSuggestion, { shouldValidate: true });
+                    setEmailSuggestion(null);
+                  }}
+                >
+                  {emailSuggestion}
+                </button>
+                ?
+              </p>
+            )}
+          </div>
           <Input
             id="password"
             label="Пароль"
