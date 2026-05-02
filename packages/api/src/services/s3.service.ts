@@ -52,17 +52,46 @@ function makeClient(): S3Client | null {
   const { bucket, region, endpoint, accessKeyId, secretAccessKey } = config.s3;
   if (!bucket || !accessKeyId || !secretAccessKey) return null;
 
-  return new S3Client({
+  const client = new S3Client({
     region,
     endpoint,
     credentials: { accessKeyId, secretAccessKey },
     // Required for path-style S3 endpoints (MinIO, R2)
     forcePathStyle: !!endpoint,
-    // Wasabi rejects presigned URLs that carry the unsigned x-amz-checksum-mode
-    // query param SDK v3.729+ adds by default. Opt out of automatic checksums.
+    // Эти флаги контролируют ВАЛИДАЦИЮ checksum'ов на стороне SDK, но НЕ
+    // убирают `x-amz-checksum-mode` из самого исходящего запроса (SDK v3.729+
+    // добавляет его автоматически на каждый GetObject). Для presigned URL
+    // этот query-param попадает в подпись → Wasabi 403 при скачивании из
+    // внешних сервисов (e.g., OpenAI fetcher для PDF). Удаляем его через
+    // middleware ниже.
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
   });
+
+  // Strip auto-added `x-amz-checksum-mode` header BEFORE signing.
+  // build-step middleware вмешивается до finalizeRequest/signing — query
+  // params (для presigned URL) и headers (для live requests) формируются
+  // на основе headers до этого момента, поэтому хедер удаляется и из URL,
+  // и из real-request'ов. Без этого presigned URL содержит
+  // `?x-amz-checksum-mode=ENABLED&...` который Wasabi 403'ит.
+  client.middlewareStack.add(
+    (next) => async (args) => {
+      const req = args.request as { headers?: Record<string, string> };
+      if (req?.headers) {
+        delete req.headers["x-amz-checksum-mode"];
+        delete req.headers["X-Amz-Checksum-Mode"];
+      }
+      return next(args);
+    },
+    {
+      step: "build",
+      name: "stripChecksumModeHeader",
+      priority: "high",
+      override: true,
+    },
+  );
+
+  return client;
 }
 
 /** Builds the S3 key for a generated file. */
