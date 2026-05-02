@@ -59,12 +59,20 @@ interface GateInput {
 
 const SNAPSHOT_KEY = "__restoreSnapshot__";
 
-const PROMPT_DISPLAY_MAX = 300;
-const PROMPT_DISPLAY_HALF = 140;
+/**
+ * Telegram message limit is 4096 chars; header + cost line + blockquote tags
+ * use ~80 chars, so cap the prompt body at ~4000 with safety margin.
+ * Long prompts are tail-truncated with ellipsis (rare — most prompts are << 4000).
+ */
+const PROMPT_DISPLAY_MAX = 3900;
 
-function truncatePromptForDisplay(prompt: string): string {
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function clampPromptForDisplay(prompt: string): string {
   if (prompt.length <= PROMPT_DISPLAY_MAX) return prompt;
-  return `${prompt.slice(0, PROMPT_DISPLAY_HALF)} […] ${prompt.slice(-PROMPT_DISPLAY_HALF)}`;
+  return `${prompt.slice(0, PROMPT_DISPLAY_MAX - 3)}...`;
 }
 
 function bigintToString(_k: string, v: unknown): unknown {
@@ -125,16 +133,16 @@ export async function gateLowIqMode(input: GateInput): Promise<boolean> {
 
   const model = AI_MODELS[modelId];
   const modelName = model ? resolveModelDisplay(modelId, ctx.user.language, model).name : modelId;
-  const displayedPrompt = promptDisplay ?? truncatePromptForDisplay(prompt);
+  const displayedPrompt = promptDisplay ?? clampPromptForDisplay(prompt);
   const text = ctx.t.confirmGeneration.message
-    .replace("{model}", modelName)
-    .replace("{prompt}", displayedPrompt)
+    .replace("{model}", escapeHtml(modelName))
+    .replace("{prompt}", escapeHtml(displayedPrompt))
     .replace("{cost}", cost.toFixed(2));
 
   const kb = new InlineKeyboard()
     .text(ctx.t.confirmGeneration.start, "lqg:start")
     .text(ctx.t.confirmGeneration.cancel, "lqg:cancel");
-  const sent = await ctx.reply(text, { reply_markup: kb });
+  const sent = await ctx.reply(text, { reply_markup: kb, parse_mode: "HTML" });
 
   const payloadObj = serializePayload(submitParams);
   if (restoreSnapshot && Object.keys(restoreSnapshot).length > 0) {

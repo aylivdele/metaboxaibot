@@ -562,7 +562,8 @@ export default {
     refineSaved: "✅ Изображение загружено в «{slot}».",
   },
   confirmGeneration: {
-    message: "Модель: {model}\nПромпт: {prompt}\nНачать генерацию? Предварительная цена: {cost} ✦",
+    message:
+      "Модель: {model}\nПромпт:\n<blockquote expandable>{prompt}</blockquote>\n\nПредварительная цена: {cost} ✦\n\nНачать генерацию?",
     voicePrompt: "🎵 голосовое сообщение",
     start: "Начать",
     cancel: "Отмена",

@@ -564,7 +564,8 @@ export default {
     refineSaved: "✅ Image loaded into «{slot}».",
   },
   confirmGeneration: {
-    message: "Model: {model}\nPrompt: {prompt}\nStart generation? Estimated price: {cost} ✦",
+    message:
+      "Model: {model}\nPrompt:\n<blockquote expandable>{prompt}</blockquote>\n\nEstimated price: {cost} ✦\n\nStart generation?",
     voicePrompt: "🎵 voice message",
     start: "Start",
     cancel: "Cancel",
