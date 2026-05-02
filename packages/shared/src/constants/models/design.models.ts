@@ -793,7 +793,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
         key: "resolution",
         label: "Разрешение",
         description:
-          "1K — стандарт, 4K — максимальные детали. Влияет на цену. 4K требует aspect_ratio ≠ auto/1:1.",
+          "1K — стандарт, 4K — максимальные детали. Влияет на цену. 4K доступно только если соотношение сторон не auto и не 1:1.",
         type: "select",
         options: [
           { value: "1K", label: "1K" },
