@@ -37,7 +37,7 @@ export function createLLMAdapter(modelOrId: string | AIModel, ctx?: AdapterConte
       return new OpenAIAdapter(modelId, apiKey, fetchFn);
     case "anthropic":
       // Прямой Anthropic API. Сейчас не используется ни одной активной моделью —
-      // Claude переведён на evolink (с fallback на kie). Адаптер сохранён как
+      // Claude переведён на kie (с fallback на evolink). Адаптер сохранён как
       // rollback-путь: чтобы вернуть прямой Anthropic для какой-то модели,
       // поменяйте её provider в gpt.models.ts на "anthropic".
       return new AnthropicAdapter(modelId, model.contextMaxMessages, apiKey, fetchFn);

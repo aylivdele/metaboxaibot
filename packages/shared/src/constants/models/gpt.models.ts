@@ -450,7 +450,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     description:
       "Новейший Sonnet (версия 4.6) — лучший баланс цена/качество у Anthropic. Быстрее и дешевле Opus, отлично для кода, текстов и анализа.",
     section: "gpt",
-    provider: "evolink-claude",
+    provider: "kie-claude",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0.85,
     outputCostUsdPerMToken: 4.275,
@@ -485,7 +485,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     description:
       "Самая быстрая и дешёвая модель Anthropic. Мгновенные ответы для простых задач, понимает изображения. Слабее Sonnet и Opus в рассуждениях.",
     section: "gpt",
-    provider: "evolink-claude",
+    provider: "kie-claude",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0.275,
     outputCostUsdPerMToken: 1.425,
@@ -737,9 +737,9 @@ export const GPT_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 40,
   },
-  // ── Claude (primary через evolink.ai, fallback на kie.ai) ────────────────
+  // ── Claude (primary через kie.ai, fallback на evolink.ai) ────────────────
   // Цены — USD за 1M ТЕКСТОВЫХ токенов модели (input / output Anthropic-native).
-  // Оба прокси (evolink, kie) проксируют /v1/messages 1:1 c Anthropic SSE,
+  // Оба прокси (kie, evolink) проксируют /v1/messages 1:1 c Anthropic SSE,
   // adapter парсит usage.input_tokens / usage.output_tokens напрямую.
   //
   // Цены ниже — KIE-прайсинг (зашитый исторически: credits/1M × $/credit).
@@ -750,15 +750,15 @@ export const GPT_MODELS: Record<string, AIModel> = {
   // PDF прокси не поддерживают напрямую → автоматически активируется
   // documentTextExtractFallback (см. ниже).
   //
-  // Fallback на kie-claude конфигурится в FALLBACK_LLM_MODELS — chat.service
-  // переключится туда при исчерпании evolink-ключей с 5xx/network ошибкой.
+  // Fallback на evolink-claude конфигурится в FALLBACK_LLM_MODELS — chat.service
+  // переключится туда при исчерпании kie-ключей с 5xx/network ошибкой.
   "claude-opus": {
     id: "claude-opus",
     name: "🎭 Claude 4.6 Opus",
     description:
       "Новейшая и самая умная модель Anthropic (версия 4.6). Лучшая для сложных аналитических и творческих задач. Понимает изображения.",
     section: "gpt",
-    provider: "evolink-claude",
+    provider: "kie-claude",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 1.425,
     outputCostUsdPerMToken: 7.15,
@@ -1023,19 +1023,19 @@ for (const model of Object.values(GPT_MODELS)) {
 // fields name/description/settings игнорируются.
 //
 // Перебор кандидатов выполняется в порядке добавления в FALLBACK_LLM_MODELS;
-// chat.service берёт первый совместимый. Сейчас порядок: KIE → ... (далее
+// chat.service берёт первый совместимый. Сейчас порядок: evolink → ... (далее
 // можно добавлять прямой Anthropic, OpenRouter и т.п.).
 export const FALLBACK_LLM_MODELS: AIModel[] = [
-  // ── Claude через KIE (fallback при недоступности evolink) ────────────────
+  // ── Claude через evolink (fallback при недоступности kie) ────────────────
   // Цены ниже совпадают с primary — calculateCost ходит по полям primary'а,
   // здесь они только для типобезопасности и (если когда-то) промоушена
   // в самостоятельную модель.
   {
     id: "claude-opus",
-    name: "Claude 4.6 Opus (kie fallback)",
-    description: "Fallback на kie при недоступности evolink.",
+    name: "Claude 4.6 Opus (evolink fallback)",
+    description: "Fallback на evolink при недоступности kie.",
     section: "gpt",
-    provider: "kie-claude",
+    provider: "evolink-claude",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 1.425,
     outputCostUsdPerMToken: 7.15,
@@ -1048,10 +1048,10 @@ export const FALLBACK_LLM_MODELS: AIModel[] = [
   },
   {
     id: "claude-sonnet",
-    name: "Claude 4.6 Sonnet (kie fallback)",
-    description: "Fallback на kie при недоступности evolink.",
+    name: "Claude 4.6 Sonnet (evolink fallback)",
+    description: "Fallback на evolink при недоступности kie.",
     section: "gpt",
-    provider: "kie-claude",
+    provider: "evolink-claude",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0.85,
     outputCostUsdPerMToken: 4.275,
@@ -1064,10 +1064,10 @@ export const FALLBACK_LLM_MODELS: AIModel[] = [
   },
   {
     id: "claude-haiku",
-    name: "Claude 4.5 Haiku (kie fallback)",
-    description: "Fallback на kie при недоступности evolink.",
+    name: "Claude 4.5 Haiku (evolink fallback)",
+    description: "Fallback на evolink при недоступности kie.",
     section: "gpt",
-    provider: "kie-claude",
+    provider: "evolink-claude",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0.275,
     outputCostUsdPerMToken: 1.425,
