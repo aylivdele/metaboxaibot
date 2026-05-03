@@ -62,6 +62,8 @@ export function envKeyForProvider(provider: string): string | undefined {
       return config.ai.luma;
     case "elevenlabs":
       return config.ai.elevenlabs;
+    case "cartesia":
+      return config.ai.cartesia;
     case "heygen":
       return config.ai.heygen;
     case "did":

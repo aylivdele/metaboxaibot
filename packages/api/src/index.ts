@@ -44,6 +44,7 @@ import { higgsfieldMotionsRoutes } from "./routes/higgsfield-motions.js";
 import { soulStylesRoutes } from "./routes/soul-styles.js";
 import { userAvatarsRoutes } from "./routes/user-avatars.js";
 import { elevenlabsVoicesRoutes } from "./routes/elevenlabs-voices.js";
+import { cartesiaVoicesRoutes } from "./routes/cartesia-voices.js";
 import { userVoicesRoutes } from "./routes/user-voices.js";
 import { downloadRoutes } from "./routes/download.js";
 import { startRateScheduler } from "./services/exchange-rate.service.js";
@@ -214,6 +215,7 @@ await server.register(higgsfieldMotionsRoutes);
 await server.register(soulStylesRoutes);
 await server.register(userAvatarsRoutes);
 await server.register(elevenlabsVoicesRoutes);
+await server.register(cartesiaVoicesRoutes);
 await server.register(userVoicesRoutes);
 await server.register(downloadRoutes);
 

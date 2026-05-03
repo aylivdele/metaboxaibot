@@ -114,13 +114,25 @@ function inferKindFromSlot(slot: MediaInputSlot): MediaKind {
   return "photo";
 }
 
-/** Extract sendable source from raw value: tg:kind:fileId → fileId, else passthrough URL. */
-function toSendable(v: string): string {
-  if (v.startsWith("tg:")) {
-    const idx = v.indexOf(":", 3);
-    return idx === -1 ? v.slice(3) : v.slice(idx + 1);
-  }
-  return v;
+/**
+ * Choose telegram-sendable source per slot element. `tg:kind:fileId` raw markers
+ * stripped → fileId (free re-send, no download). Anything else (S3 key, internal
+ * scheme, raw URL без http) — берём resolved URL, который уже прогнан через
+ * `resolveMediaInputUrls` и гарантированно кликабельный для Telegram.
+ *
+ * Длины массивов могут не совпадать (raw отсутствует / partial) — в этом случае
+ * fallback на resolved для всех элементов.
+ */
+function buildSendableSources(resolved: string[], raws: string[] | undefined): string[] {
+  if (!raws || raws.length !== resolved.length) return resolved;
+  return resolved.map((res, i) => {
+    const raw = raws[i];
+    if (raw && raw.startsWith("tg:")) {
+      const idx = raw.indexOf(":", 3);
+      return idx === -1 ? raw.slice(3) : raw.slice(idx + 1);
+    }
+    return res;
+  });
 }
 
 /**
@@ -142,7 +154,7 @@ async function sendMediaPreviews(
     const resolved = resolvedInputs[slot.slotKey];
     if (!resolved?.length) continue;
     const raws = rawInputs?.[slot.slotKey];
-    const sources = (raws && raws.length === resolved.length ? raws : resolved).map(toSendable);
+    const sources = buildSendableSources(resolved, raws);
     const kind = inferKindFromSlot(slot);
     const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
     const captionKey: keyof typeof ctx.t.confirmGeneration =

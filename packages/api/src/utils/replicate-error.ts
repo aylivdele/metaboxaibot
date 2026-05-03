@@ -20,8 +20,29 @@ export class ReplicatePredictionError extends Error {
 }
 
 /**
+ * Patterns для случаев, когда Replicate model вернул user-facing ошибку без
+ * структурного E-кода — текст явно описывает проблему юзера, но код извлечь
+ * нельзя. Тогда мапим по тексту на синтетический известный код, чтобы
+ * существующий `getReplicateUserMessage` отдал релевантный i18n-текст вместо
+ * generic'а.
+ *
+ * Пример: Midjourney через Replicate отдаёт "All generated images contained
+ * NSFW content. Try running it again with a different prompt." — без E006,
+ * но это очевидный content-policy блок.
+ */
+const USER_FACING_TEXT_PATTERNS: { pattern: RegExp; code: string }[] = [
+  // Content moderation / NSFW → E006 (content policy)
+  { pattern: /\bNSFW\b/i, code: "E006" },
+  { pattern: /\bcontent (policy|moderation|filter)/i, code: "E006" },
+  { pattern: /\bsafety (filter|policy)/i, code: "E006" },
+  { pattern: /try (running it )?again with a different prompt/i, code: "E006" },
+];
+
+/**
  * Parses a failed/canceled prediction into a typed error.
  * Extracts the E#### code from the error string if present; falls back to E1000 (unknown).
+ * Если структурного кода нет — пробуем определить категорию по тексту через
+ * USER_FACING_TEXT_PATTERNS, чтобы юзер увидел релевантную ошибку.
  */
 export function parseReplicatePredictionFailure(
   error: unknown,
@@ -30,7 +51,17 @@ export function parseReplicatePredictionFailure(
   const errorStr = String(error ?? "");
   // Replicate uses E#### (4-digit) codes, but some model errors use shorter codes like E006.
   const codeMatch = errorStr.match(/\bE\d{3,4}\b/);
-  const code = codeMatch ? codeMatch[0] : "E1000";
+  let code = codeMatch ? codeMatch[0] : "E1000";
+
+  if (code === "E1000") {
+    for (const { pattern, code: synthCode } of USER_FACING_TEXT_PATTERNS) {
+      if (pattern.test(errorStr)) {
+        code = synthCode;
+        break;
+      }
+    }
+  }
+
   return new ReplicatePredictionError(code, `Replicate prediction ${status}: ${errorStr}`);
 }
 

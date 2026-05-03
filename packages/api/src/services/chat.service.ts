@@ -39,7 +39,11 @@ import {
 } from "./key-pool.service.js";
 import { isPoolExhaustedError } from "../utils/pool-exhausted-error.js";
 import { resolveKeyProvider } from "../ai/key-provider.js";
-import { classifyRateLimit, isFiveXxError } from "../utils/rate-limit-error.js";
+import {
+  classifyRateLimit,
+  isFiveXxError,
+  isTransientNetworkError,
+} from "../utils/rate-limit-error.js";
 
 export { ContextOverflowError } from "../ai/llm/truncate.js";
 
@@ -406,9 +410,16 @@ export const chatService = {
         // the pool actually gave us a DB-tracked key (env-fallback yields keyId=null).
         const cls = classifyRateLimit(err, keyProvider);
         const is5xx = isFiveXxError(err);
+        const isNetwork = isTransientNetworkError(err);
+        const isTransient = cls.isRateLimit || is5xx || isNetwork;
         const haveChunks = chunks.length > 0;
-        const canKeyRetry =
-          keyAttempt + 1 < MAX_KEY_ATTEMPTS && !haveChunks && (cls.isRateLimit || is5xx);
+        const canKeyRetry = keyAttempt + 1 < MAX_KEY_ATTEMPTS && !haveChunks && isTransient;
+
+        const transientReason = cls.isRateLimit
+          ? "Rate-limited"
+          : is5xx
+            ? "5xx error"
+            : "Network error";
 
         if (acquiredKeyId) {
           if (cls.isRateLimit) {
@@ -420,14 +431,11 @@ export const chatService = {
 
         if (!canKeyRetry) {
           await dialogService.markMessageFailed(userMessage.id);
-          // Convert raw 429/5xx into a user-facing message. Для 429 — все ключи
-          // в throttle, юзеру стоит попробовать позже. Для 5xx — провайдер
-          // отдаёт transient ошибку ("server is currently being maintained,
-          // please try again later" и т.п.), пользы от raw stack trace ноль.
-          // Оригинальный err идёт через cause — notifyTechError развернёт его.
-          if (cls.isRateLimit || is5xx) {
-            const reason = cls.isRateLimit ? "Rate-limited" : "5xx error";
-            throw new UserFacingError(`${reason} on ${keyProvider}`, {
+          // Convert transient errors (429 / 5xx / network) into a user-facing
+          // message. Raw stack trace юзеру бесполезен; оригинал кладём в cause,
+          // notifyTechError развернёт его в alert'е.
+          if (isTransient) {
+            throw new UserFacingError(`${transientReason} on ${keyProvider}`, {
               key: "modelTemporarilyUnavailable",
               params: { modelName: model?.name ?? dialog.modelId },
               notifyOps: true,
@@ -445,9 +453,8 @@ export const chatService = {
           if (isPoolExhaustedError(poolErr)) {
             // Все ключи throttled — terminal failure для текущего цикла.
             await dialogService.markMessageFailed(userMessage.id);
-            if (cls.isRateLimit || is5xx) {
-              const reason = cls.isRateLimit ? "Rate-limited" : "5xx error";
-              throw new UserFacingError(`${reason} on ${keyProvider}`, {
+            if (isTransient) {
+              throw new UserFacingError(`${transientReason} on ${keyProvider}`, {
                 key: "modelTemporarilyUnavailable",
                 params: { modelName: model?.name ?? dialog.modelId },
                 notifyOps: true,
@@ -465,18 +472,21 @@ export const chatService = {
             modelId: dialog.modelId,
             prevKey: acquiredKeyId,
             newKey: nextAcquired.keyId,
-            reason: cls.isRateLimit ? "rate_limit" : "5xx",
+            reason: cls.isRateLimit ? "rate_limit" : is5xx ? "5xx" : "network",
           },
           "chat.sendMessageStream: retrying with fallback key",
         );
 
         // Switch state. previousResponseId привязан к старому ключу (другая
-        // OpenAI org) — дропаем и шлём полную историю.
+        // OpenAI org) — при реальной ротации дропаем и шлём полную историю.
+        // При retry с тем же ключом (env-fallback / совпавший keyId) previousResponseId
+        // остаётся валидным — экономим SQL-запрос за историей и трафик к провайдеру.
+        const keyChanged = acquiredKeyId !== nextAcquired.keyId;
         acquired = nextAcquired;
         acquiredKeyId = nextAcquired.keyId;
         adapter = createLLMAdapter(dialog.modelId, nextAcquired);
 
-        if (input.previousResponseId !== undefined) {
+        if (keyChanged && input.previousResponseId !== undefined) {
           const history = await dialogService.getHistory(dialogId, adapter.contextMaxMessages);
           const augmented = await Promise.all(
             history.map((m) =>

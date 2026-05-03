@@ -115,11 +115,11 @@ export default {
     ttsElActivated:
       "🔊 ElevenLabs TTS activated.\nSend me any text to synthesize. Configure the voice in Management settings.\n\n━━━━━━━━━━━━━━━━━━\n💡 <b>The model automatically synthesizes speech in whatever language the text is written in.</b>\n━━━━━━━━━━━━━━━━━━",
     voiceCloneActivated:
-      "🎙 Voice cloning.\nSend me a voice message or audio file (MP3/WAV/OGG) — I will create your voice profile in ElevenLabs.\nThe recommended minimum length is 30 seconds.\nThe voice will then be available in TTS ElevenLabs and video avatar settings.\n",
+      "🎙 Send me a voice message or audio file (MP3/WAV/OGG) — I'll create your voice profile. About 5 seconds of clean speech is enough. The voice will then be available in speech synthesis and video avatars.\n\n<blockquote><b>💡 Tips for a quality clone:</b>\n• Speak in the style you want the clone to have (clone will mimic energy and emotion).\n• Speak clearly in a quiet room — a decent mic helps.\n• Avoid long pauses — they get copied too.\n• Trim silence at the start and end of the recording.\n• Record in the language you plan to use for synthesis.</blockquote>",
     voiceCloneNeedsAudio: "Please send a voice message or audio file for voice cloning.",
     voiceCloneProcessing: "⏳ Creating your voice profile...",
     voiceCloneSuccess:
-      "✅ Voice «{name}» created! It is now available in ElevenLabs TTS and video avatar settings.",
+      "✅ Voice «{name}» created! It is now available in speech synthesis and video avatar settings.",
     voiceCloneFailed: "❌ Failed to create voice. Check the file format and try again.",
     musicActivated:
       "🎵 Music generation (Suno) activated.\nDescribe the music you want (genre, mood, style) and I will create it.",
@@ -151,13 +151,13 @@ export default {
     lipSyncActivated:
       "Optionally send a photo with a face first, then send the text to be spoken.\nWithout a photo, the default avatar will be used.",
     videoVoiceQueuing: "🎬 Audio received, queuing generation...",
-    elVoiceGenerating: "🎙 Generating speech via ElevenLabs...",
+    elVoiceGenerating: "🎙 Generating speech...",
     elVoiceTtsExtraCharge:
-      "⚠️ A cloned ElevenLabs voice is selected — an additional TTS charge will be applied.",
+      "⚠️ A cloned voice is selected — an additional TTS charge will be applied.",
     hintHeygen:
-      "👾 Set up your avatar and voice in the ⚙ Management section.\n\n📸 To create a personal photo avatar: open Management → HeyGen → My Avatars → Create avatar, then return to the chat and send a photo with your face.\n\n✉️ Send text → the avatar will speak it. If a cloned ElevenLabs voice is selected, speech will be synthesised via ElevenLabs (extra TTS charge).\n🎙 Or send a voice message / audio file directly — the avatar will lip-sync to your recording without TTS.",
+      "👾 Set up your avatar and voice in the ⚙ Management section.\n\n📸 To create a personal photo avatar: open Management → HeyGen → My Avatars → Create avatar, then return to the chat and send a photo with your face.\n\n✉️ Send text → the avatar will speak it. If a cloned voice is selected, speech will be synthesised via TTS (extra charge).\n🎙 Or send a voice message / audio file directly — the avatar will lip-sync to your recording without TTS.",
     hintDid:
-      "📸 Send a photo with a face — it will become the avatar.\n\n✉️ Send text → the avatar will speak it. If a cloned ElevenLabs voice is selected, speech will be synthesised via ElevenLabs (extra TTS charge).\n🎙 Or send a voice message / audio file directly — the avatar will lip-sync to your recording without TTS.\n⚙ Voice and other settings are available on the Management page.",
+      "📸 Send a photo with a face — it will become the avatar.\n\n✉️ Send text → the avatar will speak it. If a cloned voice is selected, speech will be synthesised via TTS (extra charge).\n🎙 Or send a voice message / audio file directly — the avatar will lip-sync to your recording without TTS.\n⚙ Voice and other settings are available on the Management page.",
     hintHiggsfield:
       "🖼 Attach a photo via the «First Frame» button below — the video will be built from it.\n✉️ Then send a text prompt describing the video you want.\nYou can also pick several motion presets in the ⚙ Management section.",
     higgsfieldRequiresImage:
@@ -301,7 +301,7 @@ export default {
     generationTimedOut24h:
       "❌ {modelName}: generation did not finish within 24 hours and was cancelled. Please try again.",
     modelTemporarilyUnavailable:
-      "❌ {modelName} is temporarily unavailable. Please try later or choose another model.",
+      "❌ {modelName} decided to take a break. We didn't approve, but it didn't ask. We're already on it. Meanwhile, plenty of other AI models in the bot are happy to see you.",
     soulProviderUnavailable: "❌ Character creation is temporarily unavailable. Please try later.",
     soulMissingAvatar:
       "⚠️ To generate with Higgsfield Soul, select your character in the Management menu.",

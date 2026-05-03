@@ -199,6 +199,7 @@ export const config = {
     runway: opt("RUNWAY_API_KEY"),
     luma: opt("LUMA_API_KEY"),
     elevenlabs: opt("ELEVENLABS_API_KEY"),
+    cartesia: opt("CARTESIA_API_KEY"),
     heygen: opt("HEYGEN_API_KEY"),
     heygenAvatarId: opt("HEYGEN_AVATAR_ID"),
     did: opt("DID_API_KEY"),

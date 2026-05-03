@@ -689,7 +689,7 @@ export async function executeVideoPrompt(
     let elTtsS3Key: string | null = null;
     if (AVATAR_MODELS.has(modelId) && !rawVoiceS3Key) {
       const voiceProvider = fullModelSettings.voice_provider as string | undefined;
-      if (!voiceProvider || voiceProvider === "elevenlabs") {
+      if (!voiceProvider || voiceProvider === "elevenlabs" || voiceProvider === "cartesia") {
         await ctx.api
           .editMessageText(chatId, pendingMsg.message_id, ctx.t.video.elVoiceGenerating)
           .catch(() => void 0);
@@ -1158,7 +1158,7 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       let elTtsS3Key: string | null = null;
       if (AVATAR_MODELS.has(modelId)) {
         const voiceProvider = fullModelSettings.voice_provider as string | undefined;
-        if (!voiceProvider || voiceProvider === "elevenlabs") {
+        if (!voiceProvider || voiceProvider === "elevenlabs" || voiceProvider === "cartesia") {
           await ctx.api
             .editMessageText(chatId, pendingMsg.message_id, ctx.t.video.elVoiceGenerating)
             .catch(() => void 0);

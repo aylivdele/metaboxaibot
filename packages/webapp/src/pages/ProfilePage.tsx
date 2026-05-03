@@ -1477,7 +1477,9 @@ interface PickerCatalogs {
   heygenVoices?: Map<string, string>;
   didVoices?: Map<string, string>;
   elevenlabsVoices?: Map<string, string>;
-  /** elevenlabs cloned voices keyed by externalId. */
+  cartesiaVoices?: Map<string, string>;
+  /** Cloned voices keyed by externalId AND by local UserVoice.id (for Cartesia
+   *  pickers that persist the local id вместо external). */
   userVoices?: Map<string, string>;
   heygenAvatars?: Map<string, string>;
   /** HeyGen-uploaded photos keyed by externalId (matches image_asset_id). */
@@ -1541,15 +1543,28 @@ function GalleryDetailsModal({
         next.elevenlabsVoices = new Map(data.map((v) => [v.voice_id, v.name]));
       });
     }
+    if (types.has("cartesia-voice-picker")) {
+      add(api.cartesiaVoices.list(), (data) => {
+        next.cartesiaVoices = new Map(data.map((v) => [v.voice_id, v.name]));
+      });
+    }
     if (
       types.has("voice-picker") ||
       types.has("did-voice-picker") ||
-      types.has("elevenlabs-voice-picker")
+      types.has("elevenlabs-voice-picker") ||
+      types.has("cartesia-voice-picker")
     ) {
-      add(api.userVoices.list("elevenlabs"), (data) => {
-        next.userVoices = new Map(
-          data.map((v) => [v.externalId ?? v.id, v.name] as [string, string]),
-        );
+      // Без provider-фильтра: showname-резолв нужен для всех клонированных
+      // голосов юзера (Cartesia + legacy ElevenLabs). Индексируем и по
+      // externalId, и по локальному UserVoice.id — Cartesia-picker сохраняет
+      // именно локальный id, тогда как старые EL-записи могут быть на externalId.
+      add(api.userVoices.list(), (data) => {
+        const map = new Map<string, string>();
+        for (const v of data) {
+          if (v.externalId) map.set(v.externalId, v.name);
+          map.set(v.id, v.name);
+        }
+        next.userVoices = map;
       });
     }
     if (types.has("avatar-picker")) {
@@ -1621,6 +1636,9 @@ function GalleryDetailsModal({
     if (def.type === "elevenlabs-voice-picker") {
       return catalogs.elevenlabsVoices?.get(value) ?? catalogs.userVoices?.get(value) ?? null;
     }
+    if (def.type === "cartesia-voice-picker") {
+      return catalogs.cartesiaVoices?.get(value) ?? catalogs.userVoices?.get(value) ?? null;
+    }
     if (def.type === "openai-voice-picker") {
       return OPENAI_VOICE_NAMES[value] ?? value;
     }
@@ -1679,6 +1697,7 @@ function GalleryDetailsModal({
       def.type === "voice-picker" ||
       def.type === "did-voice-picker" ||
       def.type === "elevenlabs-voice-picker" ||
+      def.type === "cartesia-voice-picker" ||
       def.type === "openai-voice-picker" ||
       def.type === "avatar-picker" ||
       def.type === "motion-picker" ||

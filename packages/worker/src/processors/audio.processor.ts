@@ -133,31 +133,39 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
         modelId,
       );
 
-      // Cloned-voice path: TTS на ElevenLabs с user-cloned voice. Voice_id живёт
-      // на конкретном ключе → нужен sticky key. Если voice пропал —
-      // resolveVoiceForTTS пересоздаст и вернёт новый voice_id + ключ свежего
-      // создания.
+      // Cloned-voice path: TTS с user-cloned voice. Voice_id живёт на
+      // конкретном ключе → нужен sticky key. resolveVoiceForTTS принудительно
+      // мигрирует EL-голоса на Cartesia при первом обращении и возвращает
+      // фактический provider (cartesia | elevenlabs).
       //
-      // Современный пикер шлёт `UserVoice.id` (стабильный local cuid).
-      // Старые записи в modelSettings могут хранить голый ElevenLabs
-      // externalId — пробуем и так, для backward-compat. Если совпадений нет
-      // ни по одному полю — это официальный EL-голос, проходит без sticky.
-      let stickyVoice: { voiceId: string; acquired: AcquiredKey } | null = null;
-      if (modelId === "tts-el" || modelId === "voice-clone") {
+      // Современный пикер шлёт `UserVoice.id` (стабильный local cuid). Старые
+      // записи в modelSettings могут хранить голый externalId — пробуем и так
+      // для backward-compat (без provider-фильтра, любые голоса юзера). Если
+      // совпадений нет — это official voice (EL preset), проходит без sticky.
+      let stickyVoice: {
+        voiceId: string;
+        acquired: AcquiredKey;
+        provider: "cartesia" | "elevenlabs";
+      } | null = null;
+      if (modelId === "tts-el" || modelId === "voice-clone" || modelId === "tts-cartesia") {
         const requestedVoice = (modelSettings?.voice_id as string | undefined) ?? voiceId ?? null;
         if (requestedVoice) {
           const userVoice =
             (await db.userVoice.findFirst({
-              where: { id: requestedVoice, provider: "elevenlabs" },
+              where: { id: requestedVoice },
               select: { id: true },
             })) ??
             (await db.userVoice.findFirst({
-              where: { provider: "elevenlabs", externalId: requestedVoice },
+              where: { externalId: requestedVoice },
               select: { id: true },
             }));
           if (userVoice) {
             const resolved = await resolveVoiceForTTS(userVoice.id);
-            stickyVoice = { voiceId: resolved.voiceId, acquired: resolved.acquired };
+            stickyVoice = {
+              voiceId: resolved.voiceId,
+              acquired: resolved.acquired,
+              provider: resolved.provider,
+            };
           }
         }
       }
@@ -177,7 +185,17 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
             token,
             queue: getAudioQueue(),
           });
-      const adapter = createAudioAdapter(modelId, acquired);
+
+      // Если sticky-voice выбран — adapter подбираем по фактическому провайдеру
+      // голоса, не по модели. Это позволяет через `tts-el` UI воспроизводить
+      // клонированные голоса которые после миграции лежат на Cartesia: внутри
+      // мы тихо переключаемся на CartesiaAdapter с Cartesia-ключом.
+      const effectiveModelId = stickyVoice
+        ? stickyVoice.provider === "cartesia"
+          ? "tts-cartesia"
+          : "tts-el"
+        : modelId;
+      const adapter = createAudioAdapter(effectiveModelId, acquired);
 
       // Если был re-clone — подменяем voice_id, чтобы адаптер дернул свежий.
       const effectiveVoiceId = stickyVoice?.voiceId ?? voiceId;

@@ -16,6 +16,7 @@ import type {
   DIDVoice,
   UserAvatar,
   ElevenLabsVoice,
+  CartesiaVoice,
   UserVoice,
 } from "../types.js";
 
@@ -374,6 +375,10 @@ export const api = {
 
   elevenlabsVoices: {
     list: () => request<ElevenLabsVoice[]>("/elevenlabs-voices"),
+  },
+
+  cartesiaVoices: {
+    list: () => request<CartesiaVoice[]>("/cartesia-voices"),
   },
 
   userVoices: {
