@@ -158,6 +158,106 @@ export function isFiveXxError(err: unknown): boolean {
   return typeof status === "number" && status >= 500 && status < 600;
 }
 
+/** Node net + undici error codes для обрывов соединения / DNS / таймаутов. */
+const TRANSIENT_NETWORK_CODES = new Set<string>([
+  "UND_ERR_SOCKET",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT",
+  // ⚠️ Сейчас безопасно: AbortController в chat-пути не используется, поэтому
+  // UND_ERR_ABORTED прилетает только из внутренних таймаутов SDK (это transient).
+  // ЕСЛИ появится фича «отменить генерацию» через AbortController — этот код
+  // будет ретраить отменённый юзером запрос. В таком случае надо либо убрать
+  // UND_ERR_ABORTED отсюда, либо проверять `signal.aborted` отдельно.
+  "UND_ERR_ABORTED",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "ECONNREFUSED",
+  "EAI_AGAIN",
+  "ENOTFOUND",
+  "EPIPE",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+]);
+
+/** Имена классов ошибок, которые SDK провайдеров используют для сетевых сбоев. */
+const TRANSIENT_NETWORK_NAMES = new Set<string>([
+  "APIConnectionError",
+  "APIConnectionTimeoutError",
+  "FetchError",
+  "ConnectTimeoutError",
+  "HeadersTimeoutError",
+  "BodyTimeoutError",
+  "SocketError",
+]);
+
+/** Сообщения, которые undici/Node/SDK кладут в обычный TypeError/Error. */
+const TRANSIENT_NETWORK_MESSAGE_PATTERNS: RegExp[] = [
+  /\bterminated\b/i,
+  /socket hang up/i,
+  /fetch failed/i,
+  /network (error|failure)/i,
+  /other side closed/i,
+  /connection (reset|closed|terminated|aborted)/i,
+  /\beconnreset\b/i,
+  /\betimedout\b/i,
+];
+
+/**
+ * True для ошибок, означающих транзиентный сетевой сбой (TCP-обрыв, таймаут,
+ * DNS-флап) — у таких ошибок нет HTTP-статуса, поэтому `isFiveXxError` их
+ * не ловит. Безопасно ретраить (запрос не дошёл до серверной обработки или
+ * ответ не дошёл до нас целиком).
+ *
+ * Обходит `cause` рекурсивно: undici `TypeError: terminated` хранит
+ * настоящий `SocketError` с `code` именно в `cause`.
+ *
+ * Guard: если у ошибки есть HTTP-статус — это ответ от провайдера, не сетевой
+ * обрыв. 5xx обработает `isFiveXxError`, остальное — terminal-ошибки, ретраить
+ * нельзя. Без этого guard'а `\bterminated\b`/`connection (reset|closed|…)` могли
+ * ложно матчить HTTP-тела с такими словами от провайдера.
+ */
+export function isTransientNetworkError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+
+  const top = err as {
+    status?: unknown;
+    statusCode?: unknown;
+    response?: { status?: unknown };
+  };
+  const httpStatus =
+    typeof top.status === "number"
+      ? top.status
+      : typeof top.statusCode === "number"
+        ? top.statusCode
+        : typeof top.response?.status === "number"
+          ? top.response.status
+          : undefined;
+  if (httpStatus !== undefined) return false;
+
+  const visited = new Set<object>();
+  const stack: unknown[] = [err];
+
+  while (stack.length > 0) {
+    const cur = stack.pop();
+    if (!cur || typeof cur !== "object" || visited.has(cur as object)) continue;
+    visited.add(cur as object);
+
+    const e = cur as { code?: unknown; name?: unknown; message?: unknown; cause?: unknown };
+
+    if (typeof e.code === "string" && TRANSIENT_NETWORK_CODES.has(e.code)) return true;
+    if (typeof e.name === "string" && TRANSIENT_NETWORK_NAMES.has(e.name)) return true;
+    if (typeof e.message === "string") {
+      for (const p of TRANSIENT_NETWORK_MESSAGE_PATTERNS) {
+        if (p.test(e.message)) return true;
+      }
+    }
+    if (e.cause !== undefined) stack.push(e.cause);
+  }
+
+  return false;
+}
+
 /** Classify an arbitrary thrown error as rate-limit-related or not. */
 export function classifyRateLimit(err: unknown, provider?: string): RateLimitClassification {
   const e = asErrorLike(err);
