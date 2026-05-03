@@ -112,7 +112,10 @@ export interface CartesiaVoice {
   description: string | null;
   gender: string | null;
   language: string | null;
-  preview_url: string | null;
+  /** True если у голоса есть preview-аудио. Сам URL резолвится on-demand
+   *  через api.cartesiaVoices.previewUrl(voice_id) — Cartesia подписывает
+   *  preview короткоживущим токеном, кэшировать готовый URL нельзя. */
+  has_preview: boolean;
 }
 
 export interface UserVoice {
