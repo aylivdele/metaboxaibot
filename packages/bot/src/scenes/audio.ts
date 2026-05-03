@@ -16,6 +16,7 @@ import {
   voiceCloneReturnRedisKey,
 } from "@metabox/shared";
 import { logger } from "../logger.js";
+import { notifyTechError } from "../utils/notify-tech.js";
 import { gateLowIqMode } from "../utils/confirm-generation.js";
 import { buildCostLine } from "../utils/cost-line.js";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
@@ -210,6 +211,11 @@ export async function handleVoiceCloneUpload(ctx: BotContext): Promise<void> {
     await ctx.api.deleteMessage(chatId, pendingMsg.message_id).catch(() => void 0);
     logger.error(err, "Voice clone error");
     await ctx.reply(ctx.t.audio.voiceCloneFailed);
+    void notifyTechError(err, {
+      section: "audio",
+      modelId: "voice-clone",
+      userId: ctx.user.id.toString(),
+    });
     // Drop any pending return marker — we don't want to silently re-activate
     // HeyGen on the next unrelated voice the user sends.
     await getRedis()
