@@ -52,8 +52,11 @@ export class DIDAdapter implements VideoAdapter {
         : 0.7;
     // const driverUrl = input.modelSettings?.driver_url as string | undefined;
 
-    const voiceS3Key = input.modelSettings?.voice_s3key as string | undefined;
-    const voiceUrlStored = input.modelSettings?.voice_url as string | undefined;
+    const voiceFromSlot = input.mediaInputs?.voice_audio?.[0];
+    const voiceS3Key = voiceFromSlot
+      ? undefined
+      : (input.modelSettings?.voice_s3key as string | undefined);
+    const voiceUrlStored = voiceFromSlot ?? (input.modelSettings?.voice_url as string | undefined);
     let voiceUrl: string | undefined = voiceUrlStored || undefined;
     if (voiceS3Key) {
       voiceUrl = (await getFileUrl(voiceS3Key).catch(() => null)) ?? voiceUrl;
@@ -67,7 +70,8 @@ export class DIDAdapter implements VideoAdapter {
       : { type: "text", input: input.prompt, provider: { type: voiceProvider, voice_id: voiceId } };
 
     const body: Record<string, unknown> = {
-      source_url: input.imageUrl ?? this.defaultPresenterUrl,
+      source_url:
+        input.mediaInputs?.avatar_photo?.[0] ?? input.imageUrl ?? this.defaultPresenterUrl,
       script,
       config: {
         fluent: true,

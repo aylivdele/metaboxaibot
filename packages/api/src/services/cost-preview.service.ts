@@ -17,12 +17,15 @@ export async function probeHeygenAudioDuration(
   modelSettings: Record<string, unknown>,
   mediaInputs: Record<string, string[]> | undefined,
 ): Promise<number | null> {
+  // Prefer the voice_audio slot (new path); fall back to legacy modelSettings keys.
+  const slotVoiceUrl = mediaInputs?.voice_audio?.[0];
   const s3Key = (modelSettings.voice_s3key as string | undefined)?.trim();
   const explicitUrl = (modelSettings.voice_url as string | undefined)?.trim();
   const mediaUrl = mediaInputs?.driving_audio?.[0] ?? mediaInputs?.reference_audios?.[0] ?? null;
 
   let url: string | null = null;
-  if (s3Key) url = await getFileUrl(s3Key).catch(() => null);
+  if (slotVoiceUrl) url = slotVoiceUrl;
+  if (!url && s3Key) url = await getFileUrl(s3Key).catch(() => null);
   if (!url && explicitUrl) url = explicitUrl;
   if (!url && mediaUrl) url = mediaUrl;
   if (!url) return null;

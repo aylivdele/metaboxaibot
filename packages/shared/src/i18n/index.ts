@@ -362,6 +362,8 @@ export interface Translations {
     referenceAudiosHint: string;
     drivingAudio: string;
     firstClip: string;
+    avatarPhoto: string;
+    voiceAudio: string;
     firstFrameWanHint: string;
     lastFrameWanHint: string;
     drivingAudioHint: string;

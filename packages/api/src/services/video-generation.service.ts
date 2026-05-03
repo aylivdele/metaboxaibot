@@ -11,7 +11,7 @@ import type {
   VideoValidationError,
 } from "../ai/video/base.adapter.js";
 
-/** Drop one-shot upload fields (avatar_photo_*, voice_*, …) from the history
+/** Drop one-shot upload fields (voice_*, talking_photo_id) from the history
  * snapshot so `inputData.modelSettings` stays clean of per-generation noise. */
 function stripOneShotKeys(settings: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
