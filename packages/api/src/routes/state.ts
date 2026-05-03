@@ -303,12 +303,15 @@ async function sendModelActivatedNotification(
         config.bot.token,
         config.bot.webappUrl,
       );
+      // parse_mode HTML — у voiceClone есть <blockquote>/<b> теги с советами
+      // Cartesia. Без него юзер видит сырую разметку.
       await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: String(userId),
           text: `${t.audio.voiceClone}\n\n${audioHint}`,
+          parse_mode: "HTML",
           ...(bottomKb ? { reply_markup: bottomKb } : {}),
         }),
       }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
