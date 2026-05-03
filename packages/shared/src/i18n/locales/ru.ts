@@ -563,10 +563,10 @@ export default {
   },
   confirmGeneration: {
     message:
-      "Модель: {model}\nПромпт:\n<blockquote expandable>{prompt}</blockquote>\n\nПредварительная цена: {cost} ✦\n\nНачать генерацию?",
+      "Модель: {model}\n💬 Промпт:\n<blockquote expandable>{prompt}</blockquote>\n\n💰 Предварительная цена: {cost} ✦\n\nНачать генерацию?",
     voicePrompt: "🎵 голосовое сообщение",
-    start: "Начать",
-    cancel: "Отмена",
+    start: "✅ Начать",
+    cancel: "❌ Отмена",
     cancelled: "Генерация отменена.",
     cancelledWithFiles: "Генерация отменена. Загруженные файлы остались сохранёнными.",
     expired: "Запрос устарел, отправьте промпт заново.",
