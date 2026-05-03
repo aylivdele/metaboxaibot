@@ -273,6 +273,7 @@ async function sendModelActivatedNotification(
   const audioHints: Record<string, string> = {
     "tts-openai": t.audio.ttsActivated,
     "tts-el": t.audio.ttsElActivated,
+    "tts-cartesia": t.audio.ttsCartesiaActivated,
     "voice-clone": t.audio.voiceCloneActivated,
     suno: t.audio.musicActivated,
     "music-el": t.audio.musicElActivated,
@@ -317,7 +318,10 @@ async function sendModelActivatedNotification(
       }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
       return;
     }
-    const voiceInputHint = modelId === "tts-el" ? "" : `\n${t.voice.inputHint}`;
+    // tts-el / tts-cartesia: голосовой ввод как «текст для синтеза» неприменим
+    // (это TTS), и оба hint'а содержат HTML-разметку <blockquote>/<b>.
+    const ttsTextOnly = modelId === "tts-el" || modelId === "tts-cartesia";
+    const voiceInputHint = ttsTextOnly ? "" : `\n${t.voice.inputHint}`;
     const audioText = `${modelName}\n\n${modelDesc}\n\n${audioHint}${voiceInputHint}\n\n${costLine}`;
     const audioReplyMarkup = webappUrl
       ? {
@@ -338,7 +342,7 @@ async function sendModelActivatedNotification(
         chat_id: String(userId),
         text: audioText,
         ...(audioReplyMarkup ? { reply_markup: audioReplyMarkup } : {}),
-        ...(modelId === "tts-el" ? { parse_mode: "HTML" } : {}),
+        ...(ttsTextOnly ? { parse_mode: "HTML" } : {}),
       }),
     }).catch((reason) => logger.warn(reason, `Could not send activated notification`));
     return;

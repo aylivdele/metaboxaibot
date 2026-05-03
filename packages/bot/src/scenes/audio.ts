@@ -49,6 +49,7 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
   const instructions: Record<string, string> = {
     "tts-openai": ctx.t.audio.ttsActivated,
     "tts-el": ctx.t.audio.ttsElActivated,
+    "tts-cartesia": ctx.t.audio.ttsCartesiaActivated,
     "voice-clone": ctx.t.audio.voiceCloneActivated,
     suno: ctx.t.audio.musicActivated,
     "music-el": ctx.t.audio.musicElActivated,
@@ -77,10 +78,13 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
         ctx.user.language,
         model,
       );
-      const voiceInputHint = modelId === "tts-el" ? "" : `\n${ctx.t.voice.inputHint}`;
+      // tts-el / tts-cartesia: голосовой ввод как «текст для синтеза» неприменим
+      // (это TTS), и оба hint'а содержат HTML-разметку <blockquote>/<b>.
+      const ttsTextOnly = modelId === "tts-el" || modelId === "tts-cartesia";
+      const voiceInputHint = ttsTextOnly ? "" : `\n${ctx.t.voice.inputHint}`;
       await ctx.reply(`${modelName}\n\n${modelDesc}\n\n${hint}${voiceInputHint}\n\n${costLine}`, {
         reply_markup: kb,
-        parse_mode: modelId === "tts-el" ? "HTML" : undefined,
+        parse_mode: ttsTextOnly ? "HTML" : undefined,
       });
       return;
     }

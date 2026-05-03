@@ -102,6 +102,7 @@ export default {
     tts: "🗣 Speech synthesis",
     ttsEl: "🔊 TTS ElevenLabs",
     ttsOpenai: "🗣 OpenAI TTS",
+    ttsCartesia: "🎙 TTS Cartesia",
     voiceClone: "🎙 Voice Clone",
     music: "🎵 Music generation",
     musicEl: "🎶 ElevenLabs (without vocal)",
@@ -114,6 +115,8 @@ export default {
       "🗣 Text-to-Speech (OpenAI) activated.\nSend me any text and I will convert it to speech.",
     ttsElActivated:
       "🔊 ElevenLabs TTS activated.\nSend me any text to synthesize. Configure the voice in Management settings.\n\n━━━━━━━━━━━━━━━━━━\n💡 <b>The model automatically synthesizes speech in whatever language the text is written in.</b>\n━━━━━━━━━━━━━━━━━━",
+    ttsCartesiaActivated:
+      "🎙 Cartesia TTS activated.\nSend me any text to synthesize — both your cloned voices and the Cartesia catalog are supported. Configure the voice and parameters in Management settings.\n\n━━━━━━━━━━━━━━━━━━\n💡 <b>Cartesia Sonic-3 supports emotion, speed and volume; language is auto-detected from the text.</b>\n━━━━━━━━━━━━━━━━━━",
     voiceCloneActivated:
       "🎙 Send me a voice message or audio file (MP3/WAV/OGG) — I'll create your voice profile. About 5 seconds of clean speech is enough. The voice will then be available in speech synthesis and video avatars.\n\n<blockquote><b>💡 Tips for a quality clone:</b>\n• Speak in the style you want the clone to have (clone will mimic energy and emotion).\n• Speak clearly in a quiet room — a decent mic helps.\n• Avoid long pauses — they get copied too.\n• Trim silence at the start and end of the recording.\n• Record in the language you plan to use for synthesis.</blockquote>",
     voiceCloneNeedsAudio: "Please send a voice message or audio file for voice cloning.",

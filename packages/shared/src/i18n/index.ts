@@ -88,6 +88,7 @@ export interface Translations {
     tts: string;
     ttsEl: string;
     ttsOpenai: string;
+    ttsCartesia: string;
     voiceClone: string;
     music: string;
     musicEl: string;
@@ -98,6 +99,7 @@ export interface Translations {
     chooseTtsProvider: string;
     chooseMusicProvider: string;
     ttsElActivated: string;
+    ttsCartesiaActivated: string;
     voiceCloneActivated: string;
     voiceCloneNeedsAudio: string;
     voiceCloneProcessing: string;
