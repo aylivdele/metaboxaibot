@@ -605,4 +605,15 @@ export default {
     submit: "Continue",
     error: "Error. Please check your details and try again.",
   },
+  generationFailedVariants: [
+    "❌ {modelName} is temporarily unavailable. We already know and we're fixing it. Don't get bored — we have 70+ other AI models, you'll surely find something you like.",
+    "❌ {modelName} is in a bad mood right now. We know and we're fixing it. While it pulls itself together, try {alternatives} — they're in shape.",
+    "❌ {modelName} lay down for a nap. We're already running to wake it up — check back a bit later. Meanwhile, the bot has 70+ other AI models that are definitely not asleep.",
+  ],
+  generationFailedAlternatives: {
+    gpt: "GPT-5, Gemini Pro or Grok",
+    design: "Nano Banana, GPT Image or Imagen",
+    video: "Seedance, Kling or Runway",
+    audio: "ElevenLabs, OpenAI TTS or Suno",
+  },
 } as const;

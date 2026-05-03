@@ -23,6 +23,12 @@ export class UserFacingError extends Error {
    * failed job, with a single muted alert it's easy to miss.
    */
   public readonly opsAlertDedupKey?: string;
+  /**
+   * Optional section ("gpt"/"design"/"video"/"audio") used by message-render
+   * helpers to pick section-appropriate variant text — например, для
+   * `modelTemporarilyUnavailable` подбирает альтернативные модели по секции.
+   */
+  public readonly section?: "gpt" | "design" | "video" | "audio";
 
   constructor(
     message: string,
@@ -31,6 +37,7 @@ export class UserFacingError extends Error {
       params?: Record<string, string | number>;
       notifyOps?: boolean;
       opsAlertDedupKey?: string;
+      section?: "gpt" | "design" | "video" | "audio";
       /**
        * Оригинальная ошибка, которую этот UserFacingError оборачивает.
        * Используется в notifyTechError — серилайзер развернёт цепочку
@@ -46,6 +53,7 @@ export class UserFacingError extends Error {
     this.params = options?.params;
     this.notifyOps = options?.notifyOps;
     this.opsAlertDedupKey = options?.opsAlertDedupKey;
+    this.section = options?.section;
   }
 }
 

@@ -17,7 +17,7 @@ import {
   buildDialogHint,
   generateWebToken,
   UserFacingError,
-  resolveUserFacingError,
+  resolveUserFacingErrorVariant,
 } from "@metabox/shared";
 import { replyNoSubscription, replyInsufficientTokens } from "../utils/reply-error.js";
 import { InlineKeyboard } from "grammy";
@@ -191,7 +191,7 @@ async function streamGptResponse(
     } else if (err instanceof ContextOverflowError) {
       await ctx.reply(ctx.t.gpt.contextOverflow);
     } else if (err instanceof UserFacingError) {
-      await ctx.reply(resolveUserFacingError(err, ctx.t.errors));
+      await ctx.reply(resolveUserFacingErrorVariant(err, ctx.t));
       // Тех-канал получает alert только если UserFacingError просит об этом
       // (notifyOps=true) или несёт оригинальную ошибку через cause —
       // notifyTechError развернёт её через `caused by:` в alert'е.

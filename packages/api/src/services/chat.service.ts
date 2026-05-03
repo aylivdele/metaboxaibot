@@ -169,6 +169,7 @@ export const chatService = {
       if (!initFallbackAcquired) {
         throw new UserFacingError(`Pool exhausted for ${keyProvider}`, {
           key: "modelTemporarilyUnavailable",
+          section: "gpt",
           params: { modelName: model?.name ?? dialog.modelId },
         });
       }
@@ -549,6 +550,7 @@ export const chatService = {
           if (isTransient) {
             throw new UserFacingError(`${transientReason} on ${keyProvider}`, {
               key: "modelTemporarilyUnavailable",
+              section: "gpt",
               params: { modelName: model?.name ?? dialog.modelId },
               notifyOps: true,
               cause: err,
@@ -571,6 +573,7 @@ export const chatService = {
             if (isTransient) {
               throw new UserFacingError(`${transientReason} on ${keyProvider}`, {
                 key: "modelTemporarilyUnavailable",
+                section: "gpt",
                 params: { modelName: model?.name ?? dialog.modelId },
                 notifyOps: true,
                 cause: err,

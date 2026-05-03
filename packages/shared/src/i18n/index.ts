@@ -450,6 +450,20 @@ export interface Translations {
     submit: string;
     error: string;
   };
+  /**
+   * Шутливые вариации текста "модель временно недоступна" для random-pick'а.
+   * Содержат `{modelName}` и (опционально) `{alternatives}` — последний раскрывается
+   * из `generationFailedAlternatives[section]`. Лежит на верхнем уровне (а не в
+   * `errors`) чтобы не ломать `Record<string, string>` в `resolveUserFacingError`
+   * и провайдер-error helper'ах.
+   */
+  generationFailedVariants: string[];
+  generationFailedAlternatives: {
+    gpt: string;
+    design: string;
+    video: string;
+    audio: string;
+  };
 }
 
 const cache = new Map<Language, Translations>();
@@ -519,6 +533,55 @@ function escapeHtml(s: string): string {
  * `cost`/`sub`/`regular` may be undefined when deduction context is unavailable
  * (e.g. crash recovery) — the cost block is then omitted.
  */
+import { UserFacingError, resolveUserFacingError } from "../errors.js";
+
+/** Секции, для которых поддерживается random-вариация generationFailed-текста. */
+export type GenerationFailedSection = "gpt" | "design" | "video" | "audio";
+
+/**
+ * Возвращает случайно выбранный шутливый текст «модель временно недоступна».
+ * Под каждый рендер дёргает random — последовательные показы юзеру одной и
+ * той же ошибки могут быть разными. Вариант с `{alternatives}` подставляет
+ * специфичный для секции список альтернативных моделей.
+ *
+ * Используется processor'ами (video/image/audio) на терминальной ошибке,
+ * `pool exhausted`-ветке и chat.service'ом через UserFacingError → bot scene.
+ *
+ * Fallback на legacy одиночный `generationFailed` текст, если по какой-то
+ * причине variants-массив пуст (защита от частичных переводов).
+ */
+export function pickGenerationFailedMessage(
+  t: Translations,
+  modelName: string,
+  section: GenerationFailedSection,
+): string {
+  const variants = t.generationFailedVariants;
+  if (!Array.isArray(variants) || variants.length === 0) {
+    return t.errors.generationFailed.replace("{modelName}", modelName);
+  }
+  const idx = Math.floor(Math.random() * variants.length);
+  const template = variants[idx]!;
+  const alternatives = t.generationFailedAlternatives[section];
+  return template.replace("{modelName}", modelName).replace("{alternatives}", alternatives);
+}
+
+/**
+ * Wrapper над `resolveUserFacingError` с поддержкой random-вариантов.
+ *
+ * Для UserFacingError с `key: "modelTemporarilyUnavailable"` и проставленным
+ * `section` — выбирает случайный вариант из `generationFailedVariants` через
+ * `pickGenerationFailedMessage` (даёт юзеру разные шутливые тексты на повторных
+ * показах). Для всех остальных ошибок — стандартное поведение
+ * `resolveUserFacingError` (lookup по key + interpolate params).
+ */
+export function resolveUserFacingErrorVariant(err: UserFacingError, t: Translations): string {
+  if (err.key === "modelTemporarilyUnavailable" && err.section) {
+    const modelName = String(err.params?.modelName ?? err.section);
+    return pickGenerationFailedMessage(t, modelName, err.section);
+  }
+  return resolveUserFacingError(err, t.errors);
+}
+
 export function buildResultCaption(
   t: Translations,
   displayName: string,

@@ -145,6 +145,7 @@ export class ApipassSunoAdapter implements AudioAdapter {
       ) {
         throw new UserFacingError(`Suno API: ${msg}`, {
           key: "modelTemporarilyUnavailable",
+          section: "audio",
           params: { modelName: "Suno" },
           notifyOps: true,
           opsAlertDedupKey: "suno-credits-exhausted",
