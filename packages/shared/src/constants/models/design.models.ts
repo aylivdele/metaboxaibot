@@ -1233,7 +1233,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     description:
       "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров и рекламы. Balanced — оптимальный баланс качества и скорости, средняя цена.",
     section: "design",
-    provider: "ideogram",
+    provider: "replicate",
     familyId: "ideogram",
     variantLabel: "Balanced",
     costUsdPerRequest: 0.06,
@@ -1272,7 +1272,7 @@ export const DESIGN_MODELS: Record<string, AIModel> = {
     description:
       "Лучше всех рисует читаемый текст на картинках. Идеален для логотипов, постеров и рекламы. Turbo — самый быстрый и дешёвый вариант, чуть ниже детализация.",
     section: "design",
-    provider: "ideogram",
+    provider: "replicate",
     familyId: "ideogram",
     variantLabel: "Turbo",
     costUsdPerRequest: 0.03,
