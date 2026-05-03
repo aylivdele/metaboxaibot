@@ -533,7 +533,8 @@ function escapeHtml(s: string): string {
  * `cost`/`sub`/`regular` may be undefined when deduction context is unavailable
  * (e.g. crash recovery) — the cost block is then omitted.
  */
-import { UserFacingError, resolveUserFacingError } from "../errors.js";
+import type { UserFacingError } from "../errors.js";
+import { resolveUserFacingError } from "../errors.js";
 
 /** Секции, для которых поддерживается random-вариация generationFailed-текста. */
 export type GenerationFailedSection = "gpt" | "design" | "video" | "audio";
