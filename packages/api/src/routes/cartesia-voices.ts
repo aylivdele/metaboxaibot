@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
-import { config } from "@metabox/shared";
+import { acquireKey } from "../services/key-pool.service.js";
+import { PoolExhaustedError } from "../utils/pool-exhausted-error.js";
 
 interface CartesiaVoiceRaw {
   id: string;
@@ -39,9 +40,14 @@ export const cartesiaVoicesRoutes: FastifyPluginAsync = async (fastify) => {
       return voicesCache.data;
     }
 
-    const apiKey = config.ai.cartesia;
-    if (!apiKey) {
-      return reply.status(503).send({ error: "Cartesia API key not configured" });
+    let apiKey: string;
+    try {
+      apiKey = (await acquireKey("cartesia")).apiKey;
+    } catch (err) {
+      if (err instanceof PoolExhaustedError) {
+        return reply.status(503).send({ error: "Cartesia API key not configured" });
+      }
+      throw err;
     }
 
     const all: CartesiaVoiceRaw[] = [];
@@ -74,14 +80,16 @@ export const cartesiaVoicesRoutes: FastifyPluginAsync = async (fastify) => {
       cursor = data[data.length - 1].id;
     }
 
-    const data = all.map((v) => ({
-      voice_id: v.id,
-      name: v.name,
-      description: v.description ?? null,
-      gender: v.gender ?? null,
-      language: v.language ?? null,
-      preview_url: v.preview_file_url ?? null,
-    }));
+    const data = all
+      .filter((v) => v.is_public)
+      .map((v) => ({
+        voice_id: v.id,
+        name: v.name,
+        description: v.description ?? null,
+        gender: v.gender ?? null,
+        language: v.language ?? null,
+        preview_url: v.preview_file_url ?? null,
+      }));
 
     voicesCache = { data, at: Date.now() };
     return data;

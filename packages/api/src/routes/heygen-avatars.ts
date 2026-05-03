@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
-import { config } from "@metabox/shared";
+import { acquireKey } from "../services/key-pool.service.js";
+import { PoolExhaustedError } from "../utils/pool-exhausted-error.js";
 
 interface HeyGenLookItem {
   id: string;
@@ -95,9 +96,14 @@ export const heygenAvatarsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{
     Querystring: { token?: string; limit?: string; gender?: string; search?: string };
   }>("/heygen-avatars", async (request, reply) => {
-    const apiKey = config.ai.heygen;
-    if (!apiKey) {
-      return reply.status(503).send({ error: "HeyGen API key not configured" });
+    let apiKey: string;
+    try {
+      apiKey = (await acquireKey("heygen")).apiKey;
+    } catch (err) {
+      if (err instanceof PoolExhaustedError) {
+        return reply.status(503).send({ error: "HeyGen API key not configured" });
+      }
+      throw err;
     }
 
     const { token, gender, search } = request.query;
