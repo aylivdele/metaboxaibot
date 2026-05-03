@@ -64,6 +64,24 @@ import {
 } from "../utils/soul-photo-buffer.js";
 import { acquireLock, releaseLock } from "../utils/dedup.js";
 
+/**
+ * Для AVATAR_MODELS one-shot фото из чата живёт в `mediaInputs.avatar_photo[0]`,
+ * а не в deprecated top-level `imageUrl`. Helper централизует это решение —
+ * вызывайте его перед сборкой submitParams в любой точке, где есть chat-photo URL
+ * для AVATAR-модели.
+ */
+function routeAvatarPhoto(
+  modelId: string,
+  imageUrl: string | undefined,
+  mediaInputs: Record<string, string[]> | undefined,
+): { imageUrl: string | undefined; mediaInputs: Record<string, string[]> | undefined } {
+  if (!imageUrl || !AVATAR_MODELS.has(modelId)) return { imageUrl, mediaInputs };
+  return {
+    imageUrl: undefined,
+    mediaInputs: { ...(mediaInputs ?? {}), avatar_photo: [imageUrl] },
+  };
+}
+
 // ── Avatar voice choice store (TTL 10 min) ──────────────────────────────────
 
 interface AvatarVoiceEntry {
@@ -635,12 +653,28 @@ export async function executeVideoPrompt(
   if (hasMediaInputs) await userStateService.clearMediaInputs(ctx.user.id, modelId);
 
   // For D-ID/HeyGen: pick up any previously saved reference photo (one-shot, legacy path)
-  const imageUrl = (await userStateService.getAndClearVideoRefImageUrl(ctx.user.id)) ?? undefined;
+  const scratchpadImageUrl =
+    (await userStateService.getAndClearVideoRefImageUrl(ctx.user.id)) ?? undefined;
   // For D-ID: pick up any previously saved driver video URL (one-shot)
   const driverUrl = (await userStateService.getAndClearVideoRefDriverUrl(ctx.user.id)) ?? undefined;
   // For HeyGen/D-ID: pick up any previously saved raw voice recording (one-shot)
   const rawVoiceS3Key =
     (await userStateService.getAndClearVideoRefVoiceUrl(ctx.user.id)) ?? undefined;
+
+  // Collect raw mediaInputs (UserState slot values + one-shot voice S3 key) and
+  // resolve once — `resolveSlotValue` handles `tg:`-fileIds and bare S3 keys
+  // uniformly, returning fresh URLs.
+  const pendingMediaInputs: Record<string, string[]> = hasMediaInputs ? { ...mediaInputs } : {};
+  if (rawVoiceS3Key) pendingMediaInputs.voice_audio = [rawVoiceS3Key];
+  const hasAnyPending = Object.keys(pendingMediaInputs).length > 0;
+  const resolvedMediaInputs = hasAnyPending
+    ? await resolveMediaInputUrls(pendingMediaInputs)
+    : undefined;
+
+  // AVATAR_MODELS: route scratchpad chat photo (already an http URL) into the
+  // avatar_photo slot.
+  const routed = routeAvatarPhoto(modelId, scratchpadImageUrl, resolvedMediaInputs);
+  const imageUrl = routed.imageUrl;
 
   // Build submitParams without EL TTS — preGen is deferred until after the gate
   // so that cancelling the confirmation costs the user $0 in EL spend.
@@ -649,18 +683,12 @@ export async function executeVideoPrompt(
     modelId,
     prompt,
     imageUrl,
-    mediaInputs: hasMediaInputs ? await resolveMediaInputUrls(mediaInputs) : undefined,
+    mediaInputs: routed.mediaInputs,
     telegramChatId: chatId,
     sendOriginalLabel: ctx.t.common.sendOriginal,
     aspectRatio: modelSettings?.aspectRatio,
     duration: modelSettings?.duration,
-    extraModelSettings:
-      driverUrl || rawVoiceS3Key
-        ? {
-            ...(driverUrl ? { driver_url: driverUrl } : {}),
-            ...(rawVoiceS3Key ? { voice_s3key: rawVoiceS3Key, voice_url: "" } : {}),
-          }
-        : undefined,
+    extraModelSettings: driverUrl ? { driver_url: driverUrl } : undefined,
     sourceMessageId,
   };
 
@@ -673,7 +701,7 @@ export async function executeVideoPrompt(
       submitParams: submitParamsBase,
       restoreSnapshot: {
         ...(snapshotMediaInputs ? { mediaInputs: snapshotMediaInputs } : {}),
-        ...(imageUrl ? { videoRefImageUrl: imageUrl } : {}),
+        ...(scratchpadImageUrl ? { videoRefImageUrl: scratchpadImageUrl } : {}),
         ...(driverUrl ? { videoRefDriverUrl: driverUrl } : {}),
         ...(rawVoiceS3Key ? { videoRefVoiceUrl: rawVoiceS3Key } : {}),
       },
@@ -687,7 +715,11 @@ export async function executeVideoPrompt(
 
   try {
     let elTtsS3Key: string | null = null;
-    if (AVATAR_MODELS.has(modelId) && !rawVoiceS3Key) {
+    // Skip TTS pre-gen if voice was already provided via the voice_audio slot
+    // (raw scratchpad voice is also routed there above, so this gate covers
+    // both UI-filled slot and chat voice messages).
+    const voiceAlreadyProvided = !!submitParamsBase.mediaInputs?.voice_audio?.[0];
+    if (AVATAR_MODELS.has(modelId) && !voiceAlreadyProvided) {
       const voiceProvider = fullModelSettings.voice_provider as string | undefined;
       if (!voiceProvider || voiceProvider === "elevenlabs" || voiceProvider === "cartesia") {
         await ctx.api
@@ -709,11 +741,10 @@ export async function executeVideoPrompt(
     const submitParams = elTtsS3Key
       ? {
           ...submitParamsBase,
-          extraModelSettings: {
-            ...submitParamsBase.extraModelSettings,
-            voice_s3key: elTtsS3Key,
-            voice_url: "",
-          },
+          mediaInputs: await resolveMediaInputUrls({
+            ...(submitParamsBase.mediaInputs ?? {}),
+            voice_audio: [elTtsS3Key],
+          }),
         }
       : submitParamsBase;
 
@@ -1128,12 +1159,13 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
     }
 
     // Build submitParams without EL TTS — preGen is deferred until after the gate.
+    const routed = routeAvatarPhoto(modelId, supportsImages ? tgUrl : undefined, mediaInputs);
     const submitParamsBase = {
       userId: ctx.user.id,
       modelId,
       prompt: caption,
-      imageUrl: supportsImages ? tgUrl : undefined,
-      mediaInputs,
+      imageUrl: routed.imageUrl,
+      mediaInputs: routed.mediaInputs,
       telegramChatId: chatId,
       sendOriginalLabel: ctx.t.common.sendOriginal,
       aspectRatio: modelSettings?.aspectRatio,
@@ -1178,7 +1210,10 @@ export async function handleVideoPhoto(ctx: BotContext): Promise<void> {
       const submitParams = elTtsS3Key
         ? {
             ...submitParamsBase,
-            extraModelSettings: { voice_s3key: elTtsS3Key, voice_url: "" },
+            mediaInputs: await resolveMediaInputUrls({
+              ...(submitParamsBase.mediaInputs ?? {}),
+              voice_audio: [elTtsS3Key],
+            }),
           }
         : submitParamsBase;
 
@@ -1661,13 +1696,14 @@ export async function handleVideoAvatarVoiceCallback(ctx: BotContext): Promise<v
   const fullModelSettings = allModelSettings[modelId] ?? {};
   const videoSettings = await userStateService.getVideoSettings(userId);
   const modelSettings = videoSettings[modelId];
-  const imageUrl = (await userStateService.getAndClearVideoRefImageUrl(userId)) ?? undefined;
+  const scratchpadImageUrl =
+    (await userStateService.getAndClearVideoRefImageUrl(userId)) ?? undefined;
 
   const validationError = videoGenerationService.validateVideoRequest(
     {
       modelId,
       prompt: "",
-      imageUrl,
+      imageUrl: scratchpadImageUrl,
       aspectRatio: modelSettings?.aspectRatio,
       duration: modelSettings?.duration,
       modelSettings: {
@@ -1689,18 +1725,23 @@ export async function handleVideoAvatarVoiceCallback(ctx: BotContext): Promise<v
     return;
   }
 
+  const routed = routeAvatarPhoto(modelId, scratchpadImageUrl, undefined);
+  // Mirrors the previous `entry.uploadedKey ? ... : entry.tgUrl` truthy gate —
+  // empty string (rare) falls through to tgUrl, matching pre-migration semantics.
+  const voiceValue = entry.uploadedKey || entry.tgUrl;
   const submitParams = {
     userId,
     modelId,
     prompt: "",
-    imageUrl,
+    imageUrl: routed.imageUrl,
+    mediaInputs: await resolveMediaInputUrls({
+      ...(routed.mediaInputs ?? {}),
+      voice_audio: [voiceValue],
+    }),
     telegramChatId: chatId,
     sendOriginalLabel: ctx.t.common.sendOriginal,
     aspectRatio: modelSettings?.aspectRatio,
     duration: modelSettings?.duration,
-    extraModelSettings: entry.uploadedKey
-      ? { voice_s3key: entry.uploadedKey, voice_url: "" }
-      : { voice_url: entry.tgUrl, voice_s3key: "" },
   };
 
   if (
@@ -1712,7 +1753,7 @@ export async function handleVideoAvatarVoiceCallback(ctx: BotContext): Promise<v
       submitParams,
       promptDisplay: ctx.t.confirmGeneration.voicePrompt,
       restoreSnapshot: {
-        ...(imageUrl ? { videoRefImageUrl: imageUrl } : {}),
+        ...(scratchpadImageUrl ? { videoRefImageUrl: scratchpadImageUrl } : {}),
       },
     })
   ) {
