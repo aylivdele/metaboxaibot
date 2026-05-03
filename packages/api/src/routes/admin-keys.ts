@@ -13,7 +13,6 @@ import { telegramAuthHook } from "../middlewares/telegram-auth.js";
 import { extractWebUserFromRequest } from "../middlewares/web-auth.js";
 import { invalidatePoolCache, getKeyStats } from "../services/key-pool.service.js";
 import { clearKeyThrottle } from "../services/throttle.service.js";
-import { envKeyForProvider } from "../ai/key-provider.js";
 import { logger } from "../logger.js";
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 
@@ -401,7 +400,6 @@ export async function adminKeysRoutes(fastify: FastifyInstance): Promise<void> {
     const providers = grouped.map((g) => ({
       provider: g.provider,
       activeKeyCount: g._count._all,
-      hasEnvFallback: !!envKeyForProvider(g.provider),
     }));
     return { providers };
   });

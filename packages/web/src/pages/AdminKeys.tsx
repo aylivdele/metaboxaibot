@@ -299,9 +299,7 @@ export default function AdminKeys() {
             {providers.map((p) => (
               <div key={p.provider} className="card p-3">
                 <div className="font-mono">{p.provider}</div>
-                <div className="text-text-hint text-xs">
-                  {p.activeKeyCount} active{p.hasEnvFallback ? " · env fallback" : ""}
-                </div>
+                <div className="text-text-hint text-xs">{p.activeKeyCount} active</div>
               </div>
             ))}
           </div>

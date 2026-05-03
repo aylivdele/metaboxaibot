@@ -7,9 +7,10 @@
  * он пропускается; если все ключи группы throttled — переходим к группе
  * с меньшим приоритетом.
  *
- * Если в БД нет активных ключей провайдера — fallback на env-переменную из
- * `config.ai.<provider>` (см. envKeyForProvider). В этом случае возвращается
- * `keyId: null`, означающий «без записи в БД».
+ * Если в БД нет активных ключей провайдера — `PoolExhaustedError`. Env-fallback
+ * убран намеренно: иначе деактивация единственного ключа в админке не
+ * останавливала бы трафик (молча подхватывался env-ключ). БД — единственный
+ * источник правды; для seed'а из env есть отдельный скрипт `seed-keys-from-env`.
  */
 
 import { db } from "../db.js";
@@ -17,7 +18,6 @@ import { getRedis } from "../redis.js";
 import { logger } from "../logger.js";
 import { decryptSecret } from "@metabox/shared";
 import { checkKeyThrottle, tripKeyThrottle } from "./throttle.service.js";
-import { envKeyForProvider } from "../ai/key-provider.js";
 import { PoolExhaustedError } from "../utils/pool-exhausted-error.js";
 
 export interface ProxyConfig {
@@ -129,21 +129,15 @@ function decodeProxy(rec: PoolKeyRecord["proxy"]): ProxyConfig | null {
   };
 }
 
-function envFallback(provider: string): AcquiredKey {
-  const apiKey = envKeyForProvider(provider);
-  if (!apiKey) {
-    throw new PoolExhaustedError(provider, 0);
-  }
-  return { keyId: null, apiKey, proxy: null };
-}
-
 /**
- * Выбрать ключ для провайдера. Если в БД нет активных ключей — fallback на env.
- * Если все ключи throttled — `PoolExhaustedError` с минимальным `retryAfterMs`.
+ * Выбрать ключ для провайдера. Если в БД нет активных ключей — `PoolExhaustedError`
+ * (никакого env-fallback'а: админка должна быть единственным источником правды,
+ * иначе деактивация ключа не отключает трафик). Если все ключи throttled —
+ * также `PoolExhaustedError` с минимальным `retryAfterMs`.
  */
 export async function acquireKey(provider: string): Promise<AcquiredKey> {
   const keys = await loadKeysForProvider(provider);
-  if (keys.length === 0) return envFallback(provider);
+  if (keys.length === 0) throw new PoolExhaustedError(provider, 0);
 
   // Группируем по приоритету (по убыванию).
   const byPriority = new Map<number, PoolKeyRecord[]>();
@@ -189,13 +183,18 @@ export async function acquireKey(provider: string): Promise<AcquiredKey> {
  * providerJobId привязан к конкретному аккаунту). Throttle игнорируется:
  * текущая операция уже в процессе, мы обязаны её завершить тем же ключом.
  *
- * Если keyId не задан или запись пропала из БД — fallback на env по provider.
+ * Если keyId не задан или запись пропала из БД — `PoolExhaustedError`
+ * (env-fallback убран; пул — единственный источник правды). Inactive-ключ
+ * всё ещё используется: in-flight-операция должна доехать на исходном ключе.
  */
 export async function acquireById(
   keyId: string | null | undefined,
   provider: string,
 ): Promise<AcquiredKey> {
-  if (!keyId) return envFallback(provider);
+  if (!keyId) {
+    logger.warn({ provider }, "key-pool.acquireById: no keyId provided");
+    throw new PoolExhaustedError(provider, 0);
+  }
 
   const row = await db.providerKey.findUnique({
     where: { id: keyId },
@@ -218,8 +217,8 @@ export async function acquireById(
   });
 
   if (!row) {
-    logger.warn({ keyId, provider }, "key-pool.acquireById: key not found, falling back to env");
-    return envFallback(provider);
+    logger.warn({ keyId, provider }, "key-pool.acquireById: key not found");
+    throw new PoolExhaustedError(provider, 0);
   }
   if (!row.isActive) {
     logger.warn(
