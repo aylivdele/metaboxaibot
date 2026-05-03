@@ -923,6 +923,10 @@ export const VIDEO_MODELS: Record<string, AIModel> = {
     contextMaxMessages: 0,
     supportedAspectRatios: ["16:9", "9:16"],
     supportedDurations: null, // avatar duration is script-driven
+    mediaInputs: [
+      { slotKey: "avatar_photo", mode: "reference_image", labelKey: "avatarPhoto" },
+      { slotKey: "voice_audio", mode: "driving_audio", labelKey: "voiceAudio" },
+    ],
     settings: [
       mkAspectRatio(["16:9", "9:16"]),
       {

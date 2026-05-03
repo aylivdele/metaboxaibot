@@ -502,6 +502,8 @@ export default {
       "Reference audios for generation:\n• Up to 3 files\n• Combined duration ≤ 15 seconds\n• Max 15 MB each (MP3, WAV)\n• When audio is provided, at least one reference image or video is required\n\nReference them in the prompt as @Audio1, @Audio2, etc.\n\nSend audio files one at a time.",
     drivingAudio: "🎵 Driving audio",
     firstClip: "🎬 First video clip",
+    avatarPhoto: "🖼 Avatar photo",
+    voiceAudio: "🎙 Voice",
     firstFrameWanHint:
       "Wan 2.7 supports the following input combinations:\n• First frame\n• First frame + driving audio\n• First frame + last frame\n• First frame + last frame + driving audio\n• First video clip\n• First video clip + last frame\n\nImage limits: JPEG/PNG/BMP/WEBP, up to 20 MB, 240–8000 px per side, aspect ratio 1:8–8:1.",
     lastFrameWanHint:

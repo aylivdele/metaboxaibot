@@ -102,8 +102,6 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
       avatar_id: id,
       image_asset_id: "",
       talking_photo_id: "",
-      avatar_photo_url: "",
-      avatar_photo_s3key: "",
     });
   };
 
@@ -113,8 +111,6 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
       image_asset_id: avatar.externalId,
       talking_photo_id: "",
       avatar_id: "",
-      avatar_photo_url: "",
-      avatar_photo_s3key: "",
     });
   };
 
@@ -140,8 +136,6 @@ export function HeyGenAvatarPicker({ avatarId, imageAssetId, onChange }: HeyGenA
         image_asset_id: "",
         talking_photo_id: "",
         avatar_id: "",
-        avatar_photo_url: "",
-        avatar_photo_s3key: "",
       });
     }
   };

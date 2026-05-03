@@ -13,8 +13,6 @@
  * Until then this set is the single source of truth.
  */
 export const ONE_SHOT_SETTING_KEYS: ReadonlySet<string> = new Set([
-  "avatar_photo_url",
-  "avatar_photo_s3key",
   "voice_url",
   "voice_s3key",
   "talking_photo_id",

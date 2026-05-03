@@ -72,14 +72,16 @@ const SUPPORTED_ASPECT_RATIOS = new Set(["16:9", "9:16"]);
  *  - POST /v3/assets    — upload image/audio assets
  *
  * Avatar source priority:
- *  1. modelSettings.image_asset_id    → pre-uploaded photo asset → type "image"
- *  2. modelSettings.avatar_photo_url  → upload image now → type "image"
- *  3. modelSettings.avatar_id         → official avatar look_id → type "avatar"
- *  4. default avatarId from config    → type "avatar"
+ *  1. mediaInputs.avatar_photo[0]     → one-shot chat photo (preferred)  → upload now → type "image"
+ *  2. input.imageUrl                  → one-shot chat photo (deprecated) → upload now → type "image"
+ *  3. modelSettings.image_asset_id    → pre-uploaded photo asset → type "image"
+ *  4. modelSettings.avatar_id         → official avatar look_id → type "avatar"
+ *  5. default avatarId from config    → type "avatar"
  *
  * Voice source priority:
- *  1. modelSettings.voice_url / voice_s3key → audio_asset_id (lip-sync)
- *  2. modelSettings.voice_id + prompt        → script + voice_id (TTS)
+ *  1. mediaInputs.voice_audio[0]            → audio_asset_id (lip-sync, preferred)
+ *  2. modelSettings.voice_url / voice_s3key → audio_asset_id (lip-sync, deprecated)
+ *  3. modelSettings.voice_id + prompt        → script + voice_id (TTS)
  */
 export class HeyGenAdapter implements VideoAdapter {
   readonly modelId = "heygen";
@@ -256,15 +258,15 @@ export class HeyGenAdapter implements VideoAdapter {
   validateRequest(input: VideoInput, ctx?: VideoValidationContext): VideoValidationError | null {
     const ms = input.modelSettings ?? {};
     const hasAvatar =
+      !!input.mediaInputs?.avatar_photo?.[0] ||
       !!input.imageUrl ||
       !!(ms.image_asset_id as string | undefined)?.trim() ||
-      !!(ms.avatar_id as string | undefined)?.trim() ||
-      !!(ms.avatar_photo_s3key as string | undefined)?.trim() ||
-      !!(ms.avatar_photo_url as string | undefined)?.trim();
+      !!(ms.avatar_id as string | undefined)?.trim();
     if (!hasAvatar) return { key: "heygenNeedsAvatar" };
 
     const explicitVoiceId = (ms.voice_id as string | undefined)?.trim();
     const hasVoiceAsset =
+      !!input.mediaInputs?.voice_audio?.[0] ||
       !!(ms.voice_s3key as string | undefined)?.trim() ||
       !!(ms.voice_url as string | undefined)?.trim();
     if (!explicitVoiceId && !hasVoiceAsset && !ctx?.hasVoiceFile) {
@@ -274,10 +276,14 @@ export class HeyGenAdapter implements VideoAdapter {
   }
 
   async submit(input: VideoInput): Promise<string> {
-    const voiceUrl = await HeyGenAdapter.freshUrl(
-      input.modelSettings?.voice_s3key,
-      input.modelSettings?.voice_url,
-    );
+    // Prefer mediaInputs.voice_audio (new path); fall back to deprecated
+    // modelSettings.voice_s3key/voice_url for in-flight jobs queued before migration.
+    const voiceUrl =
+      input.mediaInputs?.voice_audio?.[0] ??
+      (await HeyGenAdapter.freshUrl(
+        input.modelSettings?.voice_s3key,
+        input.modelSettings?.voice_url,
+      ));
     const voiceId = (input.modelSettings?.voice_id as string | undefined) ?? "en-US-JennyNeural";
     const bgColor = (input.modelSettings?.background_color as string | undefined) ?? "#FFFFFF";
     const aspectRatioRaw = input.aspectRatio ?? "16:9";
@@ -293,10 +299,6 @@ export class HeyGenAdapter implements VideoAdapter {
 
     // ── Avatar source ────────────────────────────────────────────────────────
     const imageAssetIdFromSettings = input.modelSettings?.image_asset_id as string | undefined;
-    const avatarPhotoUrl = await HeyGenAdapter.freshUrl(
-      input.modelSettings?.avatar_photo_s3key,
-      input.modelSettings?.avatar_photo_url,
-    );
     const avatarId = (input.modelSettings?.avatar_id as string | undefined) || this.defaultAvatarId;
 
     // ── Build POST /v3/videos body (discriminated union) ────────────────────
@@ -307,14 +309,11 @@ export class HeyGenAdapter implements VideoAdapter {
     };
 
     // Avatar source → determines type: "avatar" vs type: "image"
-    if (input.imageUrl) {
-      const uploadedId = await this.uploadImageAsset(undefined, input.imageUrl);
-      body.type = "image";
-      body.image = { type: "asset_id", asset_id: uploadedId };
-      logger.info({ imageAssetId: uploadedId }, "HeyGen: using uploaded image asset");
-    } else if (avatarPhotoUrl) {
-      const avatarPhotoS3Key = input.modelSettings?.avatar_photo_s3key as string | undefined;
-      const uploadedId = await this.uploadImageAsset(avatarPhotoS3Key, avatarPhotoUrl);
+    // Prefer mediaInputs.avatar_photo (new path); fall back to deprecated input.imageUrl
+    // for in-flight jobs queued before the migration.
+    const oneShotPhotoUrl = input.mediaInputs?.avatar_photo?.[0] ?? input.imageUrl;
+    if (oneShotPhotoUrl) {
+      const uploadedId = await this.uploadImageAsset(undefined, oneShotPhotoUrl);
       body.type = "image";
       body.image = { type: "asset_id", asset_id: uploadedId };
       logger.info({ imageAssetId: uploadedId }, "HeyGen: using uploaded image asset");
