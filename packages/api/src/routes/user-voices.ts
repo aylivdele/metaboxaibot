@@ -84,12 +84,15 @@ export const userVoicesRoutes: FastifyPluginAsync = async (fastify) => {
       const t = getT((user?.language ?? "en") as Language);
 
       if (config.bot.token) {
+        // parse_mode HTML — у voiceClone есть <blockquote>/<b> теги с советами
+        // Cartesia. Без него юзер видит сырую разметку.
         await fetch(`https://api.telegram.org/bot${config.bot.token}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: String(userId),
             text: `${t.audio.voiceClone}\n\n${t.audio.voiceCloneActivated}`,
+            parse_mode: "HTML",
           }),
         }).catch((err) => logger.warn(err, "voice clone start: failed to send prompt"));
       }
