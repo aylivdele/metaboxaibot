@@ -34,8 +34,10 @@ function serializeModelCompact(m: AIModel) {
     name: m.name,
     description: m.description,
     section: m.section,
-    // См. routes/models.ts — kie-claude нормализуем под бренд anthropic для UI.
-    provider: m.provider === "kie-claude" ? "anthropic" : m.provider,
+    // См. routes/models.ts — claude-прокси (kie-claude / evolink-claude) нормализуем
+    // под бренд anthropic для UI.
+    provider:
+      m.provider === "kie-claude" || m.provider === "evolink-claude" ? "anthropic" : m.provider,
     familyId: m.familyId ?? null,
     familyName: m.familyId ? (MODEL_FAMILIES[m.familyId]?.name ?? null) : null,
     familyDefaultModelId: m.familyId ? (MODEL_FAMILIES[m.familyId]?.defaultModelId ?? null) : null,
