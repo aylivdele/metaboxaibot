@@ -96,7 +96,11 @@ export function VoicesView({ onGoToVoiceClone }: { onGoToVoiceClone?: () => void
         <h2>{t("uploads.title")}</h2>
         <p className="page-subtitle">{t("uploads.subtitle")}</p>
         {onGoToVoiceClone && (
-          <button className="btn btn--primary" onClick={onGoToVoiceClone}>
+          <button
+            className="btn btn--primary"
+            style={{ marginTop: "10px" }}
+            onClick={onGoToVoiceClone}
+          >
             {t("uploads.cloneVoiceBtn")}
           </button>
         )}
@@ -145,12 +149,7 @@ export function VoicesView({ onGoToVoiceClone }: { onGoToVoiceClone?: () => void
                       )}
                       <div className="uploads-item__bottom">
                         <span className="uploads-item__meta">
-                          {voice.provider === "cartesia"
-                            ? "Cartesia"
-                            : voice.provider === "elevenlabs"
-                              ? "ElevenLabs"
-                              : voice.provider}{" "}
-                          · {new Date(voice.createdAt).toLocaleDateString()}
+                          {new Date(voice.createdAt).toLocaleDateString()}
                         </span>
                         <div className="uploads-item__actions">
                           <button

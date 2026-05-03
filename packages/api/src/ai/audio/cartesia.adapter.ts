@@ -62,25 +62,39 @@ export class CartesiaAdapter implements AudioAdapter {
     const ms = input.modelSettings ?? {};
     const voiceId = (ms.voice_id as string | undefined) || input.voiceId || DEFAULT_VOICE_ID;
     const modelId = (ms.model_id as string | undefined) ?? DEFAULT_TTS_MODEL;
-    const language = (ms.language as string | undefined) ?? "ru";
+    // language: явно указан (не "auto") → передаём; "auto" или не задано в UI →
+    // не передаём, Cartesia определит сам по тексту/голосу. Legacy-путь (без
+    // modelSettings вообще, т.е. вызов из bot напрямую) сохраняет старый
+    // дефолт "ru" для обратной совместимости.
+    const languageRaw = ms.language as string | undefined;
+    let language: string | null;
+    if (languageRaw && languageRaw !== "auto") {
+      language = languageRaw;
+    } else if (input.modelSettings) {
+      language = null;
+    } else {
+      language = "ru";
+    }
     const speed = typeof ms.speed === "number" ? ms.speed : undefined;
     const volume = typeof ms.volume === "number" ? ms.volume : undefined;
     const emotion = ms.emotion as string | undefined;
 
     // generation_config работает только для sonic-3. Для legacy моделей передаём
-    // только базовые поля.
+    // только базовые поля. Дефолты 1.0 не отправляем — лишний шум в payload'е.
     const generationConfig: Record<string, unknown> = {};
-    if (speed !== undefined) generationConfig.speed = speed;
-    if (volume !== undefined) generationConfig.volume = volume;
-    if (emotion) generationConfig.emotion = emotion;
+    if (modelId === "sonic-3") {
+      if (speed !== undefined && speed !== 1) generationConfig.speed = speed;
+      if (volume !== undefined && volume !== 1) generationConfig.volume = volume;
+      if (emotion) generationConfig.emotion = emotion;
+    }
 
     const body: Record<string, unknown> = {
       model_id: modelId,
       transcript: input.prompt,
       voice: { mode: "id", id: voiceId },
-      language,
       output_format: { container: "mp3", sample_rate: 44100, bit_rate: 128000 },
     };
+    if (language) body.language = language;
     if (Object.keys(generationConfig).length > 0) body.generation_config = generationConfig;
 
     const res = await fetchWithLog(

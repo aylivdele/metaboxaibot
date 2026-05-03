@@ -106,24 +106,15 @@ export function HeyGenVoicePicker({ voiceId, onChange }: HeyGenVoicePickerProps)
     resolvePreviewUrl: v.preview_audio ? () => v.preview_audio! : undefined,
   }));
 
-  const mineItems: VoiceListItem[] = myVoices.map((v) => {
-    // Display-friendly provider label: "Cartesia" / "ElevenLabs" / fallback to raw.
-    const providerLabel =
-      v.provider === "cartesia"
-        ? "Cartesia"
-        : v.provider === "elevenlabs"
-          ? "ElevenLabs"
-          : v.provider;
-    return {
-      id: v.id,
-      name: v.name,
-      meta: `${providerLabel} · ${new Date(v.createdAt).toLocaleDateString()}`,
-      hasPreview: v.hasAudio,
-      resolvePreviewUrl: v.hasAudio
-        ? async () => (await api.userVoices.previewUrl(v.id)).url
-        : undefined,
-    };
-  });
+  const mineItems: VoiceListItem[] = myVoices.map((v) => ({
+    id: v.id,
+    name: v.name,
+    meta: new Date(v.createdAt).toLocaleDateString(),
+    hasPreview: v.hasAudio,
+    resolvePreviewUrl: v.hasAudio
+      ? async () => (await api.userVoices.previewUrl(v.id)).url
+      : undefined,
+  }));
 
   // voice_id is the local UserVoice.id for cloned voices. Fall back to
   // externalId for records saved before this migration (backward compat).

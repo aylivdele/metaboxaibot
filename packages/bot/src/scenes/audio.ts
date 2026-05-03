@@ -85,8 +85,9 @@ export async function handleAudioSubSection(ctx: BotContext, modelId: string): P
     }
   }
 
-  // voice-clone: no voice transcription hint (audio is used for cloning, not prompts)
-  await ctx.reply(`${ctx.t.audio.voiceClone}\n\n${hint}`);
+  // voice-clone: no voice transcription hint (audio is used for cloning, not prompts).
+  // parse_mode HTML — у voiceCloneActivated есть <blockquote>/<b> тэги с советами Cartesia.
+  await ctx.reply(`${ctx.t.audio.voiceClone}\n\n${hint}`, { parse_mode: "HTML" });
 }
 
 // ── Voice cloning: accepts audio/voice file, creates EL voice ────────────────

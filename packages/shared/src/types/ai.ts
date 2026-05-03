@@ -41,6 +41,7 @@ export type ModelSettingType =
   | "did-voice-picker"
   | "elevenlabs-voice-picker"
   | "openai-voice-picker"
+  | "cartesia-voice-picker"
   | "color"
   | "avatar-picker"
   | "motion-picker"

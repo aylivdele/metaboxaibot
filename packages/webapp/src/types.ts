@@ -82,6 +82,7 @@ export interface ModelSettingDef {
     | "did-voice-picker"
     | "elevenlabs-voice-picker"
     | "openai-voice-picker"
+    | "cartesia-voice-picker"
     | "color"
     | "avatar-picker"
     | "motion-picker"
@@ -100,6 +101,15 @@ export interface ElevenLabsVoice {
   voice_id: string;
   name: string;
   category: string;
+  gender: string | null;
+  language: string | null;
+  preview_url: string | null;
+}
+
+export interface CartesiaVoice {
+  voice_id: string;
+  name: string;
+  description: string | null;
   gender: string | null;
   language: string | null;
   preview_url: string | null;
