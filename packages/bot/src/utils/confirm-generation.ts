@@ -23,7 +23,7 @@ import {
   type AIModel,
   type MediaInputSlot,
 } from "@metabox/shared";
-import { InlineKeyboard } from "grammy";
+import { InlineKeyboard, InputFile } from "grammy";
 import { replyNoSubscription, replyInsufficientTokens } from "./reply-error.js";
 import { ensureELTtsForVideo } from "./el-tts.js";
 import { pickVideoPending, pickDesignPending } from "./pending-messages.js";
@@ -135,6 +135,64 @@ function buildSendableSources(resolved: string[], raws: string[] | undefined): s
   });
 }
 
+/** Имя файла для буфер-аплоада: берём последний path-сегмент URL без query. */
+function filenameFromUrl(url: string, fallback: string): string {
+  try {
+    const path = new URL(url).pathname;
+    const last = path.split("/").pop();
+    return last && last.length > 0 ? last : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Отправить один preview-элемент. На ошибке URL'а (Telegram возвращает
+ * `WEBPAGE_CURL_FAILED` если не смог сам скачать наш presigned-S3) пытаемся
+ * перекачать байты сами и отдать через InputFile multipart-аплоадом.
+ */
+async function sendOneItem(
+  ctx: BotContext,
+  kind: MediaKind,
+  source: string,
+  caption: string | undefined,
+): Promise<boolean> {
+  const opts = caption ? { caption } : {};
+  try {
+    if (kind === "photo") await ctx.replyWithPhoto(source, opts);
+    else if (kind === "video") await ctx.replyWithVideo(source, opts);
+    else await ctx.replyWithAudio(source, opts);
+    return true;
+  } catch (err) {
+    // Buffer-upload retry имеет смысл только для http(s)-URL, который Telegram
+    // не смог подтянуть. Для file_id ретраить бессмысленно — он либо есть, либо нет.
+    if (!source.startsWith("http")) {
+      logger.warn({ err, kind }, "sendOneItem: send failed, no retry path");
+      return false;
+    }
+    try {
+      const res = await fetch(source);
+      if (!res.ok) {
+        logger.warn(
+          { err, kind, fetchStatus: res.status },
+          "sendOneItem: URL send failed and re-fetch returned non-OK",
+        );
+        return false;
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      const ext = kind === "video" ? "mp4" : kind === "audio" ? "ogg" : "jpg";
+      const file = new InputFile(buf, filenameFromUrl(source, `preview.${ext}`));
+      if (kind === "photo") await ctx.replyWithPhoto(file, opts);
+      else if (kind === "video") await ctx.replyWithVideo(file, opts);
+      else await ctx.replyWithAudio(file, opts);
+      return true;
+    } catch (retryErr) {
+      logger.warn({ err, retryErr, kind }, "sendOneItem: buffer-upload retry also failed");
+      return false;
+    }
+  }
+}
+
 /**
  * Sends one preview message per filled media slot, with a caption explaining
  * which slot the media will be used as. Called BEFORE the confirm message so
@@ -142,6 +200,14 @@ function buildSendableSources(resolved: string[], raws: string[] | undefined): s
  *
  * Prefer `rawInputs` (e.g. `tg:photo:fileId`) over resolved URLs to leverage
  * Telegram file_id reuse and avoid re-downloading.
+ *
+ * Resilience:
+ *  1. Группа n>1: пробуем sendMediaGroup. Telegram при первой кривой ссылке
+ *     отбрасывает всю группу — на ошибке пробуем поэлементно (через
+ *     `sendOneItem`), чтобы остальные превью всё же дошли.
+ *  2. Каждый элемент: на ошибке URL пытаемся скачать байты сами и отдать через
+ *     InputFile — фикс для `WEBPAGE_CURL_FAILED` на presigned-S3, когда сами
+ *     IP-блок Telegram'а до Wasabi/S3 вылетает по таймауту.
  */
 async function sendMediaPreviews(
   ctx: BotContext,
@@ -171,29 +237,54 @@ async function sendMediaPreviews(
             : "mediaPreviewAudioMulti";
     const caption = ctx.t.confirmGeneration[captionKey].replace("{label}", label);
 
-    try {
-      if (sources.length === 1) {
-        const src = sources[0];
-        if (kind === "photo") await ctx.replyWithPhoto(src, { caption });
-        else if (kind === "video") await ctx.replyWithVideo(src, { caption });
-        else await ctx.replyWithAudio(src, { caption });
-      } else {
-        const media = sources.map((src, i) => ({
-          type: kind,
-          media: src,
-          ...(i === 0 ? { caption } : {}),
-        }));
+    if (sources.length === 1) {
+      const ok = await sendOneItem(ctx, kind, sources[0], caption);
+      if (!ok) {
+        logger.warn(
+          { slotKey: slot.slotKey, kind },
+          "sendMediaPreviews: failed to send slot preview, continuing",
+        );
+      }
+      continue;
+    }
+
+    // Telegram media-group допускает максимум 10 элементов на album. При >10
+    // sendMediaGroup возвращает 400 "too many messages to send as an album".
+    // Бьём sources на батчи по 10 — будет N последовательных альбомов.
+    // Caption ставим только на первый элемент первого альбома.
+    const ALBUM_MAX = 10;
+    for (let start = 0; start < sources.length; start += ALBUM_MAX) {
+      const batch = sources.slice(start, start + ALBUM_MAX);
+      const isFirstBatch = start === 0;
+      const media = batch.map((src, i) => ({
+        type: kind,
+        media: src,
+        ...(isFirstBatch && i === 0 ? { caption } : {}),
+      }));
+      try {
         // grammY's replyWithMediaGroup type is restrictive on inputs; safe-cast
         // since we've narrowed kind above and Telegram accepts mixed strings.
         await ctx.replyWithMediaGroup(
           media as unknown as Parameters<typeof ctx.replyWithMediaGroup>[0],
         );
+      } catch (err) {
+        // Group failed — Telegram отбрасывает всю группу при первой кривой ссылке.
+        // Повторяем поэлементно, чтобы остальные элементы всё же дошли.
+        logger.warn(
+          { err, slotKey: slot.slotKey, kind, count: batch.length, batchStart: start },
+          "sendMediaPreviews: group send failed, falling back to per-item",
+        );
+        for (let i = 0; i < batch.length; i++) {
+          const itemCaption = isFirstBatch && i === 0 ? caption : undefined;
+          const ok = await sendOneItem(ctx, kind, batch[i], itemCaption);
+          if (!ok) {
+            logger.warn(
+              { slotKey: slot.slotKey, kind, index: start + i },
+              "sendMediaPreviews: per-item fallback failed, skipping",
+            );
+          }
+        }
       }
-    } catch (err) {
-      logger.warn(
-        { err, slotKey: slot.slotKey, kind, count: sources.length },
-        "sendMediaPreviews: failed to send slot preview, continuing",
-      );
     }
   }
 }
