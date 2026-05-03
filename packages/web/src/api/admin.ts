@@ -50,7 +50,6 @@ export interface KeyStatsDto {
 export interface ProviderSummary {
   provider: string;
   activeKeyCount: number;
-  hasEnvFallback: boolean;
 }
 
 export interface ProxyCreateBody {

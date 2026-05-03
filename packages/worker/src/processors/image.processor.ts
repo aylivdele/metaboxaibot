@@ -40,6 +40,7 @@ import {
   buildResultCaption,
   getFallbackCandidates,
   isFallbackCompatible,
+  pickGenerationFailedMessage,
 } from "@metabox/shared";
 import type { AIModel } from "@metabox/shared";
 import type { DeductResult } from "@metabox/api/services";
@@ -1341,7 +1342,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
   } catch (err) {
     if (err instanceof DelayedError) throw err;
     if (isRateLimitLongWindowError(err)) {
-      const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);
+      const msg = pickGenerationFailedMessage(t, modelName, "design");
       await db.generationJob.update({
         where: { id: dbJobId },
         data: { status: "failed", error: msg },
@@ -1602,7 +1603,7 @@ export async function processImageJob(job: Job<ImageJobData>, token?: string): P
       });
 
       await telegram
-        .sendMessage(telegramChatId, t.errors.generationFailed.replace("{modelName}", modelName))
+        .sendMessage(telegramChatId, pickGenerationFailedMessage(t, modelName, "design"))
         .catch(() => void 0);
     }
 

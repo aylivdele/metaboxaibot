@@ -379,6 +379,25 @@ export const api = {
 
   cartesiaVoices: {
     list: () => request<CartesiaVoice[]>("/cartesia-voices"),
+    /**
+     * Cartesia preview-файл требует Bearer-заголовок, который <audio> не
+     * передаёт. Берём байты через наш auth'ed endpoint и оборачиваем в
+     * blob: URL для воспроизведения. URL остаётся валидным до перезагрузки
+     * страницы или явного `URL.revokeObjectURL` (мелкая утечка на клик —
+     * приемлемо).
+     */
+    previewBlobUrl: async (voiceId: string): Promise<string> => {
+      const headers: Record<string, string> = {};
+      if (_initDataRaw) headers["Authorization"] = `tma ${_initDataRaw}`;
+      else if (_webToken) headers["Authorization"] = `wtoken ${_webToken}`;
+      const res = await fetch(
+        `${API_BASE}/cartesia-voices/${encodeURIComponent(voiceId)}/preview`,
+        { headers, cache: "no-store" },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    },
   },
 
   userVoices: {

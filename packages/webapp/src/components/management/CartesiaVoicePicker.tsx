@@ -87,8 +87,12 @@ export function CartesiaVoicePicker({ voiceId, onChange }: CartesiaVoicePickerPr
     ]
       .filter(Boolean)
       .join(" · "),
-    hasPreview: !!v.preview_url,
-    resolvePreviewUrl: v.preview_url ? () => v.preview_url! : undefined,
+    hasPreview: v.has_preview,
+    // Cartesia preview-URL требует Bearer-заголовок (<audio> его не передаёт),
+    // поэтому тянем байты через наш authed endpoint и оборачиваем в blob: URL.
+    resolvePreviewUrl: v.has_preview
+      ? async () => api.cartesiaVoices.previewBlobUrl(v.voice_id)
+      : undefined,
   }));
 
   const mineItems: VoiceListItem[] = myVoices.map((v) => ({

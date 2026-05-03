@@ -379,7 +379,9 @@ export function createBot(token: string): Bot<BotContext> {
           reply_markup: new InlineKeyboard()
             .text(t.audio.ttsOpenai, "audio_model:tts-openai")
             .row()
-            .text(t.audio.ttsEl, "audio_model:tts-el"),
+            .text(t.audio.ttsEl, "audio_model:tts-el")
+            .row()
+            .text(t.audio.ttsCartesia, "audio_model:tts-cartesia"),
         });
       },
       [t.audio.voiceClone]: () => handleAudioSubSection(ctx, "voice-clone"),

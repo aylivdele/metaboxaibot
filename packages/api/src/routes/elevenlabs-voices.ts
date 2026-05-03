@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
-import { config } from "@metabox/shared";
+import { acquireKey } from "../services/key-pool.service.js";
+import { PoolExhaustedError } from "../utils/pool-exhausted-error.js";
 
 interface ElevenLabsVoiceRaw {
   voice_id: string;
@@ -26,9 +27,14 @@ export const elevenlabsVoicesRoutes: FastifyPluginAsync = async (fastify) => {
       return voicesCache.data;
     }
 
-    const apiKey = config.ai.elevenlabs;
-    if (!apiKey) {
-      return reply.status(503).send({ error: "ElevenLabs API key not configured" });
+    let apiKey: string;
+    try {
+      apiKey = (await acquireKey("elevenlabs")).apiKey;
+    } catch (err) {
+      if (err instanceof PoolExhaustedError) {
+        return reply.status(503).send({ error: "ElevenLabs API key not configured" });
+      }
+      throw err;
     }
 
     const res = await fetch("https://api.elevenlabs.io/v1/voices?show_legacy=false", {

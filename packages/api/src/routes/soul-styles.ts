@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
-import { config } from "@metabox/shared";
+import { acquireKey } from "../services/key-pool.service.js";
+import { PoolExhaustedError } from "../utils/pool-exhausted-error.js";
 import { logger } from "../logger.js";
 
 interface SoulStyle {
@@ -22,15 +23,22 @@ export const soulStylesRoutes: FastifyPluginAsync = async (fastify) => {
       return stylesCache.data;
     }
 
-    const apiKey = config.ai.higgsfieldApiKey;
-    const apiSecret = config.ai.higgsfieldApiSecret;
-    if (!apiKey || !apiSecret) {
-      return reply.status(503).send({ error: "Higgsfield API key not configured" });
+    // Higgsfield Soul использует комбинированный credential `apiKey:apiSecret`
+    // (формат провайдера `higgsfield_soul` в key-pool, env-fallback соберёт пару
+    // из двух env-переменных).
+    let combined: string;
+    try {
+      combined = (await acquireKey("higgsfield_soul")).apiKey;
+    } catch (err) {
+      if (err instanceof PoolExhaustedError) {
+        return reply.status(503).send({ error: "Higgsfield API key not configured" });
+      }
+      throw err;
     }
 
     const res = await fetch("https://platform.higgsfield.ai/v1/text2image/soul-styles", {
       headers: {
-        Authorization: `Key ${apiKey}:${apiSecret}`,
+        Authorization: `Key ${combined}`,
         Accept: "application/json",
       },
     });

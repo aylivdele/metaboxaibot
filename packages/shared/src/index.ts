@@ -78,8 +78,15 @@ export {
 } from "./utils/model-modes.js";
 
 // i18n
-export { getT, preloadLocales, buildDialogHint, buildResultCaption } from "./i18n/index.js";
-export type { Translations } from "./i18n/index.js";
+export {
+  getT,
+  preloadLocales,
+  buildDialogHint,
+  buildResultCaption,
+  pickGenerationFailedMessage,
+  resolveUserFacingErrorVariant,
+} from "./i18n/index.js";
+export type { Translations, GenerationFailedSection } from "./i18n/index.js";
 export {
   MODEL_TRANSLATIONS,
   SETTING_TRANSLATIONS,

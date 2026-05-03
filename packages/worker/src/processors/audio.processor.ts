@@ -9,7 +9,13 @@ import { deductTokens, calculateCost, translatePromptIfNeeded } from "@metabox/a
 import type { DeductResult } from "@metabox/api/services";
 import { buildS3Key, uploadBuffer, uploadFromUrl, getFileUrl } from "@metabox/api/services/s3";
 import { logger } from "../logger.js";
-import { config, AI_MODELS, getT, buildResultCaption } from "@metabox/shared";
+import {
+  config,
+  AI_MODELS,
+  getT,
+  buildResultCaption,
+  pickGenerationFailedMessage,
+} from "@metabox/shared";
 import { notifyTechError, notifyTechErrorThrottled } from "../utils/notify-error.js";
 import {
   resolveUserFacingMessage,
@@ -391,7 +397,7 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
   } catch (err) {
     if (err instanceof DelayedError) throw err;
     if (isRateLimitLongWindowError(err)) {
-      const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);
+      const msg = pickGenerationFailedMessage(t, modelName, "audio");
       await db.generationJob.update({
         where: { id: dbJobId },
         data: { status: "failed", error: msg },
@@ -466,7 +472,7 @@ export async function processAudioJob(job: Job<AudioJobData>, token?: string): P
       await telegram
         .sendMessage(
           telegramChatId,
-          userMessage ?? t.errors.generationFailed.replace("{modelName}", modelName),
+          userMessage ?? pickGenerationFailedMessage(t, modelName, "audio"),
         )
         .catch(() => void 0);
     }

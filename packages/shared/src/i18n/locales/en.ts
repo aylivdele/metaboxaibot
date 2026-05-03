@@ -102,6 +102,7 @@ export default {
     tts: "🗣 Speech synthesis",
     ttsEl: "🔊 TTS ElevenLabs",
     ttsOpenai: "🗣 OpenAI TTS",
+    ttsCartesia: "🎙 TTS Cartesia",
     voiceClone: "🎙 Voice Clone",
     music: "🎵 Music generation",
     musicEl: "🎶 ElevenLabs (without vocal)",
@@ -114,6 +115,8 @@ export default {
       "🗣 Text-to-Speech (OpenAI) activated.\nSend me any text and I will convert it to speech.",
     ttsElActivated:
       "🔊 ElevenLabs TTS activated.\nSend me any text to synthesize. Configure the voice in Management settings.\n\n━━━━━━━━━━━━━━━━━━\n💡 <b>The model automatically synthesizes speech in whatever language the text is written in.</b>\n━━━━━━━━━━━━━━━━━━",
+    ttsCartesiaActivated:
+      "🎙 Cartesia TTS activated.\nSend me any text to synthesize — both your cloned voices and the Cartesia catalog are supported. Configure the voice and parameters in Management settings.\n\n━━━━━━━━━━━━━━━━━━\n💡 <b>Cartesia Sonic-3 supports emotion, speed and volume; language is auto-detected from the text.</b>\n━━━━━━━━━━━━━━━━━━",
     voiceCloneActivated:
       "🎙 Send me a voice message or audio file (MP3/WAV/OGG) — I'll create your voice profile. About 5 seconds of clean speech is enough. The voice will then be available in speech synthesis and video avatars.\n\n<blockquote><b>💡 Tips for a quality clone:</b>\n• Speak in the style you want the clone to have (clone will mimic energy and emotion).\n• Speak clearly in a quiet room — a decent mic helps.\n• Avoid long pauses — they get copied too.\n• Trim silence at the start and end of the recording.\n• Record in the language you plan to use for synthesis.</blockquote>",
     voiceCloneNeedsAudio: "Please send a voice message or audio file for voice cloning.",
@@ -565,10 +568,10 @@ export default {
   },
   confirmGeneration: {
     message:
-      "Model: {model}\nPrompt:\n<blockquote expandable>{prompt}</blockquote>\n\nEstimated price: {cost} ✦\n\nStart generation?",
+      "Model: {model}\n💬 Prompt:\n<blockquote expandable>{prompt}</blockquote>\n\n💰 Estimated price: {cost} ✦\n\nStart generation?",
     voicePrompt: "🎵 voice message",
-    start: "Start",
-    cancel: "Cancel",
+    start: "✅ Start",
+    cancel: "❌ Cancel",
     cancelled: "Generation cancelled.",
     cancelledWithFiles: "Generation cancelled. Uploaded files have been preserved.",
     expired: "Request expired, please send the prompt again.",
@@ -604,5 +607,16 @@ export default {
     password: "Password",
     submit: "Continue",
     error: "Error. Please check your details and try again.",
+  },
+  generationFailedVariants: [
+    "❌ {modelName} is temporarily unavailable. We already know and we're fixing it. Don't get bored — we have 70+ other AI models, you'll surely find something you like.",
+    "❌ {modelName} is in a bad mood right now. We know and we're fixing it. While it pulls itself together, try {alternatives} — they're in shape.",
+    "❌ {modelName} lay down for a nap. We're already running to wake it up — check back a bit later. Meanwhile, the bot has 70+ other AI models that are definitely not asleep.",
+  ],
+  generationFailedAlternatives: {
+    gpt: "GPT-5, Gemini Pro or Grok",
+    design: "Nano Banana, GPT Image or Imagen",
+    video: "Seedance, Kling or Runway",
+    audio: "ElevenLabs, OpenAI TTS or Suno",
   },
 } as const;

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
-import { config } from "@metabox/shared";
+import { acquireKey } from "../services/key-pool.service.js";
+import { PoolExhaustedError } from "../utils/pool-exhausted-error.js";
 
 interface HiggsFieldMotion {
   id: string;
@@ -22,15 +23,23 @@ export const higgsfieldMotionsRoutes: FastifyPluginAsync = async (fastify) => {
       return motionsCache.data;
     }
 
-    const apiKey = config.ai.higgsfieldApiKey;
-    const apiSecret = config.ai.higgsfieldApiSecret;
-    if (!apiKey || !apiSecret) {
-      return reply.status(503).send({ error: "Higgsfield API key not configured" });
+    // Higgsfield-аккаунт использует комбинированный credential `apiKey:apiSecret`.
+    // В key-pool такой формат хранит только провайдер `higgsfield_soul` (env-fallback
+    // соберёт пару из двух env-переменных), поэтому тянем его и подставляем как есть
+    // в Authorization-заголовок.
+    let combined: string;
+    try {
+      combined = (await acquireKey("higgsfield_soul")).apiKey;
+    } catch (err) {
+      if (err instanceof PoolExhaustedError) {
+        return reply.status(503).send({ error: "Higgsfield API key not configured" });
+      }
+      throw err;
     }
 
     const res = await fetch("https://platform.higgsfield.ai/v1/motions", {
       headers: {
-        Authorization: `Key ${apiKey}:${apiSecret}`,
+        Authorization: `Key ${combined}`,
         Accept: "application/json",
       },
     });

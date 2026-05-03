@@ -18,7 +18,8 @@ import { acquireById } from "./key-pool.service.js";
 import type { Prisma } from "@prisma/client";
 import { db } from "../db.js";
 import type { LLMInput, MessageAttachment } from "../ai/llm/base.adapter.js";
-import { AI_MODELS, UserFacingError } from "@metabox/shared";
+import { AI_MODELS, UserFacingError, getFallbackCandidates } from "@metabox/shared";
+import type { AIModel } from "@metabox/shared";
 import { userStateService } from "./user-state.service.js";
 import { getFileUrl } from "./s3.service.js";
 import {
@@ -38,7 +39,7 @@ import {
   type AcquiredKey,
 } from "./key-pool.service.js";
 import { isPoolExhaustedError } from "../utils/pool-exhausted-error.js";
-import { resolveKeyProvider } from "../ai/key-provider.js";
+import { resolveKeyProvider, resolveKeyProviderForModel } from "../ai/key-provider.js";
 import {
   classifyRateLimit,
   isFiveXxError,
@@ -117,27 +118,69 @@ export const chatService = {
     if (!dialog) throw new Error(`Dialog ${dialogId} not found`);
 
     const model = AI_MODELS[dialog.modelId];
-    const keyProvider = resolveKeyProvider(dialog.modelId);
+    // keyProvider mutable — переключается на fallback'а при исчерпании primary'а
+    // на 5xx/network. attemptedProviders отслеживает уже опробованные провайдеры
+    // (по полю `model.provider`, не по `keyProvider` — у двух разных провайдеров
+    // может быть один key-pool через resolveKeyProvider).
+    let keyProvider = resolveKeyProvider(dialog.modelId);
+    const attemptedProviders = new Set<string>();
+    if (model?.provider) attemptedProviders.add(model.provider);
+    // activeAdapterModel хранит модель, использованную для создания текущего
+    // adapter'а — primary string'ом или fallback AIModel'ом. На key-rotation
+    // нужен этот же модель (а не lookup по id), иначе после fallback-switch
+    // следующая key-rotation создала бы primary-адаптер вместо fallback.
+    let activeAdapterModel: string | AIModel = dialog.modelId;
 
-    // Acquire a key from the pool before any work — if the pool is exhausted
-    // (all keys throttled), surface a user-facing "model temporarily unavailable"
-    // error rather than enqueueing (chat is interactive, no re-enqueue path).
+    // Acquire a key from the pool before any work. Если primary pool исчерпан
+    // на старте (все ключи в cooldown) — пробуем fallback-провайдеров перед тем
+    // как сдаваться. Mirror'ит поведение image processor'а на submit-stage.
     let acquired: AcquiredKey;
     try {
       acquired = await acquireKey(keyProvider);
     } catch (err) {
-      if (isPoolExhaustedError(err)) {
+      if (!isPoolExhaustedError(err)) throw err;
+
+      let initFallbackAcquired: AcquiredKey | null = null;
+      for (const candidate of getFallbackCandidates(dialog.modelId, "llm")) {
+        if (attemptedProviders.has(candidate.provider)) continue;
+        const candidateKeyProvider = resolveKeyProviderForModel(candidate);
+        try {
+          initFallbackAcquired = await acquireKey(candidateKeyProvider);
+        } catch (poolErr) {
+          if (isPoolExhaustedError(poolErr)) continue;
+          throw poolErr;
+        }
+        logger.warn(
+          {
+            dialogId,
+            modelId: dialog.modelId,
+            fromProvider: model?.provider,
+            toProvider: candidate.provider,
+            reason: "pool_exhausted_at_init",
+          },
+          "chat.sendMessageStream: primary pool exhausted at init — using fallback provider",
+        );
+        keyProvider = candidateKeyProvider;
+        activeAdapterModel = candidate;
+        attemptedProviders.add(candidate.provider);
+        break;
+      }
+
+      if (!initFallbackAcquired) {
         throw new UserFacingError(`Pool exhausted for ${keyProvider}`, {
           key: "modelTemporarilyUnavailable",
+          section: "gpt",
           params: { modelName: model?.name ?? dialog.modelId },
         });
       }
-      throw err;
+      acquired = initFallbackAcquired;
     }
     // Mutable: на retry с другим ключом (rate-limit / 5xx до первого chunk'а)
-    // переприсваиваем acquired/keyId/adapter и шлём запрос заново.
+    // переприсваиваем acquired/keyId/adapter и шлём запрос заново. На fallback'е
+    // (другой провайдер) переприсваиваем дополнительно keyProvider + adapter
+    // через AIModel-объект из FALLBACK_LLM_MODELS.
     let acquiredKeyId = acquired.keyId;
-    let adapter = createLLMAdapter(dialog.modelId, acquired);
+    let adapter = createLLMAdapter(activeAdapterModel, acquired);
 
     // Split attachments into two classes:
     //  - text-class (.txt, .csv, .docx, .xlsx, etc.) — always extracted + inlined.
@@ -368,10 +411,14 @@ export const chatService = {
       }
     };
 
-    // Outer retry loop: на rate-limit / 5xx ДО emit'а первого chunk'а пробуем
-    // следующий ключ из пула. previousResponseId дропаем (новый ключ ≠ старый
-    // OpenAI org). Если эмиттнутые chunks > 0 — retry'нуть нельзя
+    // Outer retry loop: на rate-limit / 5xx / network ДО emit'а первого chunk'а
+    // пробуем следующий ключ из пула. previousResponseId дропаем (новый ключ ≠
+    // старый OpenAI org). Если эмиттнутые chunks > 0 — retry'нуть нельзя
     // (continuity сломается), throw'аем как раньше.
+    //
+    // Provider-fallback: если key-pool primary'а исчерпан с 5xx/network ошибкой,
+    // ищем кандидата в FALLBACK_LLM_MODELS и переключаемся туда (mirror'ит
+    // поведение image/video processor'ов). Триггерится только когда chunks=0.
     const MAX_KEY_ATTEMPTS = 2;
     let keyAttempt = 0;
     while (true) {
@@ -420,6 +467,7 @@ export const chatService = {
           : is5xx
             ? "5xx error"
             : "Network error";
+        const failureReasonLabel = cls.isRateLimit ? "rate_limit" : is5xx ? "5xx" : "network";
 
         if (acquiredKeyId) {
           if (cls.isRateLimit) {
@@ -429,7 +477,72 @@ export const chatService = {
           }
         }
 
+        // Closure: пытается переключиться на fallback-провайдера. Возвращает
+        // true если switch удался (caller должен `continue` outer loop'а),
+        // false если fallback'а нет / chunks уже отдавались / ошибка не
+        // транзиентная / pool fallback'а тоже пуст.
+        const trySwitchToFallbackProvider = async (): Promise<boolean> => {
+          if (haveChunks) return false;
+          if (!isTransient) return false;
+
+          const candidates = getFallbackCandidates(dialog.modelId, "llm").filter(
+            (m: AIModel) => !attemptedProviders.has(m.provider),
+          );
+          if (candidates.length === 0) return false;
+
+          const next = candidates[0]!;
+          const nextKeyProvider = resolveKeyProviderForModel(next);
+
+          let nextAcquired;
+          try {
+            nextAcquired = await acquireKey(nextKeyProvider);
+          } catch (poolErr) {
+            if (isPoolExhaustedError(poolErr)) return false;
+            throw poolErr;
+          }
+
+          logger.warn(
+            {
+              dialogId,
+              modelId: dialog.modelId,
+              fromProvider: model?.provider ?? keyProvider,
+              toProvider: next.provider,
+              reason: failureReasonLabel,
+            },
+            "chat.sendMessageStream: switching to fallback provider",
+          );
+
+          attemptedProviders.add(next.provider);
+          keyProvider = nextKeyProvider;
+          acquired = nextAcquired;
+          acquiredKeyId = nextAcquired.keyId;
+          adapter = createLLMAdapter(next, nextAcquired);
+          activeAdapterModel = next;
+
+          // Новый провайдер = другая org для OpenAI-семейства → previousResponseId
+          // невалиден. Дропаем + шлём полную историю.
+          if (input.previousResponseId !== undefined) {
+            const history = await dialogService.getHistory(dialogId, adapter.contextMaxMessages);
+            const augmented = await Promise.all(
+              history.map((m) =>
+                augmentHistoryMessage(m, model?.supportsDocuments === true, extractCache),
+              ),
+            );
+            input = { ...input, history: augmented, previousResponseId: undefined };
+          }
+
+          // Сбрасываем счётчик попыток — у fallback'а тоже свой бюджет MAX_KEY_ATTEMPTS.
+          keyAttempt = 0;
+          return true;
+        };
+
         if (!canKeyRetry) {
+          // В пределах текущего провайдера попыток не осталось → пробуем
+          // переключиться на fallback. Если получилось — outer loop рестартует
+          // с новым keyProvider.
+          if (await trySwitchToFallbackProvider()) {
+            continue;
+          }
           await dialogService.markMessageFailed(userMessage.id);
           // Convert transient errors (429 / 5xx / network) into a user-facing
           // message. Raw stack trace юзеру бесполезен; оригинал кладём в cause,
@@ -437,6 +550,7 @@ export const chatService = {
           if (isTransient) {
             throw new UserFacingError(`${transientReason} on ${keyProvider}`, {
               key: "modelTemporarilyUnavailable",
+              section: "gpt",
               params: { modelName: model?.name ?? dialog.modelId },
               notifyOps: true,
               cause: err,
@@ -451,11 +565,15 @@ export const chatService = {
           nextAcquired = await acquireKey(keyProvider);
         } catch (poolErr) {
           if (isPoolExhaustedError(poolErr)) {
-            // Все ключи throttled — terminal failure для текущего цикла.
+            // Все ключи текущего провайдера throttled → пробуем fallback-провайдера.
+            if (await trySwitchToFallbackProvider()) {
+              continue;
+            }
             await dialogService.markMessageFailed(userMessage.id);
             if (isTransient) {
               throw new UserFacingError(`${transientReason} on ${keyProvider}`, {
                 key: "modelTemporarilyUnavailable",
+                section: "gpt",
                 params: { modelName: model?.name ?? dialog.modelId },
                 notifyOps: true,
                 cause: err,
@@ -472,7 +590,7 @@ export const chatService = {
             modelId: dialog.modelId,
             prevKey: acquiredKeyId,
             newKey: nextAcquired.keyId,
-            reason: cls.isRateLimit ? "rate_limit" : is5xx ? "5xx" : "network",
+            reason: failureReasonLabel,
           },
           "chat.sendMessageStream: retrying with fallback key",
         );
@@ -484,7 +602,7 @@ export const chatService = {
         const keyChanged = acquiredKeyId !== nextAcquired.keyId;
         acquired = nextAcquired;
         acquiredKeyId = nextAcquired.keyId;
-        adapter = createLLMAdapter(dialog.modelId, nextAcquired);
+        adapter = createLLMAdapter(activeAdapterModel, nextAcquired);
 
         if (keyChanged && input.previousResponseId !== undefined) {
           const history = await dialogService.getHistory(dialogId, adapter.contextMaxMessages);

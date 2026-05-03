@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { telegramAuthHook } from "../middlewares/telegram-auth.js";
-import { config } from "@metabox/shared";
+import { acquireKey } from "../services/key-pool.service.js";
+import { PoolExhaustedError } from "../utils/pool-exhausted-error.js";
 
 interface CartesiaVoiceRaw {
   id: string;
@@ -25,21 +26,34 @@ let voicesCache: { data: object[]; at: number } | null = null;
 const CARTESIA_VERSION = "2026-03-01";
 const CARTESIA_API = "https://api.cartesia.ai";
 
+async function getCartesiaApiKey(): Promise<string | null> {
+  try {
+    return (await acquireKey("cartesia")).apiKey;
+  } catch (err) {
+    if (err instanceof PoolExhaustedError) return null;
+    throw err;
+  }
+}
+
 export const cartesiaVoicesRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", telegramAuthHook);
 
   /**
    * GET /cartesia-voices — список официальных (public) Cartesia voices.
    * is_owner=false → исключает наших клонированных голосов (они отдаются через
-   * /user-voices). expand[]=preview_file_url включает поле для проигрывания.
-   * Кэш 1ч — official-каталог редко меняется.
+   * /user-voices). Кэш 1ч — official-каталог редко меняется.
+   *
+   * Note: preview-URL (`preview_file_url`) НЕ включаем в листинг и НЕ кэшируем —
+   * Cartesia подписывает их короткоживущим токеном (TTL минут), а наш кэш на час
+   * стабильно возвращал бы протухшие линки. Клиент получает только `has_preview`,
+   * а сам URL запрашивается on-demand через `/cartesia-voices/:id/preview-url`.
    */
   fastify.get("/cartesia-voices", async (_request, reply) => {
     if (voicesCache && Date.now() - voicesCache.at < CACHE_TTL_MS) {
       return voicesCache.data;
     }
 
-    const apiKey = config.ai.cartesia;
+    const apiKey = await getCartesiaApiKey();
     if (!apiKey) {
       return reply.status(503).send({ error: "Cartesia API key not configured" });
     }
@@ -74,16 +88,76 @@ export const cartesiaVoicesRoutes: FastifyPluginAsync = async (fastify) => {
       cursor = data[data.length - 1].id;
     }
 
-    const data = all.map((v) => ({
-      voice_id: v.id,
-      name: v.name,
-      description: v.description ?? null,
-      gender: v.gender ?? null,
-      language: v.language ?? null,
-      preview_url: v.preview_file_url ?? null,
-    }));
+    const data = all
+      .filter((v) => v.is_public)
+      .map((v) => ({
+        voice_id: v.id,
+        name: v.name,
+        description: v.description ?? null,
+        gender: v.gender ?? null,
+        language: v.language ?? null,
+        has_preview: !!v.preview_file_url,
+      }));
 
     voicesCache = { data, at: Date.now() };
     return data;
   });
+
+  /**
+   * GET /cartesia-voices/:id/preview — стримит preview-аудио с Cartesia через
+   * наш сервер. preview_file_url требует Bearer-заголовок (Cartesia 401 без
+   * него), а browser'овский <audio> элемент авторизацию не передаёт. Поэтому
+   * прокидываем байты сами: fetch /voices/:id с expand → получаем свежий
+   * preview_file_url → fetch файла с Bearer → отдаём audio/mpeg клиенту.
+   *
+   * Webapp вызывает это через api.cartesiaVoices.previewBlob, который оборачивает
+   * ответ в blob: URL для <audio>.
+   */
+  fastify.get<{ Params: { id: string } }>(
+    "/cartesia-voices/:id/preview",
+    async (request, reply) => {
+      const { id } = request.params;
+      const apiKey = await getCartesiaApiKey();
+      if (!apiKey) {
+        return reply.status(503).send({ error: "Cartesia API key not configured" });
+      }
+
+      const metaUrl = new URL(`${CARTESIA_API}/voices/${encodeURIComponent(id)}`);
+      metaUrl.searchParams.append("expand[]", "preview_file_url");
+
+      const metaRes = await fetch(metaUrl, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Cartesia-Version": CARTESIA_VERSION,
+          Accept: "application/json",
+        },
+      });
+
+      if (!metaRes.ok) {
+        const text = await metaRes.text();
+        return reply.status(502).send({ error: `Cartesia error: ${metaRes.status} ${text}` });
+      }
+
+      const voice = (await metaRes.json()) as CartesiaVoiceRaw;
+      const previewUrl = voice.preview_file_url ?? null;
+      if (!previewUrl) return reply.status(404).send({ error: "No preview available" });
+
+      const fileRes = await fetch(previewUrl, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Cartesia-Version": CARTESIA_VERSION,
+        },
+      });
+      if (!fileRes.ok) {
+        const text = await fileRes.text().catch(() => "");
+        return reply
+          .status(502)
+          .send({ error: `Cartesia preview download failed: ${fileRes.status} ${text}` });
+      }
+
+      const buffer = Buffer.from(await fileRes.arrayBuffer());
+      const contentType = fileRes.headers.get("content-type") ?? "audio/mpeg";
+      return reply.header("content-type", contentType).send(buffer);
+    },
+  );
 };

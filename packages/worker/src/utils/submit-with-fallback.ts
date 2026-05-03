@@ -185,10 +185,10 @@ export async function submitWithFallback<T, D extends object>(
   // бы пока самый «лежачий» провайдер выйдет из cooldown'а.
   let lastDeferDelay: number | null = null;
   const updateDeferDelay = (candidateMs: number): void => {
-    // Fix: PoolExhaustedError(provider, 0) бросается envFallback'ом когда
-    // provider misconfigured (нет ни env-ключа, ни DB-rows) — это не "ждать 0мс",
-    // а "этот provider в принципе не работает". Не позволяем такому 0 поглощать
-    // useful TTL других candidates через MIN. Игнорируем noise-значения.
+    // Fix: PoolExhaustedError(provider, 0) бросается, когда у provider'а нет
+    // активных ключей в пуле — это не "ждать 0мс", а "этот provider в принципе
+    // не работает". Не позволяем такому 0 поглощать useful TTL других
+    // candidates через MIN. Игнорируем noise-значения.
     if (candidateMs <= 0) return;
     lastDeferDelay = lastDeferDelay === null ? candidateMs : Math.min(lastDeferDelay, candidateMs);
   };
