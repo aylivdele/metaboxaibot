@@ -501,6 +501,8 @@ export default {
       "Референсные аудио для генерации:\n• До 3 файлов\n• Суммарная длительность до 15 секунд\n• До 15 МБ каждый (MP3, WAV)\n• При использовании аудио нужно также хотя бы одно изображение или видео\n\nОбращайтесь к ним в промпте через @Audio1, @Audio2 и т.д.\n\nОтправляйте аудио по одному.",
     drivingAudio: "🎵 Аудиодорожка",
     firstClip: "🎬 Начальный клип",
+    avatarPhoto: "🖼 Фото аватара",
+    voiceAudio: "🎙 Голос",
     firstFrameWanHint:
       "Wan 2.7 поддерживает следующие комбинации входов:\n• Первый кадр\n• Первый кадр + аудиодорожка\n• Первый кадр + последний кадр\n• Первый кадр + последний кадр + аудиодорожка\n• Начальный клип\n• Начальный клип + последний кадр\n\nОграничения изображения: JPEG/PNG/BMP/WEBP, до 20 МБ, стороны 240–8000 px, соотношение 1:8–8:1.",
     lastFrameWanHint:
@@ -580,6 +582,12 @@ export default {
     mediaPreviewVideoMulti: "🎥 Эти видео будут использоваться как «{label}»",
     mediaPreviewAudioSingle: "🎵 Это аудио будет использоваться как «{label}»",
     mediaPreviewAudioMulti: "🎵 Эти аудио будут использоваться как «{label}»",
+    mediaPreviewFileSingle: "📎 Файл будет использоваться как «{label}»",
+    mediaPreviewFileMulti: "📎 {count} {noun} будут использоваться как «{label}»",
+    mediaPreviewFileSupplement: "📎 + ещё {count} {noun}",
+    mediaFileNounOne: "файл",
+    mediaFileNounFew: "файла",
+    mediaFileNounMany: "файлов",
   },
   modelModes: {
     pickerTitle: "Выберите режим работы:",

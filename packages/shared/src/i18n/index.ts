@@ -362,6 +362,8 @@ export interface Translations {
     referenceAudiosHint: string;
     drivingAudio: string;
     firstClip: string;
+    avatarPhoto: string;
+    voiceAudio: string;
     firstFrameWanHint: string;
     lastFrameWanHint: string;
     drivingAudioHint: string;
@@ -427,6 +429,12 @@ export interface Translations {
     mediaPreviewVideoMulti: string;
     mediaPreviewAudioSingle: string;
     mediaPreviewAudioMulti: string;
+    mediaPreviewFileSingle: string;
+    mediaPreviewFileMulti: string;
+    mediaPreviewFileSupplement: string;
+    mediaFileNounOne: string;
+    mediaFileNounFew: string;
+    mediaFileNounMany: string;
   };
   modelModes: {
     pickerTitle: string;

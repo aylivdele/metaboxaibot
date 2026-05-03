@@ -85,8 +85,13 @@ const EXT_TO_MIME: Record<string, string> = {
 
 /** Default model for new GPT dialogs (user can change via Management). */
 const DEFAULT_GPT_MODEL = "o4-mini";
-/** Minimum ms between Telegram message edits (rate-limit safety). */
-const EDIT_THROTTLE_MS = 1200;
+/**
+ * Minimum ms between Telegram message edits (rate-limit safety). Telegram
+ * держит per-chat editMessage rate-limit и периодически отвечает 429 с
+ * retry_after в десятки секунд — 2.2с интервал даёт запас сверх их 1с/edit
+ * политики, чтобы реже ловить 429 на длинных стримах.
+ */
+const EDIT_THROTTLE_MS = 2200;
 /** Finalize current message and start a new one when accumulated text reaches this length. */
 const MSG_SPLIT_AT = 3800;
 /**
@@ -96,6 +101,27 @@ const MSG_SPLIT_AT = 3800;
  * консервативный запас, чтобы даже после escape тело укладывалось в 4096.
  */
 const FINAL_CHUNK_MAX = 3500;
+
+/**
+ * Telegram отдаёт 429 с `parameters.retry_after` (секунды). Когда мы стримим
+ * длинный ответ кучей edit'ов, лимит на чат периодически срабатывает —
+ * парсим cooldown и используем чтобы либо подождать (если короткий), либо
+ * отстать от editMessage (если длинный, см. RETRY_AFTER_INLINE_MAX_MS).
+ */
+function parseRetryAfterMs(err: unknown): number | null {
+  if (!err || typeof err !== "object") return null;
+  const e = err as { error_code?: unknown; parameters?: { retry_after?: unknown } };
+  if (e.error_code === 429 && typeof e.parameters?.retry_after === "number") {
+    return e.parameters.retry_after * 1000;
+  }
+  return null;
+}
+
+/** Максимум inline-ожидания после 429 — дальше пробрасываем результат через
+ *  sendMessage (новое сообщение) вместо застрявшего edit'а. */
+const RETRY_AFTER_INLINE_MAX_MS = 5000;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** Strip <think>...</think> blocks. During streaming, also hides an unclosed partial block. */
 function stripThinkingBlocks(text: string): string {
@@ -119,6 +145,109 @@ async function streamGptResponse(
   let placeholder = await ctx.reply("⏳");
   let accumulated = "";
   let lastEdit = Date.now();
+  // 429 на edit означает per-chat rate-limit. Пока wall-clock < editBlockedUntil
+  // не пытаемся делать preview-edit'ы — иначе только усугубляем cooldown.
+  let editBlockedUntil = 0;
+
+  /**
+   * Доставка одного finalize-чанка. Для первого чанка пробуем edit плейсхолдера;
+   * если получаем 429 с длинным cooldown'ом — переходим на sendMessage
+   * (новое сообщение), чтобы юзер не ждал минуту-две Telegram'овского rate-limit.
+   * Короткий cooldown (<= RETRY_AFTER_INLINE_MAX_MS) пересиживаем и пытаемся
+   * edit ещё раз. На MarkdownV2-parse-fail падаем в plain-text. Subsequent
+   * чанки всегда идут sendMessage'ом.
+   */
+  const deliverChunk = async (
+    msgId: number,
+    body: string,
+    v2: string,
+    isFirst: boolean,
+  ): Promise<void> => {
+    const tryEdit = async (text: string, withMarkdown: boolean): Promise<void> => {
+      await ctx.api.editMessageText(
+        chatId,
+        msgId,
+        text,
+        withMarkdown ? { parse_mode: "MarkdownV2" } : {},
+      );
+    };
+    const trySend = async (text: string, withMarkdown: boolean): Promise<void> => {
+      await ctx.api.sendMessage(chatId, text, withMarkdown ? { parse_mode: "MarkdownV2" } : {});
+    };
+
+    if (!isFirst) {
+      // Subsequent части: всегда новое сообщение. Markdown → plain fallback.
+      try {
+        await trySend(v2, true);
+      } catch (markdownErr) {
+        logger.warn(markdownErr, "GPT finalize: MarkdownV2 send failed, retrying as plain text");
+        await trySend(body, false).catch((plainErr) =>
+          logger.error(plainErr, "GPT finalize: plain text send fallback also failed"),
+        );
+      }
+      return;
+    }
+
+    // Первый чанк: editMessageText по плейсхолдеру.
+    // Каскад: MarkdownV2-edit → 429-handle → plain-edit → 429-handle.
+    // На любом 429 с retry_after > RETRY_AFTER_INLINE_MAX_MS не ждём, а
+    // отдаём результат через sendMessage (плейсхолдер просто остаётся ⏳).
+    const editWithRateLimit = async (text: string, withMarkdown: boolean): Promise<boolean> => {
+      try {
+        await tryEdit(text, withMarkdown);
+        return true;
+      } catch (err) {
+        const retryMs = parseRetryAfterMs(err);
+        if (retryMs === null) throw err;
+        if (retryMs <= RETRY_AFTER_INLINE_MAX_MS) {
+          editBlockedUntil = Date.now() + retryMs;
+          await sleep(retryMs + 100);
+          try {
+            await tryEdit(text, withMarkdown);
+            return true;
+          } catch (retryErr) {
+            const retryRetryMs = parseRetryAfterMs(retryErr);
+            if (retryRetryMs !== null) {
+              editBlockedUntil = Date.now() + retryRetryMs;
+              logger.warn(
+                { retryRetryMs },
+                "GPT finalize: edit still 429 after wait, sending as new message",
+              );
+              return false;
+            }
+            throw retryErr;
+          }
+        }
+        editBlockedUntil = Date.now() + retryMs;
+        logger.warn(
+          { retryMs },
+          "GPT finalize: 429 cooldown too long for inline wait, sending as new message",
+        );
+        return false;
+      }
+    };
+
+    try {
+      const ok = await editWithRateLimit(v2, true);
+      if (!ok) {
+        await trySend(v2, true).catch((sendErr) =>
+          logger.error(sendErr, "GPT finalize: send-as-new MarkdownV2 fallback failed"),
+        );
+      }
+    } catch (markdownErr) {
+      logger.warn(markdownErr, "GPT finalize: MarkdownV2 parse failed, retrying as plain text");
+      try {
+        const ok = await editWithRateLimit(body, false);
+        if (!ok) {
+          await trySend(body, false).catch((sendErr) =>
+            logger.error(sendErr, "GPT finalize: send-as-new plain fallback failed"),
+          );
+        }
+      } catch (plainErr) {
+        logger.error(plainErr, "GPT finalize: plain text fallback also failed");
+      }
+    }
+  };
 
   const finalizeMessage = async (msgId: number, text: string) => {
     // Бьём длинный итоговый текст на части ≤ FINAL_CHUNK_MAX по \n границам.
@@ -151,23 +280,7 @@ async function streamGptResponse(
         carryOpener = opener;
       }
       const v2 = toMarkdownV2(body);
-      if (i === 0) {
-        await ctx.api
-          .editMessageText(chatId, msgId, v2, { parse_mode: "MarkdownV2" })
-          .catch(async (err) => {
-            logger.warn(err, "GPT finalize: MarkdownV2 parse failed, retrying as plain text");
-            await ctx.api
-              .editMessageText(chatId, msgId, body)
-              .catch((e) => logger.error(e, "GPT finalize: plain text fallback also failed"));
-          });
-      } else {
-        await ctx.api.sendMessage(chatId, v2, { parse_mode: "MarkdownV2" }).catch(async (err) => {
-          logger.warn(err, "GPT finalize: MarkdownV2 send failed, retrying as plain text");
-          await ctx.api
-            .sendMessage(chatId, body)
-            .catch((e) => logger.error(e, "GPT finalize: plain text send fallback also failed"));
-        });
-      }
+      await deliverChunk(msgId, body, v2, i === 0);
     }
   };
 
@@ -203,17 +316,38 @@ async function streamGptResponse(
       }
 
       const now = Date.now();
+      // Если поймали 429 на edit'е — пропускаем preview-edit'ы пока cooldown
+      // не истечёт. Финальный edit/send всё равно произойдёт в finalizeMessage.
+      if (now < editBlockedUntil) continue;
       if (now - lastEdit >= EDIT_THROTTLE_MS && accumulated.trim()) {
         const visible = stripThinkingBlocks(accumulated);
         if (visible) {
           const preview = toMarkdownV2(closeOpenMarkdownV2(visible).closed) + " ▌";
+          // Перехватываем 429 в обоих ветках (markdown + plain) и устанавливаем
+          // editBlockedUntil — без этого продолжали бы биться в rate-limit
+          // на каждом chunk'е и копить штраф.
+          const handlePreviewError = (err: unknown, ctxLabel: string): void => {
+            const retryMs = parseRetryAfterMs(err);
+            if (retryMs !== null) {
+              editBlockedUntil = Date.now() + retryMs;
+              logger.warn({ retryMs }, `${ctxLabel}: rate-limited, deferring preview edits`);
+            } else {
+              logger.warn(err, `${ctxLabel}: edit failed`);
+            }
+          };
           await ctx.api
             .editMessageText(chatId, placeholder.message_id, preview, { parse_mode: "MarkdownV2" })
             .catch(async (err) => {
+              const retryMs = parseRetryAfterMs(err);
+              if (retryMs !== null) {
+                editBlockedUntil = Date.now() + retryMs;
+                logger.warn({ retryMs }, "GPT stream: rate-limited, deferring preview edits");
+                return;
+              }
               logger.warn(err, "GPT stream: markdown preview failed, retrying as plain text");
               await ctx.api
                 .editMessageText(chatId, placeholder.message_id, visible + " ▌")
-                .catch((e) => logger.error(e, "GPT stream: plain text preview also failed"));
+                .catch((e) => handlePreviewError(e, "GPT stream: plain text preview"));
             });
           lastEdit = now;
         }

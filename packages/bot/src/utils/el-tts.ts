@@ -11,6 +11,7 @@ import { resolveVoiceForTTS } from "@metabox/api/services/user-voice";
 import { db } from "@metabox/api/db";
 import { AI_MODELS } from "@metabox/shared";
 import { logger } from "../logger.js";
+import { resolveMediaInputUrls } from "./media-input-state.js";
 
 export const AVATAR_MODELS = new Set(["heygen", "d-id"]);
 
@@ -35,7 +36,7 @@ export async function preGenerateELTts(
 ): Promise<string | null> {
   if (!AVATAR_MODELS.has(modelId)) return null;
   if (rawVoiceOverride) return null; // raw audio takes priority
-  if (videoModelSettings.voice_s3key as string | undefined) return null;
+  if (videoModelSettings.voice_s3key as string | undefined) return null; // legacy guard
 
   const requestedVoice = videoModelSettings.voice_id as string | undefined;
   const voiceProvider = videoModelSettings.voice_provider as string | undefined;
@@ -156,8 +157,10 @@ async function runTts(
 export async function ensureELTtsForVideo(
   submitParams: SubmitVideoParams,
 ): Promise<SubmitVideoParams> {
-  const { userId, modelId, prompt, extraModelSettings } = submitParams;
+  const { userId, modelId, prompt, mediaInputs, extraModelSettings } = submitParams;
   if (!AVATAR_MODELS.has(modelId)) return submitParams;
+  // Skip if voice is already provided via either channel (new mediaInputs or legacy).
+  if (mediaInputs?.voice_audio?.[0]) return submitParams;
   const existingVoiceS3Key = (extraModelSettings?.voice_s3key as string | undefined)?.trim();
   if (existingVoiceS3Key) return submitParams;
 
@@ -169,10 +172,9 @@ export async function ensureELTtsForVideo(
 
   return {
     ...submitParams,
-    extraModelSettings: {
-      ...extraModelSettings,
-      voice_s3key: elTtsS3Key,
-      voice_url: "",
-    },
+    mediaInputs: await resolveMediaInputUrls({
+      ...(mediaInputs ?? {}),
+      voice_audio: [elTtsS3Key],
+    }),
   };
 }

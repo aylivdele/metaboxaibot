@@ -1456,6 +1456,10 @@ const ALWAYS_HIDDEN_SETTING_KEYS = new Set([
   "voice_s3key",
   "voice_provider",
   "talking_photo_id",
+  // Defensive: hide legacy avatar one-shot keys still present in some users'
+  // modelSettings JSON from before the migration to mediaInputs.avatar_photo
+  // (commit 1ff95dc). No code writes to them anymore — entry can be dropped
+  // after a one-time DB cleanup.
   "avatar_photo_url",
   "avatar_photo_s3key",
   "image_asset_id", // surfaced via the avatar-picker fallback below

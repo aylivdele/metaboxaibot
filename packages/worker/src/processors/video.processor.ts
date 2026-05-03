@@ -265,6 +265,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
         // аплоадим в S3 и передаём адаптеру `voice_url`/`voice_s3key` — HeyGen.submit
         // увидит их вместо voice_id и пойдёт через audio_asset_id flow (lip-sync).
         let effectiveModelSettings = modelSettings;
+        let effectiveMediaInputs = mediaInputs;
         const requestedVoice = (modelSettings?.voice_id as string | undefined)?.trim();
         if (requestedVoice) {
           const userVoice =
@@ -340,12 +341,22 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
                 }
 
                 const voiceUrl = await getFileUrl(voiceS3Key).catch(() => null);
-                effectiveModelSettings = {
-                  ...modelSettings,
-                  voice_id: undefined,
-                  voice_s3key: voiceS3Key,
-                  ...(voiceUrl ? { voice_url: voiceUrl } : {}),
-                };
+                if (voiceUrl) {
+                  // Resolved S3 → fresh URL: write to the new mediaInputs slot.
+                  effectiveMediaInputs = {
+                    ...(effectiveMediaInputs ?? {}),
+                    voice_audio: [voiceUrl],
+                  };
+                  effectiveModelSettings = { ...modelSettings, voice_id: undefined };
+                } else {
+                  // S3 resolution failed (rare). Fall back to the legacy modelSettings
+                  // path so the adapter can attempt freshUrl() on its own.
+                  effectiveModelSettings = {
+                    ...modelSettings,
+                    voice_id: undefined,
+                    voice_s3key: voiceS3Key,
+                  };
+                }
               } else {
                 effectiveModelSettings = { ...modelSettings, voice_id: resolved.voiceId };
               }
@@ -384,7 +395,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
               submitAdapter.submit({
                 prompt: effectivePrompt,
                 imageUrl,
-                mediaInputs,
+                mediaInputs: effectiveMediaInputs,
                 aspectRatio,
                 duration,
                 modelSettings: effectiveModelSettings,
@@ -417,7 +428,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
               return adapter.submit({
                 prompt: effectivePrompt,
                 imageUrl,
-                mediaInputs,
+                mediaInputs: effectiveMediaInputs,
                 aspectRatio,
                 duration,
                 modelSettings: effectiveModelSettings,
@@ -462,7 +473,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
               submitAdapter.submit({
                 prompt: effectivePrompt,
                 imageUrl,
-                mediaInputs,
+                mediaInputs: effectiveMediaInputs,
                 aspectRatio,
                 duration,
                 modelSettings: effectiveModelSettings,
@@ -741,6 +752,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
     const model = AI_MODELS[modelId];
     const hasAudioDriver =
       !!(modelSettings?.voice_s3key || modelSettings?.voice_url) ||
+      !!mediaInputs?.voice_audio?.length ||
       !!mediaInputs?.driving_audio?.length ||
       !!mediaInputs?.reference_audios?.length;
     const caption = buildResultCaption(t, model?.name ?? modelId, prompt, {
