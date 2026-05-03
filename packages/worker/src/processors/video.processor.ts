@@ -42,6 +42,7 @@ import {
   buildResultCaption,
   getFallbackCandidates,
   isFallbackCompatible,
+  pickGenerationFailedMessage,
 } from "@metabox/shared";
 import type { AIModel } from "@metabox/shared";
 import { notifyTechError, notifyFallback } from "../utils/notify-error.js";
@@ -781,7 +782,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
   } catch (err) {
     if (err instanceof DelayedError) throw err;
     if (isRateLimitLongWindowError(err)) {
-      const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);
+      const msg = pickGenerationFailedMessage(t, modelName, "video");
       await db.generationJob.update({
         where: { id: dbJobId },
         data: { status: "failed", error: msg },
@@ -921,7 +922,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
     // Returns silently otherwise → fall through to user-facing failure handling.
     await deferIfTransientNetworkError({ err, job, token, section: "video" });
     if (isHeyGenProviderUnavailable(err)) {
-      const msg = t.errors.modelTemporarilyUnavailable.replace("{modelName}", modelName);
+      const msg = pickGenerationFailedMessage(t, modelName, "video");
       await db.generationJob.update({
         where: { id: dbJobId },
         data: { status: "failed", error: String(err) },
@@ -1049,7 +1050,7 @@ export async function processVideoJob(job: Job<VideoJobData>, token?: string): P
       });
 
       await telegram
-        .sendMessage(telegramChatId, t.errors.generationFailed.replace("{modelName}", modelName))
+        .sendMessage(telegramChatId, pickGenerationFailedMessage(t, modelName, "video"))
         .catch(() => void 0);
     }
 

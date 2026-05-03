@@ -450,7 +450,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     description:
       "Новейший Sonnet (версия 4.6) — лучший баланс цена/качество у Anthropic. Быстрее и дешевле Opus, отлично для кода, текстов и анализа.",
     section: "gpt",
-    provider: "kie-claude",
+    provider: "evolink-claude",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0.85,
     outputCostUsdPerMToken: 4.275,
@@ -485,7 +485,7 @@ export const GPT_MODELS: Record<string, AIModel> = {
     description:
       "Самая быстрая и дешёвая модель Anthropic. Мгновенные ответы для простых задач, понимает изображения. Слабее Sonnet и Opus в рассуждениях.",
     section: "gpt",
-    provider: "kie-claude",
+    provider: "evolink-claude",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 0.275,
     outputCostUsdPerMToken: 1.425,
@@ -737,26 +737,28 @@ export const GPT_MODELS: Record<string, AIModel> = {
     contextStrategy: "db_history",
     contextMaxMessages: 40,
   },
-  // ── Claude (через kie.ai) ─────────────────────────────────────────────────
-  // Цены — USD за 1M ТЕКСТОВЫХ токенов модели (input / output Anthropic-native,
-  // не KIE credits). KIE проксирует /claude/v1/messages 1:1 c Anthropic SSE,
-  // и adapter парсит usage.input_tokens / usage.output_tokens напрямую — это
-  // те же токены, на которые модель токенизирует промпт.
+  // ── Claude (primary через evolink.ai, fallback на kie.ai) ────────────────
+  // Цены — USD за 1M ТЕКСТОВЫХ токенов модели (input / output Anthropic-native).
+  // Оба прокси (evolink, kie) проксируют /v1/messages 1:1 c Anthropic SSE,
+  // adapter парсит usage.input_tokens / usage.output_tokens напрямую.
   //
-  // Откуда числа: KIE публикует прайсинг в credits/1M (1 credit ≈ $0.005),
-  // эти credits-цены вручную умножены на $/credit и зашиты как USD-константы
-  // ниже. calculateCost никаких credits→USD преобразований НЕ делает —
-  // просто tokens × inputCostUsdPerMToken / 1M.
+  // Цены ниже — KIE-прайсинг (зашитый исторически: credits/1M × $/credit).
+  // У evolink цены могут отличаться, но calculateCost у нас по фиксированным
+  // полям модели — биллинг юзеру одинаковый независимо от того, через какого
+  // прокси прошёл запрос. Платим провайдерам мы по факту, разница идёт в маржу.
   //
-  // PDF kie не поддерживает напрямую → автоматически активируется
+  // PDF прокси не поддерживают напрямую → автоматически активируется
   // documentTextExtractFallback (см. ниже).
+  //
+  // Fallback на kie-claude конфигурится в FALLBACK_LLM_MODELS — chat.service
+  // переключится туда при исчерпании evolink-ключей с 5xx/network ошибкой.
   "claude-opus": {
     id: "claude-opus",
     name: "🎭 Claude 4.6 Opus",
     description:
       "Новейшая и самая умная модель Anthropic (версия 4.6). Лучшая для сложных аналитических и творческих задач. Понимает изображения.",
     section: "gpt",
-    provider: "kie-claude",
+    provider: "evolink-claude",
     costUsdPerRequest: 0,
     inputCostUsdPerMToken: 1.425,
     outputCostUsdPerMToken: 7.15,
@@ -1008,3 +1010,72 @@ for (const model of Object.values(GPT_MODELS)) {
   if (!model.settings) model.settings = [];
   model.settings.push(contextWindowSetting(model.contextWindow));
 }
+
+// ── LLM fallback registry ───────────────────────────────────────────────────
+// Зеркало FALLBACK_DESIGN_MODELS / FALLBACK_VIDEO_MODELS, но для текстовых
+// моделей (`section: "gpt"`). Каждая запись — `AIModel` с тем же `id` что
+// у primary, но другим `provider` (другой адаптер / другой ключ-пул).
+//
+// Записи здесь НЕ попадают в AI_MODELS (там id'ы уникальны = primary).
+// Используются только chat.service'ом для подбора альтернативного провайдера
+// при исчерпании primary'а на 5xx/network ошибке. Биллинг и UI настройки
+// берутся всегда из primary — fallback наследует их «фантомно», поэтому
+// fields name/description/settings игнорируются.
+//
+// Перебор кандидатов выполняется в порядке добавления в FALLBACK_LLM_MODELS;
+// chat.service берёт первый совместимый. Сейчас порядок: KIE → ... (далее
+// можно добавлять прямой Anthropic, OpenRouter и т.п.).
+export const FALLBACK_LLM_MODELS: AIModel[] = [
+  // ── Claude через KIE (fallback при недоступности evolink) ────────────────
+  // Цены ниже совпадают с primary — calculateCost ходит по полям primary'а,
+  // здесь они только для типобезопасности и (если когда-то) промоушена
+  // в самостоятельную модель.
+  {
+    id: "claude-opus",
+    name: "Claude 4.6 Opus (kie fallback)",
+    description: "Fallback на kie при недоступности evolink.",
+    section: "gpt",
+    provider: "kie-claude",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 1.425,
+    outputCostUsdPerMToken: 7.15,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 50,
+  },
+  {
+    id: "claude-sonnet",
+    name: "Claude 4.6 Sonnet (kie fallback)",
+    description: "Fallback на kie при недоступности evolink.",
+    section: "gpt",
+    provider: "kie-claude",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 0.85,
+    outputCostUsdPerMToken: 4.275,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 50,
+  },
+  {
+    id: "claude-haiku",
+    name: "Claude 4.5 Haiku (kie fallback)",
+    description: "Fallback на kie при недоступности evolink.",
+    section: "gpt",
+    provider: "kie-claude",
+    costUsdPerRequest: 0,
+    inputCostUsdPerMToken: 0.275,
+    outputCostUsdPerMToken: 1.425,
+    supportsImages: true,
+    supportsVoice: false,
+    supportsWeb: false,
+    isAsync: false,
+    contextStrategy: "db_history",
+    contextMaxMessages: 50,
+  },
+];

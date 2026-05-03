@@ -12,10 +12,16 @@ import {
   isReplicateUserFacingError,
   getReplicateUserMessage,
 } from "@metabox/api/utils/replicate-error";
-import { type Translations, UserFacingError, resolveUserFacingError } from "@metabox/shared";
+import {
+  type Translations,
+  type GenerationFailedSection,
+  UserFacingError,
+  resolveUserFacingErrorVariant,
+  pickGenerationFailedMessage,
+} from "@metabox/shared";
 
 export function resolveUserFacingMessage(err: unknown, t: Translations): string | null {
-  if (err instanceof UserFacingError) return resolveUserFacingError(err, t.errors);
+  if (err instanceof UserFacingError) return resolveUserFacingErrorVariant(err, t);
   if (isHeyGenUserFacingError(err)) return getHeyGenUserMessage(err, t);
   if (isRunwayUserFacingError(err)) return getRunwayUserMessage(err, t);
   if (isMinimaxUserFacingError(err)) return getMinimaxUserMessage(err, t);
@@ -67,6 +73,7 @@ export function resolveSubJobError(
   err: unknown,
   t: Translations,
   modelName: string,
+  section: GenerationFailedSection = "design",
 ): { userText: string; rawText: string; isUserFacing: boolean } {
   // rawText включает cause-chain — без этого undici-ошибки выглядят как
   // абстрактное "fetch failed" в notifyTechError. Видим: сообщение, code,
@@ -76,7 +83,7 @@ export function resolveSubJobError(
   if (mapped !== null) {
     return { userText: mapped, rawText, isUserFacing: true };
   }
-  const userText = t.errors.generationFailed.replace("{modelName}", modelName);
+  const userText = pickGenerationFailedMessage(t, modelName, section);
   return { userText, rawText, isUserFacing: false };
 }
 

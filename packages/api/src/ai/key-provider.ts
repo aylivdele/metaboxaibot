@@ -26,6 +26,7 @@ export function resolveKeyProviderForModel(model: AIModel): string {
   const { provider } = model;
 
   if (provider === "kie-claude") return "kie"; // Claude через kie использует общий kie-ключ
+  if (provider === "evolink-claude") return "evolink"; // Claude через evolink использует общий evolink-ключ
 
   return provider;
 }

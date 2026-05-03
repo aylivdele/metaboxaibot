@@ -8,11 +8,40 @@ import {
 import { config } from "@metabox/shared";
 import { logCall } from "../../utils/fetch.js";
 
-const KIE_URL = "https://api.kie.ai/claude/v1/messages";
+/**
+ * Anthropic Messages API-совместимые прокси (KIE, Evolink, etc.) — все
+ * экспонируют 1:1 Anthropic SSE-протокол на разных base URL'ах. Этот адаптер
+ * принимает baseUrl параметром и обслуживает любого такого провайдера.
+ *
+ * Дефолтный env-key подбирается под providerLabel (для логов и env-fallback'а):
+ *   - "kie"     → config.ai.kie
+ *   - "evolink" → config.ai.evolink
+ */
+type ClaudeProxyConfig = {
+  /** Полный URL endpoint'а messages — например, https://api.kie.ai/claude/v1/messages */
+  url: string;
+  /** Имя провайдера для логов и env-fallback'а */
+  providerLabel: string;
+  /** Default env-key, если не передан явный apiKey */
+  envKey: string | undefined;
+};
+
+const PROVIDER_CONFIGS: Record<string, ClaudeProxyConfig> = {
+  "kie-claude": {
+    url: "https://api.kie.ai/claude/v1/messages",
+    providerLabel: "kie",
+    envKey: config.ai.kie,
+  },
+  "evolink-claude": {
+    url: "https://api.evolink.ai/v1/messages",
+    providerLabel: "evolink",
+    envKey: config.ai.evolink,
+  },
+};
 
 /**
- * Внутренний modelId → API-имя модели у kie. kie требует точное совпадение
- * со значением из enum их OpenAPI-схемы.
+ * Внутренний modelId → API-имя модели у провайдера. Anthropic-имена одинаковы
+ * у обоих прокси (kie и evolink), маппинг общий.
  */
 const MODEL_MAP: Record<string, string> = {
   "claude-opus": "claude-opus-4-6",
@@ -20,28 +49,29 @@ const MODEL_MAP: Record<string, string> = {
   "claude-haiku": "claude-haiku-4-5",
 };
 
-interface KieContentBlock {
+interface ProxyContentBlock {
   type: string;
   [k: string]: unknown;
 }
-interface KieMessage {
+interface ProxyMessage {
   role: "user" | "assistant";
-  content: string | KieContentBlock[];
+  content: string | ProxyContentBlock[];
 }
 
 /**
- * Claude через kie.ai. Совместимо по событиям SSE с Anthropic-API:
- * `message_start` / `content_block_delta` / `message_delta` / `message_stop`.
+ * Claude через Anthropic-совместимые прокси (KIE, Evolink). Совместимо по
+ * событиям SSE с Anthropic-API: `message_start` / `content_block_delta` /
+ * `message_delta` / `message_stop`.
  *
  * Отличия от прямого Anthropic:
- *   - Аутентификация: `Authorization: Bearer <KIE_KEY>` вместо `x-api-key`.
- *   - `temperature` kie молча игнорирует.
+ *   - Аутентификация: `Authorization: Bearer <KEY>` вместо `x-api-key`.
+ *   - `temperature` прокси молча игнорируют.
  *   - `type: "document"` content-блоки не поддерживаются — PDF обрабатывается
  *     server-side через `documentTextExtractFallback` (текст инлайнится
  *     в prompt в chat.service.ts).
  *   - Extended thinking — простой boolean `thinkingFlag`, без budget_tokens.
  */
-export class ClaudeKieAdapter extends BaseLLMAdapter {
+export class ClaudeAnthropicProxyAdapter extends BaseLLMAdapter {
   readonly contextStrategy = "db_history" as const;
   readonly contextMaxMessages: number;
   protected readonly modelId: string;
@@ -49,17 +79,28 @@ export class ClaudeKieAdapter extends BaseLLMAdapter {
   private readonly apiKey: string;
   private readonly fetchFn: typeof globalThis.fetch;
   private readonly apiModel: string;
+  private readonly proxyConfig: ClaudeProxyConfig;
 
+  /**
+   * @param providerKey — `"kie-claude"` | `"evolink-claude"`. Определяет
+   *   base URL и default env-key. Передаётся из factory по `model.provider`.
+   */
   constructor(
     modelId: string,
+    providerKey: string,
     contextMaxMessages = 50,
-    apiKey: string = config.ai.kie ?? "",
+    apiKey?: string,
     fetchFn?: typeof globalThis.fetch,
   ) {
     super();
+    const cfg = PROVIDER_CONFIGS[providerKey];
+    if (!cfg) {
+      throw new Error(`Unknown Claude proxy provider: ${providerKey}`);
+    }
+    this.proxyConfig = cfg;
     this.modelId = modelId;
     this.contextMaxMessages = contextMaxMessages;
-    this.apiKey = apiKey;
+    this.apiKey = apiKey ?? cfg.envKey ?? "";
     this.fetchFn = fetchFn ?? globalThis.fetch;
     this.apiModel = MODEL_MAP[modelId] ?? modelId;
   }
@@ -90,13 +131,13 @@ export class ClaudeKieAdapter extends BaseLLMAdapter {
       ...(input.extendedThinking ? { thinkingFlag: true } : {}),
     };
 
-    logCall(this.apiModel, "chatStream", {
+    logCall(`${this.proxyConfig.providerLabel}/${this.apiModel}`, "chatStream", {
       max_tokens: maxTokens,
       messages_count: messages.length,
       extended_thinking: input.extendedThinking,
     });
 
-    const res = await this.fetchFn(KIE_URL, {
+    const res = await this.fetchFn(this.proxyConfig.url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -108,7 +149,9 @@ export class ClaudeKieAdapter extends BaseLLMAdapter {
 
     if (!res.ok || !res.body) {
       const text = await res.text().catch(() => "");
-      const err = new Error(`kie Claude failed: ${res.status} ${text}`) as Error & {
+      const err = new Error(
+        `${this.proxyConfig.providerLabel} Claude failed: ${res.status} ${text}`,
+      ) as Error & {
         status?: number;
         headers?: Record<string, string | string[]>;
       };
@@ -173,22 +216,22 @@ export class ClaudeKieAdapter extends BaseLLMAdapter {
     };
   }
 
-  private buildMessages(input: LLMInput): KieMessage[] {
+  private buildMessages(input: LLMInput): ProxyMessage[] {
     // Документы (PDF) сюда не приходят — chat.service инлайнит их текст
     // в input.prompt через documentTextExtractFallback. Образуем только
     // image-блоки (URL).
-    const history: KieMessage[] = (input.history ?? []).map((m: MessageRecord) => ({
+    const history: ProxyMessage[] = (input.history ?? []).map((m: MessageRecord) => ({
       role: m.role,
       content: m.content,
     }));
 
     const urls = input.imageUrls?.length ? input.imageUrls : input.imageUrl ? [input.imageUrl] : [];
 
-    const userContent: KieMessage["content"] =
+    const userContent: ProxyMessage["content"] =
       urls.length > 0
         ? [
             ...urls.map(
-              (url): KieContentBlock => ({
+              (url): ProxyContentBlock => ({
                 type: "image",
                 source: { type: "url", url },
               }),

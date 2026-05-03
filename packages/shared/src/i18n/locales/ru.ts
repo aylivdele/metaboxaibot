@@ -563,10 +563,10 @@ export default {
   },
   confirmGeneration: {
     message:
-      "Модель: {model}\nПромпт:\n<blockquote expandable>{prompt}</blockquote>\n\nПредварительная цена: {cost} ✦\n\nНачать генерацию?",
+      "Модель: {model}\n💬 Промпт:\n<blockquote expandable>{prompt}</blockquote>\n\n💰 Предварительная цена: {cost} ✦\n\nНачать генерацию?",
     voicePrompt: "🎵 голосовое сообщение",
-    start: "Начать",
-    cancel: "Отмена",
+    start: "✅ Начать",
+    cancel: "❌ Отмена",
     cancelled: "Генерация отменена.",
     cancelledWithFiles: "Генерация отменена. Загруженные файлы остались сохранёнными.",
     expired: "Запрос устарел, отправьте промпт заново.",
@@ -602,5 +602,16 @@ export default {
     password: "Пароль",
     submit: "Продолжить",
     error: "Ошибка. Проверьте данные и попробуйте снова.",
+  },
+  generationFailedVariants: [
+    "❌ {modelName} временно недоступен. Мы уже всё знаем и чиним. Не скучайте — у нас есть 70+ других нейросетей, среди которых точно найдётся что-то по душе.",
+    "❌ {modelName} сейчас не в духе. Мы в курсе и уже чиним. Пока он приходит в себя, попробуйте {alternatives} — они в форме.",
+    "❌ {modelName} прилёг отдохнуть. Мы уже бежим его будить — загляните чуть позже. А пока в боте 70+ других нейросетей, которые точно не спят.",
+  ],
+  generationFailedAlternatives: {
+    gpt: "GPT-5, Gemini Pro или Grok",
+    design: "Nano Banana, GPT Image или Imagen",
+    video: "Seedance, Kling или Runway",
+    audio: "ElevenLabs, OpenAI TTS или Suno",
   },
 } as const;
