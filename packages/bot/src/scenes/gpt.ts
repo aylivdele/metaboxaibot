@@ -89,6 +89,13 @@ const DEFAULT_GPT_MODEL = "o4-mini";
 const EDIT_THROTTLE_MS = 1200;
 /** Finalize current message and start a new one when accumulated text reaches this length. */
 const MSG_SPLIT_AT = 3800;
+/**
+ * Максимум сырого текста на один финальный chunk. Телеграмовский лимит — 4096
+ * символов, но MarkdownV2-escape добавляет `\` к каждому спец-символу — на
+ * code-блоке с обилием `\n`/`{`/`}`/`*` инфляция бывает ощутимая. Делаем
+ * консервативный запас, чтобы даже после escape тело укладывалось в 4096.
+ */
+const FINAL_CHUNK_MAX = 3500;
 
 /** Strip <think>...</think> blocks. During streaming, also hides an unclosed partial block. */
 function stripThinkingBlocks(text: string): string {
@@ -114,15 +121,54 @@ async function streamGptResponse(
   let lastEdit = Date.now();
 
   const finalizeMessage = async (msgId: number, text: string) => {
-    const v2 = toMarkdownV2(text);
-    await ctx.api
-      .editMessageText(chatId, msgId, v2, { parse_mode: "MarkdownV2" })
-      .catch(async (err) => {
-        logger.warn(err, "GPT finalize: MarkdownV2 parse failed, retrying as plain text");
+    // Бьём длинный итоговый текст на части ≤ FINAL_CHUNK_MAX по \n границам.
+    // Телеграм режет на 4096 символов даже plain-text — без сплита `editMessage`
+    // на ответе с code-блоком на 16к символов получаем `MESSAGE_TOO_LONG`.
+    const parts: string[] = [];
+    let remaining = text;
+    while (remaining.length > FINAL_CHUNK_MAX) {
+      const newlineIdx = remaining.lastIndexOf("\n", FINAL_CHUNK_MAX);
+      const splitAt = newlineIdx > FINAL_CHUNK_MAX / 2 ? newlineIdx + 1 : FINAL_CHUNK_MAX;
+      parts.push(remaining.slice(0, splitAt));
+      remaining = remaining.slice(splitAt);
+    }
+    if (remaining) parts.push(remaining);
+
+    // Если split произошёл посреди ``` code-блока — закрываем на текущем chunk'е
+    // и переоткрываем opener'ом на следующем, чтобы каждое сообщение
+    // парсилось как самостоятельный markdown.
+    let carryOpener = "";
+    for (let i = 0; i < parts.length; i++) {
+      const isLast = i === parts.length - 1;
+      const raw = carryOpener + parts[i];
+      let body: string;
+      if (isLast) {
+        body = raw;
+        carryOpener = "";
+      } else {
+        const { closed, opener } = closeOpenMarkdownV2(raw);
+        body = closed;
+        carryOpener = opener;
+      }
+      const v2 = toMarkdownV2(body);
+      if (i === 0) {
         await ctx.api
-          .editMessageText(chatId, msgId, text)
-          .catch((e) => logger.error(e, "GPT finalize: plain text fallback also failed"));
-      });
+          .editMessageText(chatId, msgId, v2, { parse_mode: "MarkdownV2" })
+          .catch(async (err) => {
+            logger.warn(err, "GPT finalize: MarkdownV2 parse failed, retrying as plain text");
+            await ctx.api
+              .editMessageText(chatId, msgId, body)
+              .catch((e) => logger.error(e, "GPT finalize: plain text fallback also failed"));
+          });
+      } else {
+        await ctx.api.sendMessage(chatId, v2, { parse_mode: "MarkdownV2" }).catch(async (err) => {
+          logger.warn(err, "GPT finalize: MarkdownV2 send failed, retrying as plain text");
+          await ctx.api
+            .sendMessage(chatId, body)
+            .catch((e) => logger.error(e, "GPT finalize: plain text send fallback also failed"));
+        });
+      }
+    }
   };
 
   try {
@@ -138,8 +184,12 @@ async function streamGptResponse(
     for await (const chunk of stream) {
       accumulated += chunk;
 
-      // Split into a new message when approaching Telegram's 4096-char limit
-      if (accumulated.length >= MSG_SPLIT_AT) {
+      // Split into a new message when approaching Telegram's 4096-char limit.
+      // `while` (а не `if`): один stream-chunk может прилететь огромным
+      // (например, целый code-block залпом) — нужно вырезать столько кусков
+      // подряд, сколько потребуется, иначе остаток уезжает в финал и там
+      // уже не пролезает в 4096-лимит даже после finalize-сплита.
+      while (accumulated.length >= MSG_SPLIT_AT) {
         // Prefer splitting at a newline; fall back to hard cut if none found in the latter half
         const newlineIdx = accumulated.lastIndexOf("\n", MSG_SPLIT_AT);
         const splitAt = newlineIdx > MSG_SPLIT_AT / 2 ? newlineIdx + 1 : MSG_SPLIT_AT;
@@ -150,7 +200,6 @@ async function streamGptResponse(
         placeholder = await ctx.reply("⏳");
         accumulated = opener + remainder;
         lastEdit = Date.now();
-        continue;
       }
 
       const now = Date.now();
