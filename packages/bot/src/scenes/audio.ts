@@ -12,7 +12,7 @@ import {
   generateWebToken,
   resolveModelDisplay,
   UserFacingError,
-  resolveUserFacingError,
+  resolveUserFacingErrorVariant,
   voiceCloneReturnRedisKey,
 } from "@metabox/shared";
 import { logger } from "../logger.js";
@@ -267,7 +267,7 @@ export async function executeAudioPrompt(ctx: BotContext, prompt: string): Promi
     } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
       await replyInsufficientTokens(ctx);
     } else if (err instanceof UserFacingError) {
-      await ctx.reply(resolveUserFacingError(err, ctx.t.errors));
+      await ctx.reply(resolveUserFacingErrorVariant(err, ctx.t));
     } else {
       logger.error(err, "Audio message error");
       await ctx.reply(ctx.t.audio.generationFailed);

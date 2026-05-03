@@ -19,7 +19,7 @@ import {
   generateWebToken,
   resolveModelDisplay,
   UserFacingError,
-  resolveUserFacingError,
+  resolveUserFacingErrorVariant,
   type AIModel,
   type MediaInputSlot,
 } from "@metabox/shared";
@@ -316,7 +316,7 @@ async function runReplaySubmit(
     } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
       await replyInsufficientTokens(ctx);
     } else if (err instanceof UserFacingError) {
-      await ctx.reply(resolveUserFacingError(err, ctx.t.errors));
+      await ctx.reply(resolveUserFacingErrorVariant(err, ctx.t));
     } else {
       logger.error({ err, kind }, "runReplaySubmit failed");
       const failKey =

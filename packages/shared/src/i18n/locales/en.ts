@@ -565,10 +565,10 @@ export default {
   },
   confirmGeneration: {
     message:
-      "Model: {model}\nPrompt:\n<blockquote expandable>{prompt}</blockquote>\n\nEstimated price: {cost} ✦\n\nStart generation?",
+      "Model: {model}\n💬 Prompt:\n<blockquote expandable>{prompt}</blockquote>\n\n💰 Estimated price: {cost} ✦\n\nStart generation?",
     voicePrompt: "🎵 voice message",
-    start: "Start",
-    cancel: "Cancel",
+    start: "✅ Start",
+    cancel: "❌ Cancel",
     cancelled: "Generation cancelled.",
     cancelledWithFiles: "Generation cancelled. Uploaded files have been preserved.",
     expired: "Request expired, please send the prompt again.",
@@ -604,5 +604,16 @@ export default {
     password: "Password",
     submit: "Continue",
     error: "Error. Please check your details and try again.",
+  },
+  generationFailedVariants: [
+    "❌ {modelName} is temporarily unavailable. We already know and we're fixing it. Don't get bored — we have 70+ other AI models, you'll surely find something you like.",
+    "❌ {modelName} is in a bad mood right now. We know and we're fixing it. While it pulls itself together, try {alternatives} — they're in shape.",
+    "❌ {modelName} lay down for a nap. We're already running to wake it up — check back a bit later. Meanwhile, the bot has 70+ other AI models that are definitely not asleep.",
+  ],
+  generationFailedAlternatives: {
+    gpt: "GPT-5, Gemini Pro or Grok",
+    design: "Nano Banana, GPT Image or Imagen",
+    video: "Seedance, Kling or Runway",
+    audio: "ElevenLabs, OpenAI TTS or Suno",
   },
 } as const;

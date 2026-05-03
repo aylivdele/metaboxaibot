@@ -20,7 +20,7 @@ import {
   config,
   generateWebToken,
   UserFacingError,
-  resolveUserFacingError,
+  resolveUserFacingErrorVariant,
   resolveModelDisplay,
   getResolvedModes,
 } from "@metabox/shared";
@@ -550,7 +550,7 @@ export async function executeDesignPrompt(
     } else if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
       await replyInsufficientTokens(ctx);
     } else if (err instanceof UserFacingError) {
-      await ctx.reply(resolveUserFacingError(err, ctx.t.errors));
+      await ctx.reply(resolveUserFacingErrorVariant(err, ctx.t));
     } else {
       logger.error(err, "Design message error");
       await ctx.reply(ctx.t.design.generationFailed);
@@ -898,7 +898,7 @@ export async function handleDesignPhoto(ctx: BotContext): Promise<void> {
       if (err instanceof Error && err.message === "INSUFFICIENT_TOKENS") {
         await replyInsufficientTokens(ctx);
       } else if (err instanceof UserFacingError) {
-        await ctx.reply(resolveUserFacingError(err, ctx.t.errors));
+        await ctx.reply(resolveUserFacingErrorVariant(err, ctx.t));
       } else {
         logger.error(err, "Design photo+caption error");
         await ctx.reply(ctx.t.design.generationFailed);

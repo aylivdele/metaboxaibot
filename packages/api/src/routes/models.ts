@@ -62,10 +62,11 @@ function serializeModel(m: AIModel, lang: Language) {
     name: m.name,
     description: m.description,
     section: m.section,
-    // Нормализуем kie-claude → anthropic для клиентов: provider — это бренд
-    // в UI/каталоге, а не путь до API. kie-claude используется только внутри
-    // фабрики LLM и резолвере ключей.
-    provider: m.provider === "kie-claude" ? "anthropic" : m.provider,
+    // Нормализуем claude-прокси (kie-claude / evolink-claude) → anthropic для
+    // клиентов: provider — это бренд в UI/каталоге, а не путь до API. Прокси-
+    // провайдеры используются только внутри фабрики LLM и резолвере ключей.
+    provider:
+      m.provider === "kie-claude" || m.provider === "evolink-claude" ? "anthropic" : m.provider,
     supportsImages: m.supportsImages,
     supportsDocuments: m.supportsDocuments ?? false,
     supportsVoice: m.supportsVoice,
