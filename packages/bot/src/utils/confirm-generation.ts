@@ -114,24 +114,45 @@ function inferKindFromSlot(slot: MediaInputSlot): MediaKind {
   return "photo";
 }
 
+/** Тип элемента слота с точки зрения превью. `file` — uploaded-as-document
+ *  (или иной TG-тип, не совпадающий с ожидаемым media-кайндом слота); такие
+ *  элементы НЕ отправляем как фото/видео — Telegram отвечает 400 «can't use
+ *  file of type Document as Photo». Просто учитываем их в текстовой сводке. */
+type PreviewItem = {
+  source: string;
+  /** "photo"/"video"/"audio" — пробуем отправить медиа. "file" — текстовая сводка. */
+  actualKind: MediaKind | "file";
+};
+
 /**
- * Choose telegram-sendable source per slot element. `tg:kind:fileId` raw markers
- * stripped → fileId (free re-send, no download). Anything else (S3 key, internal
- * scheme, raw URL без http) — берём resolved URL, который уже прогнан через
- * `resolveMediaInputUrls` и гарантированно кликабельный для Telegram.
- *
- * Длины массивов могут не совпадать (raw отсутствует / partial) — в этом случае
- * fallback на resolved для всех элементов.
+ * Преобразует пары (resolved-URL, raw-tg-marker) в типизированные элементы
+ * превью. `tg:doc:<id>` и `tg:voice:<id>` (или mismatched-kind) → `file` —
+ * такой элемент не отправляется как медиа, а суммаризуется одной строкой.
+ * Длины массивов могут не совпадать — fallback'имся на resolved + slot-kind.
  */
-function buildSendableSources(resolved: string[], raws: string[] | undefined): string[] {
-  if (!raws || raws.length !== resolved.length) return resolved;
+function buildPreviewItems(
+  resolved: string[],
+  raws: string[] | undefined,
+  slotKind: MediaKind,
+): PreviewItem[] {
   return resolved.map((res, i) => {
-    const raw = raws[i];
+    const raw = raws && raws.length === resolved.length ? raws[i] : undefined;
     if (raw && raw.startsWith("tg:")) {
-      const idx = raw.indexOf(":", 3);
-      return idx === -1 ? raw.slice(3) : raw.slice(idx + 1);
+      const rest = raw.slice(3);
+      const idx = rest.indexOf(":");
+      const tgKind = idx === -1 ? rest : rest.slice(0, idx);
+      const fileId = idx === -1 ? "" : rest.slice(idx + 1);
+      const source = fileId || res;
+      // Маппинг tg-кайнда на media-кайнд превью. Doc/voice/неподходящие
+      // помечаем `file` — в превью не отправим, только покажем текст.
+      if (tgKind === "photo" && slotKind === "photo") return { source, actualKind: "photo" };
+      if (tgKind === "video" && slotKind === "video") return { source, actualKind: "video" };
+      if ((tgKind === "audio" || tgKind === "voice") && slotKind === "audio") {
+        return { source, actualKind: "audio" };
+      }
+      return { source, actualKind: "file" };
     }
-    return res;
+    return { source: res, actualKind: slotKind };
   });
 }
 
@@ -194,6 +215,61 @@ async function sendOneItem(
 }
 
 /**
+ * Локаль-агностичный pluralize по русским правилам (1 / 2-4 / 5+). Для en
+ * locale это безопасно: One = "file", Few = Many = "files", и любая ветка
+ * возвращает корректную форму. Для ru: правило с учётом 11/12-14 исключений.
+ */
+function pluralNoun(ctx: BotContext, count: number): string {
+  const t = ctx.t.confirmGeneration;
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return t.mediaFileNounOne;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return t.mediaFileNounFew;
+  return t.mediaFileNounMany;
+}
+
+/** Caption для медиа-сообщения о слоте (photo/video/audio media-group/single). */
+function mediaCaptionForSlot(
+  ctx: BotContext,
+  kind: MediaKind,
+  count: number,
+  label: string,
+): string {
+  const captionKey: keyof typeof ctx.t.confirmGeneration =
+    count === 1
+      ? kind === "photo"
+        ? "mediaPreviewPhotoSingle"
+        : kind === "video"
+          ? "mediaPreviewVideoSingle"
+          : "mediaPreviewAudioSingle"
+      : kind === "photo"
+        ? "mediaPreviewPhotoMulti"
+        : kind === "video"
+          ? "mediaPreviewVideoMulti"
+          : "mediaPreviewAudioMulti";
+  return ctx.t.confirmGeneration[captionKey].replace("{label}", label);
+}
+
+/** Standalone-сводка про file-only элементы слота (когда медиа в слоте нет). */
+function fileSummaryText(ctx: BotContext, count: number, label: string): string {
+  if (count === 1) {
+    return ctx.t.confirmGeneration.mediaPreviewFileSingle.replace("{label}", label);
+  }
+  return ctx.t.confirmGeneration.mediaPreviewFileMulti
+    .replace("{count}", String(count))
+    .replace("{noun}", pluralNoun(ctx, count))
+    .replace("{label}", label);
+}
+
+/** Supplement-строка для file-only элементов, прицепляется к media-caption'у
+ *  чтобы не плодить отдельные сообщения когда в слоте есть и медиа, и файлы. */
+function fileSupplementText(ctx: BotContext, count: number): string {
+  return ctx.t.confirmGeneration.mediaPreviewFileSupplement
+    .replace("{count}", String(count))
+    .replace("{noun}", pluralNoun(ctx, count));
+}
+
+/**
  * Sends one preview message per filled media slot, with a caption explaining
  * which slot the media will be used as. Called BEFORE the confirm message so
  * the user can visually verify their uploads before clicking Start.
@@ -201,13 +277,19 @@ async function sendOneItem(
  * Prefer `rawInputs` (e.g. `tg:photo:fileId`) over resolved URLs to leverage
  * Telegram file_id reuse and avoid re-downloading.
  *
+ * Один слот → одно сообщение:
+ *  - Только медиа → media-group (или single) с обычной caption'ой.
+ *  - Медиа + файлы → media-group с combined caption: media-line + supplement
+ *    «📎 + ещё N файла/файлов».
+ *  - Только файлы (uploaded-as-document, voice, миссматч-кайнд) → одно
+ *    текстовое сообщение со standalone-сводкой.
+ *
  * Resilience:
- *  1. Группа n>1: пробуем sendMediaGroup. Telegram при первой кривой ссылке
- *     отбрасывает всю группу — на ошибке пробуем поэлементно (через
- *     `sendOneItem`), чтобы остальные превью всё же дошли.
- *  2. Каждый элемент: на ошибке URL пытаемся скачать байты сами и отдать через
- *     InputFile — фикс для `WEBPAGE_CURL_FAILED` на presigned-S3, когда сами
- *     IP-блок Telegram'а до Wasabi/S3 вылетает по таймауту.
+ *  - Группа n>1: батчим по 10 (лимит Telegram). На сбое sendMediaGroup
+ *    повторяем поэлементно — остальные элементы должны дойти.
+ *  - Каждый элемент: на ошибке URL ретраим через buffer-upload (исправляет
+ *    `WEBPAGE_CURL_FAILED`). Если и это не помогает — только лог, caption
+ *    уже отправлена и второе сообщение не плодим.
  */
 async function sendMediaPreviews(
   ctx: BotContext,
@@ -220,41 +302,54 @@ async function sendMediaPreviews(
     const resolved = resolvedInputs[slot.slotKey];
     if (!resolved?.length) continue;
     const raws = rawInputs?.[slot.slotKey];
-    const sources = buildSendableSources(resolved, raws);
     const kind = inferKindFromSlot(slot);
+    const items = buildPreviewItems(resolved, raws, kind);
     const label = ctx.t.mediaInput[slot.labelKey as keyof typeof ctx.t.mediaInput] ?? slot.labelKey;
-    const captionKey: keyof typeof ctx.t.confirmGeneration =
-      sources.length === 1
-        ? kind === "photo"
-          ? "mediaPreviewPhotoSingle"
-          : kind === "video"
-            ? "mediaPreviewVideoSingle"
-            : "mediaPreviewAudioSingle"
-        : kind === "photo"
-          ? "mediaPreviewPhotoMulti"
-          : kind === "video"
-            ? "mediaPreviewVideoMulti"
-            : "mediaPreviewAudioMulti";
-    const caption = ctx.t.confirmGeneration[captionKey].replace("{label}", label);
 
-    if (sources.length === 1) {
-      const ok = await sendOneItem(ctx, kind, sources[0], caption);
+    // Разделяем элементы на media-эligible (можно отправить как photo/video/
+    // audio) и file-only (uploaded-as-document, voice, миссматч-кайнд).
+    const mediaSources = items.filter((it) => it.actualKind !== "file").map((it) => it.source);
+    const fileOnlyCount = items.filter((it) => it.actualKind === "file").length;
+
+    // Если только файлы — одно текстовое сообщение, медиа отправлять нечего.
+    if (mediaSources.length === 0) {
+      if (fileOnlyCount > 0) {
+        const summary = fileSummaryText(ctx, fileOnlyCount, label);
+        await ctx
+          .reply(summary)
+          .catch((err) =>
+            logger.warn(
+              { err, slotKey: slot.slotKey, fileOnlyCount },
+              "sendMediaPreviews: file summary reply failed",
+            ),
+          );
+      }
+      continue;
+    }
+
+    // Combined caption: media-line + supplement про файлы (если они есть).
+    // Размещается на первом элементе media-group'ы — пользователь видит ОДНО
+    // сообщение с альбомом и под ним всю информацию о слоте.
+    const mediaLine = mediaCaptionForSlot(ctx, kind, mediaSources.length, label);
+    const caption =
+      fileOnlyCount > 0 ? `${mediaLine}\n${fileSupplementText(ctx, fileOnlyCount)}` : mediaLine;
+
+    if (mediaSources.length === 1) {
+      const ok = await sendOneItem(ctx, kind, mediaSources[0], caption);
       if (!ok) {
         logger.warn(
-          { slotKey: slot.slotKey, kind },
-          "sendMediaPreviews: failed to send slot preview, continuing",
+          { slotKey: slot.slotKey, kind, fileOnlyCount },
+          "sendMediaPreviews: media send failed",
         );
       }
       continue;
     }
 
-    // Telegram media-group допускает максимум 10 элементов на album. При >10
-    // sendMediaGroup возвращает 400 "too many messages to send as an album".
-    // Бьём sources на батчи по 10 — будет N последовательных альбомов.
-    // Caption ставим только на первый элемент первого альбома.
+    // Telegram media-group допускает максимум 10 элементов на album.
+    // Бьём на батчи по 10 — будет N последовательных альбомов.
     const ALBUM_MAX = 10;
-    for (let start = 0; start < sources.length; start += ALBUM_MAX) {
-      const batch = sources.slice(start, start + ALBUM_MAX);
+    for (let start = 0; start < mediaSources.length; start += ALBUM_MAX) {
+      const batch = mediaSources.slice(start, start + ALBUM_MAX);
       const isFirstBatch = start === 0;
       const media = batch.map((src, i) => ({
         type: kind,

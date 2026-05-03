@@ -582,6 +582,12 @@ export default {
     mediaPreviewVideoMulti: "🎥 These videos will be used as «{label}»",
     mediaPreviewAudioSingle: "🎵 This audio will be used as «{label}»",
     mediaPreviewAudioMulti: "🎵 These audios will be used as «{label}»",
+    mediaPreviewFileSingle: "📎 File will be used as «{label}»",
+    mediaPreviewFileMulti: "📎 {count} {noun} will be used as «{label}»",
+    mediaPreviewFileSupplement: "📎 + {count} more {noun}",
+    mediaFileNounOne: "file",
+    mediaFileNounFew: "files",
+    mediaFileNounMany: "files",
   },
   modelModes: {
     pickerTitle: "Choose mode:",

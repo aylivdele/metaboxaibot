@@ -580,6 +580,12 @@ export default {
     mediaPreviewVideoMulti: "🎥 Эти видео будут использоваться как «{label}»",
     mediaPreviewAudioSingle: "🎵 Это аудио будет использоваться как «{label}»",
     mediaPreviewAudioMulti: "🎵 Эти аудио будут использоваться как «{label}»",
+    mediaPreviewFileSingle: "📎 Файл будет использоваться как «{label}»",
+    mediaPreviewFileMulti: "📎 {count} {noun} будут использоваться как «{label}»",
+    mediaPreviewFileSupplement: "📎 + ещё {count} {noun}",
+    mediaFileNounOne: "файл",
+    mediaFileNounFew: "файла",
+    mediaFileNounMany: "файлов",
   },
   modelModes: {
     pickerTitle: "Выберите режим работы:",

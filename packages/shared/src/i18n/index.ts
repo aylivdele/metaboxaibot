@@ -427,6 +427,12 @@ export interface Translations {
     mediaPreviewVideoMulti: string;
     mediaPreviewAudioSingle: string;
     mediaPreviewAudioMulti: string;
+    mediaPreviewFileSingle: string;
+    mediaPreviewFileMulti: string;
+    mediaPreviewFileSupplement: string;
+    mediaFileNounOne: string;
+    mediaFileNounFew: string;
+    mediaFileNounMany: string;
   };
   modelModes: {
     pickerTitle: string;
